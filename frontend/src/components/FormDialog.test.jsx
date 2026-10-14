@@ -88,6 +88,17 @@ describe('FormDialog', () => {
     expect(screen.getByLabelText(/estimate/i)).toHaveValue(1.5)
   })
 
+  it('pre-fills defaults for a new record and sends them', async () => {
+    const onSubmit = vi.fn().mockResolvedValue({})
+    render(
+      <FormDialog open title="Log time" fields={[{ name: 'workDate', label: 'Date', type: 'date' }, { name: 'note', label: 'Note' }]}
+        defaults={{ workDate: '2026-10-14' }} onClose={vi.fn()} onSubmit={onSubmit} />,
+    )
+    expect(screen.getByLabelText(/date/i)).toHaveValue('2026-10-14')
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    expect(onSubmit).toHaveBeenCalledWith({ workDate: '2026-10-14' })
+  })
+
   it('closes after a successful save', async () => {
     const onClose = vi.fn()
     renderForm({ onClose })

@@ -63,6 +63,13 @@ export function formatDay(iso) {
   return shortDay.format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
 }
 
+const isoInZone = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: ZONE })
+
+/** Today as "2026-10-14" in Eastern time, the same "today" the server uses. */
+export function todayIso(now = new Date()) {
+  return isoInZone.format(now)
+}
+
 /** "2026-10-12" plus 7 days -> "2026-10-19". Dates only, so it works in UTC. */
 export function addDays(iso, days) {
   const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`)

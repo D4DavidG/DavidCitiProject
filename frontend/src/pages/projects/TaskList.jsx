@@ -29,7 +29,7 @@ export default function TaskList({ milestoneId, canManage, people, onChanged }) 
 
   const columns = [
     { key: 'title', label: 'Task' },
-    { key: 'assignee', label: 'Assignee', render: (t) => names[t.assigneeUserId] ?? 'Unassigned' },
+    { key: 'assignee', label: 'Assignee', render: (t) => t.assigneeName ?? names[t.assigneeUserId] ?? 'Unassigned' },
     { key: 'estimate', label: 'Estimate', render: (t) => formatHours(t.estimateMinutes) },
     { key: 'status', label: 'Status', render: (t) => <StatusChip status={t.status} /> },
     ...(canManage ? [{ key: 'actions', label: '', align: 'right', render: (t) => <Button size="small" onClick={() => setDialog({ task: t })}>Edit</Button> }] : []),

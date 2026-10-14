@@ -27,8 +27,10 @@ function fromInput(field, text) {
  * manager never sends an admin-only field they didn't touch. Server errors with a
  * `field` show on that field; others show above the form.
  */
-export default function FormDialog({ open, title, fields, initial = null, submitLabel = 'Save', onSubmit, onClose }) {
-  const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.name, toInput(f, initial?.[f.name])])))
+export default function FormDialog({ open, title, fields, initial = null, defaults = null, submitLabel = 'Save', onSubmit, onClose }) {
+  const [values, setValues] = useState(() => Object.fromEntries(
+    fields.map((f) => [f.name, toInput(f, initial?.[f.name] ?? defaults?.[f.name])]),
+  ))
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -118,6 +120,8 @@ FormDialog.propTypes = {
   })).isRequired,
   /** Current values when editing (API field names); omit when creating. */
   initial: PropTypes.object,
+  /** Pre-filled values for a new record; sent like anything typed. */
+  defaults: PropTypes.object,
   submitLabel: PropTypes.string,
   /** Receives the body to send; reject with an ApiError to show it. */
   onSubmit: PropTypes.func.isRequired,

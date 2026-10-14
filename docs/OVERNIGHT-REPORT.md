@@ -15,7 +15,7 @@ behalf so you can overrule it. The plan being followed is
 | 4 | Dashboard (questions 1, 2, 7) | Done |
 | 5 | Allocation grid (questions 3, 5) | Done |
 | 6 | Projects list and detail | Done |
-| 7 | Dependency view and end-to-end tests | Not started |
+| 7 | Dependency view and end-to-end tests | Done |
 | 8 | My tasks | Not started |
 | 9 | Approvals | Not started |
 | 10 | People | Not started |
@@ -121,6 +121,24 @@ Filled in at the end of the run.
   Employees get a read-only view (the server enforces the same).
 - **Tests:** 122 in total, all passing.
 
+### Task 7: Dependency view (question 6) and end-to-end tests
+
+- **Dependency view:** deliverables laid out left to right in steps. Each one comes after
+  everything it needs, with its status, due date and "Needs Design". A blocked one says
+  "Waiting for Build to be done." Managers can add a link (a loop is refused by the
+  server, which says why) or remove one. On phones the steps stack top to bottom.
+- **End-to-end tests (Playwright, a real browser against the real local API and
+  database):**
+  1. A manager signs in and walks the seven questions: Apollo "At risk" with its budget;
+     Ben "Over-allocated" with "Apollo 25 h, Zeus 20 h"; Apollo's deliverables; Launch
+     blocked by Build.
+  2. At phone width: no sideways scrolling, and the menu opens from a button.
+
+  Both pass. I also broke one detail on purpose (the "Apollo 25 h, Zeus 20 h" wording)
+  and the walkthrough caught it.
+- **`docs/GUIDE.md` §3** now opens with a click-through website demo script.
+- **Tests:** 129 unit and component tests plus 2 end-to-end tests, all passing.
+
 ## Decisions made for you
 
 Each line is something the plan or your answers didn't settle, with what it costs if
@@ -157,4 +175,10 @@ it's wrong.
 
 ## Not verified
 
-Filled in as the run goes.
+- **The website on AWS.** Everything was tested locally: unit tests, and Playwright
+  against the local API and database. It goes live only when you run
+  `./bin/deploy-frontend.sh`, and checklist step 3.5 (refreshing a deep link) can only
+  be checked then.
+- **How it looks to a person.** Tests check what's on screen and that the phone layout
+  doesn't scroll sideways, not whether it looks good. Spacing, colours in context and
+  hover states need your eyes.

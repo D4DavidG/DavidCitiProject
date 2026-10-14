@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, centsToDollarsInput, formatCents, formatDate, formatDateTime, formatDay, formatHours, parseDollars,
+  addDays, centsToDollarsInput, formatCents, formatDate, formatDateTime, formatDay, formatHours, parseDollars, todayIso,
 } from './format'
 
 describe('formatCents', () => {
@@ -70,6 +70,13 @@ describe('formatDay and addDays', () => {
     expect(addDays('2026-10-12', 7)).toBe('2026-10-19')
     expect(addDays('2026-10-26', 7)).toBe('2026-11-02')
     expect(addDays('2026-10-12', -7)).toBe('2026-10-05')
+  })
+})
+
+describe('todayIso', () => {
+  it("is today's date in Eastern time, like the server", () => {
+    expect(todayIso(new Date('2026-10-14T03:30:00Z'))).toBe('2026-10-13') // 11:30 pm the day before in New York
+    expect(todayIso(new Date('2026-10-14T15:00:00Z'))).toBe('2026-10-14')
   })
 })
 
