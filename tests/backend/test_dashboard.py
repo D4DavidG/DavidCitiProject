@@ -50,6 +50,58 @@ def test_budget_is_for_admins_and_the_projects_manager(conn, org):
         dashboard.project_budget(conn, org["carol"], org["apollo"]["project_id"])
 
 
+# --- questions 1, 2 and 7 on one screen: the manager's project cards --------------------------------
+
+def cards(conn, actor, filters=None):
+    return dashboard.project_cards(conn, actor, filters or {}, 1, 20)["items"]
+
+
+def test_project_card_combines_status_progress_risk_and_money(conn, org):
+    approved = log(conn, org["alice"], org["task"], "2026-10-12", 2)
+    log(conn, org["alice"], org["task"], "2026-10-13", 1)
+    time_entries.decide_entry(conn, org["bob"], approved["entry_id"], approve=True)
+    [card] = cards(conn, org["bob"])
+    budget = dashboard.project_budget(conn, org["bob"], org["apollo"]["project_id"])
+    assert (card["name"], card["status"], card["progress_percent"]) == ("Apollo", "PLANNING", 0)
+    assert card["manager_name"] == "Bob Tester"
+    # Design is 13 of 60 days in (22%) with 0% of its work done: more than 15 points behind.
+    assert card["at_risk"] is True
+    assert [r["code"] for r in card["risk_reasons"]] == ["DELIVERABLE_BEHIND"]
+    for key in ("budget_cents", "planned_cents", "consumed_cents", "pending_cents", "consumed_percent"):
+        assert card[key] == budget[key], key  # the card and the budget screen never disagree
+    assert (card["consumed_cents"], card["pending_cents"]) == (9_614, 4_807)
+
+
+def test_at_risk_projects_come_first_with_their_reasons(conn, org):
+    f.project(conn, org["admin"], org["bob"], name="Aardvark")  # healthy, and first by name
+    f.project(conn, org["admin"], org["bob"], name="Old", start_date="2026-08-01", predicted_end_date="2026-10-01")
+    listed = [(c["name"], c["at_risk"]) for c in cards(conn, org["bob"])]
+    assert listed == [("Apollo", True), ("Old", True), ("Aardvark", False)]
+    old = next(c for c in cards(conn, org["bob"]) if c["name"] == "Old")
+    assert [r["code"] for r in old["risk_reasons"]] == ["PAST_END_DATE"]
+    assert next(c for c in cards(conn, org["bob"]) if c["name"] == "Aardvark")["risk_reasons"] == []
+
+
+def test_managers_get_their_own_cards_and_admins_every_live_project(conn, org):
+    assert [c["name"] for c in cards(conn, org["bob"])] == ["Apollo"]
+    assert [c["name"] for c in cards(conn, org["admin"])] == ["Apollo", "Zeus"]
+    projects.archive_project(conn, org["admin"], org["zeus"]["project_id"])
+    assert [c["name"] for c in cards(conn, org["admin"])] == ["Apollo"]
+
+
+def test_project_cards_can_be_searched_and_paginated(conn, org):
+    assert [c["name"] for c in cards(conn, org["admin"], {"search": "zeu"})] == ["Zeus"]
+    projects.update_project(conn, org["admin"], org["zeus"]["project_id"], {"status": "ACTIVE"})
+    assert [c["name"] for c in cards(conn, org["admin"], {"status": "ACTIVE"})] == ["Zeus"]
+    page = dashboard.project_cards(conn, org["admin"], {}, 2, 1)
+    assert (page["total"], page["total_pages"], [c["name"] for c in page["items"]]) == (2, 2, ["Zeus"])
+
+
+def test_employees_do_not_get_project_cards(conn, org):
+    with pytest.raises(Forbidden):
+        dashboard.project_cards(conn, org["alice"], {}, 1, 20)
+
+
 # --- questions 1 and 4: status and progress -------------------------------------------------
 
 def test_project_list_carries_progress_from_tasks(conn, org):
@@ -101,15 +153,71 @@ def test_employees_do_not_get_the_risk_panel(conn, org):
 
 # --- questions 3 and 5: allocation and over-allocation -------------------------------------------
 
+def row_for(grid, who):
+    return next(r for r in grid["items"] if r["user_id"] == who.user_id)
+
+
 def test_allocation_grid_flags_people_booked_past_capacity(conn, org):
     f.booking(conn, org["carol"], org["zeus"], org["alice"], hours_per_week=25,
               start_date="2026-10-12", end_date="2026-10-25")
     grid = dashboard.allocation(conn, org["bob"], {"week_from": "2026-10-12", "weeks": 3})
-    alice = next(r for r in grid["people"] if r["user_id"] == org["alice"].user_id)
+    alice = row_for(grid, org["alice"])
     first, _, third = alice["weeks"]
     assert (first["booked_hours"], first["project_count"], first["over_allocated"]) == (45, 2, True)
-    assert (third["booked_hours"], third["over_allocated"]) == (20, False)
+    assert first["over_by_hours"] == 5
+    assert (third["booked_hours"], third["over_allocated"], third["over_by_hours"]) == (20, False, 0)
     assert grid["weeks"] == ["2026-10-12", "2026-10-19", "2026-10-26"]
+    assert (alice["peak_over_by_hours"], alice["status"], alice["capacity_hours"]) == (5, "OVER_ALLOCATED", 40)
+
+
+def test_allocation_shows_which_projects_make_up_each_week(conn, org):
+    f.booking(conn, org["carol"], org["zeus"], org["alice"], hours_per_week=25,
+              start_date="2026-10-12", end_date="2026-10-18")
+    alice = row_for(dashboard.allocation(conn, org["bob"], {"week_from": "2026-10-12", "weeks": 2}), org["alice"])
+    zeus, apollo = org["zeus"]["project_id"], org["apollo"]["project_id"]
+    assert alice["weeks"][0]["projects"] == [{"project_id": zeus, "name": "Zeus", "hours": 25},
+                                             {"project_id": apollo, "name": "Apollo", "hours": 20}]
+    assert alice["weeks"][1]["projects"] == [{"project_id": apollo, "name": "Apollo", "hours": 20}]
+
+
+def test_allocation_names_each_persons_job_title(conn, org):
+    dan, _ = f.person(conn, org["admin"], first_name="Dan", job_title="Analyst")
+    assert row_for(dashboard.allocation(conn, org["bob"], {"weeks": 1}), dan)["job_title"] == "Analyst"
+
+
+@pytest.fixture
+def crowd(conn, org):
+    """Dan over by 10 (week 1), Alice over by 5 (week 2 only), Eve within capacity."""
+    admin = org["admin"]
+    dan, _ = f.person(conn, admin, first_name="Dan")
+    eve, _ = f.person(conn, admin, first_name="Eve")
+    users.set_capacity(conn, admin, dan.user_id, {"weekly_capacity_hours": 20})
+    f.booking(conn, admin, org["apollo"], dan, hours_per_week=30, start_date="2026-10-12", end_date="2026-10-18")
+    f.booking(conn, admin, org["zeus"], org["alice"], hours_per_week=25, start_date="2026-10-19",
+              end_date="2026-10-25")
+    f.booking(conn, admin, org["zeus"], eve, hours_per_week=10)
+    return {"dan": dan, "eve": eve}
+
+
+def test_allocation_puts_the_most_over_allocated_first(conn, org, crowd):
+    grid = dashboard.allocation(conn, org["admin"], {"week_from": "2026-10-12", "weeks": 2})
+    order = [r["user_id"] for r in grid["items"]]
+    assert order[:2] == [crowd["dan"].user_id, org["alice"].user_id]
+    assert row_for(grid, crowd["eve"])["status"] == "OK"
+
+
+def test_allocation_over_only_keeps_anyone_over_in_any_shown_week(conn, org, crowd):
+    grid = dashboard.allocation(conn, org["admin"], {"week_from": "2026-10-12", "weeks": 2, "over_only": True})
+    assert [r["user_id"] for r in grid["items"]] == [crowd["dan"].user_id, org["alice"].user_id]
+    one_week = dashboard.allocation(conn, org["admin"], {"week_from": "2026-10-12", "weeks": 1, "over_only": True})
+    assert [r["user_id"] for r in one_week["items"]] == [crowd["dan"].user_id]
+
+
+def test_allocation_is_paginated_by_person(conn, org, crowd):
+    page = dashboard.allocation(conn, org["admin"], {"week_from": "2026-10-12", "weeks": 2, "over_only": True},
+                                page=2, page_size=1)
+    assert (page["total"], page["total_pages"], page["page"]) == (2, 2, 2)
+    assert [r["user_id"] for r in page["items"]] == [org["alice"].user_id]
 
 
 def test_allocation_grid_flags_overtime_worked(conn, org):
@@ -117,7 +225,7 @@ def test_allocation_grid_flags_overtime_worked(conn, org):
     log(conn, org["alice"], org["task"], "2026-10-12", 6)
     log(conn, org["alice"], org["task"], "2026-10-13", 6)
     grid = dashboard.allocation(conn, org["admin"], {"week_from": "2026-10-12", "weeks": 1})
-    week = next(r for r in grid["people"] if r["user_id"] == org["alice"].user_id)["weeks"][0]
+    week = row_for(grid, org["alice"])["weeks"][0]
     assert (week["logged_hours"], week["overtime"]) == (12, True)
 
 

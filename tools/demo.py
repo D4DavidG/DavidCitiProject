@@ -222,30 +222,31 @@ def demo() -> None:
     apollo, zeus = find_project(admin, "Apollo"), find_project(admin, "Zeus")
 
     print("\nThe seven questions")
-    print("  1. Status of each active project:")
-    for p in admin.ok("GET", "/projects")["items"]:
-        print(f"       {p['name']:<10} {p['status']:<9} {p['progressPercent']:>3}% done")
-    print("  2. At risk:")
-    for p in admin.ok("GET", "/dashboard/at-risk")["items"]:
-        for r in p["reasons"]:
-            print(f"       {p['name']:<10} {r['message']}")
+    cards = admin.ok("GET", "/dashboard/projects")["items"]
+    print("  1, 2 and 7. The dashboard, one card per live project (at risk first):")
+    for c in cards:
+        flag = "AT RISK" if c["atRisk"] else "on track"
+        print(f"       {c['name']:<7} {c['status']:<9} {c['progressPercent']:>3}% done  {flag:<8}"
+              f"  spent ${c['consumedCents'] / 100:,.0f} of ${c['budgetCents'] / 100:,.0f}"
+              f" (planned ${c['plannedCents'] / 100:,.0f}, pending ${c['pendingCents'] / 100:,.0f})")
+        for r in c["riskReasons"]:
+            print(f"               - {r['message']}")
     grid = admin.ok("GET", f"/dashboard/allocation?weekFrom={LAST_MONDAY.isoformat()}&weeks=2")
-    print(f"  3/5. Allocation, week of {grid['weeks'][0]} (booked h / capacity h, logged h):")
-    for person in grid["people"]:
+    print(f"  3 and 5. Allocation, week of {grid['weeks'][0]}, worst first (booked h / capacity, where from):")
+    for person in grid["items"]:
         w = person["weeks"][0]
-        flags = (" OVER-ALLOCATED" if w["overAllocated"] else "") + (" OVERTIME" if w["overtime"] else "")
-        print(f"       {person['name']:<12} {w['bookedHours']:>2}/{person['capacityHours']} h on {w['projectCount']}"
-              f" project(s), logged {w['loggedHours']:g} h{flags}")
+        flags = (f" OVER BY {w['overByHours']} h" if w["overAllocated"] else "") + (" OVERTIME" if w["overtime"] else "")
+        share = ", ".join(f"{s['name']} {s['hours']} h" for s in w["projects"]) or "unbooked"
+        print(f"       {person['name']:<12} {w['bookedHours']:>2}/{person['capacityHours']} h ({share}),"
+              f" logged {w['loggedHours']:g} h{flags}")
+    over = admin.ok("GET", f"/dashboard/allocation?weekFrom={LAST_MONDAY.isoformat()}&weeks=2&overOnly=true")
+    print(f"       Only over-allocated: {', '.join(p['name'] for p in over['items']) or 'no one'}")
     print("  4. Deliverables of Apollo:")
     for m in maria.ok("GET", f"/projects/{apollo['projectId']}/milestones")["items"]:
         print(f"       {m['name']:<8} {m['status']:<12} {m['progressPercent']:>3}%  due {m['dueDate']}")
     graph = maria.ok("GET", f"/projects/{apollo['projectId']}/dependency-graph")
     names = {n["milestoneId"]: n["name"] for n in graph["nodes"]}
     print("  6. Dependency chain: " + ", ".join(f"{names[e['from']]} needs {names[e['to']]}" for e in graph["edges"]))
-    for p in (apollo, zeus):
-        b = admin.ok("GET", f"/projects/{p['projectId']}/budget")
-        print(f"  7. {p['name']:<6} budget ${b['budgetCents'] / 100:,.0f}: planned ${b['plannedCents'] / 100:,.0f},"
-              f" consumed ${b['consumedCents'] / 100:,.0f} ({b['consumedPercent']}%), pending ${b['pendingCents'] / 100:,.0f}")
 
     print("\nTrying to break the rules")
     tasks = ben.ok("GET", "/me/tasks")["items"]

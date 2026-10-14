@@ -39,12 +39,10 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  custom_error_response {
-    error_code            = 404
-    error_caching_min_ttl = 300
-    response_code         = 200
-    response_page_path    = "/index.html"
-  }
+  # No custom_error_response: it applies to the whole distribution, API included, so it
+  # turned the tracker's JSON 404s ("not found or not yours") into S3's 403 AccessDenied
+  # (seen on the first AWS deploy, 13 Oct). The React app uses HashRouter (/#/projects/7),
+  # so it never needs the server to rewrite unknown paths to index.html.
 
   # logging_config {
   #   include_cookies = false

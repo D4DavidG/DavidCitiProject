@@ -13,13 +13,23 @@ PostgreSQL (Aurora) underneath, deployed with Terraform and the repo's shell scr
 
 | # | Question | Computed by | Endpoint |
 | --- | --- | --- | --- |
-| 1 | Status of each active project | project status + progress from task estimates | `GET /projects` |
-| 2 | Projects at risk of missing deadlines | past end date, overdue or behind-schedule deliverables, budget burning faster than time | `GET /dashboard/at-risk` |
-| 3 | Resource allocation across projects | bookings (hours/week per person per project) | `GET /dashboard/allocation` |
+| 1 | Status of each active project | project status + progress from task estimates | `GET /dashboard/projects` (one card per project), `GET /projects` |
+| 2 | Projects at risk of missing deadlines | past end date, overdue or behind-schedule deliverables, budget burning faster than time | `GET /dashboard/projects` (at risk first, with reasons), `GET /dashboard/at-risk` |
+| 3 | Resource allocation across projects | bookings (hours/week per person per project), with the projects behind each week's hours | `GET /dashboard/allocation` |
 | 4 | Key deliverables and completion | deliverable status and progress computed from their tasks | `GET /projects/{id}/milestones` |
-| 5 | Over-allocated team members | weeks booked past capacity, and weeks logged past it | `GET /dashboard/allocation` |
+| 5 | Over-allocated team members | weeks booked past each person's capacity (worst week first, `?overOnly=true`), and weeks logged past it | `GET /dashboard/allocation` |
 | 6 | Dependency chain between deliverables | live dependency links, one project at a time | `GET /projects/{id}/dependency-graph` |
-| 7 | Budget consumed vs planned | planned = bookings x rate; consumed = approved time x the rate frozen when logged | `GET /projects/{id}/budget` |
+| 7 | Budget consumed vs planned | planned = bookings x rate; consumed = approved time x the rate frozen when logged | `GET /dashboard/projects`, `GET /projects/{id}/budget` |
+
+We read the brief as a portfolio and resource-management problem (the category of
+Float, Harvest Forecast and Smartsheet Resource Management), not task tracking (Jira,
+Trello). So the manager lands on the dashboard (`/dashboard/projects`: status, risk and
+budget per project, answering questions 1, 2 and 7 at a glance), then the allocation grid
+(questions 3 and 5: who is over capacity, in which week, and which projects the hours come
+from). Tasks exist only to make deliverable completion (question 4) a measured number.
+The dashboard, the risk panel and the budget screen share one money query and one risk
+function, so they can never disagree; each screen costs a fixed number of queries,
+however many projects or people there are.
 
 ## Architecture
 
@@ -116,7 +126,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 357 passed
+.venv/bin/pytest -q                                                        # 369 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code

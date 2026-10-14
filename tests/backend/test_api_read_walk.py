@@ -74,10 +74,18 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert get(b, "/project-requests/{id}", f"/project-requests/{rid}")["name"] == "Hermes"
 
     assert PAGE_KEYS <= get(a, "/dashboard/at-risk", "/dashboard/at-risk").keys()
+    board = get(b, "/dashboard/projects", "/dashboard/projects")
+    assert PAGE_KEYS <= board.keys() and [c["name"] for c in board["items"]] == ["Apollo"]
+    assert {"atRisk", "riskReasons", "progressPercent", "budgetCents", "plannedCents", "consumedCents",
+            "pendingCents", "managerName"} <= board["items"][0].keys()
     grid = get(b, "/dashboard/allocation", "/dashboard/allocation", {"weekFrom": "2026-10-12", "weeks": "2"})
-    assert grid["weeks"] == ["2026-10-12", "2026-10-19"]
-    alice_row = next(p for p in grid["people"] if p["userId"] == world["alice"].user_id)
-    assert alice_row["weeks"][0]["bookedHours"] == 20 and alice_row["weeks"][0]["loggedMinutes"] == 90
+    assert PAGE_KEYS <= grid.keys() and grid["weeks"] == ["2026-10-12", "2026-10-19"]
+    alice_row = next(p for p in grid["items"] if p["userId"] == world["alice"].user_id)
+    assert (alice_row["status"], alice_row["peakOverByHours"], alice_row["capacityHours"]) == ("OK", 0, 40)
+    week = alice_row["weeks"][0]
+    assert week["bookedHours"] == 20 and week["loggedMinutes"] == 90 and week["overByHours"] == 0
+    assert week["projects"] == [{"projectId": pid, "name": "Apollo", "hours": 20}]
+    assert b.call("GET", "/dashboard/allocation", query={"overOnly": "true"})[1]["total"] == 0
     check = get(a, "/admin/integrity-check", "/admin/integrity-check")
     assert check["checks"] == 5 and all(rows == [] for rows in check["violations"].values())
     assert get(a, "/admin/audit-log", "/admin/audit-log")["total"] > 0
@@ -131,6 +139,7 @@ def test_employee_is_refused_the_budget_and_the_approval_queue(conn, world):
     assert e.call("GET", f"/projects/{world['apollo']['project_id']}/budget")[0] == 403
     assert e.call("GET", "/approvals/time-entries")[0] == 403
     assert e.call("GET", "/dashboard/allocation")[0] == 403
+    assert e.call("GET", "/dashboard/projects")[0] == 403
 
 
 def test_another_managers_request_is_404_not_403(conn, world):
@@ -151,7 +160,7 @@ def test_someone_elses_notification_is_404_like_a_missing_one(conn, world):
 # --- malformed requests -----------------------------------------------------------------------
 
 @pytest.mark.parametrize("query, field", [({"page": "two"}, "page"), ({"pageSize": "1.5"}, "pageSize"),
-                                          ({"unread": "yes"}, "unread")])
+                                          ({"unread": "yes"}, "unread"), ({"overOnly": "1"}, "overOnly")])
 def test_malformed_query_values_are_400_with_the_field(conn, world, query, field):
     status, payload = client_for(conn, world, "bob").call("GET", "/notifications", query=query)
     assert status == 400 and payload["field"] == field

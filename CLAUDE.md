@@ -39,6 +39,10 @@ disagrees.
 | Tests | Backend: pytest with pytest-cov. Frontend: Vitest with React Testing Library (Jest-compatible API), plus `@vitest/coverage-v8`. End to end: Playwright |
 | Coverage | Evaluators will ask why coverage is what it is. Print the numbers, and list each uncovered area in the README with a reason |
 | Scope | Everything in `MVP.md` ships. Nothing is pre-cut; evenings absorb the overrun. Out of the MVP: dark mode, emailed password reset |
+| Product framing (13 Oct, evening) | Portfolio and resource management (Float, Harvest Forecast, Smartsheet RM), not task tracking (Jira, Trello). Screen order: dashboard (`GET /dashboard/projects`: status, risk, budget per project, at risk first), then the allocation grid, then a task board last and only if time |
+| Allocation grid | People x weeks, sorted by each person's worst week ("peak over by"); `?overOnly=true` keeps anyone over in any shown week; each cell lists the projects its hours come from; paginated by person |
+| "Resources" on screen | Means bookings (person x hours/week on a project), as in the brief's CRUD list. People stay "People" |
+| Rejected from the phone notes (13 Oct) | A `/admin/capacity-check` that must return zero: it contradicts question 5, where over-allocation is allowed and flagged. "No time entry, derive spend from elapsed weeks": consumed cost stays real approved time |
 
 The database design, with the full SQL, is in
 `docs/superpowers/specs/2026-10-13-database-design.md`. It overrides plan §5.
@@ -97,8 +101,8 @@ Folder names to avoid (trap 3): `lib`, `assets`, `build`, `dist`, `env`, `logs`,
 6. **Local deploy:** `curl` through the proxy on 3001 (fix traps 1 and 2 here).
 7. **Seed:** replayed through the services, with edge cases (a week booked past capacity, an employee at capacity with overtime off,
    time pending approval, an overdue deliverable, a deliverable ready for sign-off, an over-budget project, an archived project).
-8. **Frontend:** `request.js` and auth first, then the screens in `MVP.md`'s question
-   order.
+8. **Frontend:** `request.js` and auth first, then the manager dashboard, the allocation
+   grid, project detail with deliverables, the dependency view, and a task board last.
 9. **AWS deploy,** then the checks in §7.
 
 ---
@@ -406,7 +410,10 @@ deployed URL:
    `/index.html` with status 200 (`infra/cloudfront.tf:42-47`), and it applies to the
    whole distribution, API included. Our "not found or not yours" 404 may arrive as a 200
    carrying HTML. Likely fix: remove the block, and use `HashRouter` or a CloudFront
-   Function for the single-page-app rewrites.
+   Function for the single-page-app rewrites. **Observed 13 Oct** on the first deploy: with
+   no `index.html` uploaded yet, an API 404 came back as S3's `403 AccessDenied` XML. The
+   block is removed (`infra/cloudfront.tf`), and the frontend will use `HashRouter`. Recheck
+   after the next `deploy-backend.sh`.
 2. **Deep links.** S3 behind origin access control answers 403, not 404, for a missing
    key, so refreshing `/projects/7` may show an AccessDenied page. `HashRouter` avoids it.
 3. **`Authorization` reaches the Lambda on GET requests through CloudFront.** CloudFront

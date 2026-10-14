@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import demo
 
-READS = ["/projects", "/dashboard/at-risk", "/dashboard/allocation", "/notifications/unread-count",
+READS = ["/dashboard/projects", "/dashboard/at-risk", "/dashboard/allocation", "/notifications/unread-count",
          "/projects/{pid}/budget", "/projects/{pid}/milestones"]
 
 

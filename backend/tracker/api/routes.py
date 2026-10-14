@@ -105,6 +105,7 @@ ROUTES = [
     _r("POST", "/project-requests/{id}/approve", h.approve_request, {ADMIN}),
     _r("POST", "/project-requests/{id}/reject", h.reject_request, {ADMIN}),
 
+    _r("GET", "/dashboard/projects", h.project_cards, STAFF),
     _r("GET", "/dashboard/at-risk", h.at_risk, STAFF),
     _r("GET", "/dashboard/allocation", h.allocation, STAFF),
     _r("GET", "/admin/integrity-check", h.integrity_check, {ADMIN}),

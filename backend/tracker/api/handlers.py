@@ -293,12 +293,17 @@ def reject_request(ctx: Context) -> dict:
 
 # --- dashboard, admin, notifications --------------------------------------------------------
 
+def project_cards(ctx: Context) -> dict:
+    return _page(dashboard.project_cards(ctx.conn, ctx.actor, ctx.query, *ctx.page_args()), camelize)
+
+
 def at_risk(ctx: Context) -> dict:
     return _whole(dashboard.at_risk(ctx.conn, ctx.actor), camelize)
 
 
 def allocation(ctx: Context) -> dict:
-    return camelize(dashboard.allocation(ctx.conn, ctx.actor, ctx.query))
+    result = dashboard.allocation(ctx.conn, ctx.actor, ctx.query, *ctx.page_args())
+    return {**_page(result, camelize), "weeks": result["weeks"]}
 
 
 def integrity_check(ctx: Context) -> dict:
