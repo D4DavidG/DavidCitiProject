@@ -256,3 +256,12 @@ tfplan
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
+
+# Personal prep docs and the full plan: kept out of future commits. They were pushed
+# before 13 Oct and stay in origin/David's history until the repo is made private.
+private/
+
+# Local Claude Code tooling, not part of the product
+.agents/
+.claude/
+skills-lock.json

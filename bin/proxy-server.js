@@ -38,7 +38,8 @@ const server = http.createServer((req, res) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  // '*' never covers Authorization under the Fetch spec, so name the headers we use.
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   res.setHeader('Access-Control-Max-Age', '86400');
 
   // Handle preflight
@@ -101,7 +102,10 @@ const server = http.createServer((req, res) => {
       'accept': headers.accept || 'application/json',
       'content-type': headers['content-type'] || 'application/json',
       'user-agent': headers['user-agent'] || 'proxy-server',
-      'host': target.host
+      'host': target.host,
+      // The tracker API needs the bearer token and an exact body length.
+      ...(headers.authorization ? { 'authorization': headers.authorization } : {}),
+      ...(headers['content-length'] ? { 'content-length': headers['content-length'] } : {})
     }
   };
 

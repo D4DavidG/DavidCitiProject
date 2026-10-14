@@ -1,13 +1,105 @@
 # CLAUDE.md
 
-Working notes for Claude Code and the team: ACME Project Tracker, Citi coding workshop,
-Tue 13 to Thu 15 Oct 2026. The product spec is `PROJECT_PLAN.md`, and section numbers
-below (§) refer to it. If that file is missing, ask David for it rather than
-reconstructing it. This file holds what the spec does not: how this repo actually runs
-and deploys, the traps found by reading it, and how to work with David.
+Working notes for Claude Code: ACME Project Tracker, Citi coding workshop, Tue 13 to
+Thu 15 Oct 2026. A solo build by David. The product spec is `private/PROJECT_PLAN.md`
+(gitignored so later commits leave it out; earlier copies are still in the public
+repo's history), and section numbers below (§) refer to it. If
+that file is missing, ask David for it rather than reconstructing it. `MVP.md` is the
+short, public scope summary. This file holds what the spec does not: the stack, how this
+repo actually runs and deploys, the traps found by reading it, and how to work with
+David.
 
 **Rule:** if something here goes out of date, fix it in the same commit as the code that
 outdated it.
+
+---
+
+## The stack (decided 13 Oct)
+
+### Decisions
+
+These were settled in a grilling session on 13 Oct. They override any plan text that
+disagrees.
+
+| Question | Decision |
+| --- | --- |
+| Manager model (plan §2.1) | (a) org chart. `users.manager_id` is the line manager. Any manager staffs anyone onto projects they manage. Employees never choose projects |
+| Accounts | Admin creates accounts. The server generates the username (`^[A-Z]{2}[0-9]{6}$`, initials plus 6 digits, **never changes**) and a 12-character password (`secrets`), shown once. Login is by username. A forced change on first login (every route but change-password and "me" answers 403). Self-edit: name and email only. Forgotten password: admin reset. Emailed reset code is a stretch goal: the workshop role has no SES access |
+| Consumed cost (§2.2) | **Time logged on tasks** (date, minutes, note), as in Jira and OpenProject, not Workday. Only the task's assignee logs. Only approved entries cost money, at the `hourly_rate_cents` frozen on the entry when logged. Clock in/out, pay periods, overtime review and overtime premiums were **removed on 13 Oct** as payroll features |
+| Overtime | Each person has `weekly_capacity_hours` (default 40) and `overtime_allowed` (default off), set by their line manager or an admin. Logging past capacity in a Mon-to-Sun week is refused (409) unless allowed; when allowed, the week is flagged |
+| Over-allocation | Bookings above a person's capacity are **allowed and flagged** (question 5), not refused. One booking is 1 to 40 h/week; no overlapping live bookings per person per project |
+| Approver | The line manager (`users.manager_id`) **or any admin** approves or rejects logged time. Nobody approves their own |
+| Tasks | Deliverables hold tasks (estimate, assignee, To Do / In Progress / Done). The manager creates and assigns; the assignee moves status and logs time. Deliverable status is **computed**; the manager signs off, refused until all tasks and dependencies are done |
+| Invariant | `GET /admin/integrity-check`: 5 queries that must return no rows (no dependency loops; nothing live under an archived project; every record has its CREATE audit row; no time logged outside a booking; no signed-off deliverable with unfinished work). Runs after every test |
+| Schema | `TEXT` + `CHECK` instead of `ENUM`; numbered migrations in `store/migrations/`. Full design: `docs/superpowers/specs/2026-10-13-database-design.md` |
+| Wire naming (§2.4) | camelCase in JSON, snake_case in Python and Postgres, converted only in `api/serializers.py` |
+| Removal | `POST /{thing}/{id}/archive` and `/reactivate`. No DELETE verb anywhere, and tests assert it. Explain in the README why this departs from the rubric's DELETE/204 |
+| Update verb | PATCH, with partial bodies. The server refuses fields the caller's role may not change |
+| Storage | **Postgres only, no in-memory store.** Tests run against their own database, `tracker_test`, with each test rolled back |
+| Tests | Backend: pytest with pytest-cov. Frontend: Vitest with React Testing Library (Jest-compatible API), plus `@vitest/coverage-v8`. End to end: Playwright |
+| Coverage | Evaluators will ask why coverage is what it is. Print the numbers, and list each uncovered area in the README with a reason |
+| Scope | Everything in `MVP.md` ships. Nothing is pre-cut; evenings absorb the overrun. Out of the MVP: dark mode, emailed password reset |
+
+The database design, with the full SQL, is in
+`docs/superpowers/specs/2026-10-13-database-design.md`. It overrides plan §5.
+
+### Where the files go
+
+```
+backend/tracker/                 # one Lambda; the URL segment is /api/tracker/...
+├── function.py                  # handler(event, context): normalise path, then api.dispatch()
+├── requirements.txt             # psycopg[binary] only
+├── .gitignore                   # the pip packages start-dev.sh vendors here (trap 4)
+├── store/
+│   ├── migrations/001_init.sql  # numbered SQL files; never edit one that has run on Aurora
+│   ├── migrate.py               # applies new migrations on cold start, under an advisory lock
+│   ├── integrity.py             # the 5 integrity queries
+│   └── postgres.py              # connection, atomic(), queries; psycopg errors -> domain errors
+├── domain/
+│   ├── errors.py                # OverAllocated, NotFound, DependencyCycle, ...
+│   ├── money.py                 # the only code that parses or formats cents
+│   └── models.py                # plain dataclasses
+├── services/                    # business rules, no framework or HTTP imports
+│   ├── auth.py  users.py  projects.py  deliverables.py  resources.py
+│   ├── timesheets.py  budget.py  dashboard.py  requests.py
+│   └── audit.py                 # record_change(): audit row + notifications
+└── api/
+    ├── routes.py                # the one route table: method, path, roles, handler
+    ├── authorise.py             # token check, then the role re-read from the DB
+    ├── errors.py                # the one exception -> status table
+    └── serializers.py           # explicit fields, snake_case -> camelCase
+tests/backend/                   # pytest; conftest rebuilds tracker_test, runs the integrity check on teardown
+requirements-dev.txt, pytest.ini  # repo root: test tooling (venv in .venv/)
+frontend/src/
+├── services/request.js          # the one fetch wrapper; plus one file per resource
+├── auth/                        # AuthContext, session probe, RequireRole
+├── theme/                       # MUI theme
+├── components/                  # shared: DataTable/CardList, BudgetBar, StatusChip, ...
+└── pages/                       # one folder per screen in MVP.md
+frontend/src/**/*.test.jsx       # Vitest + RTL, beside the code they test
+```
+
+Folder names to avoid (trap 3): `lib`, `assets`, `build`, `dist`, `env`, `logs`, `tmp`,
+`coverage`. Check new paths with `git check-ignore -v`.
+
+### Build order, one layer at a time, each tested before the next
+
+1. **Database:** `store/migrations/001_init.sql`, `migrate.py`, `integrity.py`. Proof: one
+   test per constraint showing Postgres refuses bad rows, and each integrity query
+   catching a planted violation.
+2. **Domain:** errors, money, models. Proof: unit tests for money parsing.
+3. **Store:** `postgres.py` with `atomic()`. Proof: round-trip tests against
+   `tracker_test`.
+4. **Services:** every rule in `MVP.md`, plus `record_change`. Proof: rule tests that
+   never import `api`, with the integrity check run in teardown.
+5. **API:** route table, `authorise`, error map, serialisers, `function.py`. Proof: HTTP
+   tests covering both path shapes and 404-not-403.
+6. **Local deploy:** `curl` through the proxy on 3001 (fix traps 1 and 2 here).
+7. **Seed:** replayed through the services, with edge cases (a week booked past capacity, an employee at capacity with overtime off,
+   time pending approval, an overdue deliverable, a deliverable ready for sign-off, an over-budget project, an archived project).
+8. **Frontend:** `request.js` and auth first, then the screens in `MVP.md`'s question
+   order.
+9. **AWS deploy,** then the checks in §7.
 
 ---
 
@@ -49,13 +141,87 @@ screen. This list is also the demo running order:
 2. Projects at risk of missing deadlines: dashboard panel.
 3. Resource allocation across projects: allocation grid, person by week.
 4. Key deliverables and completion: milestone timeline.
-5. Over-allocated team members: grid cells over 40 hours flagged.
+5. Over-allocated team members: projects and hours per person per week, flagged past capacity.
 6. Dependency chain between deliverables: dependency view.
 7. Budget consumed versus planned: budget bar.
 
 The brief fixes the stack: React with React Responsive and Material UI, Python, and
 PostgreSQL, deployed to AWS (Lambda, Aurora, S3, CloudFront) through this repo's
 Terraform.
+
+### The brief's feature list (the workshop email outranks the plan)
+
+The organisers' email is the requirement. The plan is our design for meeting it. When
+they disagree, the email wins. Use the brief's own words in the UI, the README and
+the demo, so evaluators can tick items off without translating:
+
+| Brief says | We build | Where it shows |
+| --- | --- | --- |
+| User authentication and authorization | Username login, generated password changed on first login, hashed passwords, JWT with expiry, role re-read from DB | Login screen |
+| Role-based access control | Admin / Manager / Employee, one route table (plan §3, §7) | Nav differs per role; refusals in the demo |
+| CRUD: projects | `projects` | Project list and detail |
+| CRUD: deliverables | `milestones` table. **Label it "Deliverables" on screen** | Deliverables tab, timeline, dependency view |
+| CRUD: resources | `assignments` (people x hours per week). **Label it "Resources"** | Resources tab, allocation grid |
+| CRUD: budget tracking | `budget_cents` plus derived planned and consumed cost | Budget bar |
+| Search and filter | Name search and status filter on every list, all server side and paginated | Every list screen |
+| Responsive design, mobile and desktop | `react-responsive` breakpoints: tables become cards on phones, the grid scrolls sideways | Demo once at phone width |
+| "Real-time visibility" | Dashboard plus notifications, refreshed by polling (no websockets on Lambda URLs) | Dashboard, bell icon |
+| Git, Terraform, shell scripts, AWS serverless | `bin/*.sh` + `infra/` only, no hand-clicked console resources | README deploy section |
+
+"D" in CRUD is archive and reactivate, never a hard delete (§8 below).
+
+### Audit log and notifications (David's requirement, 13 Oct)
+
+**Every successful change writes one audit row, and that row notifies everyone above
+the actor.** That covers every create, edit, archive and reactivate: users (account
+created, role or title changed, password changed or reset), projects, deliverables,
+resources, budget, dependencies, tasks (created, assigned, status moved), time entries
+(logged, edited, approved, rejected), capacity and overtime settings, and project
+requests and their decisions. Reads are not logged.
+Refused requests (403, 404, 409) changed nothing, so they are not logged either.
+
+| Actor's role (stored in the DB at the time) | Who is notified |
+| --- | --- |
+| Employee | Their line manager (`users.manager_id`) and every admin |
+| Manager | Every admin |
+| Admin | Every *other* admin |
+
+Edge cases, decided so code doesn't guess: an employee with no manager notifies the
+admins only. A lone admin's action notifies nobody, but the audit row is still written.
+Archived users receive nothing. "Line manager" is `users.manager_id` (decision (a),
+in "The stack" above).
+
+How it is built, so it can't be forgotten:
+
+- **One service function, `record_change(actor, action, entity_type, entity_id, before,
+  after)`,** called inside the same `store.atomic()` transaction as the change. It
+  inserts the `audit_log` row and its `notifications` rows together. Change, audit and
+  notification commit together or not at all.
+- **Recipients come from the stored role**, never the token (§9).
+- **Snapshots use the same explicit serialisers as responses.** `password_hash` never
+  appears. Notification text is a one-line summary ("Ana Ruiz changed the budget of
+  Apollo"), never the before/after state, so a manager never sees salary through it.
+- **Append only.** A Postgres trigger refuses UPDATE and DELETE on `audit_log`.
+  Notifications are marked read, never removed.
+- **Tests:** one per row of the table above plus the two edge cases. One test also
+  calls every mutating route and asserts that each wrote at least one audit row (one per
+  entity changed: approving a request writes two). Integrity query 3 also fails any
+  record with no CREATE row. Add a route and forget `record_change`, and the suite fails.
+
+The `audit_log` and `notifications` tables are in the database spec
+(`docs/superpowers/specs/2026-10-13-database-design.md`).
+
+Routes (add to the plan §7 table): `GET /notifications` (own only, paginated,
+`?unread=true`), `GET /notifications/unread-count`, `POST /notifications/{id}/read` (404
+if not yours), `POST /notifications/read-all`. All require any authenticated user.
+`GET /admin/audit-log` stays admin only, with filters by actor, entity and date.
+
+UI: a bell with an MUI `Badge` unread count in the app bar, polled every 30 s and after
+each write. Add a notifications page, and an admin audit-log page with filters. These
+are in-app notifications only. Email notifications stay out of scope (plan §16).
+
+Demo moment: an employee changes their own name, the manager's bell shows 1, and the
+admin's audit log shows the before/after state.
 
 ## 3. Where things run (decided 13 Oct)
 
@@ -71,7 +237,9 @@ Why not Windows:
 - Terraform builds the Lambda zip on whichever machine runs it (`build_in_docker =
   false`, `infra/lambda.tf:14`). A Windows deploy ships Windows wheels of
   `psycopg-binary` to a Linux Lambda, which crashes on import.
-- The VDI's default Python is 3.13, the same as the Lambda runtime. The laptop has 3.14.
+- After `setup-environment.sh`, the VDI's default Python is 3.13 (`PYENV_VERSION`,
+  `bin/setup-environment.sh:13`), the same as the Lambda runtime. Before it, the VDI has
+  3.10. The laptop has 3.14.
 
 Work happens on branch `David`. The VDI is wiped after the workshop, so push to GitHub
 at least every evening.
@@ -142,7 +310,11 @@ source ~/.bashrc
 | `PARTICIPANT_URL not found` | Check `EVENT_ID`. Run `dig +short TXT codingworkshop.net`, and if `dig` is missing: `sudo apt install -y dnsutils` |
 | `Workshop API returned HTTP 4xx` | Wrong participant ID or code |
 | AWS calls fail later with `ExpiredToken` | Rerun `./bin/setup-participant.sh`. The credentials are temporary |
+| Lambda logs `No module named 'psycopg'`, 502 through the proxy | `~/.local/bin/pip` ran Python 3.14, which has no `psycopg-binary` 3.2.3 wheel, and `start-dev.sh:342` hides the error. Fix: `python3 -m pip install --user --force-reinstall pip`, then check `pip --version` says 3.13 (fixed 13 Oct) |
+| Setup summary: `Cannot start dnsmasq: port 5353 already in use` | Harmless if dnsmasq already holds the port. Check that `getent hosts x.localhost.localstack.cloud` returns 127.0.0.1 |
 | `$'\r': command not found` | A script picked up Windows line endings: `sed -i 's/\r$//' bin/*.sh` |
+| `PARTICIPANT_ID not found` from a script run by Claude or any non-interactive shell | Ubuntu's `~/.bashrc` returns early when not interactive, so `source ~/.bashrc` loads nothing. Export the variables in that command, or run it in your own terminal |
+| `PARTICIPANT_URL` ends in `us-east-1` | `AWS_REGION` was unset, and the DNS TXT record has an entry per region. Set it to `us-east-2` and rerun |
 
 ## 5. How this repo turns code into a running API
 
@@ -157,18 +329,10 @@ skipped.
 `backend/services/`, ... in §11) would deploy as nothing, and the API would crash on
 `import domain`. All backend code lives inside one service folder:
 
-```
-backend/tracker/          # the Lambda; the folder name is the URL segment /api/tracker/...
-├── function.py           # entry point: handler(event, context) hands off to api/
-├── requirements.txt      # psycopg[binary]; drop pymongo, we are Postgres only
-├── domain/               # exceptions, money, models
-├── services/             # business rules, no framework imports
-├── store/                # memory.py (tests) and postgres.py
-└── api/                  # route table, authorise(), exception-to-status map
-tests/                    # outside backend/ (trap 7); pytest pythonpath = backend/tracker
-```
-
-The name `tracker` is a proposal; rename it freely before the first deploy.
+All backend code lives inside that one service folder; the full tree is in "Where the
+files go" at the top. Tests sit in `tests/`, outside `backend/` (trap 7), with pytest
+`pythonpath = backend/tracker`. The name `tracker` is a proposal; rename it freely
+before the first deploy.
 
 **The same request arrives with different paths:**
 
@@ -203,14 +367,16 @@ resource.
 **Lambda is not a server.** Concurrent instances don't share memory, and an instance is
 wiped when it is recycled. What that means for the plan:
 
-- The in-memory store is a test double, never the deployed app's storage.
+- There is no in-memory store (decided 13 Oct). State lives only in Postgres.
 - Anything "generated on first run", such as the JWT signing key in §13, would differ per
   instance and cause random 401s. Use one stable secret: a Terraform `random_password`
   passed in as a Lambda environment variable, or a row in Postgres.
-- Locks must live in Postgres. The 40-hour check needs `SELECT ... FOR UPDATE` on the
-  user's row inside the transaction, or two concurrent assignments both pass.
-- The Lambda clock is UTC. Decide whose "today" the at-risk rules use; the demo is in
-  Eastern time.
+- Locks must live in Postgres. Migrations take `pg_advisory_xact_lock`, so two cold starts
+  don't both migrate. Overlapping bookings are refused by an exclusion constraint, which
+  holds under concurrency. The capacity check takes `SELECT ... FOR UPDATE` on the
+  user's row, so two concurrent entries can't both slip under the limit.
+- The Lambda and Aurora clocks are UTC. "Today", weeks and dates all use Eastern time
+  (`America/New_York`), from one Python constant passed into every query that needs it.
 
 ## 6. Traps found by reading the code
 
@@ -218,17 +384,17 @@ Fix each one when the work reaches it, not before.
 
 | # | Trap | Where | Fix |
 | --- | --- | --- | --- |
-| 1 | The proxy forwards only `accept`, `content-type`, `user-agent` and `host`, so **`Authorization` never reaches the Lambda locally**, and every authenticated call returns 401 | `bin/proxy-server.js:95-106` | Forward `authorization`, and also `content-length` if POST bodies arrive empty |
-| 2 | Preflight answers `Access-Control-Allow-Headers: *`, but the Fetch spec never lets `*` cover `Authorization`, so the browser blocks the call before trap 1 even matters | `bin/proxy-server.js:41` | Call relative `/api/...` URLs through Vite's `server.proxy`, which is same-origin both locally and on CloudFront, so CORS never applies. Or list `Authorization, Content-Type` explicitly |
+| 1 | The proxy forwards only `accept`, `content-type`, `user-agent` and `host`, so **`Authorization` never reaches the Lambda locally**, and every authenticated call returns 401 | `bin/proxy-server.js:95-106` | Forward `authorization`, and also `content-length` if POST bodies arrive empty **Fixed 13 Oct** (`bin/proxy-server.js`). |
+| 2 | Preflight answers `Access-Control-Allow-Headers: *`, but the Fetch spec never lets `*` cover `Authorization`, so the browser blocks the call before trap 1 even matters | `bin/proxy-server.js:41` | Call relative `/api/...` URLs through Vite's `server.proxy`, which is same-origin both locally and on CloudFront, so CORS never applies. Or list `Authorization, Content-Type` explicitly **Fixed 13 Oct**: the header list is explicit. |
 | 3 | `.gitignore` silently drops any folder named `lib/`, `assets`, `build`, `dist`, `env/`, `var/`, `parts/`, `logs`, `tmp`, `coverage`, `target/` or `downloads/`, anywhere in the tree. For example, `frontend/src/lib/api.js` would never be committed. It also ignores `*.config` and `package-lock.json` | `.gitignore` | Avoid those names. When a file won't show in `git status`, run `git check-ignore -v <path>` |
-| 4 | `start-dev.sh` pip-installs dependencies **into** the service folder, which leaves untracked clutter there | `bin/start-dev.sh:342` | Add `backend/tracker/.gitignore` for the vendored packages, and check `git status` after the first run |
+| 4 | `start-dev.sh` pip-installs dependencies **into** the service folder, which leaves untracked clutter there | `bin/start-dev.sh:342` | Add `backend/tracker/.gitignore` for the vendored packages, and check `git status` after the first run **Fixed 13 Oct** (`backend/tracker/.gitignore`). |
 | 5 | `npm run lint` fails: the config imports `eslint-plugin-react-hooks` and `eslint-plugin-react-refresh`, which aren't in `package.json` | `frontend/eslint.config.js:3-4` | `npm i -D` both |
 | 6 | Vite silently moves to the next free port if 3000 is busy, so you can end up looking at a stale server | `frontend/vite.config.js` | Set `server.strictPort: true`, and keep exactly one listener per port (§11) |
 | 7 | CI runs `bandit -r ./backend`. It fails on `assert` in tests (B101), `random` used for passwords (B311), string-built SQL (B608) and hard-coded seed passwords (B105/B106), and the red X shows on every push | `.github/workflows/python.actions.yml:27` | Keep tests in `tests/`, use `secrets` for the six-character password, use parameterised SQL only |
 | 8 | The repo docs curl `https://localhost:3001`, but the proxy is plain HTTP | `docs/full-stack.md:121` | Use `http://` |
 | 9 | The docs' local log command picks up your `us-east-2` region, but the functions live in LocalStack's `us-east-1` | `docs/full-stack.md:131` | Use the command in §11 |
 | 10 | React 19 ignores `propTypes` at runtime, but the org's instructions still require them | `.github/instructions/react.instructions.md` | Write them as documentation; don't rely on them for validation |
-| 11 | Postgres has no `CREATE TYPE ... IF NOT EXISTS`, and Aurora isn't publicly accessible, so the schema has to be applied from inside the Lambda | `infra/rds.tf` | Run an idempotent migration on cold start: enums inside a `DO` block, or `CHECK` constraints instead |
+| 11 | Postgres has no `CREATE TYPE ... IF NOT EXISTS`, and Aurora isn't publicly accessible, so the schema has to be applied from inside the Lambda | `infra/rds.tf` | Numbered migrations applied on cold start under an advisory lock, with `TEXT` + `CHECK` instead of enums (decided; see the spec) |
 | 12 | Local Postgres is a single shared `postgres` database | | Tests hard-code their own database name. Never point the app at it |
 
 ## 7. Check on the first AWS deploy (Wednesday)
@@ -246,19 +412,20 @@ deployed URL:
 3. **`Authorization` reaches the Lambda on GET requests through CloudFront.** CloudFront
    treats that header specially. If it is dropped, switch to a custom header.
 4. **Login latency.** A 128 MB Lambda gets a small slice of a CPU, so PBKDF2 at 600k
-   rounds can take seconds there, even though it is fast in LocalStack. Measure it, then
-   either raise `memory_size` (`infra/lambda.tf:11`) or choose the round count
-   deliberately and say so.
+   rounds can take seconds there, even though it is fast in LocalStack. On 13 Oct one
+   VDI core took 0.14 s, which estimates about 2 s at 128 MB, so `memory_size` is now
+   512 (`infra/lambda.tf:11`), estimated at about 0.5 s. Time a real login on AWS to
+   confirm.
 5. **First request after idle.** Aurora Serverless v2 with `min_capacity = 0`
    (`infra/rds.tf:27`) pauses itself. Resuming it, plus a Lambda cold start, takes many
    seconds. Warm the app up a minute before the demo.
+6. **`btree_gist` on Aurora.** The migration runs `CREATE EXTENSION btree_gist`, which the
+   no-overlap rules need. Confirm the first cold start applies `001_init` there.
 
 ## 8. Where the plan and the repo disagree
 
-- **The §2 decisions are still open:** 2.1 the one-manager model, 2.2 planned versus
-  logged hours, 2.4 wire naming. The recommendations are (a), elapsed weeks, and
-  camelCase on the wire. Don't write code that depends on an open decision; ask. Money
-  (2.3) is settled: integer cents.
+- **The §2 decisions are made** (13 Oct): see "The stack" at the top. Money (2.3) is
+  integer cents.
 - **§10 lists `implementation.md`, `testing.md` and `evaluation.md` to read.** They don't
   exist. That material is the three sections of `docs/full-stack.md`, which is the
   rubric.
@@ -267,6 +434,12 @@ deployed URL:
   "deleted records are properly removed"; we archive instead (plan §4). Keep archiving,
   explain why in the README and the demo, and ask an evaluator early whether archive
   satisfies the D in CRUD.
+- **The JUMP pre-training checklist PDF (now in `private/`) mentions FastAPI and
+  MongoDB.** That is generic
+  bootcamp material. The workshop email says Python and PostgreSQL, and the repo's
+  Lambda handler is a plain `handler(event, context)`. Don't add FastAPI or MongoDB.
+- **Plan §16 rules out email notifications.** That still holds. The in-app
+  notifications in §2 above are a different feature, and they are in scope.
 - **The rubric expects token refresh.** It lists "token expiration and refresh". We do
   expiry plus a clean re-login, and list refresh tokens as a deliberate omission (§16).
 - **How scoring works.** Five technical scores (Implementation, Design, Code, Testing,
@@ -275,9 +448,8 @@ deployed URL:
 - **Coverage targets:** 80% for backend and frontend, 90% for API and error paths, 100%
   of critical paths end to end. The README must cover the architecture, trade-offs,
   assumptions, test commands, results and known gaps.
-- **Frontend test runner.** The rubric names Jest with React Testing Library. With Vite,
-  Vitest is the native fit and has a Jest-compatible API. Decide before the first test is
-  written.
+- **Frontend test runner:** Vitest with React Testing Library, decided 13 Oct. Its API is
+  Jest-compatible, which answers the rubric's "Jest".
 
 ## 9. Rules that don't bend
 
@@ -285,9 +457,10 @@ The detail is in the plan:
 
 - Money is integer cents everywhere except on screen, and one module converts it (§2.3).
 - Nothing is deleted: archive and reactivate. There is no DELETE route and no `delete`
-  method, and tests assert their absence (§4).
-- The invariant: nobody is allocated over 40 hours in any week. Every test's teardown
-  checks it, and so does `GET /admin/capacity-check` (§5).
+  method, and tests assert their absence (§4). A Postgres trigger also refuses `DELETE` on
+  every table.
+- The invariant: the 5 integrity queries return no rows. Every test's teardown checks
+  it, and so does `GET /admin/integrity-check`.
 - Answer 404, never 403, for something that exists but isn't yours, with byte-identical
   messages (§7).
 - Authorise from the role stored in the database, never from the token's claim (§7).
@@ -312,6 +485,9 @@ The detail is in the plan:
 
 - **Python:** PEP 8, snake_case, and type hints plus docstrings on everything public
   (from `.github/instructions/`). Target 3.13; don't use 3.14-only features.
+- **SQL:** values are always parameters. Table and column names that vary are composed
+  with `psycopg.sql` (`store.postgres.insert/update/columns`), never f-strings. CI's
+  bandit fails on string-built SQL (B608), and it was clean on 13 Oct.
 - **React:** function components, camelCase names, PascalCase components, Airbnb style,
   PropTypes and JSDoc on components and public functions. Stay with JavaScript (`.jsx`),
   since the scaffold is JS.
@@ -337,7 +513,22 @@ AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test \
 ./bin/deploy-backend.sh && ./bin/deploy-frontend.sh            # AWS; prints the CloudFront URL
 ```
 
-Tests: one command that prints the count. It isn't built yet; record it here when it is.
+Tests (local Postgres must be running; they create and drop their own `tracker_*test`
+databases and never touch `postgres`):
+
+```sh
+python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
+.venv/bin/pytest -q                                                        # prints the count
+.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing           # with coverage
+```
+
+Demo against the running API (local proxy, or the deployed URL via `TRACKER_API`):
+
+```sh
+TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py seed   # once: users, projects, tasks, time
+TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then every refusal
+terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first password (per environment)
+```
 
 ## 12. Safe to ignore
 

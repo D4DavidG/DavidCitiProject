@@ -1,0 +1,296 @@
+"""Deliverables, dependencies, tasks and logged time: how the work gets tracked.
+
+The clock is frozen on Wednesday 14 Oct 2026 (week of Mon 12 to Sun 18 Oct).
+"""
+
+import pytest
+
+import factories as f
+from domain.errors import Conflict, DependencyCycle, Forbidden, NotFound, OverCapacity, ValidationError
+from services import milestones, tasks, time_entries, users
+
+
+@pytest.fixture
+def org(conn):
+    admin = f.admin(conn)
+    bob, _ = f.person(conn, admin, role="MANAGER", first_name="Bob")
+    carol, _ = f.person(conn, admin, role="MANAGER", first_name="Carol")
+    alice, _ = f.person(conn, admin, manager=bob, first_name="Alice")   # $100,000 a year -> 4807 c/h
+    eve, _ = f.person(conn, admin, manager=carol, first_name="Eve")
+    apollo = f.project(conn, admin, bob, name="Apollo")
+    zeus = f.project(conn, admin, carol, name="Zeus")
+    f.booking(conn, bob, apollo, alice)
+    f.booking(conn, bob, apollo, eve)
+    design = f.deliverable(conn, bob, apollo, name="Design")
+    build = f.deliverable(conn, bob, apollo, name="Build")
+    return {"admin": admin, "bob": bob, "carol": carol, "alice": alice, "eve": eve,
+            "apollo": apollo, "zeus": zeus, "design": design, "build": build}
+
+
+def status_of(conn, actor, ms):
+    return milestones.get_milestone(conn, actor, ms["milestone_id"])["status"]
+
+
+def log(conn, who, task, day, hours, **extra):
+    return time_entries.log_time(conn, who, task["task_id"],
+                                 {"work_date": day, "minutes": int(hours * 60), **extra})
+
+
+# --- deliverables ------------------------------------------------------------------
+
+def test_manager_creates_deliverables_on_own_project_only(conn, org):
+    with pytest.raises(NotFound):
+        f.deliverable(conn, org["carol"], org["apollo"])
+    with pytest.raises(Forbidden):
+        f.deliverable(conn, org["alice"], org["apollo"])
+
+
+def test_status_is_computed_from_tasks(conn, org):
+    assert status_of(conn, org["bob"], org["design"]) == "NOT_STARTED"
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    tasks.move_task(conn, org["alice"], t["task_id"], "IN_PROGRESS")
+    assert status_of(conn, org["bob"], org["design"]) == "IN_PROGRESS"
+
+
+def test_progress_is_done_estimate_over_total_estimate(conn, org):
+    small = f.task(conn, org["bob"], org["design"], assignee=org["alice"], estimate_minutes=60)
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"], estimate_minutes=180)
+    tasks.move_task(conn, org["alice"], small["task_id"], "DONE")
+    got = milestones.get_milestone(conn, org["bob"], org["design"]["milestone_id"])
+    assert (got["progress_percent"], got["done_estimate_minutes"], got["total_estimate_minutes"]) == (25, 60, 240)
+
+
+def test_blocked_while_a_dependency_is_not_signed_off(conn, org):
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    assert status_of(conn, org["bob"], org["build"]) == "BLOCKED"
+
+
+def test_sign_off_refused_while_a_task_is_unfinished(conn, org):
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    with pytest.raises(Conflict, match="task"):
+        milestones.sign_off(conn, org["bob"], org["design"]["milestone_id"])
+
+
+def test_sign_off_refused_while_a_dependency_is_open(conn, org):
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    with pytest.raises(Conflict, match="depends"):
+        milestones.sign_off(conn, org["bob"], org["build"]["milestone_id"])
+
+
+def test_sign_off_when_everything_is_done(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    tasks.move_task(conn, org["alice"], t["task_id"], "DONE")
+    milestones.sign_off(conn, org["bob"], org["design"]["milestone_id"])
+    assert status_of(conn, org["bob"], org["design"]) == "DONE"
+
+
+def test_reopening_a_task_clears_sign_off_down_the_chain(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    tasks.move_task(conn, org["alice"], t["task_id"], "DONE")
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    milestones.sign_off(conn, org["bob"], org["design"]["milestone_id"])
+    milestones.sign_off(conn, org["bob"], org["build"]["milestone_id"])
+    tasks.move_task(conn, org["alice"], t["task_id"], "IN_PROGRESS")
+    assert status_of(conn, org["bob"], org["design"]) == "IN_PROGRESS"
+    assert status_of(conn, org["bob"], org["build"]) == "BLOCKED"
+
+
+def test_adding_a_task_to_a_signed_off_deliverable_clears_the_sign_off(conn, org):
+    milestones.sign_off(conn, org["bob"], org["design"]["milestone_id"])
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    assert status_of(conn, org["bob"], org["design"]) == "NOT_STARTED"
+
+
+def test_archiving_a_deliverable_archives_its_tasks(conn, org):
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    milestones.archive_milestone(conn, org["bob"], org["design"]["milestone_id"])
+    assert tasks.list_tasks(conn, org["bob"], org["design"]["milestone_id"]) == []
+
+
+# --- dependencies ---------------------------------------------------------------
+
+def test_dependency_loop_is_refused(conn, org):
+    test = f.deliverable(conn, org["bob"], org["apollo"], name="Test")
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    milestones.add_dependency(conn, org["bob"], test["milestone_id"], org["build"]["milestone_id"])
+    with pytest.raises(DependencyCycle):
+        milestones.add_dependency(conn, org["bob"], org["design"]["milestone_id"], test["milestone_id"])
+
+
+def test_dependency_across_projects_is_refused(conn, org):
+    other = f.deliverable(conn, org["carol"], org["zeus"])
+    with pytest.raises(ValidationError, match="same project"):
+        milestones.add_dependency(conn, org["admin"], org["design"]["milestone_id"], other["milestone_id"])
+
+
+def test_duplicate_dependency_is_a_conflict(conn, org):
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    with pytest.raises(Conflict):
+        milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+
+
+def test_removing_and_readding_a_dependency(conn, org):
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    milestones.remove_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    assert status_of(conn, org["bob"], org["build"]) == "NOT_STARTED"
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    assert status_of(conn, org["bob"], org["build"]) == "BLOCKED"
+
+
+def test_dependency_graph_has_nodes_and_edges(conn, org):
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    graph = milestones.dependency_graph(conn, org["alice"], org["apollo"]["project_id"])
+    assert {n["name"] for n in graph["nodes"]} == {"Design", "Build"}
+    assert graph["edges"] == [{"from": org["build"]["milestone_id"], "to": org["design"]["milestone_id"]}]
+
+
+# --- tasks ---------------------------------------------------------------------
+
+def test_assignee_must_be_booked_on_the_project(conn, org):
+    outsider, _ = f.person(conn, org["admin"], manager=org["bob"])
+    with pytest.raises(ValidationError) as caught:
+        f.task(conn, org["bob"], org["design"], assignee=outsider)
+    assert caught.value.field == "assignee_user_id"
+
+
+def test_only_the_assignee_moves_a_task(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    with pytest.raises(Forbidden):
+        tasks.move_task(conn, org["eve"], t["task_id"], "DONE")
+    with pytest.raises(Forbidden):
+        tasks.move_task(conn, org["bob"], t["task_id"], "DONE")
+
+
+def test_done_sets_and_reopening_clears_completed_at(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    assert tasks.move_task(conn, org["alice"], t["task_id"], "DONE")["completed_at"] is not None
+    assert tasks.move_task(conn, org["alice"], t["task_id"], "TODO")["completed_at"] is None
+
+
+def test_my_tasks_lists_open_tasks_assigned_to_me(conn, org):
+    mine = f.task(conn, org["bob"], org["design"], assignee=org["alice"], title="Mine")
+    f.task(conn, org["bob"], org["design"], assignee=org["eve"], title="Not mine")
+    done = f.task(conn, org["bob"], org["design"], assignee=org["alice"], title="Finished")
+    tasks.move_task(conn, org["alice"], done["task_id"], "DONE")
+    assert [t["title"] for t in tasks.my_tasks(conn, org["alice"])] == [mine["title"]]
+
+
+def test_manager_reassigns_and_re_estimates(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    row = tasks.update_task(conn, org["bob"], t["task_id"], {"assignee_user_id": org["eve"].user_id,
+                                                             "estimate_minutes": 480})
+    assert (row["assignee_user_id"], row["estimate_minutes"]) == (org["eve"].user_id, 480)
+
+
+# --- logging time ------------------------------------------------------------------
+
+def test_assignee_logs_time_at_their_frozen_rate(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    entry = log(conn, org["alice"], t, "2026-10-13", 2, note="Sketches")
+    assert (entry["minutes"], entry["hourly_rate_cents"], entry["status"]) == (120, 4807, "PENDING")
+    users.admin_update(conn, org["admin"], org["alice"].user_id, {"annual_salary_cents": 20_000_000})
+    still = conn.execute("SELECT hourly_rate_cents FROM time_entries WHERE entry_id = %s",
+                         (entry["entry_id"],)).fetchone()["hourly_rate_cents"]
+    assert still == 4807  # a raise doesn't rewrite logged costs
+
+
+def test_only_the_assignee_logs_time_on_a_task(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    with pytest.raises(Forbidden):
+        log(conn, org["eve"], t, "2026-10-13", 1)
+
+
+def test_future_dates_are_refused(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    with pytest.raises(ValidationError) as caught:
+        log(conn, org["alice"], t, "2026-10-15", 1)
+    assert caught.value.field == "work_date"
+
+
+def test_dates_outside_the_booking_are_refused(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    with pytest.raises(Conflict, match="booked"):
+        log(conn, org["alice"], t, "2026-09-30", 1)
+
+
+def test_more_than_24_hours_in_a_day_is_refused(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"overtime_allowed": True})
+    log(conn, org["alice"], t, "2026-10-13", 20)
+    with pytest.raises(Conflict, match="24"):
+        log(conn, org["alice"], t, "2026-10-13", 5)
+
+
+def test_logging_past_capacity_is_refused_without_overtime(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20})
+    log(conn, org["alice"], t, "2026-10-12", 8)
+    log(conn, org["alice"], t, "2026-10-13", 8)
+    with pytest.raises(OverCapacity, match="20"):
+        log(conn, org["alice"], t, "2026-10-14", 5)
+
+
+def test_logging_past_capacity_is_allowed_when_overtime_is_on(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20, "overtime_allowed": True})
+    log(conn, org["alice"], t, "2026-10-12", 12)
+    log(conn, org["alice"], t, "2026-10-13", 12)
+
+
+def test_rejected_time_does_not_count_toward_capacity(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 10})
+    wrong = log(conn, org["alice"], t, "2026-10-12", 9)
+    time_entries.decide_entry(conn, org["bob"], wrong["entry_id"], approve=False)
+    log(conn, org["alice"], t, "2026-10-13", 9)
+
+
+def test_line_manager_or_admin_approves(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    first = log(conn, org["alice"], t, "2026-10-12", 1)
+    second = log(conn, org["alice"], t, "2026-10-13", 1)
+    assert time_entries.decide_entry(conn, org["bob"], first["entry_id"], approve=True)["status"] == "APPROVED"
+    assert time_entries.decide_entry(conn, org["admin"], second["entry_id"], approve=False)["status"] == "REJECTED"
+
+
+def test_other_managers_and_employees_cannot_approve(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    entry = log(conn, org["alice"], t, "2026-10-12", 1)
+    with pytest.raises(NotFound):
+        time_entries.decide_entry(conn, org["carol"], entry["entry_id"], approve=True)
+    with pytest.raises(Forbidden):
+        time_entries.decide_entry(conn, org["eve"], entry["entry_id"], approve=True)
+
+
+def test_editing_a_decided_entry_sends_it_back_to_pending(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    entry = log(conn, org["alice"], t, "2026-10-12", 1)
+    time_entries.decide_entry(conn, org["bob"], entry["entry_id"], approve=True)
+    row = time_entries.edit_entry(conn, org["alice"], entry["entry_id"], {"minutes": 90})
+    assert (row["status"], row["decided_by"], row["minutes"]) == ("PENDING", None, 90)
+
+
+def test_someone_elses_entry_is_not_found(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    entry = log(conn, org["alice"], t, "2026-10-12", 1)
+    with pytest.raises(NotFound):
+        time_entries.edit_entry(conn, org["eve"], entry["entry_id"], {"minutes": 90})
+
+
+def test_pending_approvals_show_only_my_reports(conn, org):
+    a_task = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    e_task = f.task(conn, org["bob"], org["design"], assignee=org["eve"])
+    log(conn, org["alice"], a_task, "2026-10-12", 1)
+    log(conn, org["eve"], e_task, "2026-10-12", 1)
+    bob_queue = time_entries.pending_approvals(conn, org["bob"], 1, 50)["items"]
+    assert [e["user_id"] for e in bob_queue] == [org["alice"].user_id]
+    assert len(time_entries.pending_approvals(conn, org["admin"], 1, 50)["items"]) == 2
+
+
+def test_shrinking_a_booking_past_logged_time_is_refused(conn, org):
+    from services import assignments
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    log(conn, org["alice"], t, "2026-10-12", 1)
+    booking = assignments.list_bookings(conn, org["bob"], org["apollo"]["project_id"])[0]
+    with pytest.raises(Conflict, match="outside"):
+        assignments.update_booking(conn, org["bob"], booking["assignment_id"], {"start_date": "2026-10-13"})
