@@ -259,6 +259,10 @@ def test_time_entry_is_1_minute_to_24_hours(conn, world, minutes):
     assert caught.value.diag.constraint_name == "time_entries_minutes_range"
 
 
+def test_time_entries_are_not_over_capacity_by_default(conn, world):
+    assert rows.entry(conn, world["task"], world["alice"])["over_capacity"] is False
+
+
 def test_nobody_approves_their_own_time(conn, world):
     e = rows.entry(conn, world["task"], world["alice"])
     assert refused(conn, "UPDATE time_entries SET status = 'APPROVED', decided_by = user_id, decided_at = now()"
