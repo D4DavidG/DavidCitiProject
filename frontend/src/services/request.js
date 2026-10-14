@@ -3,25 +3,27 @@
  *
  * Every call goes through request(): it adds the base URL and the login token,
  * sends JSON, and turns any failure into an ApiError carrying the server's own
- * message ({ error, field }). A 401 (expired or invalid session) is handled in
+ * message ({ error, field, code }). A 401 (expired or invalid session) is handled in
  * one place, the handler AuthContext registers, except for the login call itself,
  * where 401 just means "wrong username or password".
  */
 
 const NETWORK_MESSAGE = "Can't reach the server. Check your connection and try again."
 
-/** An error answer from the API: HTTP status, the server's message, and the field it concerns. */
+/** An error answer from the API: HTTP status, the server's message, the field it concerns, and its code. */
 export class ApiError extends Error {
   /**
    * @param {number} status HTTP status, or 0 when the server couldn't be reached
    * @param {string} message text safe to show to the user
    * @param {string} [field] the camelCase input the error is about, when there is one
+   * @param {string} [code] a machine-readable tag, e.g. OVER_CAPACITY (the page asks to confirm)
    */
-  constructor(status, message, field) {
+  constructor(status, message, field, code) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.field = field
+    this.code = code
   }
 }
 
@@ -120,5 +122,5 @@ export async function request(method, path, { body, query } = {}) {
 
   if (response.status === 401 && path !== '/auth/login' && onUnauthorized) onUnauthorized()
   const message = payload?.error ?? `Request failed (${response.status}).`
-  throw new ApiError(response.status, message, payload?.field)
+  throw new ApiError(response.status, message, payload?.field, payload?.code)
 }

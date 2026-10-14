@@ -70,6 +70,14 @@ describe('request()', () => {
     await expect(failure).rejects.toMatchObject({ status: 400, message: 'Name is required.', field: 'name' })
   })
 
+  it('keeps the server error code', async () => {
+    fetchMock.mockReturnValueOnce(answer(409, { error: 'x', code: 'OVER_CAPACITY' }))
+    await expect(request('POST', '/tasks/1/time-entries', { body: {} })).rejects.toMatchObject({ code: 'OVER_CAPACITY' })
+    fetchMock.mockReturnValueOnce(answer(409, { error: 'y' }))
+    const failure = await request('POST', '/tasks/1/time-entries', { body: {} }).catch((e) => e)
+    expect(failure.code).toBeUndefined()
+  })
+
   it('calls the unauthorized handler on a 401', async () => {
     const handler = vi.fn()
     setUnauthorizedHandler(handler)
