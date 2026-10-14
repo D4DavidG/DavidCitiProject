@@ -75,13 +75,13 @@ ChartRow.propTypes = {
 
 /**
  * The legend: a list of keys. A problem key adds the warning icon, a line key draws a 2 px line.
- * @param {object} props items: label, colour and kind ('swatch' | 'line' | 'problem')
+ * @param {object} props items: label, colour and kind ('swatch' | 'line' | 'problem'), and an id when labels can repeat
  */
 export function ChartLegend({ items }) {
   return (
     <Box component="ul" aria-label="Legend" sx={{ listStyle: 'none', m: 0, mt: 1.5, p: 0, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-      {items.map(({ label, colour, kind }) => (
-        <Box component="li" key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, typography: 'body2' }}>
+      {items.map(({ id, label, colour, kind }) => (
+        <Box component="li" key={id ?? label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, typography: 'body2' }}>
           <Box
             aria-hidden="true"
             data-mark
@@ -99,6 +99,8 @@ export function ChartLegend({ items }) {
 
 ChartLegend.propTypes = {
   items: PropTypes.arrayOf(PropTypes.shape({
+    /** A unique key when two labels can be the same (two projects with one name). */
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     label: PropTypes.string.isRequired,
     colour: PropTypes.string.isRequired,
     kind: PropTypes.oneOf(['swatch', 'line', 'problem']).isRequired,

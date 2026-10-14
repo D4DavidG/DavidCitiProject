@@ -2,12 +2,13 @@ import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import {
-  Box, Button, Card, CardActions, CardContent, Chip, LinearProgress, MenuItem, Pagination, TextField, Typography,
+  Box, Button, Card, CardActions, CardContent, Chip, LinearProgress, Link as MuiLink, MenuItem, Pagination, TextField, Typography,
 } from '@mui/material'
 import WarningIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckIcon from '@mui/icons-material/CheckCircleOutlined'
 import BudgetBar from '../../components/BudgetBar'
 import BudgetChart from '../../components/charts/BudgetChart'
+import WorkloadChart from '../../components/charts/WorkloadChart'
 import PageHeader from '../../components/PageHeader'
 import PageState from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
@@ -17,6 +18,8 @@ import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
 
 const PAGE_SIZE = 12
+/** The workload chart shows this many people, the most over first (the server sorts them). */
+const WORKLOAD_PEOPLE = 8
 const STATUS_OPTIONS = [['', 'All statuses'], ['PLANNING', 'Planning'], ['ACTIVE', 'Active'], ['ON_HOLD', 'On hold'], ['COMPLETE', 'Complete']]
 
 function Stat({ label, value, color }) {
@@ -88,6 +91,26 @@ ProjectCard.propTypes = {
 }
 
 /**
+ * Questions 3 and 5: this week's workload for every project, on its own request, so the project
+ * search and filters below never refetch or empty it, and its failure never hides the cards.
+ */
+function WorkloadPanel() {
+  // useApi re-runs whenever its function changes, so it is memoised once: no inputs, no refetch.
+  const load = useCallback(() => request('GET', '/dashboard/allocation', { query: { weeks: 1, pageSize: WORKLOAD_PEOPLE } }), [])
+  const { data, error, loading, reload } = useApi(load)
+  return (
+    <Box sx={{ mb: 3 }}>
+      <PageState loading={loading} error={error} onRetry={reload} empty={data && data.items.length === 0 ? 'No employees to show.' : null}>
+        {data && <WorkloadChart people={data.items} total={data.total} />}
+      </PageState>
+      <MuiLink component={Link} to="/allocation" sx={{ display: 'inline-block', mt: 1, fontWeight: 600 }}>
+        All people and weeks in Allocation
+      </MuiLink>
+    </Box>
+  )
+}
+
+/**
  * The manager's landing screen: every live project they run (admins: all), each
  * with status, risk and budget. At-risk projects come first (the server orders them).
  */
@@ -111,6 +134,8 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle={`${user.role === 'ADMIN' ? "Every live project's" : 'The projects you manage:'} status, risk and budget. At-risk projects come first.`}
       />
+
+      <WorkloadPanel />
 
       <Box component="form" onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); setPageNumber(1) }} sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
         <TextField id="dashboard-search" label="Search projects" size="small" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} sx={{ flex: '1 1 220px' }} />

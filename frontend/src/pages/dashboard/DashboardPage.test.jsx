@@ -16,8 +16,21 @@ const HERMES = {
   budgetCents: 8_000_000, plannedCents: 0, consumedCents: 0, pendingCents: 0, plannedPercent: 0, pendingPercent: 0,
 }
 
-function renderDashboard(answers = { 'GET /dashboard/projects': [200, page([APOLLO, HERMES])] }) {
-  const calls = stubApi(answers)
+const BEN = {
+  userId: 4, name: 'Ben Okafor', capacityHours: 40, peakOverByHours: 5,
+  weeks: [{
+    week: '2026-10-12', bookedHours: 45, overByHours: 5, overAllocated: true,
+    projects: [{ projectId: 1, name: 'Apollo', hours: 25 }, { projectId: 2, name: 'Zeus', hours: 20 }],
+  }],
+}
+
+/** Overrides merge into the defaults, so a test that changes one answer keeps the others. */
+function renderDashboard(answers = {}) {
+  const calls = stubApi({
+    'GET /dashboard/projects': [200, page([APOLLO, HERMES])],
+    'GET /dashboard/allocation': [200, { ...page([BEN], { total: 12 }), weeks: ['2026-10-12'] }],
+    ...answers,
+  })
   renderAt(<DashboardPage />, { path: '/dashboard' })
   return calls
 }
@@ -101,6 +114,36 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('figure', { name: 'Budget by project' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /retry/i }))
     expect(await screen.findByRole('article', { name: 'Apollo' })).toBeInTheDocument()
+  })
+
+  it('shows this week\'s workload above the filters, asking for one week of the 8 most over', async () => {
+    const calls = renderDashboard()
+    const chart = await screen.findByRole('figure', { name: 'Workload this week · all projects' })
+    expect(chart.compareDocumentPosition(screen.getByLabelText(/search projects/i)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(calls.find((c) => c.path === '/dashboard/allocation').query).toMatchObject({ weeks: '1', pageSize: '8' })
+    expect(within(chart).getByText('Showing 1 of 12 people, most over first.')).toBeInTheDocument() // the panel passes the server's total
+    expect(screen.getByRole('link', { name: 'All people and weeks in Allocation' })).toHaveAttribute('href', '/allocation')
+  })
+
+  it('leaves the workload chart alone when searching projects', async () => {
+    const calls = renderDashboard()
+    await screen.findByRole('figure', { name: 'Workload this week · all projects' })
+    await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
+    await waitFor(() => expect(calls.at(-1).query.search).toBe('apo'))
+    expect(calls.filter((c) => c.path === '/dashboard/allocation')).toHaveLength(1)
+    expect(screen.getByRole('figure', { name: 'Workload this week · all projects' })).toBeInTheDocument()
+  })
+
+  it('keeps the cards when the workload chart fails, with Retry on the chart only', async () => {
+    renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO, HERMES])], 'GET /dashboard/allocation': [500, { error: 'Database unavailable.' }] })
+    expect(await screen.findByText('Database unavailable.')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1)
+    expect(await screen.findByRole('article', { name: 'Apollo' })).toBeInTheDocument()
+  })
+
+  it('says when there are no employees', async () => {
+    renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO])], 'GET /dashboard/allocation': [200, { ...page([]), weeks: ['2026-10-12'] }] })
+    expect(await screen.findByText('No employees to show.')).toBeInTheDocument()
   })
 
   it('pages through long lists', async () => {
