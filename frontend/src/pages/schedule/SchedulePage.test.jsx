@@ -86,6 +86,13 @@ describe('SchedulePage', () => {
     expect(within(legend).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Apollo', 'Zeus', 'Over capacity'])
   })
 
+  it('leaves Over capacity out of the legend when no one shown is over', async () => {
+    renderSchedule(() => [200, { ...page([CHLOE]), weeks: WEEKS }])
+    await bar(/Chloe Kim, Zeus/)
+    const legend = screen.getByRole('list', { name: 'Legend' })
+    expect(within(legend).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Zeus'])
+  })
+
   it('names five project colours in the legend, then the grey Other with how many share it', async () => {
     const seven = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ projectId: id, name: `P${id}`, hours: 6 })) // 42 h: over
     const busy = { ...BEN, weeks: WEEKS.map((w) => week(w, seven)) }

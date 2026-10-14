@@ -213,12 +213,13 @@ export default function SchedulePage() {
   const onPage = new Map(projects.map((p) => [p.projectId, p.name]))
   const slotted = [...colours].filter(([id, colour]) => onPage.has(id) && colour !== OTHER_COLOUR)
   const otherCount = [...onPage.keys()].filter((id) => colours.get(id) === OTHER_COLOUR).length
+  // People with a red-outlined week on screen; the legend explains the outline only when one is drawn.
+  const overCount = people.filter((p) => p.weeks.some((w) => w.overAllocated)).length
   const legend = [
     ...slotted.map(([id, colour]) => ({ id, label: onPage.get(id), colour, kind: 'swatch' })),
     ...(otherCount ? [{ label: `Other (${otherCount})`, colour: OTHER_COLOUR, kind: 'swatch' }] : []),
-    { label: 'Over capacity', colour: OVER, kind: 'problem' },
+    ...(overCount ? [{ label: 'Over capacity', colour: OVER, kind: 'problem' }] : []),
   ]
-  const overCount = people.filter((p) => p.status === 'OVER_ALLOCATED').length
   const summary = overCount
     ? `${overCount} of ${people.length} people shown are booked past capacity in at least one of these weeks.`
     : 'No one shown is booked past capacity in these weeks.'
