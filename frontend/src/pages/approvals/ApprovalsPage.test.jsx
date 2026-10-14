@@ -32,6 +32,12 @@ describe('ApprovalsPage', () => {
     expect(within(table).getByText('8 h')).toBeInTheDocument()
   })
 
+  it('marks time logged past capacity', async () => {
+    renderQueue({ 'GET /approvals/time-entries': [200, page([{ ...ENTRY, overCapacity: true }, { ...ENTRY, entryId: 31, overCapacity: false }])] })
+    const table = await screen.findByRole('table', { name: /time waiting for approval/i })
+    expect(within(table).getAllByText('Over capacity')).toHaveLength(1)
+  })
+
   it('approves an entry, which then leaves the queue', async () => {
     const calls = renderQueue()
     await screen.findByText('Ben Okafor')

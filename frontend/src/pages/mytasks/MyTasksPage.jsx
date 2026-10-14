@@ -4,6 +4,7 @@ import { Alert, Box, Button, Card, CardActions, CardContent, MenuItem, Paginatio
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
+import OverCapacityMark from '../../components/OverCapacityMark'
 import PageHeader from '../../components/PageHeader'
 import PageState from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
@@ -177,7 +178,7 @@ export default function MyTasksPage() {
     { key: 'workDate', label: 'Date', render: (e) => formatDate(e.workDate) },
     { key: 'taskTitle', label: 'Task' },
     { key: 'projectName', label: 'Project' },
-    { key: 'minutes', label: 'Time', render: (e) => formatHours(e.minutes) },
+    { key: 'minutes', label: 'Time', render: (e) => <>{formatHours(e.minutes)} {e.overCapacity && <OverCapacityMark />}</> },
     { key: 'status', label: 'Approval', render: (e) => <StatusChip status={e.status} /> },
     { key: 'note', label: 'Note' },
     { key: 'actions', label: '', align: 'right', render: (e) => <Button size="small" onClick={() => setEditing(e)}>Edit</Button> },

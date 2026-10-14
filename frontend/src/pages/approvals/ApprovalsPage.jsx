@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Alert, Box, Button, Pagination } from '@mui/material'
 import DataTable from '../../components/DataTable'
+import OverCapacityMark from '../../components/OverCapacityMark'
 import PageHeader from '../../components/PageHeader'
 import PageState from '../../components/PageState'
 import { formatDate, formatHours } from '../../services/format'
@@ -40,7 +41,7 @@ export default function ApprovalsPage() {
     { key: 'taskTitle', label: 'Task' },
     { key: 'projectName', label: 'Project' },
     { key: 'workDate', label: 'Date', render: (e) => formatDate(e.workDate) },
-    { key: 'minutes', label: 'Time', render: (e) => formatHours(e.minutes) },
+    { key: 'minutes', label: 'Time', render: (e) => <>{formatHours(e.minutes)} {e.overCapacity && <OverCapacityMark />}</> },
     { key: 'note', label: 'Note' },
     {
       key: 'actions',

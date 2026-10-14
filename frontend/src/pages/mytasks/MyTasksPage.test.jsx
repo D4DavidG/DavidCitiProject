@@ -121,6 +121,12 @@ describe('MyTasksPage', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ minutes: 420 }))
   })
 
+  it('marks my time logged past capacity', async () => {
+    renderPage({ 'GET /me/time-entries': [200, page([{ ...ENTRY, overCapacity: true }, { ...ENTRY, entryId: 31, overCapacity: false }])] })
+    const table = await screen.findByRole('table', { name: /my logged time/i })
+    expect(within(table).getAllByText('Over capacity')).toHaveLength(1)
+  })
+
   it('refuses more than 24 h before sending anything, and keeps the dialog open', async () => {
     const calls = renderPage()
     const task = await screen.findByRole('article', { name: 'Portal UI' })
