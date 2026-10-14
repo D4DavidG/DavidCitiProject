@@ -59,7 +59,8 @@ Modelled on Jira, GitHub Projects and OpenProject, not on a payroll system.
   logged it.
 - **Capacity:** each person has a weekly capacity (default 40 hours) and an "overtime
   allowed" switch, set by their line manager. With the switch off, logging hours past
-  capacity is refused. With it on, the week is flagged as overtime. The same person also
+  capacity asks "Log anyway?" first; if the person confirms, the entry is saved, marked
+  "Over capacity", and their manager is told. With it on, the week is flagged as overtime. The same person also
   has a task limit (default 2, 1 to 10): how many unfinished tasks they may take themselves.
 
 ## Who can do what
@@ -88,8 +89,9 @@ their own time.
 
 ## Rules the app enforces (each one demoable as a refusal)
 
-1. **No overtime unless allowed.** Logging hours past someone's weekly capacity is
-   refused unless their manager switched overtime on. Booking someone past capacity is
+1. **Overtime is never silent.** Logging hours past someone's weekly capacity is
+   refused until they confirm, unless their manager switched overtime on; confirmed
+   time is marked and their manager is told. Booking someone past capacity is
    allowed but flagged red: that's the over-allocation answer.
 2. **Nothing is deleted.** Records are archived and can be reactivated, so cost history
    survives. There is no DELETE route, and the database itself refuses deletes.

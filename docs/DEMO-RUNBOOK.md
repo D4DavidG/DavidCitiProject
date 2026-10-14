@@ -19,7 +19,11 @@ local stack (section 7), but reaches AWS only after `./bin/deploy-backend.sh` an
   your role may send, **Mine** / **To decide** tabs for managers (migration
   `003_request_kinds.sql`, applied by the Lambda's first cold start after the deploy).
   The seed's pending overtime request from Ben exists only in a database seeded after
-  this change; on AWS, make a request live instead (GUIDE §3, step 10).
+  this change; on AWS, make a request live instead (GUIDE §3, step 10);
+- overtime as a warning: logging past capacity without overtime opens **Over your weekly
+  capacity** with **Log anyway** / **Cancel**; confirmed time shows **Over capacity** on
+  My logged time and Approvals (migration `004_over_capacity.sql`, same cold start).
+  AWS today: the old flat refusal, "... Ask your manager to allow overtime."
 
 Until you deploy, Path A on AWS has no charts in steps 1 and 5, no Board (so no "The
 pull-board moment"), and a slower bell with no pop-up in "The audit-log moment". Demo
@@ -94,7 +98,7 @@ others, the first block of `python3 tools/demo.py demo` prints every username.
 
 | Don't | Why |
 | --- | --- |
-| Reject Ben's pending time, or turn on his overtime | Rejected time doesn't count toward the week (`time_entries.py:62, 68`), so the 409 refusal becomes a real 201 entry. Approving is safe |
+| Reject Ben's pending time, or turn on his overtime | Rejected time doesn't count toward the week (`time_entries.py:75, 81`), so the 409 refusal becomes a real 201 entry. Approving is safe |
 | Change Ana's **email** | `demo.py` finds people by email (`demo.py:94-96`). Change her name only |
 | Run `demo.py demo` on or after Mon 19 Oct | "Last week" is worked out from today (`demo.py:28-30`). From 19 Oct Ben's 40 h are two weeks back, so refusal 1 is accepted (201) and writes a real entry. Reseeding can't fix it: `seed` stops when Apollo exists (`demo.py:116-118`) |
 
@@ -232,7 +236,7 @@ questions, "Trying to break the rules", then "The invariant".
 
 | # | Request | Status | Why |
 | --- | --- | --- | --- |
-| 1 | Ben logs 2 more hours last week (he is at 40 h, overtime off) | 409 | Weekly capacity rule (`time_entries.py:71-73`) |
+| 1 | Ben logs 2 more hours last week (he is at 40 h, overtime off) | 409, asked to confirm (`code: OVER_CAPACITY`; the script never confirms) | Weekly capacity rule (`time_entries.py:83-90`) |
 | 2 | Ben logs time tomorrow | 400 | No future dates |
 | 3 | Maria opens Zeus, which Sam manages | 404 | Not yours looks exactly like missing |
 | 4 | Project 999999 | 404 | Same wording as 3, so ids can't be probed |
@@ -271,20 +275,20 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `490 passed in 19.40s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  31 passed (31)` and `Tests  297 passed (297)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `502 passed in 20.50s` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  31 passed (31)` and `Tests  302 passed (302)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 297 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 302 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
 
 | Command | Takes | Numbers (14 Oct) |
 | --- | --- | --- |
-| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 20 s | `TOTAL 1905 68 96%`: api 100%, function.py 100%, domain 99%, services 95.4%, store 93.9% |
-| `cd frontend && npm run test:coverage` | about a minute and a half (108 s) | Statements 94.72%, Branches 91.16%, Functions 90.47%, Lines 95.83% |
+| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 20 s | `TOTAL 1920 68 96%`: api 100%, function.py 100%, domain 99%, services 95.5%, store 93.9% |
+| `cd frontend && npm run test:coverage` | about a minute and a half (115 s) | Statements 94.78%, Branches 91.24%, Functions 90.63%, Lines 95.88% |
 
 The rubric asks for 80% overall and 90% on API and error paths. What the missing 4% is,
 honestly: mostly guards (already archived, not found, nothing to change), **plus five real
@@ -301,14 +305,14 @@ down mid-request (`postgres.py:121`) and turning a foreign-key violation into a 
 
 | Rule | Command | Result (14 Oct) |
 | --- | --- | --- |
-| 40-hour week | `.venv/bin/pytest -q -k capacity` | `12 passed, 416 deselected` (about 0.7 s) |
-| Not yours = 404, word for word | `.venv/bin/pytest -q -k byte_identical` | `3 passed, 425 deselected` (about 0.4 s) |
-| Nothing can be deleted | `.venv/bin/pytest -q -k delete` | `14 passed, 414 deselected` (about 0.5 s) |
-| Unknown usernames cost the same hashing as real ones | `.venv/bin/pytest -q -k unknown_username_costs` | `1 passed, 427 deselected` |
+| 40-hour week | `.venv/bin/pytest -q -k capacity` | `17 passed, 485 deselected` (about 1 s) |
+| Not yours = 404, word for word | `.venv/bin/pytest -q -k byte_identical` | `3 passed, 499 deselected` (about 0.4 s) |
+| Nothing can be deleted | `.venv/bin/pytest -q -k delete` | `14 passed, 488 deselected` (about 0.5 s) |
+| Unknown usernames cost the same hashing as real ones | `.venv/bin/pytest -q -k unknown_username_costs` | `1 passed, 501 deselected` |
 | The 5 integrity queries catch planted problems | `.venv/bin/pytest -q tests/backend/test_integrity.py` | `10 passed in 0.36s` |
-| Approvals screen | `cd frontend && npx vitest run src/pages/approvals` | `Tests  4 passed (4)`, 2.3 s |
+| Approvals screen | `cd frontend && npx vitest run src/pages/approvals` | `Tests  5 passed (5)`, 2.3 s |
 
-Good single tests to open in VS Code: `test_logging_past_capacity_is_refused_without_overtime`
+Good single tests to open in VS Code: `test_logging_past_capacity_asks_first_without_overtime`
 (`tests/backend/test_work.py`), `test_another_managers_project_is_byte_identical_to_a_missing_one`
 and `test_role_comes_from_the_database_not_the_token` (`tests/backend/test_api.py`).
 

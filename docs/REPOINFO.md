@@ -4,8 +4,8 @@ What to say to the Citi evaluators (15 Oct) and in later job interviews. It cove
 say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minute-demo).
 
 **Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
-final fix wave, the project-manager notifications and requests for everyone: 490 backend
-tests, 297 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
+final fix wave, the project-manager notifications and requests for everyone, and the overtime warning: 502 backend
+tests, 302 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
 pop-up, the three charts, the project manager being notified of an employee's project
@@ -32,8 +32,8 @@ points at a file and line you can open.
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 490 backend tests running against a real Postgres database,
-> and 297 website tests."
+> with Terraform. There are 502 backend tests running against a real Postgres database,
+> and 302 website tests."
 
 ### 2 minutes
 
@@ -259,7 +259,7 @@ else lives in the services. Five integrity queries catch what neither can preven
   overlapping live bookings for one person **on the same project** (an exclusion
   constraint, `:78-80`), tasks and dependencies that cross projects (composite foreign
   keys, `:119-122, 145-146`), and approving your own time (`:179`).
-- **The services enforce** weekly capacity and overtime (`services/time_entries.py:53-73`),
+- **The services enforce** weekly capacity and overtime (`services/time_entries.py:63-90`),
   no future dates, sign-off completeness, dependency loops and ownership.
 - **Nothing is deleted.** A trigger refuses DELETE on every application table, and
   `audit_log` also refuses UPDATE (`001_init.sql:246-255`). You archive and reactivate
@@ -350,8 +350,8 @@ from the token."
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "490 backend tests against a real Postgres database, at
-96% coverage, with the API layer at 100%. Plus 297 website tests at 94.72% of
+**Headline (fresh, 14 Oct 2026):** "502 backend tests against a real Postgres database, at
+96% coverage, with the API layer at 100%. Plus 302 website tests at 94.78% of
 statements, and 22 Playwright browser tests."
 
 **What (three layers, plus the website):**
@@ -367,10 +367,10 @@ statements, and 22 Playwright browser tests."
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct (after requests for everyone):** backend `490 passed in 19.40s`;
-  coverage `1905 statements, 68 missed, 96%`. By folder: `api/` 100%, `function.py` 100%,
-  `domain/` 99%, `services/` 95.4%, `store/` 93.9%. Website: 31 files, `297 passed`, about
-  a minute and a half. Website coverage: 94.72% of statements, 95.83% of lines, 91.16% of
+- **Fresh numbers, 14 Oct (after the overtime warning):** backend `502 passed in 20.50s`;
+  coverage `1920 statements, 68 missed, 96%`. By folder: `api/` 100%, `function.py` 100%,
+  `domain/` 99%, `services/` 95.5%, `store/` 93.9%. Website: 31 files, `302 passed`, about
+  a minute and a half. Website coverage: 94.78% of statements, 95.88% of lines, 91.24% of
   branches, 90.47% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
   `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
@@ -537,11 +537,11 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **490 backend, 297 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **502 backend, 302 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **96% of statements** (94% with
-   branches), the API layer 100%. Website **94.72% statements, 95.83% lines, 91.16% branches,
+   branches), the API layer 100%. Website **94.78% statements, 95.88% lines, 91.24% branches,
    90.47% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after requests for everyone). Browser tests
    and load tests get no percentage, on purpose: their measure is journeys walked, and speed
    and failures. *Point at: `docs/TESTING.md` section 2*
@@ -635,10 +635,13 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     shows each project's milestones against dates. Float has drag-to-schedule; we don't:
     bookings are edited in a form. *Point at: `frontend/src/pages/allocation/AllocationPage.jsx`; `frontend/src/components/charts/TimelineChart.jsx`*
 21. **"If someone logs too many hours: warn them, let them go ahead, flag the manager?"**
-    Today it is stricter: logging past weekly capacity is refused (409) unless the person's
-    manager or an admin has turned on `overtime_allowed`; when allowed, the week is flagged.
-    The soft version (warn, allow, flag the manager) is proposed, **not built**.
-    *Point at: `services/time_entries.py:51-75` (`_check_limits`)*
+    Yes, built 14 Oct (not yet deployed). Without overtime allowed, the first answer is a
+    409 with `code: "OVER_CAPACITY"` ("This puts you 2 h over your 40 h week. Log anyway?
+    Your manager will be told."). **Log anyway** resends with `confirmOverCapacity: true`:
+    the entry is saved, marked "Over capacity" on My logged time and Approvals, and the
+    notification to the line manager, project manager and admins ends "(2 h over capacity)".
+    With overtime allowed it is saved unmarked and the week is flagged, as before.
+    *Point at: `services/time_entries.py:63-90` (`_check_limits`)*
 
 ### Every security check, and where it came from
 
@@ -693,8 +696,8 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
    time; spend more than 15 points ahead of schedule. One function serves both screens.
    *`services/dashboard.py:29, 77-112`*
 5. **"Why allow over-allocation?"** The client asked to *see* it. Refusing it would hide
-   it. Bookings are allowed and flagged; logged time past capacity is refused unless
-   overtime is on. *`services/assignments.py:1-7`; `services/time_entries.py:71-73`*
+   it. Bookings are allowed and flagged; logged time past capacity asks first, then is
+   saved and marked if the person confirms (unless overtime is on, when it is just saved). *`services/assignments.py:1-7`; `services/time_entries.py:83-90`*
 
 5a. **"Is this a push or a pull system? How does work get to people?"** Both. The manager (or an admin) creates each
    task, and can still assign it to someone booked on the project, even past that
@@ -736,8 +739,8 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
     refuses the second. There is no parallel test. *`001_init.sql:78-80`;
     `services/access.py:43-50` (each manager changes only their own projects)*
 14. **"Two time entries that together pass 40 h?"** `SELECT ... FOR UPDATE` on the
-    person's row makes the second wait, then see the first. It's tested one request at a
-    time only. *`services/time_entries.py:54-55, 67-73`*
+    person's row makes the second wait, then see the first, so an unconfirmed entry can't
+    slip past. It's tested one request at a time only. *`services/time_entries.py:67, 80-90`*
 15. **"Migrations on Lambda?"** One transaction under `pg_advisory_xact_lock` with a 10 s
     lock timeout. Each file's sha256 is recorded, and an edited old migration is refused.
     *`store/migrate.py:19, 50-53, 64-67`*
@@ -746,7 +749,7 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
     ask whether archive counts as the D in CRUD. *`tests/backend/test_api.py:229-233`;
     `001_init.sql:240-255`; `tests/backend/test_no_delete.py:32, 37`*
 17. **"Why freeze the rate on each time entry?"** So a later raise doesn't rewrite past
-    spend. *`001_init.sql:166`; `services/time_entries.py:93-95`*
+    spend. *`001_init.sql:166`; `services/time_entries.py:111-114`*
 18. **"Who stops self-approval?"** Only the database: the `time_entries_not_own_approval`
     CHECK, mapped to 409. The service doesn't check it. *`001_init.sql:179`;
     `store/postgres.py:47`*
@@ -844,7 +847,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Every API route is tested over HTTP" | "Every route is called in-process with a Lambda-shaped event; real HTTP is covered by the demo script and Playwright" | `test_api.py` calls `app.dispatch()` |
 | "The uncovered 4% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:239` |
 | "The rule tests prove the layers are separate" | "The rule tests show services don't need HTTP; the import direction is what keeps them separate" | No test enforces imports |
-| "Real Postgres, not mocks" (right after "297 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
+| "Real Postgres, not mocks" (right after "302 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
 | "The staircase went up to 11 s" | "Up to about 10 s in the logs (9.8 s)" | 7 to 11 s was the load-test client's `max` column |
 | "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:278-279` |
@@ -884,7 +887,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 8. Small website bugs:
    - "Mark all as read" is enabled based only on the current page; the server marks all;
    - the "At risk" counter counts one page;
-   - approving an already-decided entry again is allowed (`services/time_entries.py:125-145`).
+   - approving an already-decided entry again is allowed (`services/time_entries.py:146-166`).
 9. Unexplained: 2 of 16,184 load-test requests got no response.
 10. Ask the evaluators whether archive counts as the D in CRUD.
 11. (d) History charts: a burn-up chart (work done over time) and budget spent over time.
@@ -894,7 +897,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 490 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 502 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -911,8 +914,8 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 490 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 297 / 94.72% | Website tests / statements (95.83% of lines) | 14 Oct |
+| 502 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
+| 302 / 94.78% | Website tests / statements (95.88% of lines) | 14 Oct |
 | 66 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 10 + 1 | Tables: ten for the app, plus `schema_migrations` | 14 Oct |

@@ -12,12 +12,12 @@ checks one layer, from the database up to a real browser.
 
 | Kind | What it proves | Why this kind | Files | Command (from the repo root) | Time | Count today |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Database rule tests** | Postgres itself refuses bad rows (each by its named rule), nothing can be deleted, the 5 integrity queries each catch a planted problem, migrations run once and all-or-nothing | The last line of defence must hold even if the Python is wrong | `tests/backend/test_schema.py`, `test_no_delete.py`, `test_integrity.py`, `test_migrate.py` | `.venv/bin/pytest -q tests/backend/test_schema.py tests/backend/test_no_delete.py tests/backend/test_integrity.py tests/backend/test_migrate.py` | 2 s | 82 |
-| **Business-rule (service) tests** | Every rule in `MVP.md`: who may do what, capacity and overtime, sign-off, budget maths, audit rows and who gets notified, money, the clock, password hashing, tokens | Fast and precise: they call the rules directly, never through HTTP (they never import `api`) | `tests/backend/test_users.py`, `test_work.py`, `test_projects.py`, `test_requests.py`, `test_dashboard.py`, `test_audit.py`, `test_domain.py`, `test_security.py` | `.venv/bin/pytest -q tests/backend/test_users.py tests/backend/test_work.py tests/backend/test_projects.py tests/backend/test_requests.py tests/backend/test_dashboard.py tests/backend/test_audit.py tests/backend/test_domain.py tests/backend/test_security.py` | 7 s | 279 |
-| **API tests** | Routing (both path shapes), every route needs a token, the role is read from the database, 404 not 403, error and list shapes, no DELETE route; every read route and every write route called once; the Lambda entry point | Proves the wiring between the web request and the rules, using real Lambda-shaped events | `tests/backend/test_api.py`, `test_api_read_walk.py`, `test_api_audit_walk.py`, `test_function.py` | `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py` | 4 s | 125 |
+| **Database rule tests** | Postgres itself refuses bad rows (each by its named rule), nothing can be deleted, the 5 integrity queries each catch a planted problem, migrations run once and all-or-nothing | The last line of defence must hold even if the Python is wrong | `tests/backend/test_schema.py`, `test_no_delete.py`, `test_integrity.py`, `test_migrate.py` | `.venv/bin/pytest -q tests/backend/test_schema.py tests/backend/test_no_delete.py tests/backend/test_integrity.py tests/backend/test_migrate.py` | 2 s | 83 |
+| **Business-rule (service) tests** | Every rule in `MVP.md`: who may do what, capacity and overtime, sign-off, budget maths, audit rows and who gets notified, money, the clock, password hashing, tokens | Fast and precise: they call the rules directly, never through HTTP (they never import `api`) | `tests/backend/test_users.py`, `test_work.py`, `test_projects.py`, `test_requests.py`, `test_dashboard.py`, `test_audit.py`, `test_domain.py`, `test_security.py` | `.venv/bin/pytest -q tests/backend/test_users.py tests/backend/test_work.py tests/backend/test_projects.py tests/backend/test_requests.py tests/backend/test_dashboard.py tests/backend/test_audit.py tests/backend/test_domain.py tests/backend/test_security.py` | 7 s | 287 |
+| **API tests** | Routing (both path shapes), every route needs a token, the role is read from the database, 404 not 403, error and list shapes, no DELETE route; every read route and every write route called once; the Lambda entry point | Proves the wiring between the web request and the rules, using real Lambda-shaped events | `tests/backend/test_api.py`, `test_api_read_walk.py`, `test_api_audit_walk.py`, `test_function.py` | `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py` | 4 s | 128 |
 | **"Writes really commit" test** | A change is actually saved, not left in a transaction that is never committed | Every other test rolls back on purpose, so only a test on its own database can catch "nothing is ever saved" | `tests/backend/test_store_commits.py` | `.venv/bin/pytest -q tests/backend/test_store_commits.py` | under 1 s | 2 |
 | **Race (concurrency) tests** | Two people pressing "Take this" at the same moment: only one wins, and nobody goes over their task limit | A race only shows up with two real database connections at once; the test waits until Postgres reports the second one blocked | `tests/backend/test_claim_race.py` | `.venv/bin/pytest -q tests/backend/test_claim_race.py` | under 1 s | 2 |
-| **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (31 files, beside the code they test) | `cd frontend && npm test` | 109 s | 297 |
+| **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (31 files, beside the code they test) | `cd frontend && npm test` | 115 s | 302 |
 | **Browser tests** (Playwright) | A real Chrome against the real running app: the demo walk (the seven questions, plus the phone menu), the pull board (Ana takes a task and puts it back), requests (Ana asks, Maria rejects with a note, Ana reads it on a phone), the screen tour (every screen for a manager and an employee, desktop and phone, no sideways scrolling, a deep-link refresh), the three charts (timeline: Late words and icon, tooltips on hover, tap and focus, print stripes; budget: the Budget line's position, tooltips; workload: gridlines and bars line up, Tab opens the tooltip, print stripes, contrast), README screenshots (only when asked) | The only test that sees what David sees: real login, real API, real database, real layout | `frontend/e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `tour.spec.js`, `timeline.spec.js`, `budget.spec.js`, `workload.spec.js`, `screenshots.spec.js` | `cd frontend && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_ZEUS_MANAGER_USERNAME=SP345715 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test` | 66 s | 22 tests in 8 files: 21 passed, 1 skipped (screenshots, on purpose) |
 | **Load test** | How fast the API answers with many users at once, and whether anything fails | Speed and failures under load can't be seen one request at a time | `tools/loadtest.py` | AWS (asks for the AWS admin password, then runs): `read -rsp 'Admin password: ' TRACKER_ADMIN_PASSWORD && export TRACKER_ADMIN_PASSWORD && TRACKER_API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker python3 tools/loadtest.py --users 25 --seconds 60`. Locally, leave out `TRACKER_API` and keep to 10 users or fewer: LocalStack itself fails past about 15 (`README.md:296-303`) | 20 to 60 s | Last run on AWS, 13 Oct: 16,184 reads at 539 per second, 2 failed (`README.md:269-275`). Not rerun today |
 | **k6 load test (planned)** | The same as the load test, with the industry tool named in the meeting notes ("sk8", `notes.txt:6`) | Evaluators may expect a named tool; k6 also gives standard reports | not built yet | none yet; k6 is not installed on the VDI (`which k6` prints nothing) | | 0 |
@@ -26,8 +26,8 @@ Plus two checks that are not tests but run with them: **lint** (ESLint reads the
 code for mistakes: `cd frontend && npm run lint`, clean, 5 s) and **bandit** (a security
 scanner for the Python, the same one CI runs: no issues, under 1 s).
 
-Backend total: `.venv/bin/pytest -q` printed `490 passed in 19.40s`.
-Website total: `npm test` printed `Test Files  31 passed (31)`, `Tests  297 passed (297)`, `Duration  108.86s`.
+Backend total: `.venv/bin/pytest -q` printed `502 passed in 20.50s`.
+Website total: `npm test` printed `Test Files  31 passed (31)`, `Tests  302 passed (302)`, `Duration  114.72s`.
 
 The backend tests need local Postgres running. They build their own `tracker_test`
 database (`tests/backend/pg.py:13`) and never touch the app's data.
@@ -55,15 +55,15 @@ coverage misses.
 `.venv/bin/pytest --cov=backend/tracker -q` printed:
 
 ```
-TOTAL                                        1905     68    96%
-490 passed in 19.40s
+TOTAL                                        1920     68    96%
+502 passed in 20.50s
 ```
 
-96% means: of the 1,905 statements in our backend, the tests ran all but 68. It
+96% means: of the 1,920 statements in our backend, the tests ran all but 68. It
 measures our code only; `.coveragerc` leaves out the psycopg library that
 `start-dev.sh` copies into the folder. All four backend test kinds count toward it.
 
-With branches too (`--cov-branch`) the total is 95% (600 branches, 64 partly taken).
+With branches too (`--cov-branch`) the total is 95% (604 branches, 64 partly taken).
 The API layer (`api/`: routes, auth, error mapping, every handler) is **100%**, lines and
 branches. The lowest files, counting branches, are `services/milestones.py` (85%),
 `store/postgres.py` (82%) and `services/assignments.py` (87%). Counting statements only
@@ -76,16 +76,16 @@ To see which lines were missed: `.venv/bin/pytest --cov=backend/tracker --cov-re
 `cd frontend && npm run test:coverage` printed:
 
 ```
-Statements   : 94.72% ( 1240/1309 )
-Branches     : 91.16% ( 929/1019 )
-Functions    : 90.47% ( 437/483 )
-Lines        : 95.83% ( 1059/1105 )
+Statements   : 94.78% ( 1255/1324 )
+Branches     : 91.24% ( 938/1028 )
+Functions    : 90.63% ( 445/491 )
+Lines        : 95.88% ( 1073/1119 )
 ```
 
 V8 is the JavaScript engine inside Chrome and Node; it counts what ran while the
-component tests ran. Read the four lines as: 1,240 of 1,309 instructions ran; 929 of 1,019
-yes/no paths were taken; 437 of 483 functions were called (many of the missing ones are
-small click handlers on rarely used buttons); 1,059 of 1,105 lines ran. The one module that
+component tests ran. Read the four lines as: 1,255 of 1,324 instructions ran; 938 of 1,028
+yes/no paths were taken; 445 of 491 functions were called (many of the missing ones are
+small click handlers on rarely used buttons); 1,073 of 1,119 lines ran. The one module that
 talks to the API, `services/request.js`, is at 100% of lines and functions and 97% of
 branches.
 
@@ -104,7 +104,7 @@ branches.
 | Rubric target | Goal | Today | Met? |
 | --- | --- | --- | --- |
 | Backend code coverage | 80% | 96% of statements (95% with branches) | Yes |
-| Frontend code coverage | 80% | 94.72% statements, 95.83% lines, 91.16% branches, 90.47% functions | Yes |
+| Frontend code coverage | 80% | 94.78% statements, 95.88% lines, 91.24% branches, 90.63% functions | Yes |
 | API endpoints (all CRUD) | 90% | `api/` 100%; every route called by the two walk tests | Yes |
 | Error handling | 90% | `api/errors.py` 100%; `test_api_read_walk.py` covers malformed input and a crash returning 500 | Yes |
 | Critical user paths end to end | 100% | Manager's demo walk, pull board, an employee's request and its answer, every screen for manager and employee | Partly. Not end to end yet: an employee logs time and the manager approves it (component tests only, `README.md:253-254`); an admin creates, edits, archives and reactivates a project; the forced password change at first sign-in |
@@ -244,14 +244,13 @@ to the local stack, even if `E2E_BASE_URL` is still set from an AWS run, because
 `pull.spec.js` and `requests.spec.js` write data. Each run therefore adds one archived
 task, one rejected request from Ana, audit rows and bell notifications (for Ana, Maria and
 every admin) to the local database. It ends with a table
-and exits with an error code if any step failed. Last run, 14 Oct (after requests for
-everyone):
+and exits with an error code if any step failed. Last run, 14 Oct (after the overtime warning):
 
 ```
 Step            Result Detail
-Backend tests   PASS   490 passed, coverage 96%
+Backend tests   PASS   502 passed, coverage 96%
 Bandit          PASS   no issues
-Website tests   PASS   297 passed, lines 95.83%
+Website tests   PASS   302 passed, lines 95.88%
 Lint            PASS   clean
 Build           PASS   frontend/dist
 Browser tests   PASS   21 passed, 1 skipped; screenshots in /tmp/tmp.Lr3R7H5Zto

@@ -256,7 +256,7 @@ def demo() -> None:
     tasks = ben.ok("GET", "/me/tasks")["items"]
     ui_task = next(t for t in tasks if t["title"] == "Portal UI")
     saturday = (LAST_MONDAY + dt.timedelta(days=5)).isoformat()
-    expect("Ben logs 2 more hours last week: he is at 40 h with overtime off",
+    expect("Ben logs 2 more hours last week: at 40 h with overtime off, he is asked to confirm",
            *ben.call("POST", f"/tasks/{ui_task['taskId']}/time-entries", {"workDate": saturday, "minutes": 120}), 409)
     expect("Ben logs time tomorrow", *ben.call("POST", f"/tasks/{ui_task['taskId']}/time-entries",
                                                  {"workDate": day(1), "minutes": 60}), 400)

@@ -42,7 +42,7 @@ What's done and what isn't, honestly:
 | Database (10 tables, rules enforced by Postgres) | Done, tested, deployed to Aurora |
 | Backend API (66 routes, roles, audit log, notifications) | Done and tested. 62 of the routes are on Lambda; the 4 pull-board routes and migration `002_task_limit.sql` arrive with the next `./bin/deploy-backend.sh` |
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
-| Tests | Backend: 490 passing, 96% coverage, 100% for the API layer. Frontend: 297 passing, 94.72% of statements and 95.83% of lines covered, plus 22 browser (Playwright) tests in 8 files (14 Oct) |
+| Tests | Backend: 502 passing, 96% coverage, 100% for the API layer. Frontend: 302 passing, 94.78% of statements and 95.88% of lines covered, plus 22 browser (Playwright) tests in 8 files (14 Oct) |
 | AWS deployment | Verified 13 Oct: health, login, token, 404s, demo, load test |
 | Frontend (React, Material UI) | **Every screen built and tested**, live on AWS since 14 Oct (website deployed 11:35 UTC). The later 14 Oct changes (Hours and Minutes boxes, the Copy username and password button, the login-timing fix, the pull board, the bell's 10 s check with its pop-up, and the three charts: Workload and Budget on the Dashboard, the Deliverables timeline on each project) are local until the next `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
 
@@ -57,7 +57,7 @@ and JSON. Things you can show:
 | --- | --- | --- |
 | Click through the app as a manager: dashboard, allocation grid, a project, its dependencies | The CloudFront URL, or `http://localhost:3000` locally | 3 |
 | Run the whole story: the seven answers, then ten requests the rules refuse | `python3 tools/demo.py demo` | 3 |
-| Prove the code works | `.venv/bin/pytest -q` (490 backend tests, ~19 s) and `cd frontend && npm test` (297, about a minute and a half) | 3, 9 |
+| Prove the code works | `.venv/bin/pytest -q` (502 backend tests, ~20 s) and `cd frontend && npm test` (302, about a minute and a half) | 3, 9 |
 | Show it's live on AWS | `curl .../health`, the demo against AWS, the AWS console | 5 |
 | Show raw API answers (JSON) | `curl` with a login token | 4 |
 | Look inside the database | `psql` or DBeaver, on the local copy | 4 |
@@ -117,9 +117,9 @@ Maria: her username is printed by `python3 tools/demo.py demo`, and the password
 | 3 | Point at **1, 2 and 7** in the output | "The manager's dashboard: each project's status, whether it's at risk and why, and budget spent against planned. At-risk projects come first." |
 | 4 | Point at **3 and 5** | "Ben is booked 45 hours against a 40-hour week: 25 on Apollo, 20 on Zeus. That's the over-allocation question. Neither project's manager could see it alone, because it spans projects." |
 | 5 | Point at **4 and 6** | "Deliverables, with completion worked out from their tasks, and the dependency chain. Launch is blocked because Build isn't done." |
-| 6 | Point at **Trying to break the rules** | "Every one of these is a real request the server refused. Logging past 40 hours, a loop in the dependencies, someone else's project (404, not 403, so you can't tell it exists), deleting anything (there is no delete: records are archived)." |
+| 6 | Point at **Trying to break the rules** | "Every one of these is a real request the server refused. Logging past 40 hours without confirming, a loop in the dependencies, someone else's project (404, not 403, so you can't tell it exists), deleting anything (there is no delete: records are archived)." |
 | 7 | Point at **5 integrity checks, 0 violations** | "Five database queries that must always return nothing: no dependency loops, no time logged outside a booking, and so on. They run after every database test, and here on live data." |
-| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "490 backend tests against a real Postgres database, not mocks. 297 website tests, which fake the API so they need no database. Plus a real browser test that walks this exact demo." |
+| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "502 backend tests against a real Postgres database, not mocks. 302 website tests, which fake the API so they need no database. Plus a real browser test that walks this exact demo." |
 | 9 | Optional: `(set -a; source ENVIRONMENT.config; python3 tools/console.py logs)` | "Here are those requests arriving in AWS's logs." |
 | 10 | Tell one story from section 8, "Things that went wrong" | Evaluators score curiosity and observation. These stories show both. |
 
@@ -129,9 +129,10 @@ the map). Good ones to have ready:
 - **The 40-hour rule:** `backend/tracker/services/time_entries.py`, function
   `_check_limits`, and its test `tests/backend/test_work.py` (search for `capacity`).
 - **No double-booking:** the `EXCLUDE` constraint in
-  `backend/tracker/store/migrations/001_init.sql` (there are three migration files; the
-  second, `002_task_limit.sql`, adds each person's task limit, and the third,
-  `003_request_kinds.sql`, adds the kinds of request). Postgres itself
+  `backend/tracker/store/migrations/001_init.sql` (there are four migration files; the
+  second, `002_task_limit.sql`, adds each person's task limit, the third,
+  `003_request_kinds.sql`, adds the kinds of request, and the fourth,
+  `004_over_capacity.sql`, marks time logged past capacity). Postgres itself
   refuses an overlapping booking for the same person on the same project.
 - **Who may do what:** `backend/tracker/api/routes.py`, one table listing every
   endpoint and which roles may call it.
@@ -272,9 +273,9 @@ backend/tracker/                     the whole backend: one Lambda
                                      tasks, time_entries, requests, dashboard (the seven answers),
                                      audit (log and notifications), passwords, tokens, access, views
   domain/                            small shared pieces: errors, money (cents), clock (Eastern time), values
-  store/                             the database: migrations/ (001_init.sql: all tables and rules; 002_task_limit.sql),
+  store/                             the database: migrations/ (001_init.sql: all tables and rules; 002 to 004 add columns),
                                      migrate.py, integrity.py (the 5 checks), postgres.py
-tests/backend/                       490 tests; conftest.py builds the test database
+tests/backend/                       502 tests; conftest.py builds the test database
 frontend/src/                        the website (React + Material UI):
   services/request.js                the one module that calls the API (token, JSON, errors, 401)
   services/format.js                 the only code that turns cents, minutes and dates into text
@@ -381,9 +382,11 @@ is in the repo; that was checked before every commit.
 person twice on the same project for overlapping dates) is refused by Postgres itself:
 an `EXCLUDE` constraint, which also holds when two requests arrive at once.
 Over-allocation across projects is allowed but flagged, because the client asked to
-*see* it (question 5). Logging more than 40 hours in a week is refused unless their
-manager allowed overtime. That check locks the person's row first, so two requests at
-once can't both slip under.
+*see* it (question 5). Logging more than 40 hours in a week without overtime asks first:
+"This puts you 2 h over your 40 h week. Log anyway? Your manager will be told." If they
+confirm, the entry is saved, marked "Over capacity", and their manager is told by how much
+(we don't hide real work; Jira and Harvest do the same). That check locks the person's
+row first, so an unconfirmed entry can never slip past.
 
 **"How is the budget calculated?"** Planned = booked hours × the person's hourly rate
 (salary ÷ 2,080 hours). Consumed = approved logged time × the rate frozen when the time
@@ -404,7 +407,7 @@ counted as the next day.
 
 ### Testing
 
-**"How did you test it?"** 490 backend tests with pytest, against a real PostgreSQL database,
+**"How did you test it?"** 502 backend tests with pytest, against a real PostgreSQL database,
 not mocks. Each test runs inside a transaction that's rolled back, so tests can't
 affect each other, and the integrity check runs after each database test.
 
@@ -428,8 +431,8 @@ demoted (`users.py:239`). The list is in the README under "Known gaps".
 broke the code (removed a sort, a filter, a check) and confirmed the right test failed.
 Every behavioural fix ships with the test that fails without it.
 
-**"And the frontend?"** 297 tests with Vitest and React Testing Library (Jest's API),
-94.72% of statements and 95.83% of lines covered. They render each screen with the API stubbed (no database) and check what a
+**"And the frontend?"** 302 tests with Vitest and React Testing Library (Jest's API),
+94.78% of statements and 95.88% of lines covered. They render each screen with the API stubbed (no database) and check what a
 person would see and what gets sent (cents, minutes from the Hours and Minutes boxes, only
 the changed fields). On top of that, Playwright drives a real browser against the real local API and database through the demo, and checks
 the phone layout doesn't scroll sideways.
@@ -502,8 +505,8 @@ Run from `~/DavidCitiProject` on the VDI.
 
 ```sh
 # Tests
-.venv/bin/pytest -q                                   # backend tests (expect 490 passed)
-(cd frontend && npm test)                             # website tests (expect 297 passed)
+.venv/bin/pytest -q                                   # backend tests (expect 502 passed)
+(cd frontend && npm test)                             # website tests (expect 302 passed)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)   # real browser, needs ./bin/start-dev.sh running
 .venv/bin/pytest --cov --cov-report=term-missing      # with the coverage table
 .venv/bin/pytest -q -k capacity                       # only tests with "capacity" in the name

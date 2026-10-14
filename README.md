@@ -52,7 +52,9 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
 - **`api/errors.py`** is the one table from domain error to status: 400 validation,
   401 not signed in, 403 role can't, 404 missing *or not yours* (identical messages,
   so ids can't be probed), 409 state refuses (over capacity, dependency loop), 503
-  database down.
+  database down. The body is `{"error": ...}`, plus `field` when one input is at fault and
+  `code` when the website should act on it: `OVER_CAPACITY` means "ask, then resend with
+  `confirmOverCapacity: true`".
 - **`services/`** holds the business rules (overlap and self-approval are Postgres only);
   rule tests call it directly, never through HTTP, which shows the rules don't need HTTP.
   What keeps the layers apart is the import direction: nothing below `api/` imports it
@@ -69,7 +71,7 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
   existing service (`archive_project`, `set_capacity`) in the same transaction, so the
   same rules and audit rows apply, and the decision notifies the asker.
 
-### Data model (`backend/tracker/store/migrations/001_init.sql`, `002_task_limit.sql`, `003_request_kinds.sql`)
+### Data model (`backend/tracker/store/migrations/001_init.sql` to `004_over_capacity.sql`)
 
 `users`, `projects`, `assignments` (bookings, "Resources" on screen), `milestones`
 (deliverables), `milestone_dependencies`, `tasks`, `time_entries`, `project_requests`,
@@ -78,6 +80,8 @@ migration runner keeps for itself. `002_task_limit.sql` adds one column, `users.
 (1 to 10, default 2), because the first file never changes once it has run on Aurora.
 `003_request_kinds.sql` gives `project_requests` a `kind` (new project, archive a project,
 task limit, overtime, other), with a check per kind; old rows default to new project.
+`004_over_capacity.sql` adds `time_entries.over_capacity` (default false): the entry was
+logged past capacity without overtime, after the person confirmed.
 Money is integer cents. Nothing is deleted: a trigger refuses `DELETE` on every
 application table, and records are archived and reactivated instead.
 
@@ -123,8 +127,12 @@ They run after every database test.
   then the person's row, inside the same `atomic()` that writes the CLAIM or RELEASE audit
   row, so two people can't take one task and one person can't slip past the limit
   (`tests/backend/test_claim_race.py` runs both races on separate connections).
-- **Capacity:** logging past a person's weekly capacity is refused unless their manager
-  switched overtime on. Booking someone past capacity is allowed but flagged.
+- **Capacity:** logging past a person's weekly capacity without overtime asks first
+  (409, `code: "OVER_CAPACITY"`, "This puts you 2 h over your 40 h week. Log anyway?").
+  Resent with `confirmOverCapacity: true`, it is saved, marked "Over capacity" on My
+  logged time and Approvals, and the notification to the manager says by how much. With
+  overtime on, it is saved unmarked and the week is flagged. Booking someone past capacity
+  is allowed but flagged.
 - **Approval:** the line manager or an admin approves logged time. Only approved time
   is charged.
 - **Deliverables:** their status is computed. Sign-off is refused until all tasks and
@@ -180,7 +188,7 @@ frontend/src/
 - **Hash URLs** (`/#/projects/7`): the server only ever serves `index.html`, so CloudFront
   needs no rewrite rule (the one we removed also swallowed the API's 404s).
 - **Server errors are shown as written**, on the field they concern when there is one
-  ("2 tasks are not done yet", "past your capacity of 40 h").
+  ("2 tasks are not done yet", "This puts you 2 h over your 40 h week").
 
 ## Running it locally (on the VDI)
 
@@ -207,7 +215,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 490 passed
+.venv/bin/pytest -q                                                        # 502 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -234,8 +242,8 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 297 passed: Vitest + React Testing Library
-npm run test:coverage                     # 94.72% of statements, 95.83% of lines
+npm test                                  # 302 passed: Vitest + React Testing Library
+npm run test:coverage                     # 94.78% of statements, 95.88% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
 ```
@@ -250,7 +258,7 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
   `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
   `requests.spec.js`: an employee asks her line manager, he rejects it with a note from
   To decide, and she reads the answer at phone width.
-- Against the rubric's goals: frontend 94.72% of statements (goal 80%); the demo journey end to end.
+- Against the rubric's goals: frontend 94.78% of statements (goal 80%); the demo journey end to end.
 
 **Known gaps (the uncovered 4% of the backend, 5% of the frontend):**
 
