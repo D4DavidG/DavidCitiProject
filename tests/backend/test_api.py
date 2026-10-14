@@ -278,3 +278,11 @@ def test_another_managers_board_is_byte_identical_to_a_missing_one(conn, org):
     other = carol.call("GET", f"/projects/{org['apollo']['project_id']}/board")
     missing = carol.call("GET", "/projects/999999/board")
     assert other == missing and other[0] == 404
+
+
+def test_an_employee_not_booked_on_the_project_gets_the_same_404_for_its_board(conn, org):
+    alice = client_for(conn, org, "alice")  # booked on Apollo, not on Zeus
+    other = alice.call("GET", f"/projects/{org['zeus']['project_id']}/board")
+    missing = alice.call("GET", "/projects/999999/board")
+    assert other == missing and other[0] == 404
+    assert alice.call("GET", f"/projects/{org['apollo']['project_id']}/board")[0] == 200
