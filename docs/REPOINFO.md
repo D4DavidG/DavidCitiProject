@@ -3,10 +3,13 @@
 What to say to the Citi evaluators (15 Oct) and in later job interviews. It covers what to
 say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minute-demo).
 
-**Last checked:** 14 Oct 2026, against HEAD `a52da44` on branch `David`, plus the
-uncommitted 14 Oct changes: the login-timing fix, the Hours and Minutes boxes, and the
-**Copy username and password** button (not on AWS until the next deploy). Every number
-below says when it was measured. Every claim points at a file and line you can open.
+**Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
+final fix wave (the commit after `8fd9099`): 428 backend tests, 291 website tests, 21
+Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
+but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
+the **Copy username and password** button, the pull board, the bell's 10 s check with its
+pop-up, and the three charts. Every number below says when it was measured. Every claim
+points at a file and line you can open.
 
 **Contents:** [1 Pitch](#1-the-pitch) · [2 Seven questions](#2-the-seven-questions) ·
 [3 Architecture](#3-architecture) · [4 Data and tables](#4-where-the-data-lives-and-the-10-tables) ·
@@ -346,8 +349,8 @@ from the token."
 ## 7. Testing
 
 **Headline (fresh, 14 Oct 2026):** "428 backend tests against a real Postgres database, at
-96% coverage, with the API layer at 100%. Plus 291 website tests at about 93% of
-statements, and Playwright browser tests."
+96% coverage, with the API layer at 100%. Plus 291 website tests at 94.84% of
+statements, and 21 Playwright browser tests."
 
 **What (three layers, plus the website):**
 
@@ -365,7 +368,7 @@ statements, and Playwright browser tests."
 - **Fresh numbers, 14 Oct (after the pull board):** backend `428 passed in 14.57s`; coverage
   `1847 statements, 73 missed, 96%`. By folder: `api/` 100%, `function.py` 100%, `domain/`
   99%, `services/` 94.9%, `store/` 93.9%. Website: 31 files, `291 passed`, about a minute and
-  a half. Website coverage: 94.83% of statements, 96.1% of lines, 90.59% of branches,
+  a half. Website coverage: 94.84% of statements, 96.11% of lines, 90.64% of branches,
   91.02% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
   `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
@@ -536,8 +539,8 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **96% of statements** (94% with
-   branches), the API layer 100%. Website **94.8% statements, 96.1% lines, 90.6% branches,
-   91.0% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after the charts). Browser tests
+   branches), the API layer 100%. Website **94.84% statements, 96.11% lines, 90.64% branches,
+   91.02% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after the charts). Browser tests
    and load tests get no percentage, on purpose: their measure is journeys walked, and speed
    and failures. *Point at: `docs/TESTING.md` section 2*
 3. **"Selenium or Playwright?"** Playwright. It waits by itself for a button to be clickable
@@ -801,7 +804,7 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
     tour fails on sideways scroll at 375 px. *`frontend/src/theme/responsive.js:4`;
     `frontend/e2e/tour.spec.js`*
 29a. **"Why no chart library?"** The bundle was already 711 kB before the charts (re-measured
-    15 Oct), and our three add about 18 kB (728 kB); a library would add more. No chart needed
+    14 Oct), and our three add about 18 kB (728 kB); a library would add more. No chart needed
     one. Each is boxes sized in percent. The server sends every percentage, so the browser
     never touches cents. The project colours failed a colour-blindness validator on the first
     try, so I changed them. *`frontend/src/components/charts/`;
@@ -905,7 +908,7 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 | Number | What | Measured |
 | --- | --- | --- |
 | 428 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 291 / 93% | Website tests / statements (95% of lines) | 14 Oct |
+| 291 / 94.84% | Website tests / statements (96.11% of lines) | 14 Oct |
 | 66 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 10 + 1 | Tables: ten for the app, plus `schema_migrations` | 14 Oct |

@@ -2,11 +2,23 @@
 
 What to run and click, in order, during a live demo, and what you should see.
 **Last checked:** 14 Oct 2026, about 09:30 EDT, at commit `a52da44` (AWS up and warm, every website fix live).
-Test counts updated 14 Oct, about 10:15 EDT, after three changes that are **not on AWS yet**:
-Hours and Minutes boxes for typed time, the **Copy username and password** button, and the
-login-timing fix. Until you run `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`,
-the AWS site still has the single hours box and a **Copy password** button that copies only
-the password. The local stack (section 7) already has all three.
+**Not on AWS yet.** Everything built on 14 Oct after that check is committed and runs on the
+local stack (section 7), but reaches AWS only after `./bin/deploy-backend.sh` and
+`./bin/deploy-frontend.sh`:
+
+- the **Hours** and **Minutes** boxes for typed time (AWS: one hours box);
+- the **Copy username and password** button (AWS: **Copy password**, password only);
+- the login-timing fix;
+- the pull board: the **Board** tab, **Take this** and **Put back**, Ready to take on My
+  tasks, Task limit on People (4 routes and migration `002_task_limit.sql`);
+- the bell: asks every 10 s while the tab is visible, at once when you come back, with a
+  pop-up when the count rises (AWS: every 30 s, no pop-up);
+- the three charts: **Workload this week** and **Budget by project** on the Dashboard, and
+  the **Deliverables timeline** on each project.
+
+Until you deploy, Path A on AWS has no charts in steps 1 and 5, no Board (so no "The
+pull-board moment"), and a slower bell with no pop-up in "The audit-log moment". Demo
+those on the local stack, or deploy first.
 
 For the story behind each step, see [GUIDE.md §3](GUIDE.md#3-the-5-minute-demo) and the
 evaluator questions in [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably-be-asked).
@@ -254,7 +266,7 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 14 s (10.5 to 16.5 s) | `428 passed in 12.84s` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 14 s (10.5 to 16.5 s) | `428 passed in 14.30s` |
 | Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  31 passed (31)` and `Tests  291 passed (291)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
@@ -267,7 +279,7 @@ API at `fetch`. Say it that way.
 | Command | Takes | Numbers (14 Oct) |
 | --- | --- | --- |
 | `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 13 s | `TOTAL 1847 73 96%`: api 100%, function.py 100%, domain 99%, services 94.9%, store 93.9% |
-| `cd frontend && npm run test:coverage` | about a minute and a half (89 s) | Statements 94.83%, Branches 90.59%, Functions 91.02%, Lines 96.1% |
+| `cd frontend && npm run test:coverage` | about a minute and a half (108 s) | Statements 94.84%, Branches 90.64%, Functions 91.02%, Lines 96.11% |
 
 The rubric asks for 80% overall and 90% on API and error paths. What the missing 4% is,
 honestly: mostly guards (already archived, not found, nothing to change), **plus five real
@@ -284,10 +296,10 @@ down mid-request (`postgres.py:121`) and turning a foreign-key violation into a 
 
 | Rule | Command | Result (14 Oct) |
 | --- | --- | --- |
-| 40-hour week | `.venv/bin/pytest -q -k capacity` | `12 passed, 413 deselected` (about 0.7 s) |
-| Not yours = 404, word for word | `.venv/bin/pytest -q -k byte_identical` | `3 passed, 422 deselected` (about 0.4 s) |
-| Nothing can be deleted | `.venv/bin/pytest -q -k delete` | `14 passed, 411 deselected` (about 0.5 s) |
-| Unknown usernames cost the same hashing as real ones | `.venv/bin/pytest -q -k unknown_username_costs` | `1 passed, 424 deselected` |
+| 40-hour week | `.venv/bin/pytest -q -k capacity` | `12 passed, 416 deselected` (about 0.7 s) |
+| Not yours = 404, word for word | `.venv/bin/pytest -q -k byte_identical` | `3 passed, 425 deselected` (about 0.4 s) |
+| Nothing can be deleted | `.venv/bin/pytest -q -k delete` | `14 passed, 414 deselected` (about 0.5 s) |
+| Unknown usernames cost the same hashing as real ones | `.venv/bin/pytest -q -k unknown_username_costs` | `1 passed, 427 deselected` |
 | The 5 integrity queries catch planted problems | `.venv/bin/pytest -q tests/backend/test_integrity.py` | `10 passed in 0.36s` |
 | Approvals screen | `cd frontend && npx vitest run src/pages/approvals` | `Tests  4 passed (4)`, 2.3 s |
 
@@ -305,6 +317,9 @@ instead of failing.
 | `demo.spec.js` (2 tests) | Manager walks the seven questions: Apollo "At risk", Ben "Over-allocated" with "Apollo 25 h, Zeus 20 h", the Build deliverable, Launch "Blocked". Then at 375x812: no sideways scroll, **Open menu** shows Allocation | `E2E_MANAGER_USERNAME`, or `E2E_ADMIN_PASSWORD` to look Maria up |
 | `pull.spec.js` (1 test) | An employee takes a Ready task from the Board and puts it back. **Writes data** (makes and archives its own Ready task, plus audit rows and bell notifications), so **run it locally only, never against AWS**. "Go-live checklist" stays free for the live demo | `E2E_ADMIN_PASSWORD`, or `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME`. Ana must hold at most 1 task |
 | `tour.spec.js` (5 tests) | Every screen for manager and employee, desktop and phone, fails on sideways scroll, saves a screenshot of each. Plus: refreshing a deep link keeps the page. Read-only, safe on AWS | `E2E_TOUR_DIR`, `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME` |
+| `timeline.spec.js` (4 tests) | Zeus's late Migration says **Late** with the icon; its tooltip opens on hover and on a phone tap with no sideways scroll; stripes only in print and forced colours; Apollo reads Design **Done**, Build **In progress 0%**, Launch **Blocked**. Read-only. Local only until the charts are deployed | `E2E_ZEUS_MANAGER_USERNAME` (Sam, `SP345715` locally), or `E2E_ADMIN_PASSWORD` |
+| `budget.spec.js` (3 tests) | The Budget line sits at 100 of 125 of the bar column, desktop and phone; a row's tooltip opens on hover and on Tab. Read-only. Local only until the charts are deployed | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
+| `workload.spec.js` (5 tests) | Gridlines, hour labels and Ben's bar line up, desktop and phone, no sideways scroll; Tab opens a row's tooltip (whose sentence includes "+5 h over"); the over segment is striped only in print and forced colours; words and marks clear contrast. Read-only. Local only until the charts are deployed | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
 | `screenshots.spec.js` (1) | Not a test: rewrites the README pictures in `docs/screenshots/` | `E2E_SCREENSHOTS=1` and `E2E_ADMIN_PASSWORD`. Don't run it live |
 
 **Best live option: against AWS, no local stack needed** (14 Oct: `2 passed (7.0s)`):

@@ -33,7 +33,7 @@ describe('WorkloadChart', () => {
     draw([BEN, ANA, DEV])
     expect(screen.getByRole('figure', { name: 'Workload this week · all projects' })).toBeInTheDocument()
     expect(screen.getAllByRole('img').map((r) => r.getAttribute('aria-label'))).toEqual([
-      '45 h booked, capacity 40 h · Apollo 25 h, Zeus 20 h · Ben Okafor',
+      '45 h booked, capacity 40 h, +5 h over · Apollo 25 h, Zeus 20 h · Ben Okafor',
       '30 h booked, capacity 40 h · Apollo 30 h · Ana Ruiz',
       '0 h booked, capacity 20 h · Not booked · Dev Shah',
     ])
@@ -55,6 +55,8 @@ describe('WorkloadChart', () => {
     expect(left(over)).toBeCloseTo(66.67, 2)
     expect(width(over)).toBeCloseTo(8.33, 2)
     expect(within(ben).getByText('+5 h over')).toBeInTheDocument()
+    // role="img" hides the row's own text from screen readers, so its name must carry the words too.
+    expect(ben).toHaveAccessibleName(/^45 h booked, capacity 40 h, \+5 h over · /)
     expect(within(ben).getByTestId('WarningAmberRoundedIcon')).toBeInTheDocument()
     expect(within(ben).getByText('45 / 40 h')).toBeInTheDocument()
     expect(left(within(ben).getByTestId('capacity'))).toBeCloseTo(66.67, 2)

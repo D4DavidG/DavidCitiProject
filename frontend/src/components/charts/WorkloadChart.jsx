@@ -33,11 +33,16 @@ function pieces(projects, colours) {
   return otherHours > 0 ? [...named, { key: 'other', colour: OTHER_COLOUR, hours: otherHours }] : named
 }
 
-/** The sentence a row's tooltip and aria-label carry: value first, then every project's full hours, then the name. */
+/**
+ * The sentence a row's tooltip and aria-label carry: value first (with "+N h over" when shown),
+ * then every project's full hours, then the name. role="img" hides the row's own text from
+ * screen readers, so every word the row shows must be in here.
+ */
 function rowTooltip(person) {
   const week = thisWeek(person)
   const list = [...week.projects].sort((a, b) => a.projectId - b.projectId).map((p) => `${p.name} ${p.hours} h`).join(', ')
-  return `${week.bookedHours} h booked, capacity ${person.capacityHours} h · ${list || 'Not booked'} · ${person.name}`
+  const over = week.overAllocated ? `, +${week.overByHours} h over` : ''
+  return `${week.bookedHours} h booked, capacity ${person.capacityHours} h${over} · ${list || 'Not booked'} · ${person.name}`
 }
 
 /** The figure's one-line summary: who is over capacity this week, and by how much. */

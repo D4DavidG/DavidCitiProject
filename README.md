@@ -227,7 +227,7 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 ```sh
 cd frontend
 npm test                                  # 291 passed: Vitest + React Testing Library
-npm run test:coverage                     # 93% of statements, 95% of lines
+npm run test:coverage                     # 94.84% of statements, 96.11% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
 ```
@@ -240,9 +240,9 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
   manager signs in and walks the seven questions (dashboard, allocation, a project, its
   dependencies), and the dashboard at phone width has no sideways scrolling.
   `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
-- Against the rubric's goals: frontend 93% (goal 80%); the demo journey end to end.
+- Against the rubric's goals: frontend 94.84% of statements (goal 80%); the demo journey end to end.
 
-**Known gaps (the uncovered 4% of the backend, 7% of the frontend):**
+**Known gaps (the uncovered 4% of the backend, 5% of the frontend):**
 
 - a manager cannot put a task back to Ready from the screen (the Assign dialog has no
   empty choice); the API allows it (`PATCH /tasks/{id}` with `assigneeUserId: null`);

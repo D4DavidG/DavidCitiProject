@@ -70,6 +70,8 @@ describe('BudgetChart', () => {
     expect(within(ares).getByText('$52,900 of $40,000 · Planned 230%')).toBeInTheDocument()
     expect(within(ares).getAllByText('▸')).toHaveLength(2)
     expect(within(ares).getByText('Planned cost is over budget')).toBeInTheDocument()
+    // role="img" hides the row's own text from screen readers, so its name must carry the words too.
+    expect(ares).toHaveAccessibleName(/ · over budget · planned cost is over budget · Ares$/)
   })
 
   it('says Over budget when $5 over still rounds to 100%', () => {

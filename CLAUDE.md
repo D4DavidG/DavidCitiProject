@@ -15,11 +15,12 @@ outdated it.
 ### Where things stand (updated 14 Oct, evening)
 
 - **Built:** backend, database and every website screen in `MVP.md`. All of it is
-  deployed to AWS and checked there, except four 14 Oct changes that are committed but
+  deployed to AWS and checked there, except five 14 Oct changes that are committed but
   not deployed (Hours and Minutes boxes, **Copy username and password**, the login-timing
-  fix at `services/users.py:159-164`, and the pull board with migration
-  `002_task_limit.sql`): on AWS after the next `./bin/deploy-backend.sh` and
-  `./bin/deploy-frontend.sh`. Three charts, built 14 Oct and not yet deployed (plain MUI
+  fix at `services/users.py:159-164`, the pull board with migration
+  `002_task_limit.sql`, and the bell's 10 s check with its pop-up): on AWS after the next
+  `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. The full list is at the top of
+  `docs/DEMO-RUNBOOK.md`. Three charts, built 14 Oct and not yet deployed (plain MUI
   boxes, no chart library; the server sends every percentage): a deliverables timeline on
   each project, and a budget chart and this week's workload on the dashboard
   (`components/charts/`). Tests: 428 backend, 291 website, and 21 Playwright browser

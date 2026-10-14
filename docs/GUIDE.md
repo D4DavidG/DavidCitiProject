@@ -42,9 +42,9 @@ What's done and what isn't, honestly:
 | Database (10 tables, rules enforced by Postgres) | Done, tested, deployed to Aurora |
 | Backend API (66 routes, roles, audit log, notifications) | Done and tested. 62 of the routes are on Lambda; the 4 pull-board routes and migration `002_task_limit.sql` arrive with the next `./bin/deploy-backend.sh` |
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
-| Tests | Backend: 428 passing, 96% coverage, 100% for the API layer. Frontend: 291 passing, 93% coverage, plus 21 browser (Playwright) tests in 7 files (14 Oct) |
+| Tests | Backend: 428 passing, 96% coverage, 100% for the API layer. Frontend: 291 passing, 94.84% of statements and 96.11% of lines covered, plus 21 browser (Playwright) tests in 7 files (14 Oct) |
 | AWS deployment | Verified 13 Oct: health, login, token, 404s, demo, load test |
-| Frontend (React, Material UI) | **Every screen built and tested**, live on AWS since 14 Oct (website deployed 11:35 UTC). The later 14 Oct changes (Hours and Minutes boxes, the Copy username and password button, the login-timing fix, the pull board) are local until the next `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
+| Frontend (React, Material UI) | **Every screen built and tested**, live on AWS since 14 Oct (website deployed 11:35 UTC). The later 14 Oct changes (Hours and Minutes boxes, the Copy username and password button, the login-timing fix, the pull board, the bell's 10 s check with its pop-up, and the three charts: Workload and Budget on the Dashboard, the Deliverables timeline on each project) are local until the next `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
 
 ---
 
@@ -427,7 +427,7 @@ broke the code (removed a sort, a filter, a check) and confirmed the right test 
 Every behavioural fix ships with the test that fails without it.
 
 **"And the frontend?"** 291 tests with Vitest and React Testing Library (Jest's API),
-93% coverage. They render each screen with the API stubbed (no database) and check what a
+94.84% of statements and 96.11% of lines covered. They render each screen with the API stubbed (no database) and check what a
 person would see and what gets sent (cents, minutes from the Hours and Minutes boxes, only
 the changed fields). On top of that, Playwright drives a real browser against the real local API and database through the demo, and checks
 the phone layout doesn't scroll sideways.

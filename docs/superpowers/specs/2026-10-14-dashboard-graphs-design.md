@@ -1,7 +1,7 @@
 # Dashboard graphs design
 
 Status: **Built 14 Oct (plan `docs/superpowers/plans/2026-10-14-dashboard-graphs.md`).**
-Nothing here is built yet. Five changes from the chat design are marked **(changed)**;
+Five changes from the chat design are marked **(changed)**;
 each has its reason next to it, and David can reverse any of them with one word.
 
 **Why:** the dashboard answers the client's questions in words and numbers today: cards,
@@ -104,7 +104,10 @@ through `spentPercent(percent, cents)` (`format.js:48`), so under 1% reads "<1%"
 `Box` inside the `<li>`. That `Box` is the target: at least 24 px tall, wrapped in a MUI
 `Tooltip` that opens on tap (`enterTouchDelay={0}`, as `AllocationPage.jsx:29`), focusable
 (`tabIndex={0}`) so the keyboard gets the same text, with `role="img"` and an `aria-label`
-holding the tooltip's sentence. The value comes first in the tooltip, then the name. React
+holding the tooltip's sentence. The value comes first in the tooltip, then the name.
+Because `role="img"` hides the row's own text from screen readers, the sentence also carries
+every state word the row shows: "Late", "Outside project dates", "+5 h over", "over budget",
+"planned cost is over budget" (added in the final review, 14 Oct). React
 escapes the text, so names from the API can't inject markup. Tooltips only repeat what the
 list or table already shows.
 

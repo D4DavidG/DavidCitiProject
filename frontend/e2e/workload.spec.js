@@ -92,7 +92,7 @@ for (const [name, size] of [['desktop', { width: 1440, height: 900 }], ['phone',
 test('tabbing onto a row opens its tooltip, as hovering does', async ({ page }) => {
   const chart = await openDashboard(page)
   const row = ben(chart)
-  const sentence = '45 h booked, capacity 40 h · Apollo 25 h, Zeus 20 h · Ben Okafor'
+  const sentence = '45 h booked, capacity 40 h, +5 h over · Apollo 25 h, Zeus 20 h · Ben Okafor'
   await expect(row).toHaveAttribute('aria-label', sentence)
 
   await row.hover()

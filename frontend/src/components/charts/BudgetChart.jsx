@@ -48,13 +48,18 @@ function Arrow({ outside }) {
 
 Arrow.propTypes = { outside: PropTypes.bool }
 
+/**
+ * The sentence a row's tooltip and aria-label carry, ending in the name. role="img" hides the
+ * row's own text from screen readers, so both red warnings the row shows are in here too.
+ */
 function rowTooltip(p, over) {
   if (!(p.budgetCents > 0)) return `No budget set · ${formatCents(p.consumedCents)} spent · ${p.name}`
   const planned = p.plannedCents > 0
     ? `${formatCents(p.plannedCents)} planned (${spentPercent(p.plannedPercent, p.plannedCents)})`
     : 'nothing planned'
   const overWord = over ? ' · over budget' : ''
-  return `${formatCents(p.consumedCents)} spent (${spentPercent(p.consumedPercent, p.consumedCents)}) · ${formatCents(p.pendingCents)} waiting (${spentPercent(p.pendingPercent, p.pendingCents)}) · ${planned} · budget ${formatCents(p.budgetCents)}${overWord} · ${p.name}`
+  const plannedOverWord = p.plannedOverBudget ? ' · planned cost is over budget' : ''
+  return `${formatCents(p.consumedCents)} spent (${spentPercent(p.consumedPercent, p.consumedCents)}) · ${formatCents(p.pendingCents)} waiting (${spentPercent(p.pendingPercent, p.pendingCents)}) · ${planned} · budget ${formatCents(p.budgetCents)}${overWord}${plannedOverWord} · ${p.name}`
 }
 
 /**

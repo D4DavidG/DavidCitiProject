@@ -103,7 +103,9 @@ export default function TimelineChart({ deliverables, edges, projectStart, proje
         const outside = d.startDate < projectStart || d.dueDate > projectEnd
         const { left, width } = span(axis, d.startDate, d.dueDate)
         const problem = lateNow ? 'late' : undefined
-        const tooltip = `${percent} done · ${d.name} · ${formatDay(d.startDate)} – ${formatDate(d.dueDate)} · ${stateWord}${afterText}`
+        // Every visible state word goes in the sentence: role="img" hides the row's own text from screen readers.
+        const outsideText = outside ? ' · Outside project dates' : ''
+        const tooltip = `${percent} done · ${d.name} · ${formatDay(d.startDate)} – ${formatDate(d.dueDate)} · ${stateWord}${afterText}${outsideText}`
         return (
           <ChartRow key={d.milestoneId} tooltip={tooltip}>
             <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: COLUMNS, alignItems: 'center' }}>

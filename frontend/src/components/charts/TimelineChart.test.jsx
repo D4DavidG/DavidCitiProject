@@ -23,7 +23,7 @@ describe('TimelineChart', () => {
     expect(screen.getAllByRole('img').map((r) => r.getAttribute('aria-label'))).toEqual([
       '100% done · Design · Oct 1 – Oct 6, 2026 · Done',
       '0% done · Build · Oct 1 – Nov 12, 2026 · In progress · after Design',
-      '0% done · Migration · Aug 14 – Oct 10, 2026 · Late',
+      '0% done · Migration · Aug 14 – Oct 10, 2026 · Late · Outside project dates',
     ])
     expect(within(row('Build')).getByText('Build · after Design')).toBeInTheDocument()
   })
@@ -47,7 +47,10 @@ describe('TimelineChart', () => {
   it('says when a deliverable sits outside the project dates', () => {
     draw()
     expect(within(row('Migration')).getByText('Outside project dates')).toBeInTheDocument()
+    // role="img" hides the row's own text from screen readers, so its name must carry the words too.
+    expect(row('Migration')).toHaveAccessibleName(/ · Outside project dates$/)
     expect(within(row('Build')).queryByText('Outside project dates')).toBeNull()
+    expect(row('Build')).not.toHaveAccessibleName(/Outside project dates/)
     expect(within(row('Migration')).getByTestId('bar')).toHaveStyle({ left: '0%' })
   })
 
