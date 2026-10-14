@@ -14,7 +14,12 @@ local stack (section 7), but reaches AWS only after `./bin/deploy-backend.sh` an
 - the bell: asks every 10 s while the tab is visible, at once when you come back, with a
   pop-up when the count rises (AWS: every 30 s, no pop-up);
 - the three charts: **Workload this week** and **Budget by project** on the Dashboard, and
-  the **Deliverables timeline** on each project.
+  the **Deliverables timeline** on each project;
+- requests for everyone: **Requests** in every role's menu, **New request** with the kinds
+  your role may send, **Mine** / **To decide** tabs for managers (migration
+  `003_request_kinds.sql`, applied by the Lambda's first cold start after the deploy).
+  The seed's pending overtime request from Ben exists only in a database seeded after
+  this change; on AWS, make a request live instead (GUIDE §3, step 10).
 
 Until you deploy, Path A on AWS has no charts in steps 1 and 5, no Board (so no "The
 pull-board moment"), and a slower bell with no pop-up in "The audit-log moment". Demo
@@ -266,20 +271,20 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 19 s) | `432 passed in 18.99s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  31 passed (31)` and `Tests  291 passed (291)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `490 passed in 19.40s` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  31 passed (31)` and `Tests  297 passed (297)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 291 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 297 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
 
 | Command | Takes | Numbers (14 Oct) |
 | --- | --- | --- |
-| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 13 s | `TOTAL 1847 73 96%`: api 100%, function.py 100%, domain 99%, services 94.9%, store 93.9% |
-| `cd frontend && npm run test:coverage` | about a minute and a half (108 s) | Statements 94.84%, Branches 90.64%, Functions 91.02%, Lines 96.11% |
+| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 20 s | `TOTAL 1905 68 96%`: api 100%, function.py 100%, domain 99%, services 95.4%, store 93.9% |
+| `cd frontend && npm run test:coverage` | about a minute and a half (108 s) | Statements 94.72%, Branches 91.16%, Functions 90.47%, Lines 95.83% |
 
 The rubric asks for 80% overall and 90% on API and error paths. What the missing 4% is,
 honestly: mostly guards (already archived, not found, nothing to change), **plus five real

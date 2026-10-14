@@ -62,14 +62,22 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
   `tests/backend/test_store_commits.py` guards that.
 - **Wire format:** JSON is camelCase; Python and SQL are snake_case. `services/views.py`
   names every output field, so a password hash can never leak.
+- **Requests (`services/requests.py`):** everyone but admins asks. Managers ask the admins
+  (new project, archive a project, free text); employees ask their line manager or an
+  admin (higher task limit, overtime, free text). Who may decide is one SQL condition,
+  the same people `record_change` notifies when the request is sent. Approving calls the
+  existing service (`archive_project`, `set_capacity`) in the same transaction, so the
+  same rules and audit rows apply, and the decision notifies the asker.
 
-### Data model (`backend/tracker/store/migrations/001_init.sql` and `002_task_limit.sql`)
+### Data model (`backend/tracker/store/migrations/001_init.sql`, `002_task_limit.sql`, `003_request_kinds.sql`)
 
 `users`, `projects`, `assignments` (bookings, "Resources" on screen), `milestones`
 (deliverables), `milestone_dependencies`, `tasks`, `time_entries`, `project_requests`,
 `audit_log`, `notifications`: ten tables for the app, plus `schema_migrations`, which the
 migration runner keeps for itself. `002_task_limit.sql` adds one column, `users.task_limit`
 (1 to 10, default 2), because the first file never changes once it has run on Aurora.
+`003_request_kinds.sql` gives `project_requests` a `kind` (new project, archive a project,
+task limit, overtime, other), with a check per kind; old rows default to new project.
 Money is integer cents. Nothing is deleted: a trigger refuses `DELETE` on every
 application table, and records are archived and reactivated instead.
 
@@ -142,8 +150,7 @@ Also: login and the forced first password change; My account (your own name, ema
 log time, typed in two boxes, Hours and Minutes; a **Ready to take** section); a **Board** tab on each project
 (Ready, To do, In progress, Done, with Take this, Put back and Assign); Approvals; People (accounts, capacity,
 overtime, task limit, password resets; a new or reset password is shown once, with a **Copy username
-and password** button); Project
-requests; Notifications (a bell polled every 10 s while the tab is visible, at once when you return to it, and after every change, with a pop-up when something new arrives); Audit log
+and password** button); Requests (everyone asks: Mine and To decide tabs for managers); Notifications (a bell polled every 10 s while the tab is visible, at once when you return to it, and after every change, with a pop-up when something new arrives); Audit log
 (admins, with before/after changes). On phones the sidebar becomes a drawer, tables
 become cards and the grid scrolls sideways (<img src="docs/screenshots/phone-dashboard.png" alt="Dashboard at phone width" width="120">).
 
@@ -200,7 +207,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 432 passed
+.venv/bin/pytest -q                                                        # 490 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -227,8 +234,8 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 291 passed: Vitest + React Testing Library
-npm run test:coverage                     # 94.84% of statements, 96.11% of lines
+npm test                                  # 297 passed: Vitest + React Testing Library
+npm run test:coverage                     # 94.72% of statements, 95.83% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
 ```
@@ -241,7 +248,9 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
   manager signs in and walks the seven questions (dashboard, allocation, a project, its
   dependencies), and the dashboard at phone width has no sideways scrolling.
   `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
-- Against the rubric's goals: frontend 94.84% of statements (goal 80%); the demo journey end to end.
+  `requests.spec.js`: an employee asks her line manager, he rejects it with a note from
+  To decide, and she reads the answer at phone width.
+- Against the rubric's goals: frontend 94.72% of statements (goal 80%); the demo journey end to end.
 
 **Known gaps (the uncovered 4% of the backend, 5% of the frontend):**
 

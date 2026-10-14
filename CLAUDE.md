@@ -24,9 +24,15 @@ outdated it.
   boxes, no chart library; the server sends every percentage): a deliverables timeline on
   each project, and a budget chart and this week's workload on the dashboard
   (`components/charts/`). Also not deployed: an employee's project work now notifies the
-  project's manager too (`services/audit.py`). Tests: 432 backend, 291 website, and 21 Playwright browser
-  tests in 7 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
-  puts back a task; `e2e/tour.spec.js` screenshots every screen at desktop and phone width;
+  project's manager too (`services/audit.py`). Also not deployed: **requests for
+  everyone** (migration `003_request_kinds.sql`; spec
+  `docs/superpowers/specs/2026-10-14-requests-design.md`): employees ask their line
+  manager for a higher task limit, overtime or anything else; managers ask the admins
+  for a new project, to archive one, or anything else; approving applies the change and
+  the asker's bell says so. Tests: 490 backend, 297 website, and 22 Playwright browser
+  tests in 8 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
+  puts back a task; `e2e/requests.spec.js` asks and answers a request;
+  `e2e/tour.spec.js` screenshots every screen at desktop and phone width;
   `timeline`, `budget` and `workload` specs check the charts).
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
@@ -42,15 +48,17 @@ outdated it.
   - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
     email or texts (role and network), and the design for any future reset flow;
   - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
-    a per-person task limit), built 14 Oct (66 routes, two migration files).
+    a per-person task limit), built 14 Oct (66 routes; three migration files since
+    `003_request_kinds.sql`).
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
   and cleanup scripts, and `terraform apply`/`destroy`. Every other shell command runs
   without a prompt (a blanket `"Bash"` allow, added 14 Oct at David's request; delete
   that line to go back). Hand him the exact commands for the denied ones.
 - **Open items:**
-  - deploy the three charts: `git push origin David`, then `./bin/deploy-backend.sh` (the
-    server's `plannedPercent` and `pendingPercent`) and `./bin/deploy-frontend.sh`;
+  - deploy the three charts and requests for everyone: `git push origin David`, then
+    `./bin/deploy-backend.sh` (the server's `plannedPercent` and `pendingPercent`, and
+    migration 003 on the first cold start) and `./bin/deploy-frontend.sh`;
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
   - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8);
@@ -78,6 +86,7 @@ disagrees.
 | Over-allocation | Bookings above a person's capacity are **allowed and flagged** (question 5), not refused. One booking is 1 to 40 h/week; no overlapping live bookings per person per project |
 | Approver | The line manager (`users.manager_id`) **or any admin** approves or rejects logged time. Nobody approves their own |
 | Tasks | Deliverables hold tasks (estimate, assignee, To Do / In Progress / Done). The manager creates; employees pull Ready tasks (Take this, up to their `task_limit`, default 2); managers can still assign. The assignee moves status and logs time. Deliverable status is **computed**; the manager signs off, refused until all tasks and dependencies are done |
+| Requests (14 Oct) | `project_requests` gains a `kind` (migration 003). Managers ask the admins (new project, archive a project, free text); employees ask their line manager or an admin (task limit, overtime, free text). Who may decide = who is notified when it is sent. Approving runs the existing service (`archive_project`, `set_capacity`) in the same transaction |
 | Invariant | `GET /admin/integrity-check`: 5 queries that must return no rows (no dependency loops; nothing live under an archived project; every record has its CREATE audit row; no time logged outside a booking; no signed-off deliverable with unfinished work). Runs after every database test |
 | Schema | `TEXT` + `CHECK` instead of `ENUM`; numbered migrations in `store/migrations/`. Full design: `docs/superpowers/specs/2026-10-13-database-design.md` |
 | Wire naming (§2.4) | camelCase in JSON, snake_case in Python and Postgres, converted only in `api/http.py` (incoming keys, computed results) and `services/views.py` (each record's fields, by name) |
@@ -103,7 +112,7 @@ backend/tracker/                 # one Lambda; the URL segment is /api/tracker/.
 ├── requirements.txt             # psycopg[binary] only
 ├── .gitignore                   # the pip packages start-dev.sh vendors here (trap 4)
 ├── store/
-│   ├── migrations/              # 001_init.sql, 002_task_limit.sql: numbered SQL files; never edit one that has run on Aurora
+│   ├── migrations/              # 001_init.sql, 002_task_limit.sql, 003_request_kinds.sql; never edit one that has run on Aurora
 │   ├── migrate.py               # applies new migrations on cold start, under an advisory lock
 │   ├── integrity.py             # the 5 integrity queries
 │   └── postgres.py              # connection, atomic(), queries; psycopg errors -> domain errors
@@ -230,8 +239,9 @@ the actor.** That covers every create, edit, archive and reactivate: users (acco
 created, role or title changed, password changed or reset), projects, deliverables,
 resources, budget, dependencies, tasks (created, assigned, claimed from the board, put
 back, status moved), time entries (logged, edited, approved, rejected), capacity,
-overtime and task-limit settings, and project
-requests and their decisions. Reads are not logged.
+overtime and task-limit settings, and requests of every kind and their decisions (a
+decision also notifies the asker, through `record_change(..., also_notify=)`). Reads
+are not logged.
 Refused requests (403, 404, 409) changed nothing, so they are not logged either.
 
 | Actor's role (stored in the DB at the time) | Who is notified |

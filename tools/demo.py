@@ -198,7 +198,9 @@ def seed() -> None:
     legacy = admin.ok("POST", "/projects", {"name": "Legacy CRM", "managerId": uid["maria.lopez@acme.test"],
                                             "startDate": day(-200), "predictedEndDate": day(-40), "status": "COMPLETE"})
     admin.ok("POST", f"/projects/{legacy['projectId']}/archive")
-    step("Hermes approved from a request, Iris pending, Legacy CRM archived")
+    # Ben is at capacity with overtime off: he asks Maria, his line manager, to allow it.
+    ben.ok("POST", "/project-requests", {"kind": "OVERTIME", "justification": "Portal UI needs a Saturday to finish"})
+    step("Hermes approved from a request, Iris pending, Legacy CRM archived, Ben's overtime request pending")
     print(f"\nDone. Every seeded person's password is {DEMO_PASSWORD}. Usernames: python3 tools/demo.py demo")
 
 

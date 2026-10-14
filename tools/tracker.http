@@ -73,6 +73,22 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/me/ready-tasks
 Authorization: Bearer {{token}}
 
+### Requests you may decide, pending only. scope: MINE (you asked) or TO_DECIDE; also kind=.
+# Admins decide every request; a manager decides their own employees' requests.
+GET {{baseUrl}}/project-requests?scope=TO_DECIDE&status=PENDING
+Authorization: Bearer {{token}}
+
+### Requests of one kind: NEW_PROJECT, ARCHIVE_PROJECT, TASK_LIMIT, OVERTIME or OTHER.
+# Sending one is a write (POST /project-requests), so it is not here. The body per kind:
+#   manager:  {"kind": "NEW_PROJECT", "name": "Hermes", "justification": "...",
+#              "proposedStart": "2026-11-01", "proposedEnd": "2027-02-28"}
+#   manager:  {"kind": "ARCHIVE_PROJECT", "projectId": 1, "justification": "..."}
+#   employee: {"kind": "TASK_LIMIT", "taskLimit": 3, "justification": "..."}
+#   employee: {"kind": "OVERTIME", "justification": "..."}
+#   either:   {"kind": "OTHER", "name": "A second monitor", "justification": "..."}
+GET {{baseUrl}}/project-requests?kind=OVERTIME
+Authorization: Bearer {{token}}
+
 ### Audit log, newest first (admin only). Every change, with before/after state.
 GET {{baseUrl}}/admin/audit-log?page=1&pageSize=20
 Authorization: Bearer {{token}}

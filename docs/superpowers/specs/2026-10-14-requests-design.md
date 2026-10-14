@@ -1,6 +1,6 @@
 # Requests for everyone: design
 
-Status: **Designed 14 Oct 2026 (evening)**; plan: `docs/superpowers/plans/2026-10-14-requests.md`.
+Status: **Built 14 Oct 2026 (evening), local only until the next deploy**; plan: `docs/superpowers/plans/2026-10-14-requests.md`.
 
 **Why:** today only a manager can ask for something (a new project). David chose
 "Everyone, more kinds": employees ask their line manager, managers ask the admins, and

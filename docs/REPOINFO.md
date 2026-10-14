@@ -4,12 +4,12 @@ What to say to the Citi evaluators (15 Oct) and in later job interviews. It cove
 say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minute-demo).
 
 **Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
-final fix wave and the project-manager notifications: 432 backend tests, 291 website tests, 21
-Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
+final fix wave, the project-manager notifications and requests for everyone: 490 backend
+tests, 297 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
-pop-up, the three charts, and the project manager being notified of an employee's project
-work. Every number below says when it was measured. Every claim
+pop-up, the three charts, the project manager being notified of an employee's project
+work, and requests for everyone (migration 003). Every number below says when it was measured. Every claim
 points at a file and line you can open.
 
 **Contents:** [1 Pitch](#1-the-pitch) · [2 Seven questions](#2-the-seven-questions) ·
@@ -32,8 +32,8 @@ points at a file and line you can open.
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 432 backend tests running against a real Postgres database,
-> and 291 website tests."
+> with Terraform. There are 490 backend tests running against a real Postgres database,
+> and 297 website tests."
 
 ### 2 minutes
 
@@ -123,7 +123,7 @@ browser -> CloudFront (/api/tracker*) -> Lambda Function URL
   shared by every layer.
 
 **Point at:** `backend/tracker/function.py:58-71`, `api/app.py:36-49` (`dispatch`),
-`api/routes.py:125` (`match`), `api/errors.py:17-41`.
+`api/routes.py:126` (`match`), `api/errors.py:17-41`.
 
 ---
 
@@ -187,7 +187,7 @@ layer uses `domain`.
 | `milestone_dependencies` | "A depends on B", both in the same project | Dependency view |
 | `tasks` | A work item: estimate in minutes, assignee, status (`TODO`, `IN_PROGRESS`, `DONE`) | Tasks under a deliverable |
 | `time_entries` | Logged time: date, minutes, note, the hourly rate frozen when logged (`hourly_rate_cents`), status (`PENDING`, `APPROVED`, `REJECTED`) | My tasks, Approvals |
-| `project_requests` | A manager asks for a project; the admin's decision; `created_project_id` | Requests |
+| `project_requests` | A request of one `kind`: a manager asks the admins for a new project (`created_project_id` once approved) or to archive one (`project_id`); an employee asks their line manager for a higher task limit (`task_limit`) or overtime; either asks anything else. The decision, by whom, and its note | Requests |
 | `audit_log` | One row per change: who, their role, the action, which record, before and after (JSONB), a one-line summary | Audit log |
 | `notifications` | One per person told, per audit row; read or unread | The bell |
 
@@ -201,7 +201,8 @@ users ─┬─ manages ─► projects ─┬─► assignments (person × hour
        │                       └─► milestones ─┬─► milestone_dependencies (A needs B)
        │                                       └─► tasks ──► time_entries
        ├─ line manager of ─► users (manager_id points back at users)
-       └─ files ─► project_requests ──(when approved)──► projects
+       └─ asks ─► project_requests ──(when approved)──► a new or archived project,
+                                                          or the asker's task limit / overtime
 every change ──► audit_log ──► notifications (one per person told)
 ```
 
@@ -209,8 +210,8 @@ every change ──► audit_log ──► notifications (one per person told)
 
 | What | How many | Example |
 | --- | --- | --- |
-| CHECK rules | 41 | A booking is 1 to 40 h/week; a budget can't be negative; you can't approve your own time |
-| Foreign keys (links between tables) | 26 | A task must belong to a real deliverable |
+| CHECK rules | 47 | A booking is 1 to 40 h/week; a budget can't be negative; you can't approve your own time |
+| Foreign keys (links between tables) | 27 | A task must belong to a real deliverable |
 | Primary keys | 11 | One per table, `schema_migrations` included |
 | UNIQUE | 5, plus a unique index on `lower(email)` | A username is used once; two people can't share an email, whatever the capitals |
 | Exclusion constraint | 1 (`assignments_no_overlap`) | The same person can't be booked twice on the same project for overlapping dates |
@@ -349,9 +350,9 @@ from the token."
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "432 backend tests against a real Postgres database, at
-96% coverage, with the API layer at 100%. Plus 291 website tests at 94.84% of
-statements, and 21 Playwright browser tests."
+**Headline (fresh, 14 Oct 2026):** "490 backend tests against a real Postgres database, at
+96% coverage, with the API layer at 100%. Plus 297 website tests at 94.72% of
+statements, and 22 Playwright browser tests."
 
 **What (three layers, plus the website):**
 
@@ -361,16 +362,16 @@ statements, and 21 Playwright browser tests."
 | 2. Rules | Each business rule behaves as specified | Calls the services directly; never imports `api` | e.g. `tests/backend/test_work.py` |
 | 3. API | All 66 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route other than login is missed | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
 | Website | Screens behave correctly | Vitest + React Testing Library, with `fetch` stubbed (no database) | `frontend/src/**/*.test.jsx` |
-| Browser | The demo works in a real browser | Playwright: 21 tests in 7 files (one only takes README screenshots) | `frontend/e2e/` |
+| Browser | The demo works in a real browser | Playwright: 22 tests in 8 files (one only takes README screenshots) | `frontend/e2e/` |
 
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct (after the pull board):** backend `432 passed in 18.99s`; coverage
-  `1847 statements, 73 missed, 96%`. By folder: `api/` 100%, `function.py` 100%, `domain/`
-  99%, `services/` 94.9%, `store/` 93.9%. Website: 31 files, `291 passed`, about a minute and
-  a half. Website coverage: 94.84% of statements, 96.11% of lines, 90.64% of branches,
-  91.02% of functions. Lint: clean.
+- **Fresh numbers, 14 Oct (after requests for everyone):** backend `490 passed in 19.40s`;
+  coverage `1905 statements, 68 missed, 96%`. By folder: `api/` 100%, `function.py` 100%,
+  `domain/` 99%, `services/` 95.4%, `store/` 93.9%. Website: 31 files, `297 passed`, about
+  a minute and a half. Website coverage: 94.72% of statements, 95.83% of lines, 91.16% of
+  branches, 90.47% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
   `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
   later 14 Oct changes; none of its tests log time, type an estimate or click Copy.
@@ -536,12 +537,12 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **432 backend, 291 website, 21 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **490 backend, 297 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **96% of statements** (94% with
-   branches), the API layer 100%. Website **94.84% statements, 96.11% lines, 90.64% branches,
-   91.02% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after the charts). Browser tests
+   branches), the API layer 100%. Website **94.72% statements, 95.83% lines, 91.16% branches,
+   90.47% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after requests for everyone). Browser tests
    and load tests get no percentage, on purpose: their measure is journeys walked, and speed
    and failures. *Point at: `docs/TESTING.md` section 2*
 3. **"Selenium or Playwright?"** Playwright. It waits by itself for a button to be clickable
@@ -565,10 +566,11 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    `record_change` notifies her line manager, every admin and, when the change is to a
    project's work (a task, logged time), that project's manager too. Chloe reports to Sam,
    so Sam's bell goes up; if the task is on Maria's project, Maria's does as well. Someone
-   who is both is told once. The project manager was added on 14 Oct after this meeting. *Point at: `services/audit.py:41-47` (the recipient rule) and `:51-66` (finding the project's manager); `tests/backend/test_audit.py` (the four project-manager tests); `tools/demo.py:37`*
+   who is both is told once. The project manager was added on 14 Oct after this meeting. *Point at: `services/audit.py:42-51` (the recipient rule) and `:55-70` (finding the project's manager); `tests/backend/test_audit.py` (the four project-manager tests); `tools/demo.py:37`*
 8. **"Does every action make a notification?"** Every successful change writes one audit
    row and notifies the people above the actor (employee: line manager, admins and, for project work, the project's manager; manager:
-   admins; admin: the other admins). Reads and refused requests are not logged. One test
+   admins; admin: the other admins). A decision on a request also notifies whoever asked
+   (`also_notify`). Reads and refused requests are not logged. One test
    calls every write route and checks it left an audit row. *Point at: CLAUDE.md section 2 table; `tests/backend/test_api_audit_walk.py`*
 9. **"What if someone steals the access token? A 15-minute timer?"** Today: the token lasts
    8 hours, carries only the user id, and the role is re-read from the database on every
@@ -583,7 +585,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 11. **"How can you delete projects?"** You can't, by design: an admin archives (and can
     reactivate), and a Postgres trigger refuses any DELETE on every application table. The
     rubric's D in CRUD is met by archive; we haven't yet asked an evaluator whether that
-    counts. **Queued, not built:** managers asking an admin to archive a project. *Point at: `store/migrations/001_init.sql:239-255`; `api/routes.py:66`*
+    counts. **Built 14 Oct (not on AWS until the next deploy):** a manager asks an admin to archive a project from the Requests page; approving runs the same `archive_project`. *Point at: `store/migrations/001_init.sql:239-255`; `api/routes.py:66`; `services/requests.py` (`_apply`)*
 12. **"History for employees?"** Today an admin can open the audit log and filter by person,
     record type and date, with before and after state. **Queued, not built:** a History tab
     per person that their line manager can read. *Point at: `frontend/src/pages/audit/AuditLogPage.jsx:99-103`*
@@ -599,7 +601,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     charts). The server avoids one-query-per-row loops and every list is paginated.
     **Queued, not built:** splitting the bundle per page and a cleanup pass. *Point at: `frontend/dist/assets/index-*.js`; `services/paging.py`*
 15. **"Guardrails: how do you know the requirements are met?"** Three layers: Postgres
-    refuses bad rows (41 CHECK rules, 26 foreign keys, one exclusion constraint, 10
+    refuses bad rows (47 CHECK rules, 27 foreign keys, one exclusion constraint, 10
     triggers); five integrity queries must return no rows and run after every database test
     and at `GET /admin/integrity-check`; and the role table decides who may call what. The
     requirements are traced to screens and tests. *Point at: `store/integrity.py`; `docs/superpowers/specs/2026-10-14-requirements-check.md`*
@@ -781,7 +783,7 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
     *`api/errors.py:17-41`*
 24. **"Audit atomic with the change?"** `record_change` runs in the same `atomic()`
     transaction. Integrity query 3 and a walk test over every write route catch a forgotten
-    call. *`services/audit.py:27-47`; `tests/backend/test_api_audit_walk.py:17`*
+    call. *`services/audit.py:29-52`; `tests/backend/test_api_audit_walk.py:17`*
 25. **"Pagination?"** Top-level lists return `{items, page, pageSize, total, totalPages}`,
     capped at 100, paged in SQL except the dashboard (paged in Python to put at-risk
     first). Lists inside a project return the whole list in that same envelope.
@@ -842,7 +844,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Every API route is tested over HTTP" | "Every route is called in-process with a Lambda-shaped event; real HTTP is covered by the demo script and Playwright" | `test_api.py` calls `app.dispatch()` |
 | "The uncovered 4% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:239` |
 | "The rule tests prove the layers are separate" | "The rule tests show services don't need HTTP; the import direction is what keeps them separate" | No test enforces imports |
-| "Real Postgres, not mocks" (right after "291 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
+| "Real Postgres, not mocks" (right after "297 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
 | "The staircase went up to 11 s" | "Up to about 10 s in the logs (9.8 s)" | 7 to 11 s was the load-test client's `max` column |
 | "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:278-279` |
@@ -892,7 +894,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 432 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 490 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -909,8 +911,8 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 432 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 291 / 94.84% | Website tests / statements (96.11% of lines) | 14 Oct |
+| 490 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
+| 297 / 94.72% | Website tests / statements (95.83% of lines) | 14 Oct |
 | 66 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 10 + 1 | Tables: ten for the app, plus `schema_migrations` | 14 Oct |

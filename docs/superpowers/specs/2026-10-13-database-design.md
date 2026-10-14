@@ -168,12 +168,19 @@ unfinished tasks a person may take themselves (Take this); a manager can still a
 it. It is set with capacity and "overtime allowed". Section 4 below shows `001_init.sql`
 as first written and is not edited, because that file never changes once it has run.
 
+**Added 14 Oct (migration `003_request_kinds.sql`):** `project_requests` gains `kind`
+(`NEW_PROJECT` by default, `ARCHIVE_PROJECT`, `TASK_LIMIT`, `OVERTIME`, `OTHER`),
+`project_id` (archive requests only) and `task_limit` (task-limit requests only), with a
+CHECK per rule, and nobody may decide their own request. The SQL and the reasons are in
+`docs/superpowers/specs/2026-10-14-requests-design.md` section 3.
+
 ## 3. Files
 
 ```
 backend/tracker/store/
 ├── migrations/001_init.sql   # section 4
 ├── migrations/002_task_limit.sql  # adds users.task_limit (14 Oct)
+├── migrations/003_request_kinds.sql  # requests of five kinds (14 Oct)
 ├── migrate.py                # section 5
 ├── integrity.py              # section 6
 └── postgres.py               # connect(), atomic(), error translation; section 3.1

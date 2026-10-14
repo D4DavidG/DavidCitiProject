@@ -69,8 +69,11 @@ Modelled on Jira, GitHub Projects and OpenProject, not on a payroll system.
 | Create, archive and restore users; reset passwords; edit salaries | yes | no | no |
 | Set weekly capacity, "overtime allowed" and task limit | anyone | own reports | no |
 | Edit own name and email; see own salary | yes | yes | yes |
-| Create projects, approve requests, assign managers, archive or restore projects | yes | no | no |
-| Request a new project | n/a | yes | no |
+| Create projects, assign managers, archive or restore projects | yes | no | no |
+| Ask for a new project or to archive one (Requests) | n/a | yes | no |
+| Ask for a higher task limit or overtime (Requests) | n/a | no | yes |
+| Ask anything else (Requests, free text) | n/a | yes | yes |
+| Decide requests | all | own reports' | no |
 | Edit description, dates, budget and status; book people | all | own projects | no |
 | Deliverables and dependencies: create, edit, sign off, archive | all | own projects | no |
 | Tasks: create, assign, estimate | all | own projects | no |
@@ -119,7 +122,7 @@ at risk       = past end date and not complete, OR a deliverable overdue,
 
 Login, Change password, Dashboard, Projects (list and detail, with Deliverables, Tasks,
 Board, Resources and Budget tabs), Dependency view, Allocation grid, People, My tasks (Ready to take; update
-status, log time), Approvals (logged time), Project requests, Notifications, Audit log
+status, log time), Approvals (logged time), Requests, Notifications, Audit log
 (admin).
 
 ## Out of the MVP
