@@ -43,7 +43,7 @@ class Actor:
         return self.role == EMPLOYEE
 
 
-def load(conn: psycopg.Connection, user_id: int) -> Actor:
+def load(conn: psycopg.Connection, user_id: int, issued_at: int | None = None) -> Actor:
     """The live (not archived) user with this id; otherwise the standard 401."""
     row = conn.execute(
         "SELECT user_id, role, manager_id, first_name, last_name, must_change_password"

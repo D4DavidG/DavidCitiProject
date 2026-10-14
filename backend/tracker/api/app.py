@@ -25,7 +25,8 @@ def authorise(conn: psycopg.Connection, request: http.Request, route: routes.Rou
     header = request.headers.get("authorization", "")
     if not header.startswith("Bearer "):
         raise AuthenticationError(tokens.INVALID_MESSAGE)
-    actor = actors.load(conn, tokens.verify(header[len("Bearer "):], secret, now))
+    claims = tokens.verify(header[len("Bearer "):], secret, now)
+    actor = actors.load(conn, claims.user_id, claims.issued_at)
     if actor.must_change_password and not route.allowed_before_password_change:
         raise PasswordChangeRequired("Change your generated password before continuing.")
     if route.roles is not None and actor.role not in route.roles:

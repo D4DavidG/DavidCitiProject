@@ -88,7 +88,7 @@ def test_duplicate_email_is_a_conflict(conn, org):
 def test_login_with_username_returns_a_token_for_that_user(conn, org):
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
     result = users.login(conn, {"username": username.lower(), "password": org["alice_pw"]}, SECRET, NOW)
-    assert tokens.verify(result["token"], SECRET, NOW) == org["alice"].user_id
+    assert tokens.verify(result["token"], SECRET, NOW).user_id == org["alice"].user_id
     assert result["user"]["must_change_password"] is True
 
 

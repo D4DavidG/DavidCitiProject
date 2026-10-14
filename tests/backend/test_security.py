@@ -62,7 +62,20 @@ def test_username_is_initials_plus_six_digits(first, last, prefix):
 
 def test_token_round_trip_gives_back_the_user_id():
     token = tokens.issue(42, SECRET, now=NOW)
-    assert tokens.verify(token, SECRET, now=NOW + dt.timedelta(hours=1)) == 42
+    assert tokens.verify(token, SECRET, now=NOW + dt.timedelta(minutes=10)).user_id == 42
+
+
+def test_access_token_lasts_fifteen_minutes():
+    assert tokens.LIFETIME == dt.timedelta(minutes=15)
+    token = tokens.issue(42, SECRET, now=NOW)
+    assert tokens.verify(token, SECRET, now=NOW + dt.timedelta(minutes=14, seconds=59)).user_id == 42
+    with pytest.raises(AuthenticationError):
+        tokens.verify(token, SECRET, now=NOW + dt.timedelta(minutes=15))
+
+
+def test_verify_returns_the_issue_time():
+    token = tokens.issue(42, SECRET, now=NOW)
+    assert tokens.verify(token, SECRET, now=NOW) == tokens.Claims(42, int(NOW.timestamp()))
 
 
 def test_expired_token_is_refused():
