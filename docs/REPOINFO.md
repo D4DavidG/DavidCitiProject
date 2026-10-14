@@ -630,10 +630,12 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     errors with `aria-describedby`, and the tour test checks the phone layout. There is no
     axe package in `frontend/package.json` and no scan in `frontend/e2e/`. An axe scan inside
     Playwright is queued. *Point at: `frontend/e2e/tour.spec.js`; `frontend/package.json`*
-20. **"A schedule and project plan like Float?"** Partly built. The allocation grid is
-    Float-style (people by weeks, over-booked weeks flagged), and the deliverables timeline
-    shows each project's milestones against dates. Float has drag-to-schedule; we don't:
-    bookings are edited in a form. *Point at: `frontend/src/pages/allocation/AllocationPage.jsx`; `frontend/src/components/charts/TimelineChart.jsx`*
+20. **"A schedule and project plan like Float?"** Mostly built. The **Schedule** screen is
+    Float-style: people by weeks, a bar per booking in its project's colour ("Apollo · 25 h/wk"),
+    over-booked weeks outlined in red with "+5 h over", a bar opens its project. It reads the
+    allocation route, nothing new on the server. The deliverables timeline shows each project's
+    milestones against dates. Float has drag-to-schedule; we don't: bookings are edited in a
+    form. *Point at: `frontend/src/pages/schedule/SchedulePage.jsx`; `frontend/src/components/charts/TimelineChart.jsx`*
 21. **"If someone logs too many hours: warn them, let them go ahead, flag the manager?"**
     Yes, built 14 Oct (not yet deployed). Without overtime allowed, the first answer is a
     409 with `code: "OVER_CAPACITY"` ("This puts you 2 h over your 40 h week. Log anyway?

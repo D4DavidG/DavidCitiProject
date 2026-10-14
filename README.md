@@ -154,6 +154,8 @@ screen per question, in the order a manager needs them:
 
 Three charts, drawn with plain MUI boxes and no chart library: a deliverables timeline on each project, and a budget chart and this week's workload on the dashboard. The server sends every percentage.
 
+**Schedule** (questions 3 and 5, Float-style; managers and admins): one row per person, weeks across (8, 13 or 26), a bar per booking in its project's colour labelled "Apollo · 25 h/wk", a red outline and "+5 h over" on weeks past capacity; a bar opens its project. Same `GET /dashboard/allocation` as the grid.
+
 Also: login and the forced first password change; My account (your own name, email and password); My tasks (employees move status and
 log time, typed in two boxes, Hours and Minutes; a **Ready to take** section); a **Board** tab on each project
 (Ready, To do, In progress, Done, with Take this, Put back and Assign); Approvals; People (accounts, capacity,
