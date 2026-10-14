@@ -7,6 +7,7 @@ import { STAFF, homePath, useAuth } from './auth/useAuth'
 import AppLayout from './components/AppLayout'
 import ComingSoon from './components/ComingSoon'
 import PageState from './components/PageState'
+import DashboardPage from './pages/dashboard/DashboardPage'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
 import theme from './theme/theme'
@@ -47,7 +48,7 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/change-password" element={<RequireRole><ChangePasswordPage /></RequireRole>} />
       <Route element={<SignedIn />}>
-        <Route path="/dashboard" element={<RequireRole roles={STAFF}><ComingSoon title="Dashboard" /></RequireRole>} />
+        <Route path="/dashboard" element={<RequireRole roles={STAFF}><DashboardPage /></RequireRole>} />
         <Route path="/allocation" element={<RequireRole roles={STAFF}><ComingSoon title="Allocation" /></RequireRole>} />
         <Route path="/projects" element={<ComingSoon title="Projects" />} />
         <Route path="/projects/:id" element={<ComingSoon title="Project" />} />
