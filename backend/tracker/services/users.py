@@ -26,7 +26,6 @@ ROLES = {ADMIN, MANAGER, EMPLOYEE}
 COLUMNS = columns(["user_id", "username", "first_name", "last_name", "email", "job_title", "role", "manager_id",
                    "annual_salary_cents", "weekly_capacity_hours", "overtime_allowed", "must_change_password",
                    "is_archived", "archived_at", "archived_by", "created_at", "updated_at"])
-_DUMMY_HASH = passwords.hash_password("timing-equaliser", rounds=1000)
 _PROFILE_FIELDS = {"first_name", "last_name", "email"}
 _ADMIN_FIELDS = _PROFILE_FIELDS | {"job_title", "role", "manager_id", "annual_salary_cents",
                                    "weekly_capacity_hours", "overtime_allowed"}
@@ -155,9 +154,13 @@ def login(conn: psycopg.Connection, data: dict, secret: str, now: dt.datetime) -
     row = conn.execute(sql.SQL("SELECT {}, password_hash FROM users WHERE username = %s AND NOT is_archived")
                        .format(COLUMNS),
                        (username,)).fetchone()
-    # Hash something even for an unknown username, so timing doesn't reveal which usernames exist.
-    ok = passwords.verify_password(password, row["password_hash"] if row else _DUMMY_HASH)
-    if row is None or not ok:
+    if row is None:
+        # Do the same hashing work as a real check (one PBKDF2 at the current round count),
+        # so the reply time doesn't reveal which usernames exist. Nothing is hashed at import:
+        # a 600k-round dummy there would slow every cold start by as long as a login takes.
+        passwords.hash_password(password)
+        raise AuthenticationError(BAD_LOGIN)
+    if not passwords.verify_password(password, row["password_hash"]):
         raise AuthenticationError(BAD_LOGIN)
     del row["password_hash"]
     return {"token": tokens.issue(row["user_id"], secret, now), "user": row}

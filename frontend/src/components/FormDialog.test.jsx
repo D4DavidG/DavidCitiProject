@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FormDialog from './FormDialog'
 import { ApiError } from '../services/request'
@@ -59,33 +59,121 @@ describe('FormDialog', () => {
     expect(await screen.findByText('That would overlap an existing booking.')).toBeInTheDocument()
   })
 
-  it('sends id dropdowns as numbers and hours as minutes', async () => {
+  it('sends id dropdowns as numbers', async () => {
     const onSubmit = vi.fn().mockResolvedValue({})
     render(
       <FormDialog
         open
         title="New task"
-        fields={[
-          { name: 'assigneeUserId', label: 'Assignee', type: 'select', numeric: true, options: [[4, 'Ben Okafor'], [3, 'Ana Ruiz']] },
-          { name: 'estimateMinutes', label: 'Estimate (hours)', type: 'hours' },
-        ]}
+        fields={[{ name: 'assigneeUserId', label: 'Assignee', type: 'select', numeric: true, options: [[4, 'Ben Okafor'], [3, 'Ana Ruiz']] }]}
         onClose={vi.fn()}
         onSubmit={onSubmit}
       />,
     )
     await userEvent.click(screen.getByLabelText(/assignee/i))
     await userEvent.click(await screen.findByRole('option', { name: 'Ben Okafor' }))
-    await userEvent.type(screen.getByLabelText(/estimate/i), '2.5')
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
-    expect(onSubmit).toHaveBeenCalledWith({ assigneeUserId: 4, estimateMinutes: 150 })
+    expect(onSubmit).toHaveBeenCalledWith({ assigneeUserId: 4 })
   })
 
-  it('shows minutes as hours when editing', () => {
-    render(
-      <FormDialog open title="Edit task" fields={[{ name: 'estimateMinutes', label: 'Estimate (hours)', type: 'hours' }]}
-        initial={{ estimateMinutes: 90 }} onClose={vi.fn()} onSubmit={vi.fn()} />,
-    )
-    expect(screen.getByLabelText(/estimate/i)).toHaveValue(1.5)
+  describe('a duration field (Hours and Minutes boxes)', () => {
+    const TIME = { name: 'minutes', label: 'Time', type: 'duration', max: 1440, required: true }
+    const ESTIMATE = { name: 'estimateMinutes', label: 'Estimate', type: 'duration', max: 60000, required: true }
+
+    function renderDuration(field, props = {}) {
+      const onSubmit = vi.fn().mockResolvedValue({})
+      render(<FormDialog open title="Log time" fields={[field]} onClose={vi.fn()} onSubmit={onSubmit} {...props} />)
+      return onSubmit
+    }
+
+    async function enter(hours, minutes) {
+      const group = screen.getByRole('group', { name: /time|estimate/i })
+      if (hours !== '') await userEvent.type(within(group).getByLabelText('Hours'), hours)
+      if (minutes !== '') await userEvent.type(within(group).getByLabelText('Minutes'), minutes)
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    }
+
+    it('groups the two boxes under the field label', () => {
+      renderDuration(TIME)
+      const group = screen.getByRole('group', { name: /time/i })
+      expect(within(group).getByLabelText('Hours')).toHaveAttribute('inputmode', 'numeric')
+      expect(within(group).getByLabelText('Minutes')).toHaveAttribute('inputmode', 'numeric')
+    })
+
+    it('sends 2 h 30 min as 150 minutes', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('2', '30')
+      expect(onSubmit).toHaveBeenCalledWith({ minutes: 150 })
+    })
+
+    it('refuses 75 minutes under the Minutes box, tied to it, and sends nothing', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('1', '75')
+      expect(screen.getByLabelText('Minutes')).toHaveAccessibleDescription('Minutes must be a whole number from 0 to 59.')
+      expect(screen.getByLabelText('Minutes')).toHaveAttribute('aria-invalid', 'true')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('refuses 2.5 minutes the same way', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('', '2.5')
+      expect(screen.getByLabelText('Minutes')).toHaveAccessibleDescription('Minutes must be a whole number from 0 to 59.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('refuses no time at all, under the Hours box', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('', '')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('Enter some time: at least 1 minute.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('refuses more than its maximum: 24 h 30 min of logged time', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('24', '30')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('That is more than 24 h.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('takes an estimate of 100 h but not 1001 h', async () => {
+      const onSubmit = renderDuration(ESTIMATE)
+      await enter('1001', '')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('Hours must be a whole number from 0 to 1000.')
+      expect(onSubmit).not.toHaveBeenCalled()
+      await userEvent.clear(screen.getByLabelText('Hours'))
+      await enter('100', '')
+      expect(onSubmit).toHaveBeenCalledWith({ estimateMinutes: 6000 })
+    })
+
+    it('pre-fills 420 as 7 h 0 min when editing, and sends a change as minutes', async () => {
+      const onSubmit = renderDuration(TIME, { initial: { minutes: 420 } })
+      const hours = screen.getByLabelText('Hours')
+      const minutes = screen.getByLabelText('Minutes')
+      expect(hours).toHaveValue('7')
+      expect(minutes).toHaveValue('0')
+      await userEvent.clear(hours)
+      await userEvent.type(hours, '6')
+      await userEvent.clear(minutes)
+      await userEvent.type(minutes, '45')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).toHaveBeenCalledWith({ minutes: 405 })
+    })
+
+    it('sends nothing when the time is unchanged, even if typed differently', async () => {
+      const onClose = vi.fn()
+      const onSubmit = renderDuration(TIME, { initial: { minutes: 420 }, onClose })
+      await userEvent.clear(screen.getByLabelText('Minutes'))
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).not.toHaveBeenCalled()
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it("puts the server's error for the field under the Hours box", async () => {
+      const onSubmit = vi.fn().mockRejectedValue(new ApiError(400, 'You can log at most 24 h in one day.', 'minutes'))
+      renderDuration(TIME, { onSubmit })
+      await enter('3', '')
+      await waitFor(() => expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('You can log at most 24 h in one day.'))
+    })
   })
 
   it('pre-fills defaults for a new record and sends them', async () => {

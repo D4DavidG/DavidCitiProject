@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PeoplePage from './PeoplePage'
@@ -7,6 +7,14 @@ import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
 const MARIA = { userId: 2, username: 'ML662930', firstName: 'Maria', lastName: 'Lopez', email: 'maria.lopez@acme.test', role: 'MANAGER', jobTitle: 'Delivery lead', managerId: null, weeklyCapacityHours: 40, overtimeAllowed: false, isArchived: false, annualSalaryCents: 13_000_000 }
 const BEN = { userId: 4, username: 'BO435681', firstName: 'Ben', lastName: 'Okafor', email: 'ben.okafor@acme.test', role: 'EMPLOYEE', jobTitle: 'Developer', managerId: 2, weeklyCapacityHours: 40, overtimeAllowed: false, isArchived: false, annualSalaryCents: 10_000_000 }
 const DEV = { ...BEN, userId: 6, username: 'DS516414', firstName: 'Dev', lastName: 'Shah', managerId: 9, annualSalaryCents: undefined }
+
+/** Gives jsdom (which has no clipboard) a navigator.clipboard whose writeText is the given mock. */
+function stubClipboard(writeText = vi.fn().mockResolvedValue(undefined)) {
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  return writeText
+}
+
+afterEach(() => { delete navigator.clipboard })
 
 function renderPeople(user = USERS.admin, answers = {}) {
   const calls = stubApi({ 'GET /users': [200, page([MARIA, BEN, DEV])], ...answers })
@@ -56,6 +64,45 @@ describe('PeoplePage', () => {
     expect(within(shown).getByText('CK971979')).toBeInTheDocument()
     expect(within(shown).getByText('Xy7kQ2mP9aLw')).toBeInTheDocument()
     expect(within(shown).getByText(/shown only once/i)).toBeInTheDocument()
+  })
+
+  it('copies the new username and password together, as two lines', async () => {
+    const writeText = stubClipboard()
+    renderPeople(USERS.admin, {
+      'POST /users': [201, { user: { ...BEN, userId: 7, username: 'CK971979', firstName: 'Chloe', lastName: 'Kim' }, temporaryPassword: 'Xy7kQ2mP9aLw' }],
+    })
+    await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(screen.getByRole('button', { name: /new person/i }))
+    await userEvent.type(screen.getByLabelText(/first name/i), 'Chloe')
+    await userEvent.type(screen.getByLabelText(/last name/i), 'Kim')
+    await userEvent.type(screen.getByLabelText(/email/i), 'chloe.kim@acme.test')
+    await userEvent.click(screen.getByRole('button', { name: /create/i }))
+    const shown = await screen.findByRole('dialog', { name: /account created/i })
+    await userEvent.click(within(shown).getByRole('button', { name: 'Copy username and password' }))
+    expect(writeText).toHaveBeenCalledWith('Username: CK971979\nTemporary password: Xy7kQ2mP9aLw')
+    expect(within(shown).getByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
+
+  it('copies the username and the reset password together', async () => {
+    const writeText = stubClipboard()
+    renderPeople(USERS.admin, { 'POST /users/4/reset-password': [200, { temporaryPassword: 'N3wTempPass12' }] })
+    const table = await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(within(table).getByRole('button', { name: /reset password for ben okafor/i }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /reset password/i }))
+    const shown = await screen.findByRole('dialog', { name: /password reset/i })
+    await userEvent.click(within(shown).getByRole('button', { name: 'Copy username and password' }))
+    expect(writeText).toHaveBeenCalledWith('Username: BO435681\nTemporary password: N3wTempPass12')
+  })
+
+  it('says so when the browser refuses to copy, instead of failing silently', async () => {
+    stubClipboard(vi.fn().mockRejectedValue(new Error('denied')))
+    renderPeople(USERS.admin, { 'POST /users/4/reset-password': [200, { temporaryPassword: 'N3wTempPass12' }] })
+    const table = await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(within(table).getByRole('button', { name: /reset password for ben okafor/i }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /reset password/i }))
+    const shown = await screen.findByRole('dialog', { name: /password reset/i })
+    await userEvent.click(within(shown).getByRole('button', { name: 'Copy username and password' }))
+    expect(await within(shown).findByText(/couldn't copy/i)).toBeInTheDocument()
   })
 
   it('lets a manager set capacity for their own reports only, and not create accounts', async () => {

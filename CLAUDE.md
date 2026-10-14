@@ -12,27 +12,46 @@ David.
 **Rule:** if something here goes out of date, fix it in the same commit as the code that
 outdated it.
 
-### Where things stand (updated 14 Oct, midday)
+### Where things stand (updated 14 Oct, morning)
 
 - **Built:** backend, database and every website screen in `MVP.md`. All of it is
-  deployed to AWS and checked there. Tests: 374 backend, 199 website, and Playwright
-  browser tests (`e2e/demo.spec.js` walks the demo; `e2e/tour.spec.js` screenshots
+  deployed to AWS and checked there, except three uncommitted 14 Oct changes (Hours and
+  Minutes boxes, **Copy username and password**, the login-timing fix at
+  `services/users.py:157-162`): on AWS after the next `./bin/deploy-backend.sh` and
+  `./bin/deploy-frontend.sh`. Tests: 375 backend, 219 website, and 8 Playwright browser
+  tests in 3 files (`e2e/demo.spec.js` walks the demo; `e2e/tour.spec.js` screenshots
   every screen at desktop and phone width).
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);
+  - `docs/INTERVIEW-PREP.md` (what to say, with every claim checked against the code,
+    and a "say this, not that" table) and `docs/DEMO-RUNBOOK.md` (what to run and click
+    live, the tests, Plan B); `tools/tracker.http` holds read-only API requests for VS
+    Code's REST Client;
   - `docs/OVERNIGHT-REPORT.md`: what was built on the night of 13 to 14 Oct, every
     decision made for David, and what isn't verified;
   - `docs/superpowers/plans/2026-10-13-manual-verification.md`: the AWS checklist,
-    all steps done.
+    all steps done;
+  - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
+    email or texts (role and network), and the design for any future reset flow;
+  - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
+    a per-person task limit), proposed and not built.
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
-  and cleanup scripts, and `terraform apply`/`destroy`. Shell commands outside its
-  short allow list prompt David. Hand him the exact commands to run.
+  and cleanup scripts, and `terraform apply`/`destroy`. Every other shell command runs
+  without a prompt (a blanket `"Bash"` allow, added 14 Oct at David's request; delete
+  that line to go back). Hand him the exact commands for the denied ones.
 - **Open items:**
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
-  - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8).
+  - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8);
+  - old sessions survive a password change: tokens carry only the user id and `verify`
+    never checks when one was issued (`services/tokens.py:47-59`); fix with
+    `password_changed_at`;
+  - changing your own email needs no current password (`update_self` in
+    `services/users.py`); it matters once an emailed reset exists;
+  - pull board designed (`docs/superpowers/specs/2026-10-14-pull-board-design.md`),
+    waiting for David's review. Until it is built: 62 routes, one migration file.
 
 ---
 
@@ -46,15 +65,15 @@ disagrees.
 | Question | Decision |
 | --- | --- |
 | Manager model (plan §2.1) | (a) org chart. `users.manager_id` is the line manager. Any manager staffs anyone onto projects they manage. Employees never choose projects |
-| Accounts | Admin creates accounts. The server generates the username (`^[A-Z]{2}[0-9]{6}$`, initials plus 6 digits, **never changes**) and a 12-character password (`secrets`), shown once. Login is by username. A forced change on first login (every route but change-password and "me" answers 403). Self-edit: name and email only. Forgotten password: admin reset. Emailed reset code is a stretch goal: the workshop role has no SES access |
+| Accounts | Admin creates accounts. The server generates the username (`^[A-Z]{2}[0-9]{6}$`, initials plus 6 digits, **never changes**) and a 12-character password (`secrets`), shown once. Login is by username. A forced change on first login (every route but change-password and "me" answers 403). Self-edit: name and email only. Forgotten password: admin reset. Emailed reset code is a stretch goal. Checked 14 Oct: the Lambda can't send email or texts. Its role has no `ses:` permission, and it sits in a VPC with no NAT gateway or email/SNS endpoint, which our role can't create |
 | Consumed cost (§2.2) | **Time logged on tasks** (date, minutes, note), as in Jira and OpenProject, not Workday. Only the task's assignee logs. Only approved entries cost money, at the `hourly_rate_cents` frozen on the entry when logged. Clock in/out, pay periods, overtime review and overtime premiums were **removed on 13 Oct** as payroll features |
 | Overtime | Each person has `weekly_capacity_hours` (default 40) and `overtime_allowed` (default off), set by their line manager or an admin. Logging past capacity in a Mon-to-Sun week is refused (409) unless allowed; when allowed, the week is flagged |
 | Over-allocation | Bookings above a person's capacity are **allowed and flagged** (question 5), not refused. One booking is 1 to 40 h/week; no overlapping live bookings per person per project |
 | Approver | The line manager (`users.manager_id`) **or any admin** approves or rejects logged time. Nobody approves their own |
 | Tasks | Deliverables hold tasks (estimate, assignee, To Do / In Progress / Done). The manager creates and assigns; the assignee moves status and logs time. Deliverable status is **computed**; the manager signs off, refused until all tasks and dependencies are done |
-| Invariant | `GET /admin/integrity-check`: 5 queries that must return no rows (no dependency loops; nothing live under an archived project; every record has its CREATE audit row; no time logged outside a booking; no signed-off deliverable with unfinished work). Runs after every test |
+| Invariant | `GET /admin/integrity-check`: 5 queries that must return no rows (no dependency loops; nothing live under an archived project; every record has its CREATE audit row; no time logged outside a booking; no signed-off deliverable with unfinished work). Runs after every database test |
 | Schema | `TEXT` + `CHECK` instead of `ENUM`; numbered migrations in `store/migrations/`. Full design: `docs/superpowers/specs/2026-10-13-database-design.md` |
-| Wire naming (§2.4) | camelCase in JSON, snake_case in Python and Postgres, converted only in `api/serializers.py` |
+| Wire naming (§2.4) | camelCase in JSON, snake_case in Python and Postgres, converted only in `api/http.py` (incoming keys, computed results) and `services/views.py` (each record's fields, by name) |
 | Removal | `POST /{thing}/{id}/archive` and `/reactivate`. No DELETE verb anywhere, and tests assert it. Explain in the README why this departs from the rubric's DELETE/204 |
 | Update verb | PATCH, with partial bodies. The server refuses fields the caller's role may not change |
 | Storage | **Postgres only, no in-memory store.** Tests run against their own database, `tracker_test`, with each test rolled back |
@@ -91,9 +110,10 @@ backend/tracker/                 # one Lambda; the URL segment is /api/tracker/.
 │   └── audit.py                 # record_change(): audit row + notifications
 └── api/
     ├── routes.py                # the one route table: method, path, roles, handler
-    ├── authorise.py             # token check, then the role re-read from the DB
+    ├── app.py                   # dispatch() and authorise(): token check, then the role re-read from the DB
     ├── errors.py                # the one exception -> status table
-    └── serializers.py           # explicit fields, snake_case -> camelCase
+    ├── handlers.py              # one function per route
+    └── http.py                  # event parsing, camelCase <-> snake_case (record fields: services/views.py)
 tests/backend/                   # pytest; conftest rebuilds tracker_test, runs the integrity check on teardown
 requirements-dev.txt, pytest.ini  # repo root: test tooling (venv in .venv/)
 frontend/src/
@@ -490,9 +510,9 @@ The detail is in the plan:
 - Money is integer cents everywhere except on screen, and one module converts it (§2.3).
 - Nothing is deleted: archive and reactivate. There is no DELETE route and no `delete`
   method, and tests assert their absence (§4). A Postgres trigger also refuses `DELETE` on
-  every table.
-- The invariant: the 5 integrity queries return no rows. Every test's teardown checks
-  it, and so does `GET /admin/integrity-check`.
+  every application table (`schema_migrations` has none).
+- The invariant: the 5 integrity queries return no rows. Every database test's teardown
+  checks it, and so does `GET /admin/integrity-check`.
 - Answer 404, never 403, for something that exists but isn't yours, with byte-identical
   messages (§7).
 - Authorise from the role stored in the database, never from the token's claim (§7).
@@ -561,7 +581,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # on
 (cd frontend && npm test)                                                  # website: Vitest + RTL
 (cd frontend && npm run test:coverage && npm run lint)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)                        # Playwright; needs start-dev.sh + seed
-# Screen tour: usernames come from `demo.py demo`; add E2E_BASE_URL=<CloudFront URL> for AWS
+# Screen tour: usernames come from `demo.py demo`; add E2E_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net for AWS
 (cd frontend && E2E_MANAGER_USERNAME=... E2E_EMPLOYEE_USERNAME=... E2E_TOUR_DIR=/some/dir npm run e2e -- tour)
 ```
 
@@ -569,7 +589,7 @@ Demo against the running API (local proxy, or the deployed URL via `TRACKER_API`
 
 ```sh
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py seed   # once: users, projects, tasks, time
-TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then every refusal
+TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then ten refusals
 TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py    # concurrent reads + logins; LocalStack fails past ~15 users (its file limit)
 terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first password (per environment)
 (set -a; source ENVIRONMENT.config; python3 tools/console.py logs)  # AWS console, signed in (lambda|logs|rds|cloudfront|s3)

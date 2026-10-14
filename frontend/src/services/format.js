@@ -58,6 +58,36 @@ export function formatHours(minutes) {
   return parts.join(' ') || '0 min'
 }
 
+/** 420 -> { hours: '7', minutes: '0' }: the text for the Hours and Minutes boxes when editing. */
+export function splitMinutes(minutes) {
+  if (minutes === null || minutes === undefined) return { hours: '', minutes: '' }
+  return { hours: String(Math.floor(minutes / 60)), minutes: String(minutes % 60) }
+}
+
+const WHOLE = /^\d+$/
+
+/**
+ * What someone typed in the Hours and Minutes boxes -> { minutes } in total, or
+ * { box, error } naming the box ('hours' or 'minutes') the message belongs under.
+ * An empty box counts as 0. Whole numbers only, so "2.5" is refused rather than
+ * guessed at. maxMinutes is the server's own limit (1440 for logged time).
+ */
+export function parseDuration(hoursText, minutesText, maxMinutes) {
+  const hours = String(hoursText ?? '').trim() || '0'
+  const minutes = String(minutesText ?? '').trim() || '0'
+  const maxHours = Math.floor(maxMinutes / 60)
+  if (!WHOLE.test(hours) || Number(hours) > maxHours) {
+    return { box: 'hours', error: `Hours must be a whole number from 0 to ${maxHours}.` }
+  }
+  if (!WHOLE.test(minutes) || Number(minutes) > 59) {
+    return { box: 'minutes', error: 'Minutes must be a whole number from 0 to 59.' }
+  }
+  const total = Number(hours) * 60 + Number(minutes)
+  if (total === 0) return { box: 'hours', error: 'Enter some time: at least 1 minute.' }
+  if (total > maxMinutes) return { box: 'hours', error: `That is more than ${formatHours(maxMinutes)}.` }
+  return { minutes: total }
+}
+
 /** "2026-10-14" -> "Oct 14, 2026". A date has no time zone, so it is read as UTC to keep the day. */
 export function formatDate(iso) {
   if (!iso) return DASH

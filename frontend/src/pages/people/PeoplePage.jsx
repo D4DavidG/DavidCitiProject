@@ -35,15 +35,20 @@ function accountFields(managers) {
   ]
 }
 
-/** Shows a generated password once, with a copy button. It is never shown again. */
+/**
+ * Shows a generated password once, with a button that copies the username and password
+ * together, labelled as on screen, so the admin can paste both to the person. It is never
+ * shown again.
+ */
 function PasswordShown({ title, person, username, password, onClose }) {
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState('idle') // 'idle' | 'copied' | 'failed'
   async function copy() {
     try {
-      await navigator.clipboard.writeText(password)
-      setCopied(true)
+      // Throws when there is no clipboard (plain-HTTP pages) or the browser refuses.
+      await navigator.clipboard.writeText(`Username: ${username}\nTemporary password: ${password}`)
+      setCopyState('copied')
     } catch {
-      setCopied(false)
+      setCopyState('failed')
     }
   }
   return (
@@ -56,9 +61,10 @@ function PasswordShown({ title, person, username, password, onClose }) {
         <Typography variant="body2" color="text.secondary">Temporary password</Typography>
         <Typography sx={{ fontFamily: 'monospace', fontSize: '1.25rem' }}>{password}</Typography>
         <Alert severity="warning">This password is shown only once. Give it to them; they must change it when they first sign in.</Alert>
+        {copyState === 'failed' && <Alert severity="error">Couldn&apos;t copy. Select the username and password and copy them by hand.</Alert>}
       </DialogContent>
       <DialogActions>
-        <Button onClick={copy}>{copied ? 'Copied' : 'Copy password'}</Button>
+        <Button onClick={copy}>{copyState === 'copied' ? 'Copied' : 'Copy username and password'}</Button>
         <Button variant="contained" onClick={onClose}>Done</Button>
       </DialogActions>
     </Dialog>

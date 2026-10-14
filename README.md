@@ -34,14 +34,16 @@ however many projects or people there are.
 
 ## Architecture
 
-One Lambda, `backend/tracker/`, in four layers. Each layer only calls the one below it.
+One Lambda, `backend/tracker/`: an entry point and four folders, with Postgres underneath.
+Dependencies only point downward: nothing below `api/` knows HTTP exists.
 
 ```
 request -> function.py      Lambda entry: one connection per warm instance, migrate on cold start
         -> api/             parse the event, match the route table, authorise, map errors to status codes
-        -> services/        every business rule; raises domain errors, knows nothing about HTTP
+        -> services/        the business rules and their SQL; raise domain errors, know nothing about HTTP
         -> store/           Postgres connection and transactions, migrations, integrity queries
         -> PostgreSQL       constraints refuse bad rows even if a service has a bug
+           domain/          errors, money, clock, values: shared by every layer, imports nothing else
 ```
 
 - **`api/routes.py`** is the one route table: method, path, which roles may call it.
@@ -51,10 +53,12 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
   401 not signed in, 403 role can't, 404 missing *or not yours* (identical messages,
   so ids can't be probed), 409 state refuses (over capacity, dependency loop), 503
   database down.
-- **`services/`** holds every rule, and the rule tests call it directly, never through
-  HTTP. That is what proves the layers are separate.
+- **`services/`** holds the business rules (overlap and self-approval are Postgres only);
+  rule tests call it directly, never through HTTP, which shows the rules don't need HTTP.
+  What keeps the layers apart is the import direction: nothing below `api/` imports it
+  (`api/app.py` does reach past `services/` for `store.postgres.translate_errors`).
 - **`store/postgres.py`** opens every connection in autocommit mode and wraps every
-  write in `atomic()`. psycopg's default would silently never commit after a read;
+  multi-statement write in `atomic()`. psycopg's default would silently never commit after a read;
   `tests/backend/test_store_commits.py` guards that.
 - **Wire format:** JSON is camelCase; Python and SQL are snake_case. `services/views.py`
   names every output field, so a password hash can never leak.
@@ -63,8 +67,10 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
 
 `users`, `projects`, `assignments` (bookings, "Resources" on screen), `milestones`
 (deliverables), `milestone_dependencies`, `tasks`, `time_entries`, `project_requests`,
-`audit_log`, `notifications`. Money is integer cents. Nothing is deleted: a trigger
-refuses `DELETE` on every table, and records are archived and reactivated instead.
+`audit_log`, `notifications`: ten tables for the app, plus `schema_migrations`, which the
+migration runner keeps for itself. Money is integer cents. Nothing is deleted: a trigger
+refuses `DELETE` on every application table, and records are archived and reactivated
+instead.
 
 The database itself refuses whatever one row can prove wrong:
 
@@ -74,7 +80,10 @@ The database itself refuses whatever one row can prove wrong:
 - a dependency across projects;
 - someone approving their own time.
 
-Rules that need several rows, the clock or the caller live in the services.
+Postgres enforces what a constraint can express; rules that need the clock, sums or the
+caller (weekly capacity, sign-off, dependency loops, ownership) live in the services; the
+five integrity queries catch what neither can prevent. Some rules are in both (booking
+hours, date order), and some only in the database (overlap, self-approval).
 
 **Integrity check** (`store/integrity.py`, `GET /admin/integrity-check`): five queries
 that must always return no rows:
@@ -85,13 +94,15 @@ that must always return no rows:
 - no time logged outside a booking;
 - no signed-off deliverable with unfinished work.
 
-They run after **every** test.
+They run after every database test.
 
 ### Business rules
 
 - **Accounts:** admins create them. The server generates the username (initials plus 6
   digits, never changed) and a 12-character password, shown once and changed at first
-  login. Passwords are hashed with PBKDF2-SHA256 at 600,000 rounds.
+  login. Passwords are hashed with PBKDF2-SHA256 at 600,000 rounds. An unknown username
+  costs the same hashing work as a wrong password, so the reply time doesn't reveal which
+  usernames exist (test: `test_unknown_username_costs_the_same_hashing_as_a_wrong_password`).
 - **Projects:** admins create projects. A manager runs their own: description, dates,
   budget, status, bookings, deliverables, tasks.
 - **Tasks:** employees move the tasks assigned to them and log time on them. They can't
@@ -117,7 +128,9 @@ screen per question, in the order a manager needs them:
 | ![Project page with deliverables and tasks](docs/screenshots/project.png) | ![Dependencies: Design, then Build, then Launch (blocked)](docs/screenshots/dependencies.png) |
 
 Also: login and the forced first password change; My account (your own name, email and password); My tasks (employees move status and
-log time); Approvals; People (accounts, capacity, overtime, password resets); Project
+log time, typed in two boxes, Hours and Minutes); Approvals; People (accounts, capacity,
+overtime, password resets; a new or reset password is shown once, with a **Copy username
+and password** button); Project
 requests; Notifications (a bell polled every 30 s and after every change); Audit log
 (admins, with before/after changes). On phones the sidebar becomes a drawer, tables
 become cards and the grid scrolls sideways (<img src="docs/screenshots/phone-dashboard.png" alt="Dashboard at phone width" width="120">).
@@ -127,7 +140,8 @@ frontend/src/
   services/request.js   the one module that calls the API: base URL, token, JSON, errors
                         as { status, message, field }; a 401 signs out in one place
   services/format.js    the only code that turns cents, minutes and dates into text (and
-                        typed dollars into cents, as text, never floating point)
+                        typed dollars into cents, as text, never floating point; typed
+                        hours and minutes into minutes)
   auth/                 session (token in sessionStorage, probed with /auth/me on load),
                         RequireRole (signed-out -> login, must change password -> there first)
   components/           layout, DataTable (table on desktop, cards on phones), FormDialog,
@@ -137,7 +151,10 @@ frontend/src/
 
 - **No business rules in the browser.** Every figure (risk, progress, money, over
   capacity) comes from the server; the website formats it. Buttons a role can't use
-  aren't shown, but the server is what refuses.
+  aren't shown, but the server is what refuses. The one exception is convenience, not a
+  rule: the Hours and Minutes boxes check whole numbers and the server's own limits (24 h
+  of logged time, 1,000 h of estimate) so the dialog can say which box is wrong; the server
+  still enforces both.
 - **Hash URLs** (`/#/projects/7`): the server only ever serves `index.html`, so CloudFront
   needs no rewrite rule (the one we removed also swallowed the API's 404s).
 - **Server errors are shown as written**, on the field they concern when there is one
@@ -168,7 +185,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 374 passed
+.venv/bin/pytest -q                                                        # 375 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -176,7 +193,9 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # on
 
 Against the rubric's coverage goals (`docs/full-stack.md`): backend 96% (goal 80%);
 the API layer (`api/`: routing, auth, error mapping, every handler) 100% (goal 90%), with
-every route in the table called over HTTP by the two walk tests.
+every route in the table called by the two walk tests. They run in-process: a
+Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exercised by
+`tools/demo.py` and Playwright.
 
 | File | What it proves |
 | --- | --- |
@@ -186,15 +205,15 @@ every route in the table called over HTTP by the two walk tests.
 | `test_users.py`, `test_audit.py`, `test_projects.py`, `test_work.py`, `test_requests.py`, `test_dashboard.py` | every business rule, calling services directly |
 | `test_api.py` | routing (both path shapes), every non-public route needs a token, role from the database, 404 not 403, error and list shapes, no DELETE anywhere |
 | `test_api_audit_walk.py` | calls every write route and checks each one left an audit row |
-| `test_api_read_walk.py` | calls every read route and checks its shape; audit-log filters; malformed queries and bodies; a crash is a bare 500 |
+| `test_api_read_walk.py` | calls every read route and checks its shape; audit-log filters; malformed queries and bodies; a crash is a 500 with a generic message (`{"error": ...}`) |
 | `test_domain.py`, `test_security.py` | validation, money, the Eastern-time clock, hashing (and that production stays at 600k rounds), tokens |
 
 ### Frontend tests
 
 ```sh
 cd frontend
-npm test                                  # 199 passed: Vitest + React Testing Library
-npm run test:coverage                     # 93% of statements, 94% of lines
+npm test                                  # 219 passed: Vitest + React Testing Library
+npm run test:coverage                     # 93% of statements, 95% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
 ```
@@ -213,8 +232,13 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
 
 - guard branches in the services for ids that don't exist or records already archived
   (for example, archiving an archived task); the same guards are tested on other records;
+- a handful of real rules with no test yet: reactivating a deliverable or task clears a
+  sign-off (`milestones.py:197`, `tasks.py:146`); adding a dependency clears a sign-off
+  (`milestones.py:291`); archived deliverables can't be in dependencies
+  (`milestones.py:268`); a manager who still runs live projects can't be demoted
+  (`users.py:237`);
 - the database-down branch inside a request (the cold-start one is tested);
-- in the frontend, mostly the People screen's less-used paths: copy-to-clipboard, an
+- in the frontend, mostly the People screen's less-used paths: an
   admin editing a person, "Show archived" and paging; plus the Reactivate buttons for an
   archived project or person;
 - end to end covers the manager's demo journey and the phone layout; the employee
@@ -277,8 +301,9 @@ one VDI. On AWS the same 10 users got 3.5 times the throughput with no failures.
 deployed URL (set `TRACKER_API`).
 
 ```sh
-TRACKER_ADMIN_PASSWORD='<admin password>' python3 tools/demo.py seed   # once
-TRACKER_ADMIN_PASSWORD='<admin password>' python3 tools/demo.py demo
+read -rsp 'Admin password: ' TRACKER_ADMIN_PASSWORD; echo; export TRACKER_ADMIN_PASSWORD
+python3 tools/demo.py seed   # once
+python3 tools/demo.py demo
 ```
 
 `seed` creates two managers and four employees (password `Demo-pass-2026`), three live
@@ -311,16 +336,26 @@ The first request after a deploy migrates Aurora and creates `AD000001`.
 - **Cost arithmetic in SQL.** Budget and risk figures sum `minutes x rate / 60` in SQL,
   one aggregate query rather than a row-by-row loop, using the same rounding as
   `domain/money.py`. The budget test pins the two together.
-- **No refresh tokens.** Tokens expire after 8 hours, then sign in again. A token
-  can't be revoked, so the role is re-read from the database on every request.
+- **No refresh tokens.** Tokens expire after 8 hours, then sign in again. One token can't be
+  revoked, but the user is re-read on every request, so archiving them ends all their tokens.
 - **Secrets in Terraform state.** The JWT secret and the first admin's password are
   generated by Terraform, so they are in its state file. The forced password change
   limits the exposure.
 - **"Today" is Eastern time,** from one constant (`domain/clock.py`).
-- **Lambda memory is 512 MB,** so a 600k-round PBKDF2 login takes about 0.5 s rather
-  than about 2 s.
+- **Lambda memory is 512 MB,** because the 600k-round PBKDF2 login is CPU-bound and
+  Lambda gives CPU in proportion to memory. We estimated 0.5 s; AWS measured about 1.1 s.
 - **Known disclosure:** a manager who books one person can work out that person's rate
   from planned cost.
+- **No email or text messages.** On AWS the Lambda runs on the organisers' role, which has
+  no `ses:` permission, inside a private network with no NAT gateway or email/SNS
+  endpoint, and our role can't create either. So a new or reset password is shown once to
+  the admin and must be changed at first sign-in
+  ([findings](./docs/superpowers/specs/2026-10-14-email-and-sms-findings.md)).
+- **Known security gaps.** A password change doesn't end old sessions: a token carries
+  only the user id, and `verify` never checks when it was issued
+  (`services/tokens.py:47-59`); the fix is a `password_changed_at` column. And changing
+  your own email needs no current password (`update_self`, `services/users.py`), which
+  would matter once an emailed reset exists.
 
 ## Contributing
 

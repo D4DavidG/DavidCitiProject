@@ -44,13 +44,13 @@ email and password. A forgotten password is reset by an admin.
 Modelled on Jira, GitHub Projects and OpenProject, not on a payroll system.
 
 - **Tasks:** each deliverable is broken into tasks. The project's manager creates them,
-  gives each an estimate in hours, and assigns it to someone booked on the project.
+  gives each an estimate in hours and minutes, and assigns it to someone booked on the project.
 - **Ticking work off:** the assignee moves their task from To Do to In Progress to Done.
 - **Progress** of a deliverable is the share of its estimated hours that are done.
   "Blocked" shows automatically while a deliverable it depends on isn't finished.
 - **Sign-off:** the manager signs a deliverable off, and only once all its tasks and
   dependencies are done.
-- **Logging time:** the assignee logs hours on their task (a date, a number of hours,
+- **Logging time:** the assignee logs time on their task (a date, hours and minutes,
   a note). Their line manager, or any admin, approves or rejects it. Only approved time
   is charged to the project's budget, at the hourly rate the person had when they
   logged it.

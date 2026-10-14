@@ -13,7 +13,7 @@ import { useApi } from '../../services/useApi'
 const TASK_STATUSES = [['TODO', 'To do'], ['IN_PROGRESS', 'In progress'], ['DONE', 'Done']]
 const TIME_FIELDS = [
   { name: 'workDate', label: 'Date', type: 'date', required: true, helper: 'Not in the future. You must have been booked on the project that day.' },
-  { name: 'minutes', label: 'Time (hours)', type: 'hours', required: true, helper: 'e.g. 2.5 for two and a half hours.' },
+  { name: 'minutes', label: 'Time', type: 'duration', max: 1440, required: true, helper: 'Hours and minutes, e.g. 2 h 30 min.' },
   { name: 'note', label: 'Note', type: 'textarea' },
 ]
 

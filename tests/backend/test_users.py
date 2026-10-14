@@ -4,6 +4,7 @@ Rule tests call the services directly and never import the api package.
 """
 
 import datetime as dt
+import hashlib
 import re
 
 import pytest
@@ -104,6 +105,27 @@ def test_every_login_failure_gets_the_same_401(conn, org, case):
     with pytest.raises(AuthenticationError) as caught:
         users.login(conn, credentials, SECRET, NOW)
     assert str(caught.value) == users.BAD_LOGIN
+
+
+def test_unknown_username_costs_the_same_hashing_as_a_wrong_password(conn, org, monkeypatch):
+    # The dummy check for an unknown username once ran at a fixed 1,000 rounds while real
+    # hashes run at 600,000: about 1 s apart on AWS, enough to tell which usernames exist.
+    # Any round count other than the suite's 1,000 exposes a dummy that doesn't follow ROUNDS.
+    monkeypatch.setattr(users.passwords, "ROUNDS", 1234)
+    bob, bob_pw = f.person(conn, org["admin"], first_name="Bob")
+    username = users.get_user(conn, bob, bob.user_id)["username"]
+    rounds_used = []
+    real_pbkdf2 = hashlib.pbkdf2_hmac
+
+    def spy(name, password, salt, rounds):
+        rounds_used.append(rounds)
+        return real_pbkdf2(name, password, salt, rounds)
+
+    monkeypatch.setattr(hashlib, "pbkdf2_hmac", spy)
+    for name in (username, "ZZ999999"):  # known user with a wrong password, then an unknown username
+        with pytest.raises(AuthenticationError):
+            users.login(conn, {"username": name, "password": "wrong-" + bob_pw}, SECRET, NOW)
+    assert rounds_used == [1234, 1234]
 
 
 def test_change_password_clears_the_forced_change(conn, org):
