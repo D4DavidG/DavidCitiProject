@@ -2,7 +2,7 @@
 
 A project-management and tracking platform for ACME Inc., built for the Citi coding
 workshop (13 to 15 Oct 2026). It answers the client's seven questions from live data:
-React with Material UI on the front (in progress), Python on AWS Lambda behind it,
+React with Material UI on the front, Python on AWS Lambda behind it,
 PostgreSQL (Aurora) underneath, deployed with Terraform and the repo's shell scripts.
 
 - How it works, how to demo it, likely questions: [docs/GUIDE.md](./docs/GUIDE.md)
@@ -105,12 +105,53 @@ They run after **every** test.
 - **Audit:** every change writes an audit row in the same transaction, and notifies
   the people above the actor (in-app bell).
 
+## The website (`frontend/`)
+
+React 19 with Material UI, react-responsive and React Router, built with Vite. It has one
+screen per question, in the order a manager needs them:
+
+| Dashboard (questions 1, 2, 7) | Allocation grid (questions 3, 5) |
+| --- | --- |
+| ![Dashboard: Apollo at risk with its reason and budget bar](docs/screenshots/dashboard.png) | ![Allocation grid: Ben booked 45 of 40 hours, Apollo 25 h and Zeus 20 h](docs/screenshots/allocation.png) |
+| **Project (question 4): deliverables, tasks, resources, budget** | **Dependency view (question 6)** |
+| ![Project page with deliverables and tasks](docs/screenshots/project.png) | ![Dependencies: Design, then Build, then Launch (blocked)](docs/screenshots/dependencies.png) |
+
+Also: login and the forced first password change; My tasks (employees move status and
+log time); Approvals; People (accounts, capacity, overtime, password resets); Project
+requests; Notifications (a bell polled every 30 s and after every change); Audit log
+(admins, with before/after changes). On phones the sidebar becomes a drawer, tables
+become cards and the grid scrolls sideways (<img src="docs/screenshots/phone-dashboard.png" alt="Dashboard at phone width" width="120">).
+
+```
+frontend/src/
+  services/request.js   the one module that calls the API: base URL, token, JSON, errors
+                        as { status, message, field }; a 401 signs out in one place
+  services/format.js    the only code that turns cents, minutes and dates into text (and
+                        typed dollars into cents, as text, never floating point)
+  auth/                 session (token in sessionStorage, probed with /auth/me on load),
+                        RequireRole (signed-out -> login, must change password -> there first)
+  components/           layout, DataTable (table on desktop, cards on phones), FormDialog,
+                        BudgetBar, StatusChip, PageState (loading / error with Retry / empty)
+  pages/                one folder per screen
+```
+
+- **No business rules in the browser.** Every figure (risk, progress, money, over
+  capacity) comes from the server; the website formats it. Buttons a role can't use
+  aren't shown, but the server is what refuses.
+- **Hash URLs** (`/#/projects/7`): the server only ever serves `index.html`, so CloudFront
+  needs no rewrite rule (the one we removed also swallowed the API's 404s).
+- **Server errors are shown as written**, on the field they concern when there is one
+  ("2 tasks are not done yet", "past your capacity of 40 h").
+
 ## Running it locally (on the VDI)
 
 ```sh
 source ~/.bashrc && ./bin/start-dev.sh          # Postgres, LocalStack, deploys the Lambda, proxy :3001, Vite :3000
 curl http://localhost:3001/api/tracker/health   # {"status": "ok"}
 ```
+
+Then open `http://localhost:3000`. For demo data, run `tools/demo.py seed` (see "Live
+demo" below); every seeded account's password is `Demo-pass-2026`.
 
 The first admin is `AD000001`. Its generated password differs per environment:
 
@@ -127,7 +168,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 369 passed
+.venv/bin/pytest -q                                                        # 372 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -148,12 +189,36 @@ every route in the table called over HTTP by the two walk tests.
 | `test_api_read_walk.py` | calls every read route and checks its shape; audit-log filters; malformed queries and bodies; a crash is a bare 500 |
 | `test_domain.py`, `test_security.py` | validation, money, the Eastern-time clock, hashing (and that production stays at 600k rounds), tokens |
 
-**Known gaps (the uncovered 4%):**
+### Frontend tests
+
+```sh
+cd frontend
+npm test                                  # 175 passed: Vitest + React Testing Library
+npm run test:coverage                     # 93% of statements, 94% of lines
+npm run lint                              # ESLint, clean
+E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
+```
+
+- **Component and screen tests** (beside the code, `*.test.jsx`) render each screen with
+  the API stubbed at `fetch`, and check what a person would see and what gets sent:
+  field names, cents, minutes, only-changed fields on edit, the server's refusals shown
+  as written, role-dependent buttons, phone layout.
+- **End to end** (`frontend/e2e/demo.spec.js`, against the local API and database): a
+  manager signs in and walks the seven questions (dashboard, allocation, a project, its
+  dependencies), and the dashboard at phone width has no sideways scrolling.
+  `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
+- Against the rubric's goals: frontend 93% (goal 80%); the demo journey end to end.
+
+**Known gaps (the uncovered 4% of the backend, 7% of the frontend):**
 
 - guard branches in the services for ids that don't exist or records already archived
   (for example, archiving an archived task); the same guards are tested on other records;
 - the database-down branch inside a request (the cold-start one is tested);
-- the frontend, which is not built yet;
+- in the frontend, mostly the People screen's less-used paths: copy-to-clipboard, an
+  admin editing a person, "Show archived" and paging; plus the Reactivate buttons for an
+  archived project or person;
+- end to end covers the manager's demo journey and the phone layout; the employee
+  journey (log time, then a manager approves) is covered by screen tests, not end to end;
 - 2 of 16,184 requests at 25 users on AWS got no HTTP response (status 0) and are unexplained;
   the Lambda logged no error for them (below).
 
@@ -228,7 +293,7 @@ integrity check.
 ```sh
 ./bin/setup-participant.sh       # fresh temporary AWS credentials (they expire)
 ./bin/deploy-backend.sh          # terraform apply: Lambda, Aurora, CloudFront, secrets
-./bin/deploy-frontend.sh         # once the frontend exists; prints the CloudFront URL
+./bin/deploy-frontend.sh         # builds the website, uploads it to S3, prints the CloudFront URL
 terraform -chdir=infra output -raw bootstrap_admin_password   # right after the AWS deploy
 ```
 

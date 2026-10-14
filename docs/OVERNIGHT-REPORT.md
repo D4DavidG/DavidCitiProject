@@ -16,12 +16,12 @@ behalf so you can overrule it. The plan being followed is
 | 5 | Allocation grid (questions 3, 5) | Done |
 | 6 | Projects list and detail | Done |
 | 7 | Dependency view and end-to-end tests | Done |
-| 8 | My tasks | Not started |
-| 9 | Approvals | Not started |
-| 10 | People | Not started |
-| 11 | Project requests | Not started |
-| 12 | Notifications | Not started |
-| 13 | Audit log | Not started |
+| 8 | My tasks | Done |
+| 9 | Approvals | Done |
+| 10 | People | Done |
+| 11 | Project requests | Done |
+| 12 | Notifications | Done |
+| 13 | Audit log | Done |
 | 14 | Finish: coverage, README, guide | Not started |
 
 ## What you need to do this morning
@@ -139,6 +139,83 @@ Filled in at the end of the run.
 - **`docs/GUIDE.md` §3** now opens with a click-through website demo script.
 - **Tests:** 129 unit and component tests plus 2 end-to-end tests, all passing.
 
+### A small backend fix (found while building Task 8)
+
+The task and time-entry lists already looked up the project, deliverable, task and
+person names, but the API dropped them before answering. So the website couldn't say
+which project a task belongs to, or whose time is waiting for approval. Now they're
+included (`projectName`, `milestoneName`, `assigneeName`, `taskTitle`, `personName`).
+Two new backend tests failed first, then passed; the backend suite is at 372 passing and
+bandit is clean. It's a separate commit ("Name the project, deliverable, task and person
+…"). **AWS needs `./bin/deploy-backend.sh` to get it.**
+
+### Task 8: My tasks (employees)
+
+- **Open tasks as cards:** title, project and deliverable ("Apollo · Build"), estimate,
+  and a Status dropdown (To do, In progress, Done) to tick work off.
+- **Log time:** date (defaults to today, Eastern time), hours ("2.5") and a note. If it
+  would take you past your weekly capacity without overtime allowed, the server's
+  message appears in the dialog ("…past your capacity of 40 h. Ask your manager to allow
+  overtime.").
+- **My logged time:** a table with date, task, project, time, approval status and note.
+  Editing an entry sends it back for approval.
+- **Tests:** 137 in total, all passing.
+
+### Task 9: Approvals
+
+- **Time waiting for a decision:** person, task, project, date, time and note. Managers
+  see their direct reports; admins see everyone.
+- **Approve / Reject** on each row (each button names the entry for screen readers, e.g.
+  "Approve 8 h by Ben Okafor"). A decided entry leaves the list, with a confirmation
+  line. Server refusals are shown as they come.
+- **Tests:** 141 in total, all passing.
+
+### Task 10: People
+
+- **Everyone in the organisation:** name, username, role, job title, capacity
+  ("40 h/week · overtime"), and salary only where the server shares it (admins, or
+  your own). Search by name, username or email; filter by role; admins can show
+  archived accounts.
+- **Admins:** "New person" (the server generates the username and a 12-character
+  password, shown once with a Copy button and a "shown only once" warning), edit, reset
+  password (also shown once), archive and reactivate.
+- **Managers:** a Capacity button for their own direct reports only: weekly hours and
+  "Overtime allowed".
+- **Tests:** 149 in total, all passing.
+
+### Task 11: Project requests
+
+- **Managers:** "New request" with name, description, why it's needed, and proposed dates.
+  They see their own requests and the decisions.
+- **Admins:** every request, with who asked. "Approve" opens a form with the proposed
+  dates already filled in, plus a budget and a note, and creates the project (the
+  requester becomes its manager). "Reject" takes a note. Approved requests link to their
+  project.
+- **Status filter** on the server.
+- **Tests:** 155 in total, all passing.
+
+### Task 12: Notifications
+
+- **A bell in the top bar** with a red count of unread notifications. It checks every 30
+  seconds, and straight after any change you make in the app (Lambda can't push to the
+  browser, so it asks).
+- **Notifications page:** one-line summaries of what changed ("Ana Ruiz logged 8 h on
+  task Portal UI"), when, and a "New" mark. "Mark as read", "Mark all as read" and
+  "Unread only".
+- **Tests:** 165 in total, all passing (the 30-second check is tested with a fake clock).
+
+### Task 13: Audit log (admins)
+
+- **Every change, newest first:** when (Eastern time), who (and their role), the action,
+  the record ("Person #3"), and the one-line summary.
+- **Filters on the server:** person, record type, record id, from and to dates.
+- **"Show changes"** opens a small table of only the fields that changed, before and
+  after (e.g. email: `ana@old.test` → `ana.ruiz@acme.test`). A newly created record shows
+  its starting values.
+- **Every menu item now has its real screen:** the "Coming soon" placeholder and the
+  starter's `App.css` are removed.
+- **Tests:** 169 in total, all passing; the production build works.
+
 ## Decisions made for you
 
 Each line is something the plan or your answers didn't settle, with what it costs if
@@ -152,8 +229,8 @@ it's wrong.
 - **Signed in per browser tab:** the login token is kept in `sessionStorage`, so closing
   the tab signs you out (safer on shared machines). Cost if wrong: switch to
   `localStorage` in `src/auth/AuthContext.jsx` to stay signed in across tabs.
-- **The starter's `App.css` is still in the folder, unused.** Deleting files needs a
-  command outside your pre-approved list. Delete it any time.
+- **The starter's `App.css` was removed** in Task 13, once you'd allowed all shell
+  commands. Cost if wrong: none.
 - **Your settings now allow me to run any shell command** (you asked at 11:15 pm). Your
   `deny` list is kept and slightly widened: no `git push` in any form, no deploy or
   cleanup script, no `terraform apply`/`destroy`. To go back, remove the line `"Bash",`
@@ -169,6 +246,9 @@ it's wrong.
 - **Money and hours are typed in human units:** budgets in dollars ("150,000") and
   estimates in hours ("2.5"). They're converted to cents and minutes in one place, with
   text-based parsing (no rounding errors). Cost if wrong: none.
+- **The bell refreshes after every change in the app**, not only every 30 seconds.
+  The API module announces each successful change, and the bell listens. Cost if
+  wrong: none.
 - **Dates on screen:** plain dates (due dates, start dates) are shown exactly as stored;
   timestamps (when something happened) are shown in Eastern time, like the server. Cost
   if wrong: a one-line change in `format.js`.

@@ -26,11 +26,13 @@ Numbers here were measured on 13 Oct 2026. Re-run the commands in section 9 befo
 > ACME asked seven questions about their projects: which are at risk, who is
 > over-allocated, how much budget is used, and so on. I read that as a portfolio and
 > resource-management problem, the category of tools like Float and Harvest Forecast,
-> not a task board like Jira. So I built the backend that answers all seven from live
-> data. It's a Python API on AWS Lambda with a PostgreSQL database (Aurora). The
-> business rules are enforced twice, in the code and in the database itself, and 370
-> automated tests run against a real database. It's deployed on AWS. I load-tested it
-> there and found and fixed two real problems. The React frontend is the next step.
+> not a task board like Jira. So the manager lands on a dashboard of every project's
+> status, risk and budget, then an allocation grid that shows who is over capacity across
+> projects. It's a React website and a Python API on AWS Lambda with a PostgreSQL
+> database (Aurora). The business rules are enforced twice, in the code and in the
+> database itself, and about 550 automated tests check it, including a real browser
+> walking the demo. I deployed it to AWS, load-tested it there, and found and fixed two
+> real problems.
 
 What's done and what isn't, honestly:
 
@@ -39,7 +41,7 @@ What's done and what isn't, honestly:
 | Database (10 tables, rules enforced by Postgres) | Done, tested, deployed to Aurora |
 | Backend API (62 routes, roles, audit log, notifications) | Done, tested, deployed to Lambda |
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
-| Tests | 370 passing; 96% coverage overall, 100% for the API layer |
+| Tests | Backend: 372 passing, 96% coverage, 100% for the API layer. Frontend: 175 passing, 93% coverage, plus 2 browser (Playwright) tests |
 | AWS deployment | Verified 13 Oct: health, login, token, 404s, demo, load test |
 | Frontend (React, Material UI) | **Demo screens built and tested** (14 Oct, overnight): login, dashboard, allocation grid, projects, deliverables, dependency view. Live on AWS after `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
 
@@ -54,7 +56,7 @@ and JSON. Things you can show:
 | --- | --- | --- |
 | Click through the app as a manager: dashboard, allocation grid, a project, its dependencies | The CloudFront URL (after `./bin/deploy-frontend.sh`), or `http://localhost:3000` locally | 3 |
 | Run the whole story: the seven answers, then every rule refusing bad input | `python3 tools/demo.py demo` | 3 |
-| Prove the code works | `.venv/bin/pytest -q`: 370 tests in about 12 s | 3, 9 |
+| Prove the code works | `.venv/bin/pytest -q` (372 backend tests, ~15 s) and `cd frontend && npm test` (175, ~30 s) | 3, 9 |
 | Show it's live on AWS | `curl .../health`, the demo against AWS, the AWS console | 5 |
 | Show raw API answers (JSON) | `curl` with a login token | 4 |
 | Look inside the database | `psql` or DBeaver, on the local copy | 4 |
@@ -115,7 +117,7 @@ Maria: her username is printed by `python3 tools/demo.py demo`, and the password
 | 5 | Point at **4 and 6** | "Deliverables, with completion worked out from their tasks, and the dependency chain. Launch is blocked because Build isn't done." |
 | 6 | Point at **Trying to break the rules** | "Every one of these is a real request the server refused. Logging past 40 hours, a loop in the dependencies, someone else's project (404, not 403, so you can't tell it exists), deleting anything (there is no delete: records are archived)." |
 | 7 | Point at **5 integrity checks, 0 violations** | "Five database queries that must always return nothing: no dependency loops, no time logged outside a booking, and so on. They run after every test, and here on live data." |
-| 8 | Run `.venv/bin/pytest -q` | "370 tests against a real Postgres database, not mocks. 12 seconds." |
+| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "372 backend tests against a real Postgres database, not mocks, and 175 for the website. Plus a real browser test that walks this exact demo." |
 | 9 | Optional: `(set -a; source ENVIRONMENT.config; python3 tools/console.py logs)` | "Here are those requests arriving in AWS's logs." |
 | 10 | Tell one story from section 8, "Things that went wrong" | Evaluators score curiosity and observation. These stories show both. |
 
@@ -137,9 +139,10 @@ the map). Good ones to have ready:
 | Thing | Where it lives | How to reach it |
 | --- | --- | --- |
 | The code | This repo, branch `David` | VS Code on the VDI, or https://github.com/D4DavidG/DavidCitiProject/tree/David |
-| Tests | `tests/backend/` | `.venv/bin/pytest -q` in the repo folder (local Postgres must be running) |
+| Tests | `tests/backend/`, `frontend/src/**/*.test.jsx`, `frontend/e2e/` | `.venv/bin/pytest -q` in the repo folder (local Postgres must be running); `cd frontend && npm test`; `E2E_ADMIN_PASSWORD=… npm run e2e` with the local stack running |
 | The live API (AWS) | CloudFront → Lambda → Aurora | `$TRACKER_API` (section 3), using `curl`, `tools/demo.py` or `tools/loadtest.py` |
-| The live API in a browser | Same | Only `.../api/tracker/health` works in a browser tab. Everything else needs a login token, so use `curl` |
+| The website | CloudFront (S3) on AWS; Vite on the VDI | `https://d1gov8jpsxhwer.cloudfront.net` after `./bin/deploy-frontend.sh`; `http://localhost:3000` locally |
+| The raw API in a browser | Same as the API | Only `.../api/tracker/health` works in a browser tab. Everything else needs a login token, so use `curl` (or the website) |
 | The AWS console | AWS, us-east-2 | `(set -a; source ENVIRONMENT.config; python3 tools/console.py)`; section 5 |
 | The AWS database | Aurora, inside a private network | **Not directly.** It isn't reachable from the internet, by design. You see its data through the API |
 | The local copy of everything | Your VDI | `./bin/start-dev.sh` starts it; the API is then at `http://localhost:3001/api/tracker` |
@@ -264,7 +267,15 @@ backend/tracker/                     the whole backend: one Lambda
   domain/                            small shared pieces: errors, money (cents), clock (Eastern time), values
   store/                             the database: migrations/001_init.sql (all tables and rules),
                                      migrate.py, integrity.py (the 5 checks), postgres.py
-tests/backend/                       370 tests; conftest.py builds the test database
+tests/backend/                       372 tests; conftest.py builds the test database
+frontend/src/                        the website (React + Material UI):
+  services/request.js                the one module that calls the API (token, JSON, errors, 401)
+  services/format.js                 the only code that turns cents, minutes and dates into text
+  auth/                              session and the role gate (RequireRole)
+  components/                        layout, DataTable, FormDialog, BudgetBar, StatusChip, PageState
+  pages/                             one folder per screen: dashboard, allocation, projects, mytasks,
+                                     approvals, people, requests, notifications, audit, login
+frontend/e2e/                        Playwright: a real browser walking the demo
 tools/demo.py                        seed + demo, over HTTP
 tools/loadtest.py                    load test
 tools/console.py                     opens the AWS console
@@ -285,7 +296,6 @@ say **Deliverables** and **Resources**. Same things.
 | --- | --- | --- |
 | `bin/` | The organisers' scripts: setup, start, deploy, cleanup | We use them; the deploy depends on them |
 | `infra/` | Terraform for all of AWS | We use it. We changed `lambda.tf`, `locals.tf`, `output.tf`, `cloudfront.tf` and added `secrets.tf` |
-| `frontend/` | The starter React app | It becomes our website next |
 | `.github/` | CI checks (bandit, npm audit, checkov) | They run on every push |
 | `backend/_examples/` | Sample services in 3 languages | Ignored by the deploy (names starting with `_` are skipped) |
 | `data/`, `infra/eks.tf`, `infra/helm/`, `infra/documentdb.tf` | For other workshop tracks | Switched off; unused |
@@ -381,7 +391,7 @@ counted as the next day.
 
 ### Testing
 
-**"How did you test it?"** 370 tests with pytest, against a real PostgreSQL database,
+**"How did you test it?"** 372 backend tests with pytest, against a real PostgreSQL database,
 not mocks. Each test runs inside a transaction that's rolled back, so tests can't
 affect each other, and the integrity check runs after each one.
 
@@ -401,8 +411,16 @@ database-down branch inside a request. The list is in the README under "Known ga
 broke the code (removed a sort, a filter, a check) and confirmed the right test failed.
 Most tests were written before the code and seen failing first.
 
-**"No frontend tests?"** The frontend isn't built yet. The plan is Vitest with React
-Testing Library, and Playwright for end to end.
+**"And the frontend?"** 175 tests with Vitest and React Testing Library (Jest's API),
+93% coverage. They render each screen with the API stubbed and check what a person would
+see and what gets sent (cents, minutes, only the changed fields). On top of that, Playwright
+drives a real browser against the real local API and database through the demo, and checks
+the phone layout doesn't scroll sideways.
+
+**"Where are the business rules in the website?"** Nowhere, on purpose. Risk, progress,
+over-capacity and every money figure come from the server; the website only formats them
+(`services/format.js` is the only place cents become dollars). Buttons a role can't use
+are hidden, but the server is what refuses.
 
 ### Performance
 
@@ -445,10 +463,9 @@ payroll features that made it a Workday clone). It wrote code test-first, and I 
 everything on real AWS myself, which is where the CloudFront and cold-start problems
 were found. Be ready to explain any file in section 7; that's the real test.
 
-**"What would you do next?"** The frontend: login, then the manager dashboard and the
-allocation grid (questions 1, 2, 3, 5 and 7), then deliverables and the dependency view.
-After that, token refresh (now it's expiry plus log in again) and emailed password reset
-(the workshop's AWS role has no email access).
+**"What would you do next?"** An end-to-end test of the employee journey (log time, a
+manager approves it), token refresh (now it's expiry plus log in again), emailed password
+reset (the workshop's AWS role has no email access), and a Kanban board for tasks.
 
 **"What would you do differently?"** Start the AWS deploy on day one: two of the most
 interesting problems only showed up there.
@@ -461,7 +478,9 @@ Run from `~/DavidCitiProject` on the VDI.
 
 ```sh
 # Tests
-.venv/bin/pytest -q                                   # all tests (expect 370 passed)
+.venv/bin/pytest -q                                   # backend tests (expect 372 passed)
+(cd frontend && npm test)                             # website tests (expect 175 passed)
+(cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)   # real browser, needs ./bin/start-dev.sh running
 .venv/bin/pytest --cov --cov-report=term-missing      # with the coverage table
 .venv/bin/pytest -q -k capacity                       # only tests with "capacity" in the name
 

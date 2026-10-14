@@ -392,8 +392,8 @@ Fix each one when the work reaches it, not before.
 | 2 | Preflight answers `Access-Control-Allow-Headers: *`, but the Fetch spec never lets `*` cover `Authorization`, so the browser blocks the call before trap 1 even matters | `bin/proxy-server.js:41` | Call relative `/api/...` URLs through Vite's `server.proxy`, which is same-origin both locally and on CloudFront, so CORS never applies. Or list `Authorization, Content-Type` explicitly **Fixed 13 Oct**: the header list is explicit. |
 | 3 | `.gitignore` silently drops any folder named `lib/`, `assets`, `build`, `dist`, `env/`, `var/`, `parts/`, `logs`, `tmp`, `coverage`, `target/` or `downloads/`, anywhere in the tree. For example, `frontend/src/lib/api.js` would never be committed. It also ignores `*.config` and `package-lock.json` | `.gitignore` | Avoid those names. When a file won't show in `git status`, run `git check-ignore -v <path>` |
 | 4 | `start-dev.sh` pip-installs dependencies **into** the service folder, which leaves untracked clutter there | `bin/start-dev.sh:342` | Add `backend/tracker/.gitignore` for the vendored packages, and check `git status` after the first run **Fixed 13 Oct** (`backend/tracker/.gitignore`). |
-| 5 | `npm run lint` fails: the config imports `eslint-plugin-react-hooks` and `eslint-plugin-react-refresh`, which aren't in `package.json` | `frontend/eslint.config.js:3-4` | `npm i -D` both |
-| 6 | Vite silently moves to the next free port if 3000 is busy, so you can end up looking at a stale server | `frontend/vite.config.js` | Set `server.strictPort: true`, and keep exactly one listener per port (§11) |
+| 5 | `npm run lint` fails: the config imports `eslint-plugin-react-hooks` and `eslint-plugin-react-refresh`, which aren't in `package.json` | `frontend/eslint.config.js:3-4` | `npm i -D` both **Fixed 14 Oct** (both installed; `npm run lint` is clean). |
+| 6 | Vite silently moves to the next free port if 3000 is busy, so you can end up looking at a stale server | `frontend/vite.config.js` | Set `server.strictPort: true`, and keep exactly one listener per port (§11) **Fixed 14 Oct** (`strictPort: true`). |
 | 7 | CI runs `bandit -r ./backend`. It fails on `assert` in tests (B101), `random` used for passwords (B311), string-built SQL (B608) and hard-coded seed passwords (B105/B106), and the red X shows on every push | `.github/workflows/python.actions.yml:27` | Keep tests in `tests/`, use `secrets` for the six-character password, use parameterised SQL only |
 | 8 | The repo docs curl `https://localhost:3001`, but the proxy is plain HTTP | `docs/full-stack.md:121` | Use `http://` |
 | 9 | The docs' local log command picks up your `us-east-2` region, but the functions live in LocalStack's `us-east-1` | `docs/full-stack.md:131` | Use the command in §11 |
@@ -500,9 +500,15 @@ The detail is in the plan:
 - **React:** function components, camelCase names, PascalCase components, Airbnb style,
   PropTypes and JSDoc on components and public functions. Stay with JavaScript (`.jsx`),
   since the scaffold is JS.
-- **Frontend packages still to add:** `@mui/material @emotion/react @emotion/styled
-  react-router react-responsive prop-types`. CI fails on high-severity `npm audit`
-  findings, so check before adding anything else.
+- **Frontend packages (installed 14 Oct):** MUI 9 (`@mui/material`, `@mui/icons-material`,
+  emotion), React Router 8 (`HashRouter`), react-responsive, prop-types; Vitest 5, React
+  Testing Library, Playwright. CI fails on high-severity `npm audit` findings, so run it
+  before adding anything else (0 on 14 Oct).
+- **Frontend rules in practice:** every API call goes through `src/services/request.js`;
+  only `src/services/format.js` turns cents, minutes and dates into text (and typed
+  dollars into cents); field names are exactly the API's camelCase; forms are
+  `components/FormDialog.jsx` (edit sends only changed fields); MUI icons are named
+  `…Outlined` in v9 (check `node_modules/@mui/icons-material/<Name>.js` exists).
 - **Terraform:** snake_case, a comment on every resource, and `terraform validate`
   before committing.
 
@@ -529,6 +535,9 @@ databases and never touch `postgres`):
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
 .venv/bin/pytest -q                                                        # prints the count
 .venv/bin/pytest --cov=backend/tracker --cov-report=term-missing           # with coverage
+(cd frontend && npm test)                                                  # website: Vitest + RTL
+(cd frontend && npm run test:coverage && npm run lint)
+(cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)                        # Playwright; needs start-dev.sh + seed
 ```
 
 Demo against the running API (local proxy, or the deployed URL via `TRACKER_API`):
