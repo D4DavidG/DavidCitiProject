@@ -416,9 +416,9 @@ endpoint's 95th percentile was 65 ms or less (13 Oct)."
 
 **Supporting points:**
 
-- 16,184 requests at 25 users. p95 was 57 to 65 ms per endpoint (`README.md:274`).
+- 16,184 requests at 25 users. p95 was 57 to 65 ms per endpoint (`README.md:276`).
 - Inside the Lambda, a warm request takes **6 ms at the median and 13 ms at p95**, from
-  the CloudWatch REPORT lines (`README.md:276-277`).
+  the CloudWatch REPORT lines (`README.md:278-279`).
 - A login takes about 1.1 s whatever the load: p50 1.11 s, p95 1.13 s at 512 MB. That's
   on purpose, because the password hash is deliberately slow (`infra/lambda.tf:11`).
 - The dashboard costs a fixed number of queries however many projects there are. Money is
@@ -649,7 +649,7 @@ Short answers. Paths are under `backend/tracker/` unless they say otherwise.
     checks at once when you switch back, refreshes after your own writes, and shows a pop-up
     when the count rises. The Notifications page reloads itself on a change. Why not WebSockets:
     `docs/superpowers/specs/2026-10-14-websockets-findings.md`.
-    *`frontend/src/components/NotificationBell.jsx:8, 87-95`*
+    *`frontend/src/components/NotificationBell.jsx:8, 91-104`*
 29. **"Responsive?"** At 899 px and below, tables become cards and the sidebar a drawer. A Playwright
     tour fails on sideways scroll at 375 px. *`frontend/src/theme/responsive.js:4`;
     `frontend/e2e/tour.spec.js`*
@@ -687,8 +687,8 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Real Postgres, not mocks" (right after "241 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
 | "The staircase went up to 11 s" | "Up to about 10 s in the logs (9.8 s)" | 7 to 11 s was the load-test client's `max` column |
-| "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:276-277` |
-| "25 cold starts took 0.2 s each" | "0.17 to 0.30 s each" | `README.md:286-287` |
+| "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:278-279` |
+| "25 cold starts took 0.2 s each" | "0.17 to 0.30 s each" | `README.md:288-289` |
 | "Every write is wrapped in atomic()" | "Every multi-statement write" | Marking notifications read is one UPDATE |
 | "DELETE is refused on every table" | "On every application table" | `schema_migrations` has no trigger |
 | "The integrity check runs after every test" | "After every database test" | Unit tests and `no_integrity_check` tests skip it |
