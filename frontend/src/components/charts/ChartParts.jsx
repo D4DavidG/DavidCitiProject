@@ -34,7 +34,8 @@ export function ChartFigure({ title, summary, axis, legend, note, children }) {
       <Typography id={headingId} variant="h3" component="h2">{title}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{summary}</Typography>
       {axis}
-      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>{children}</Box>
+      {/* Relative, so a reference line (Today, Budget) can be one absolute li spanning every row. */}
+      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, position: 'relative' }}>{children}</Box>
       {legend}
       {note}
     </Card>

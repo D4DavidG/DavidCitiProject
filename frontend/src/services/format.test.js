@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, centsToDollarsInput, formatCents, formatDate, formatDateTime, formatDay, formatHours, parseDollars, parseDuration, splitMinutes, todayIso,
+  addDays, centsToDollarsInput, daysBetween, formatCents, formatDate, formatDateTime, formatDay, formatHours, parseDollars, parseDuration, splitMinutes, todayIso,
 } from './format'
 
 describe('formatCents', () => {
@@ -118,6 +118,11 @@ describe('formatDay and addDays', () => {
     expect(addDays('2026-10-12', 7)).toBe('2026-10-19')
     expect(addDays('2026-10-26', 7)).toBe('2026-11-02')
     expect(addDays('2026-10-12', -7)).toBe('2026-10-05')
+  })
+
+  it('counts whole days between two dates', () => {
+    expect(daysBetween('2026-08-14', '2026-12-31')).toBe(139)
+    expect(daysBetween('2026-10-14', '2026-10-14')).toBe(0)
   })
 })
 

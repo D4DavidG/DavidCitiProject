@@ -116,6 +116,15 @@ export function addDays(iso, days) {
   return date.toISOString().slice(0, 10)
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Whole days from one date to another: "2026-10-14" to "2026-10-21" -> 7. Dates only, so UTC, like addDays. */
+export function daysBetween(fromIso, toIso) {
+  const from = Date.parse(`${fromIso.slice(0, 10)}T00:00:00Z`)
+  const to = Date.parse(`${toIso.slice(0, 10)}T00:00:00Z`)
+  return Math.round((to - from) / DAY_MS)
+}
+
 /** A timestamp, shown in Eastern time: "Oct 13, 2026, 9:03 PM". */
 export function formatDateTime(iso) {
   if (!iso) return DASH

@@ -6,6 +6,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import FormDialog from '../../components/FormDialog'
 import PageState from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
+import TimelineChart from '../../components/charts/TimelineChart'
 import { formatDate } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -93,11 +94,13 @@ Deliverable.propTypes = {
 
 /**
  * Question 4: the project's deliverables, each with a status and progress the
- * server computes from its tasks. The manager signs a deliverable off; the server
- * refuses while any task, or anything it depends on, is unfinished.
+ * server computes from its tasks, drawn first as a timeline and then as cards. Both
+ * come from the one dependency-graph request, so they can't disagree. The manager
+ * signs a deliverable off; the server refuses while any task, or anything it depends
+ * on, is unfinished.
  */
-export default function DeliverablesTab({ projectId, canManage, people }) {
-  const load = useCallback(() => request('GET', `/projects/${projectId}/milestones`), [projectId])
+export default function DeliverablesTab({ projectId, canManage, people, startDate, predictedEndDate }) {
+  const load = useCallback(() => request('GET', `/projects/${projectId}/dependency-graph`), [projectId])
   const { data, error, loading, reload } = useApi(load)
   const [actionError, setActionError] = useState(null)
   const [dialog, setDialog] = useState(null) // null | { deliverable?: object }
@@ -119,7 +122,7 @@ export default function DeliverablesTab({ projectId, canManage, people }) {
     reload()
   }
 
-  const items = data?.items ?? []
+  const items = data?.nodes ?? []
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
       {actionError && <Alert severity="error" onClose={() => setActionError(null)}>{actionError}</Alert>}
@@ -127,6 +130,7 @@ export default function DeliverablesTab({ projectId, canManage, people }) {
         <Box><Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({})}>New deliverable</Button></Box>
       )}
       <PageState loading={loading} error={error} onRetry={reload} empty={data && items.length === 0 ? 'No deliverables yet.' : null}>
+        <TimelineChart deliverables={items} edges={data?.edges ?? []} projectStart={startDate} projectEnd={predictedEndDate} />
         {items.map((d) => (
           <Deliverable
             key={d.milestoneId}
@@ -171,4 +175,8 @@ DeliverablesTab.propTypes = {
   canManage: PropTypes.bool.isRequired,
   /** [userId, name] for everyone booked on the project (task assignees). */
   people: PropTypes.arrayOf(PropTypes.array).isRequired,
+  /** The project's start date (ISO), for the timeline's axis. */
+  startDate: PropTypes.string.isRequired,
+  /** The project's predicted end date (ISO), for the timeline's axis. */
+  predictedEndDate: PropTypes.string.isRequired,
 }

@@ -13,6 +13,11 @@ describe('chart parts', () => {
     expect(screen.getByRole('figure', { name: 'Budget by project' })).toHaveTextContent('0 of 2 projects are over budget.')
   })
 
+  it('lets a reference line span every row: the rows list is the positioning box', () => {
+    inTheme(<ChartFigure title="Lines" summary="S"><li>row</li></ChartFigure>)
+    expect(within(screen.getByRole('figure', { name: 'Lines' })).getByRole('list')).toHaveStyle({ position: 'relative' })
+  })
+
   it('gives each row one focusable target that carries the tooltip sentence', async () => {
     inTheme(<ul><ChartRow tooltip="45 h booked · Ben Okafor"><span>Ben</span></ChartRow></ul>)
     const target = screen.getByRole('img', { name: '45 h booked · Ben Okafor' })

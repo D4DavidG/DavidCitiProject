@@ -12,7 +12,7 @@ function renderDetail(user = USERS.manager, answers = {}) {
     'GET /projects/1': [200, APOLLO],
     'GET /users/2': [200, MARIA],
     'GET /projects/1/assignments': [200, page(BOOKINGS)],
-    'GET /projects/1/milestones': [200, page([DESIGN, BUILD])],
+    'GET /projects/1/dependency-graph': [200, { nodes: [DESIGN, BUILD], edges: [{ from: 11, to: 10 }] }],
     'GET /milestones/11/tasks': [200, page(BUILD_TASKS)],
     'GET /milestones/10/tasks': [200, page([])],
     'GET /projects/1/budget': [200, BUDGET],
@@ -54,7 +54,7 @@ describe('ProjectDetailPage', () => {
   it("shows the server's refusal when a sign-off is refused", async () => {
     const ready = { ...BUILD, status: 'IN_PROGRESS', doneTaskCount: 2, progressPercent: 100 }
     renderDetail(USERS.manager, {
-      'GET /projects/1/milestones': [200, page([ready])],
+      'GET /projects/1/dependency-graph': [200, { nodes: [ready], edges: [] }],
       'POST /milestones/11/sign-off': [409, { error: 'Design must be signed off first.' }],
     })
     const build = await screen.findByRole('region', { name: 'Build' })
@@ -111,7 +111,7 @@ describe('ProjectDetailPage', () => {
     // A deliverable reads DONE only once signed off; "ready" is all tasks done and not blocked.
     const launchReady = { ...BUILD, milestoneId: 12, name: 'Launch', status: 'IN_PROGRESS', doneTaskCount: 2, progressPercent: 100 }
     const testsBlocked = { ...BUILD, milestoneId: 13, name: 'Tests', status: 'BLOCKED', taskCount: 1, doneTaskCount: 1 }
-    renderDetail(USERS.manager, { 'GET /projects/1/milestones': [200, page([DESIGN, BUILD, launchReady, testsBlocked])] })
+    renderDetail(USERS.manager, { 'GET /projects/1/dependency-graph': [200, { nodes: [DESIGN, BUILD, launchReady, testsBlocked], edges: [] }] })
     const build = await screen.findByRole('region', { name: 'Build' })
     expect(within(build).getByRole('button', { name: /sign off/i })).toBeDisabled()
     expect(within(build).getByText(/2 tasks left to finish/i)).toBeInTheDocument()
@@ -123,9 +123,22 @@ describe('ProjectDetailPage', () => {
 
   it('gives both reasons when a deliverable has open tasks and is waiting on another', async () => {
     const launch = { ...BUILD, milestoneId: 12, name: 'Launch', status: 'BLOCKED', taskCount: 1, doneTaskCount: 0 }
-    renderDetail(USERS.manager, { 'GET /projects/1/milestones': [200, page([DESIGN, BUILD, launch])] })
+    renderDetail(USERS.manager, { 'GET /projects/1/dependency-graph': [200, { nodes: [DESIGN, BUILD, launch], edges: [] }] })
     const card = await screen.findByRole('region', { name: 'Launch' })
     expect(within(card).getByText(/1 task left to finish and waiting for what it depends on/i)).toBeInTheDocument()
+  })
+
+  it('draws the deliverables timeline above the cards, from the one dependency-graph request', async () => {
+    const calls = renderDetail()
+    const chart = await screen.findByRole('figure', { name: 'Deliverables timeline' })
+    expect(chart.compareDocumentPosition(screen.getByRole('region', { name: 'Build' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(calls.some((c) => c.path === '/projects/1/milestones' && c.method === 'GET')).toBe(false)
+  })
+
+  it('shows no chart when there are no deliverables', async () => {
+    renderDetail(USERS.manager, { 'GET /projects/1/dependency-graph': [200, { nodes: [], edges: [] }] })
+    expect(await screen.findByText('No deliverables yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('figure')).toBeNull()
   })
 
   it('writes "1 task", not "1 tasks"', async () => {

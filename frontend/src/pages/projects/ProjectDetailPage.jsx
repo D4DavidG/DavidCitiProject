@@ -114,7 +114,7 @@ export default function ProjectDetailPage() {
             <Tab value="board" label="Board" />
           </Tabs>
 
-          {tab === 'deliverables' && <DeliverablesTab projectId={projectId} canManage={canManage} people={people} />}
+          {tab === 'deliverables' && <DeliverablesTab projectId={projectId} canManage={canManage} people={people} startDate={p.startDate} predictedEndDate={p.predictedEndDate} />}
           {tab === 'resources' && (
             <PageState loading={bookings.loading && !bookings.data} error={bookings.error} onRetry={bookings.reload}>
               <ResourcesTab projectId={projectId} bookings={bookings.data?.items ?? []} canManage={canManage} onChanged={bookings.reload} />
