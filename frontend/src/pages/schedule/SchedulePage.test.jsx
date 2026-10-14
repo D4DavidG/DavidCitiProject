@@ -63,6 +63,17 @@ describe('SchedulePage', () => {
     expect(place(screen.getByRole('link', { name: /Chloe Kim, Zeus/ }))).toEqual(['2/4', '1'])
   })
 
+  it('tabs through a person\'s bars lane by lane, then week by week, so focus never jumps between lanes', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    const order = screen.getAllByRole('link', { name: /^Ben Okafor/ }).map((link) => link.getAttribute('aria-label'))
+    expect(order).toEqual([
+      'Ben Okafor, Apollo, 25 hours a week, Oct 12 to Oct 25',
+      'Ben Okafor, Apollo, 10 hours a week, Oct 26 to Nov 1',
+      'Ben Okafor, Zeus, 20 hours a week, Oct 12 to Oct 25',
+    ])
+  })
+
   it('colours a bar by its project, the same in every row', async () => {
     renderSchedule()
     const benZeus = await bar(/Ben Okafor, Zeus/)

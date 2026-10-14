@@ -7,6 +7,7 @@ import {
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
+import { visuallyHidden } from '@mui/utils'
 import { ChartFigure, ChartLegend } from '../../components/charts/ChartParts'
 import PageHeader from '../../components/PageHeader'
 import PageState from '../../components/PageState'
@@ -21,8 +22,6 @@ const PAGE_SIZE = 25
 /** The name column (narrower on phones) and the smallest a week may get before the time line scrolls. */
 const NAME = { xs: '7.5rem', md: '11rem' }
 const WEEK = '6rem'
-/** Text read out by screen readers but not drawn. */
-const HIDDEN = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }
 
 /** The grid every row and the week header share: the name, then one column per week. */
 function rowGrid(weekCount) {
@@ -107,7 +106,9 @@ BookingBar.propTypes = {
  */
 function PersonRow({ person, weeks, colours }) {
   const bars = scheduleBars(person.weeks)
-  const lanes = [...new Set(bars.map((b) => b.projectId))].sort((a, b) => a - b)
+  const lanes = [...new Set(bars.map((bar) => bar.projectId))].sort((x, y) => x - y)
+  // Lane by lane, then week by week: the order Tab visits them, so focus never jumps between lanes.
+  bars.sort((x, y) => lanes.indexOf(x.projectId) - lanes.indexOf(y.projectId) || x.first - y.first)
   const laneCount = Math.max(lanes.length, 1)
   return (
     <Box component="li" sx={{ ...rowGrid(weeks.length), gridTemplateRows: `repeat(${laneCount + 1}, auto)`, borderTop: `1px solid ${GRID}` }}>
@@ -152,7 +153,7 @@ function PersonRow({ person, weeks, colours }) {
           variant="caption"
           sx={{ gridColumn: i + 2, gridRow: laneCount + 1, px: 0.75, pb: 0.5, color: 'error.main', display: 'flex', alignItems: 'center', gap: 0.5 }}
         >
-          <Box component="span" sx={HIDDEN}>{`Week of ${formatDay(w.week)}: ${w.bookedHours} of ${person.capacityHours} hours booked, `}</Box>
+          <Box component="span" sx={visuallyHidden}>{`Week of ${formatDay(w.week)}: ${w.bookedHours} of ${person.capacityHours} hours booked, `}</Box>
           <WarningAmberRoundedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
           <span>{`+${w.overByHours} h over`}</span>
         </Typography>
