@@ -144,10 +144,16 @@ def test_a_request_is_decided_once(conn, org):
         requests.approve_request(conn, org["admin"], req["request_id"], {})
 
 
-def test_managers_cannot_decide_requests(conn, org):
+def test_managers_cannot_decide_their_own_requests(conn, org):
     req = file(conn, org["bob"])
-    with pytest.raises(Forbidden):
+    with pytest.raises(NotFound):
         requests.approve_request(conn, org["bob"], req["request_id"], {})
+
+
+def test_employees_never_decide(conn, org):
+    req = ask(conn, org["alice"], "OTHER", name="A desk")
+    with pytest.raises(Forbidden):
+        requests.reject_request(conn, org["alice"], req["request_id"], {})
 
 
 def test_another_managers_request_is_not_found(conn, org):
@@ -203,3 +209,96 @@ def test_another_managers_report_request_is_not_found(conn, org):
     assert requests.get_request(conn, org["bob"], req["request_id"])["name"] == "Allow overtime"
     with pytest.raises(NotFound):
         requests.get_request(conn, org["carol"], req["request_id"])
+
+
+# --- deciding: the change is applied, the asker is told -------------------------
+
+def setting(conn, who, column):
+    return conn.execute("SELECT task_limit, overtime_allowed FROM users WHERE user_id = %s",
+                        (who.user_id,)).fetchone()[column]
+
+
+def test_approving_an_archive_request_archives_the_project_and_its_work(conn, org):
+    work = f.task(conn, org["bob"], f.deliverable(conn, org["bob"], org["apollo"]))
+    req = ask(conn, org["bob"], "ARCHIVE_PROJECT", project_id=org["apollo"]["project_id"])
+    result = requests.approve_request(conn, org["admin"], req["request_id"], {"decision_note": "Done"})
+    assert (result["request"]["status"], result["project"]) == ("APPROVED", None)
+    archived = conn.execute("SELECT is_archived FROM tasks WHERE task_id = %s", (work["task_id"],)).fetchone()
+    assert archived["is_archived"]
+    actions = {(a["action"], a["entity_type"]) for a in conn.execute("SELECT action, entity_type FROM audit_log")}
+    assert {("APPROVE", "project_requests"), ("ARCHIVE", "projects")} <= actions
+
+
+def test_approving_a_task_limit_request_sets_the_limit(conn, org):
+    req = ask(conn, org["alice"], "TASK_LIMIT", task_limit=4)
+    requests.approve_request(conn, org["bob"], req["request_id"], {})
+    assert setting(conn, org["alice"], "task_limit") == 4
+
+
+def test_approving_never_lowers_a_task_limit(conn, org):
+    req = ask(conn, org["alice"], "TASK_LIMIT", task_limit=4)
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"task_limit": 6})
+    with pytest.raises(Conflict):
+        requests.approve_request(conn, org["bob"], req["request_id"], {})
+    assert setting(conn, org["alice"], "task_limit") == 6
+
+
+def test_approving_overtime_turns_it_on(conn, org):
+    req = ask(conn, org["alice"], "OVERTIME")
+    requests.approve_request(conn, org["admin"], req["request_id"], {})
+    assert setting(conn, org["alice"], "overtime_allowed") is True
+
+
+def counts(conn):
+    return conn.execute("SELECT (SELECT count(*) FROM users) AS u, (SELECT count(*) FROM projects) AS p").fetchone()
+
+
+def test_approving_free_text_changes_only_the_request(conn, org):
+    req = ask(conn, org["alice"], "OTHER", name="A desk")
+    before = (counts(conn), setting(conn, org["alice"], "task_limit"))
+    row = requests.approve_request(conn, org["bob"], req["request_id"], {"decision_note": "Ordered"})["request"]
+    assert (row["status"], row["decision_note"]) == ("APPROVED", "Ordered")
+    assert (counts(conn), setting(conn, org["alice"], "task_limit")) == before
+
+
+def test_approving_a_non_project_request_takes_only_a_note(conn, org):
+    req = ask(conn, org["alice"], "OVERTIME")
+    with pytest.raises(ValidationError) as refused:
+        requests.approve_request(conn, org["bob"], req["request_id"], {"budget_cents": 100})
+    assert refused.value.field == "budget_cents"
+
+
+def test_rejecting_changes_nothing_but_the_request(conn, org):
+    req = ask(conn, org["alice"], "TASK_LIMIT", task_limit=4)
+    row = requests.reject_request(conn, org["bob"], req["request_id"], {"decision_note": "Not now"})
+    assert (row["status"], setting(conn, org["alice"], "task_limit")) == ("REJECTED", 2)
+
+
+def test_another_manager_cannot_decide_my_report_request(conn, org):
+    req = ask(conn, org["alice"], "OVERTIME")
+    with pytest.raises(NotFound):
+        requests.approve_request(conn, org["carol"], req["request_id"], {})
+
+
+def test_manager_cannot_decide_a_managers_request(conn, org):
+    req = ask(conn, org["carol"], "OTHER", name="A bigger room")
+    with pytest.raises(NotFound):
+        requests.approve_request(conn, org["bob"], req["request_id"], {})
+
+
+def test_decision_notifies_the_asker(conn, org):
+    req = ask(conn, org["alice"], "OVERTIME")
+    requests.approve_request(conn, org["bob"], req["request_id"], {})
+    told = conn.execute("SELECT n.recipient_user_id, a.summary FROM notifications n JOIN audit_log a USING (audit_id)"
+                        " WHERE a.action = 'APPROVE' AND a.entity_type = 'project_requests'").fetchall()
+    recipients = {t["recipient_user_id"] for t in told}
+    assert org["alice"].user_id in recipients and org["bob"].user_id not in recipients
+    assert told[0]["summary"] == "Bob Tester approved Alice Tester's request: Allow overtime"
+
+
+def test_archive_approval_is_409_if_already_archived_and_leaves_the_request_pending(conn, org):
+    req = ask(conn, org["bob"], "ARCHIVE_PROJECT", project_id=org["apollo"]["project_id"])
+    projects.archive_project(conn, org["admin"], org["apollo"]["project_id"])
+    with pytest.raises(Conflict):
+        requests.approve_request(conn, org["admin"], req["request_id"], {})
+    assert requests.get_request(conn, org["admin"], req["request_id"])["status"] == "PENDING"
