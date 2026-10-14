@@ -5,10 +5,10 @@ import AuthProvider from './auth/AuthContext'
 import RequireRole from './auth/RequireRole'
 import { STAFF, homePath, useAuth } from './auth/useAuth'
 import AppLayout from './components/AppLayout'
-import ComingSoon from './components/ComingSoon'
 import PageState from './components/PageState'
 import AllocationPage from './pages/allocation/AllocationPage'
 import ApprovalsPage from './pages/approvals/ApprovalsPage'
+import AuditLogPage from './pages/audit/AuditLogPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
@@ -67,7 +67,7 @@ export function AppRoutes() {
         <Route path="/people" element={<RequireRole roles={STAFF}><PeoplePage /></RequireRole>} />
         <Route path="/requests" element={<RequireRole roles={STAFF}><RequestsPage /></RequireRole>} />
         <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/audit" element={<RequireRole roles={['ADMIN']}><ComingSoon title="Audit log" /></RequireRole>} />
+        <Route path="/audit" element={<RequireRole roles={['ADMIN']}><AuditLogPage /></RequireRole>} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
