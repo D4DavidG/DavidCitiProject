@@ -12,6 +12,28 @@ David.
 **Rule:** if something here goes out of date, fix it in the same commit as the code that
 outdated it.
 
+### Where things stand (updated 14 Oct, midday)
+
+- **Built:** backend, database and every website screen in `MVP.md`. All of it is
+  deployed to AWS and checked there. Tests: 374 backend, 199 website, and Playwright
+  browser tests (`e2e/demo.spec.js` walks the demo; `e2e/tour.spec.js` screenshots
+  every screen at desktop and phone width).
+- **Read these first:**
+  - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
+    evaluator Q&A);
+  - `docs/OVERNIGHT-REPORT.md`: what was built on the night of 13 to 14 Oct, every
+    decision made for David, and what isn't verified;
+  - `docs/superpowers/plans/2026-10-13-manual-verification.md`: the AWS checklist,
+    all steps done.
+- **Who does what:** Claude edits, tests and commits when asked. David pushes and
+  deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
+  and cleanup scripts, and `terraform apply`/`destroy`. Shell commands outside its
+  short allow list prompt David. Hand him the exact commands to run.
+- **Open items:**
+  - "Mark all as read" checks only the notifications on the current page;
+  - notifications seeded before 14 Oct keep their old wording (no day for logged time);
+  - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8).
+
 ---
 
 ## The stack (decided 13 Oct)
@@ -416,6 +438,7 @@ deployed URL:
    after the next `deploy-backend.sh`.
 2. **Deep links.** S3 behind origin access control answers 403, not 404, for a missing
    key, so refreshing `/projects/7` may show an AccessDenied page. `HashRouter` avoids it.
+   **Observed 14 Oct: it works.** The tour's deep-link refresh passed against CloudFront.
 3. **`Authorization` reaches the Lambda on GET requests through CloudFront.** CloudFront
    treats that header specially. If it is dropped, switch to a custom header. **Observed 13
    Oct: it arrives.** `GET /auth/me` with a Bearer token returned 200 through CloudFront.
@@ -538,6 +561,8 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # on
 (cd frontend && npm test)                                                  # website: Vitest + RTL
 (cd frontend && npm run test:coverage && npm run lint)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)                        # Playwright; needs start-dev.sh + seed
+# Screen tour: usernames come from `demo.py demo`; add E2E_BASE_URL=<CloudFront URL> for AWS
+(cd frontend && E2E_MANAGER_USERNAME=... E2E_EMPLOYEE_USERNAME=... E2E_TOUR_DIR=/some/dir npm run e2e -- tour)
 ```
 
 Demo against the running API (local proxy, or the deployed URL via `TRACKER_API`):

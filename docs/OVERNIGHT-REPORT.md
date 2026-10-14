@@ -24,12 +24,21 @@ behalf so you can overrule it. The plan being followed is
 | 13 | Audit log | Done |
 | 14 | Finish: coverage, screenshots, README, guide | Done |
 | Review | A fresh reviewer read all the night's work | Done: 5 fixes made (below) |
+| Morning | Screen tour of the live site, screenshot review, fixes | Done (see "Morning", below) |
 
 **In one line:** every screen in `MVP.md` is built and tested. That's 199 website tests
-(93% coverage), 374 backend tests, and a real browser walking the demo. It's all committed
-on `David`, but not pushed or deployed.
+(93% coverage), 374 backend tests, and a real browser walking the demo and touring every
+screen.
 
-## What you need to do this morning
+**Update, 14 Oct midday:**
+- **Pushed:** you pushed everything through `1d1ea98`.
+- **Website deployed:** at 11:35 UTC.
+- **Backend:** the deploy ran, but its result wasn't checked afterwards.
+- **Checklist step 3.5 (deep links):** passed on AWS.
+- **Permissions:** the blanket shell permission described in Decisions has been removed
+  again, at your request.
+
+## What you needed to do this morning (done)
 
 In your terminal on the VDI, in this order:
 
@@ -54,8 +63,8 @@ Then:
 4. **Read "Decisions made for you" below,** and overrule anything you disagree with.
 5. **Practise the website demo:** `docs/GUIDE.md` §3, "The website script".
 
-If you'd rather not use the new permission setting during the day, remove the line
-`"Bash",` from `.claude/settings.local.json` (see Decisions).
+The temporary `"Bash"` permission line has since been removed from
+`.claude/settings.local.json`.
 
 ## Done, task by task
 
@@ -391,13 +400,11 @@ it's wrong.
 
 ## Not verified
 
-- **Phone layout of pages other than the dashboard,** in a real browser. They use the
-  same components (cards instead of tables, a drawer menu), but only the dashboard was
-  checked at 375 px by Playwright.
-- **The website on AWS.** Everything was tested locally: unit tests, and Playwright
-  against the local API and database. It goes live only when you run
-  `./bin/deploy-frontend.sh`, and checklist step 3.5 (refreshing a deep link) can only
-  be checked then.
+- ~~Phone layout of pages other than the dashboard.~~ *Checked 14 Oct:* the tour visits
+  every page at 375 px in a real browser, with no sideways scrolling.
+- ~~The website on AWS.~~ *Checked 14 Oct:* the tour passed against CloudFront,
+  including step 3.5 (refreshing a deep link). The midday fixes (`b880af9`, `64b3671`,
+  `1d1ea98`) haven't been toured on AWS yet.
 - **How it looks to a person.** Tests check what's on screen and that the phone layout
   doesn't scroll sideways, not whether it looks good. Spacing, colours in context and
   hover states need your eyes.
