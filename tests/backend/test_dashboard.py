@@ -240,6 +240,19 @@ def test_allocation_is_paginated_by_person(conn, org, crowd):
     assert [r["user_id"] for r in page["items"]] == [org["alice"].user_id]
 
 
+def test_allocation_for_one_week_ranks_by_that_week_and_counts_everyone(conn, org, crowd):
+    """The dashboard's workload chart asks for weeks=1 and the 8 worst: its "Showing 8 of 12" note needs both."""
+    admin, this_week = org["admin"], {"week_from": "2026-10-12", "weeks": 1}
+    everyone = dashboard.allocation(conn, admin, this_week, page_size=100)
+    top = dashboard.allocation(conn, admin, this_week, page=1, page_size=1)
+    assert [r["user_id"] for r in top["items"]] == [crowd["dan"].user_id]
+    assert top["total"] == len(everyone["items"]) > 1
+    peaks = [r["peak_over_by_hours"] for r in everyone["items"]]
+    assert peaks == sorted(peaks, reverse=True) and all(len(r["weeks"]) == 1 for r in everyone["items"])
+    # Alice is over only next week, so this week she ranks as within capacity.
+    assert (row_for(everyone, org["alice"])["peak_over_by_hours"], row_for(everyone, org["alice"])["status"]) == (0, "OK")
+
+
 def test_allocation_grid_flags_overtime_worked(conn, org):
     users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 10, "overtime_allowed": True})
     log(conn, org["alice"], org["task"], "2026-10-12", 6)

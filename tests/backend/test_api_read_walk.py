@@ -88,6 +88,10 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert week["bookedHours"] == 20 and week["loggedMinutes"] == 90 and week["overByHours"] == 0
     assert week["projects"] == [{"projectId": pid, "name": "Apollo", "hours": 20}]
     assert b.call("GET", "/dashboard/allocation", query={"overOnly": "true"})[1]["total"] == 0
+    # The dashboard's workload chart: one week, a short page, and the total of everyone for its note.
+    status, one = b.call("GET", "/dashboard/allocation", query={"weekFrom": "2026-10-12", "weeks": "1", "pageSize": "1"})
+    assert status == 200 and one["weeks"] == ["2026-10-12"] and len(one["items"]) == 1
+    assert (one["pageSize"], one["total"]) == (1, grid["total"])
     check = get(a, "/admin/integrity-check", "/admin/integrity-check")
     assert check["checks"] == 5 and all(rows == [] for rows in check["violations"].values())
     assert get(a, "/admin/audit-log", "/admin/audit-log")["total"] > 0
