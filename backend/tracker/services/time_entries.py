@@ -135,8 +135,10 @@ def decide_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, approve:
         row = conn.execute("UPDATE time_entries SET status = %s, decided_by = %s, decided_at = now(),"
                            " updated_at = now() WHERE entry_id = %s RETURNING *",
                            (status, actor.user_id, entry_id)).fetchone()
+        # `before` carries the author's name for the summary; the snapshot is the entry alone.
+        snapshot = {k: v for k, v in before.items() if k != "person_name"}
         audit.record_change(conn, actor, status[:-1] if approve else "REJECT", "time_entries", entry_id,
-                            entry_view(before), entry_view(row),
+                            entry_view(snapshot), entry_view(row),
                             f"{actor.name} {status.lower()} {hours_text(row['minutes'])} logged by"
                             f" {before['person_name']} on {row['work_date'].isoformat()}")
     return row

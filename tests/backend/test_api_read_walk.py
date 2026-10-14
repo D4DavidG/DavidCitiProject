@@ -121,6 +121,20 @@ def test_logged_time_names_the_person_task_and_project(conn, world):
     assert (mine[0]["taskTitle"], mine[0]["projectName"]) == ("Sketch", "Apollo")
 
 
+def test_approving_time_snapshots_only_the_entry_not_the_joined_names(conn, world):
+    # The approval reads the entry joined to its author's name; that name must not leak
+    # into the audit snapshot, or every approval would show a fake "personName" change.
+    entry = world["entry"]["entry_id"]
+    status, _ = client_for(conn, world, "bob").call("POST", f"/time-entries/{entry}/approve")
+    assert status == 200
+    row = conn.execute("SELECT before_state, after_state FROM audit_log WHERE entity_type = 'time_entries'"
+                       " AND entity_id = %s AND action = 'APPROVE'", (entry,)).fetchone()
+    assert "personName" not in row["before_state"] and "personName" not in row["after_state"]
+    changed = {k for k in row["before_state"] if row["before_state"][k] != row["after_state"].get(k)}
+    # updatedAt only differs outside a test, where the two steps aren't one transaction.
+    assert {"status", "decidedBy", "decidedAt"} <= changed <= {"status", "decidedBy", "decidedAt", "updatedAt"}
+
+
 # --- the audit log's filters ----------------------------------------------------------------
 
 def test_audit_log_filters_by_actor_entity_and_date(conn, world):
