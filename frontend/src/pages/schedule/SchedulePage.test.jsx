@@ -54,6 +54,16 @@ describe('SchedulePage', () => {
     expect(screen.getByRole('link', { name: 'Chloe Kim, Zeus, 30 hours a week, Oct 12 to Oct 25' })).toBeInTheDocument()
   })
 
+  it("places each bar on its own weeks (grid columns) and its project's lane (grid row)", async () => {
+    renderSchedule()
+    const place = (link) => { const s = getComputedStyle(link); return [s.gridColumn, s.gridRow] }
+    // Column 1 is the name, so week 0 is column 2; a bar ends at the line after its last week.
+    expect(place(await bar(/Ben Okafor, Apollo, 25/))).toEqual(['2/4', '1'])
+    expect(place(screen.getByRole('link', { name: /Ben Okafor, Apollo, 10/ }))).toEqual(['4/5', '1'])
+    expect(place(screen.getByRole('link', { name: /Ben Okafor, Zeus/ }))).toEqual(['2/4', '2'])
+    expect(place(screen.getByRole('link', { name: /Chloe Kim, Zeus/ }))).toEqual(['2/4', '1'])
+  })
+
   it('colours a bar by its project, the same in every row', async () => {
     renderSchedule()
     const benZeus = await bar(/Ben Okafor, Zeus/)
