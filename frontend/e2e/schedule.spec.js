@@ -60,6 +60,19 @@ for (const [name, size] of [['desktop', { width: 1440, height: 900 }], ['phone',
   })
 }
 
+test('on a phone, a first-week bar brought into view by focus is not hidden under the names', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const chart = await openSchedule(page)
+  const ben = chart.locator('li').filter({ hasText: 'Ben Okafor' })
+  const box = chart.getByRole('list').filter({ hasText: 'Ben Okafor' }).locator('..')
+  await box.evaluate((el) => { el.scrollLeft = el.scrollWidth })
+  const bar = apolloBar(chart)
+  await bar.focus() // the browser scrolls the box to bring the bar into view
+  const names = await ben.getByText('Ben Okafor', { exact: true }).locator('..').boundingBox()
+  const shown = await bar.boundingBox()
+  expect(shown.x, 'the bar starts right of the sticky name column').toBeGreaterThanOrEqual(names.x + names.width - 1)
+})
+
 test('tabbing onto a bar opens its tooltip, and Enter opens the project', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   const chart = await openSchedule(page)
