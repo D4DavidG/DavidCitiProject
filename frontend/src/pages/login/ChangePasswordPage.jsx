@@ -16,7 +16,7 @@ const FIELDS = [
  * every other request with 403, and RequireRole keeps sending you back here.
  */
 export default function ChangePasswordPage() {
-  const { user, refreshUser } = useAuth()
+  const { user, startSession } = useAuth()
   const navigate = useNavigate()
   const [values, setValues] = useState({ currentPassword: '', newPassword: '', confirm: '' })
   const [fieldErrors, setFieldErrors] = useState({})
@@ -33,10 +33,11 @@ export default function ChangePasswordPage() {
     setFieldErrors({})
     setBusy(true)
     try {
-      await request('POST', '/auth/change-password', {
+      // The change ends every older session, this one included, and answers with a new one.
+      const result = await request('POST', '/auth/change-password', {
         body: { currentPassword: values.currentPassword, newPassword: values.newPassword },
       })
-      const updated = await refreshUser()
+      const updated = startSession(result)
       navigate(homePath(updated ?? user), { replace: true })
     } catch (failure) {
       if (failure.field && failure.field in values) setFieldErrors({ [failure.field]: failure.message })

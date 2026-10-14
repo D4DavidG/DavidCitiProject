@@ -76,6 +76,11 @@ export function setTokens(access, refresh) {
   refreshToken = refresh
 }
 
+/** The refresh token held now (after any rotation), for Sign out to end it on the server. */
+export function getRefreshToken() {
+  return refreshToken
+}
+
 /** Register the function called when the session is over: a 401 that a refresh couldn't fix. */
 export function setUnauthorizedHandler(handler) {
   onUnauthorized = handler

@@ -25,13 +25,14 @@ describe('ChangePasswordPage', () => {
     expect(screen.getByText(/choose your own password/i)).toBeInTheDocument()
   })
 
-  it('sends the current and new password, then goes home', async () => {
-    const calls = stubApi({ 'POST /auth/change-password': [200, USERS.manager] })
-    const auth = session({ ...USERS.manager, mustChangePassword: true }, { refreshUser: vi.fn().mockResolvedValue(USERS.manager) })
+  it('sends the current and new password, keeps the new session it gets back, then goes home', async () => {
+    const answer = { token: 'new-token', refreshToken: 'new-refresh', user: USERS.manager }
+    const calls = stubApi({ 'POST /auth/change-password': [200, answer] })
+    const auth = session({ ...USERS.manager, mustChangePassword: true }, { startSession: vi.fn((result) => result.user) })
     renderPage(auth)
     await fill('Generated-123', 'my-new-password', 'my-new-password')
     expect(calls[0].body).toEqual({ currentPassword: 'Generated-123', newPassword: 'my-new-password' })
-    expect(auth.refreshUser).toHaveBeenCalled()
+    expect(auth.startSession).toHaveBeenCalledWith(answer)
     expect(await screen.findByText('dashboard page')).toBeInTheDocument()
   })
 

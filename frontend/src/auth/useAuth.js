@@ -7,9 +7,10 @@ import { createContext, useContext } from 'react'
  *   status: 'loading'|'signedOut'|'signedIn'|'unavailable',
  *   sessionExpired: boolean,
  *   login: (username: string, password: string) => Promise<object>,
- *   logout: () => void,
+ *   logout: () => Promise<void>,
  *   refreshUser: () => Promise<object>,
  *   retrySession: () => void,
+ *   startSession: (result: { token: string, refreshToken: string, user: object }) => object,
  * }} Session
  */
 export const AuthContext = createContext(null)

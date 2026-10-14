@@ -21,6 +21,7 @@ export function session(user, overrides = {}) {
     login: vi.fn(),
     logout: vi.fn(),
     refreshUser: vi.fn(),
+    startSession: vi.fn((result) => result.user),
     ...overrides,
   }
 }
