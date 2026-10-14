@@ -8,6 +8,7 @@ import MenuIcon from '@mui/icons-material/Menu'
 import { useAuth } from '../auth/useAuth'
 import { useIsMobile } from '../theme/responsive'
 import { NAV_ITEMS, ROLE_LABELS } from './navigation'
+import NotificationBell from './NotificationBell'
 
 const DRAWER_WIDTH = 240
 
@@ -58,6 +59,7 @@ export default function AppLayout({ children }) {
           <Typography variant="h6" component="span" sx={{ fontWeight: 700, color: 'primary.main', flexGrow: 1 }} noWrap>
             ACME Project Tracker
           </Typography>
+          <NotificationBell />
           {!isMobile && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2">{user.firstName} {user.lastName}</Typography>

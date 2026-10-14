@@ -13,6 +13,7 @@ import DashboardPage from './pages/dashboard/DashboardPage'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
 import MyTasksPage from './pages/mytasks/MyTasksPage'
+import NotificationsPage from './pages/notifications/NotificationsPage'
 import PeoplePage from './pages/people/PeoplePage'
 import DependencyPage from './pages/projects/DependencyPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
@@ -65,7 +66,7 @@ export function AppRoutes() {
         <Route path="/approvals" element={<RequireRole roles={STAFF}><ApprovalsPage /></RequireRole>} />
         <Route path="/people" element={<RequireRole roles={STAFF}><PeoplePage /></RequireRole>} />
         <Route path="/requests" element={<RequireRole roles={STAFF}><RequestsPage /></RequireRole>} />
-        <Route path="/notifications" element={<ComingSoon title="Notifications" />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/audit" element={<RequireRole roles={['ADMIN']}><ComingSoon title="Audit log" /></RequireRole>} />
         <Route path="*" element={<NotFound />} />
       </Route>

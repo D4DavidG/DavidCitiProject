@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, request, setToken, setUnauthorizedHandler } from './request'
+import { ApiError, onWrite, request, setToken, setUnauthorizedHandler } from './request'
 
 function answer(status, payload) {
   return Promise.resolve({
@@ -92,6 +92,21 @@ describe('request()', () => {
       status: 0,
       message: expect.stringContaining("Can't reach the server"),
     })
+  })
+
+  it('tells write listeners after a successful change, but not after a read or a failure', async () => {
+    const listener = vi.fn()
+    const stop = onWrite(listener)
+    await request('GET', '/projects')
+    expect(listener).not.toHaveBeenCalled()
+    await request('POST', '/notifications/read-all')
+    expect(listener).toHaveBeenCalledOnce()
+    fetchMock.mockReturnValueOnce(answer(409, { error: 'no' }))
+    await request('PATCH', '/projects/1', { body: {} }).catch(() => {})
+    expect(listener).toHaveBeenCalledOnce()
+    stop()
+    await request('POST', '/notifications/read-all')
+    expect(listener).toHaveBeenCalledOnce()
   })
 
   it('falls back to a generic message when the error body is not JSON', async () => {

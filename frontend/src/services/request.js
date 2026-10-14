@@ -27,6 +27,16 @@ export class ApiError extends Error {
 
 let token = null
 let onUnauthorized = null
+const writeListeners = new Set()
+
+/**
+ * Be told after every successful change (any non-GET call). The notification bell
+ * uses this to refresh its count straight away. Returns a function that stops listening.
+ */
+export function onWrite(listener) {
+  writeListeners.add(listener)
+  return () => writeListeners.delete(listener)
+}
 
 /** Remember (or forget, with null) the token sent as `Authorization: Bearer`. */
 export function setToken(value) {
@@ -85,7 +95,10 @@ export async function request(method, path, { body, query } = {}) {
   }
 
   const payload = parse(await response.text())
-  if (response.ok) return payload ?? null
+  if (response.ok) {
+    if (method !== 'GET') writeListeners.forEach((listener) => listener())
+    return payload ?? null
+  }
 
   if (response.status === 401 && path !== '/auth/login' && onUnauthorized) onUnauthorized()
   const message = payload?.error ?? `Request failed (${response.status}).`

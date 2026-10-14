@@ -48,6 +48,11 @@ describe('AppLayout', () => {
     expect(auth.logout).toHaveBeenCalledOnce()
   })
 
+  it('has the notification bell in the top bar', async () => {
+    renderLayout(USERS.manager)
+    expect(await screen.findByRole('link', { name: /notifications, no unread/i })).toBeInTheDocument()
+  })
+
   it('renders the page inside the layout', () => {
     renderLayout(USERS.manager)
     expect(screen.getByText('page body')).toBeInTheDocument()
