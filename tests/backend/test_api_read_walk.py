@@ -24,7 +24,7 @@ def world(conn, org):  # noqa: F811
     milestones.add_dependency(conn, bob, build["milestone_id"], design["milestone_id"])
     task = f.task(conn, bob, design, assignee=alice, title="Sketch")
     entry = time_entries.log_time(conn, alice, task["task_id"], {"work_date": "2026-10-13", "minutes": 90})
-    request = requests.create_request(conn, bob, {"name": "Hermes", "justification": "Growth"})
+    request = requests.create_request(conn, bob, {"kind": "NEW_PROJECT", "name": "Hermes", "justification": "Growth"})
     return {**org, "design": design, "build": build, "task": task, "entry": entry, "request": request}
 
 

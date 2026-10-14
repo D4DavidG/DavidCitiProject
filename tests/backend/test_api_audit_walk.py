@@ -91,9 +91,9 @@ def test_every_mutating_route_writes_an_audit_row(conn):
     hit(b, "POST", "/assignments/{id}/archive", f"/assignments/{booking['assignmentId']}/archive")
 
     req = hit(b, "POST", "/project-requests", "/project-requests",
-              {"name": "Hermes", "justification": "Growth", "proposedStart": "2026-11-01", "proposedEnd": "2027-01-31"})
+              {"kind": "NEW_PROJECT", "name": "Hermes", "justification": "Growth", "proposedStart": "2026-11-01", "proposedEnd": "2027-01-31"})
     hit(a, "POST", "/project-requests/{id}/approve", f"/project-requests/{req['requestId']}/approve", {})
-    req2 = hit(b, "POST", "/project-requests", "/project-requests", {"name": "Iris", "justification": "Maybe"})
+    req2 = hit(b, "POST", "/project-requests", "/project-requests", {"kind": "NEW_PROJECT", "name": "Iris", "justification": "Maybe"})
     hit(a, "POST", "/project-requests/{id}/reject", f"/project-requests/{req2['requestId']}/reject",
         {"decisionNote": "Later"})
     hit(a, "POST", "/projects/{id}/archive", f"/projects/{pid}/archive")

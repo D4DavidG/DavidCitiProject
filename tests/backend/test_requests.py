@@ -1,10 +1,15 @@
-"""Project requests: a manager asks, an admin approves (creating the project) or rejects."""
+"""Requests: managers and employees ask, the people above them approve or reject.
+
+Kinds: NEW_PROJECT and ARCHIVE_PROJECT (managers), TASK_LIMIT and OVERTIME
+(employees), OTHER (both). Approving applies the change through the existing
+services; a decision notifies the asker.
+"""
 
 import pytest
 
 import factories as f
 from domain.errors import Conflict, Forbidden, NotFound, ValidationError
-from services import requests
+from services import projects, requests, users
 
 
 @pytest.fixture
@@ -13,25 +18,93 @@ def org(conn):
     bob, _ = f.person(conn, admin, role="MANAGER", first_name="Bob")
     carol, _ = f.person(conn, admin, role="MANAGER", first_name="Carol")
     alice, _ = f.person(conn, admin, manager=bob, first_name="Alice")
-    return {"admin": admin, "bob": bob, "carol": carol, "alice": alice}
+    apollo = f.project(conn, admin, bob, name="Apollo")
+    return {"admin": admin, "bob": bob, "carol": carol, "alice": alice, "apollo": apollo}
 
 
 def file(conn, who, **extra):
-    data = {"name": "Hermes", "justification": "Customers asked for it",
+    data = {"kind": "NEW_PROJECT", "name": "Hermes", "justification": "Customers asked for it",
             "proposed_start": "2026-11-01", "proposed_end": "2027-02-28"}
     data.update(extra)
     return requests.create_request(conn, who, data)
 
 
+# A valid body for each kind, apart from ARCHIVE_PROJECT's project_id.
+SAMPLE = {"NEW_PROJECT": {"name": "Hermes"}, "ARCHIVE_PROJECT": {}, "TASK_LIMIT": {"task_limit": 4},
+          "OVERTIME": {}, "OTHER": {"name": "A second monitor"}}
+SENDS = {"bob": {"NEW_PROJECT", "ARCHIVE_PROJECT", "OTHER"}, "alice": {"TASK_LIMIT", "OVERTIME", "OTHER"},
+         "admin": set()}
+
+
+def ask(conn, who, kind, **fields):
+    """Send one request of `kind`, with a note, as `who`."""
+    return requests.create_request(conn, who, {"kind": kind, "justification": "Launch week", **SAMPLE[kind], **fields})
+
+
+@pytest.mark.parametrize("who", sorted(SENDS))
+@pytest.mark.parametrize("kind", sorted(SAMPLE))
+def test_each_role_sends_only_its_kinds(conn, org, who, kind):
+    extra = {"project_id": org["apollo"]["project_id"]} if kind == "ARCHIVE_PROJECT" else {}
+    if kind in SENDS[who]:
+        row = ask(conn, org[who], kind, **extra)
+        assert (row["status"], row["kind"], row["requested_by"]) == ("PENDING", kind, org[who].user_id)
+    else:
+        with pytest.raises(Forbidden):
+            ask(conn, org[who], kind, **extra)
+
+
+def test_archive_request_only_for_a_live_project_you_manage(conn, org):
+    with pytest.raises(NotFound):
+        ask(conn, org["carol"], "ARCHIVE_PROJECT", project_id=org["apollo"]["project_id"])
+    row = ask(conn, org["bob"], "ARCHIVE_PROJECT", project_id=org["apollo"]["project_id"])
+    assert (row["name"], row["project_id"]) == ("Archive Apollo", org["apollo"]["project_id"])
+    projects.archive_project(conn, org["admin"], org["apollo"]["project_id"])
+    with pytest.raises(Conflict):
+        ask(conn, org["bob"], "ARCHIVE_PROJECT", project_id=org["apollo"]["project_id"])
+
+
+@pytest.mark.parametrize("limit", [2, 11])
+def test_task_limit_request_must_raise_the_limit(conn, org, limit):
+    with pytest.raises(ValidationError) as refused:
+        ask(conn, org["alice"], "TASK_LIMIT", task_limit=limit)
+    assert refused.value.field == "task_limit"
+
+
+def test_task_limit_request_names_the_new_limit(conn, org):
+    row = ask(conn, org["alice"], "TASK_LIMIT", task_limit=4)
+    assert (row["name"], row["task_limit"]) == ("Raise my task limit to 4", 4)
+
+
+def test_overtime_request_only_while_overtime_is_off(conn, org):
+    assert ask(conn, org["alice"], "OVERTIME")["name"] == "Allow overtime"
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"overtime_allowed": True})
+    with pytest.raises(Conflict):
+        ask(conn, org["alice"], "OVERTIME")
+
+
+@pytest.mark.parametrize("kind", sorted(SAMPLE))
+def test_every_request_needs_a_note(conn, org, kind):
+    who = org["bob"] if kind in SENDS["bob"] else org["alice"]
+    extra = {"project_id": org["apollo"]["project_id"]} if kind == "ARCHIVE_PROJECT" else {}
+    with pytest.raises(ValidationError) as refused:
+        ask(conn, who, kind, justification=None, **extra)
+    assert refused.value.field == "justification"
+
+
+def test_a_field_from_another_kind_is_refused(conn, org):
+    with pytest.raises(ValidationError) as refused:
+        ask(conn, org["alice"], "OVERTIME", task_limit=4)
+    assert refused.value.field == "task_limit"
+
+
+def test_unknown_kind_is_refused(conn, org):
+    with pytest.raises(ValidationError):
+        requests.create_request(conn, org["alice"], {"kind": "RAISE", "justification": "Please"})
+
+
 def test_manager_files_a_request(conn, org):
     row = file(conn, org["bob"])
     assert (row["status"], row["requested_by"]) == ("PENDING", org["bob"].user_id)
-
-
-@pytest.mark.parametrize("who", ["alice", "admin"])
-def test_only_managers_file_requests(conn, org, who):
-    with pytest.raises(Forbidden):
-        file(conn, org[who])
 
 
 def test_managers_see_their_own_requests_and_admins_see_all(conn, org):

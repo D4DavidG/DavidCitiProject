@@ -189,10 +189,12 @@ def seed() -> None:
     step("last week: Ana 30 h (approved), Ben 40 h (pending: at capacity), Chloe 50 h (approved, overtime on)")
 
     # Intake and history.
-    req = sam.ok("POST", "/project-requests", {"name": "Hermes", "justification": "Partners asked for an API",
+    req = sam.ok("POST", "/project-requests", {"kind": "NEW_PROJECT", "name": "Hermes",
+                                               "justification": "Partners asked for an API",
                                                "proposedStart": day(14), "proposedEnd": day(120)})
     admin.ok("POST", f"/project-requests/{req['requestId']}/approve", {"budgetCents": 80_000_00})
-    maria.ok("POST", "/project-requests", {"name": "Iris", "justification": "Internal analytics dashboard"})
+    maria.ok("POST", "/project-requests", {"kind": "NEW_PROJECT", "name": "Iris",
+                                           "justification": "Internal analytics dashboard"})
     legacy = admin.ok("POST", "/projects", {"name": "Legacy CRM", "managerId": uid["maria.lopez@acme.test"],
                                             "startDate": day(-200), "predictedEndDate": day(-40), "status": "COMPLETE"})
     admin.ok("POST", f"/projects/{legacy['projectId']}/archive")

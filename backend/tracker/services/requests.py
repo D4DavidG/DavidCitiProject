@@ -1,8 +1,14 @@
-"""Project requests (intake): a manager asks for a project, an admin approves or rejects.
+"""Requests: managers and employees ask, the people above them decide.
 
-Approval creates the project, managed by the manager who asked for it, in the
-same transaction. That writes two audit rows: the request was decided, and a
-project was created.
+Five kinds (the `kind` column of project_requests, migration 003):
+
+    NEW_PROJECT, ARCHIVE_PROJECT  sent by managers, decided by admins
+    TASK_LIMIT, OVERTIME          sent by employees, decided by their line manager or an admin
+    OTHER                         free text from either; deciding it changes nothing else
+
+Who decides is who `record_change` notifies when the request is sent. Approving
+applies the change through the existing service in the same transaction, so the
+same rules and audit rows apply as if the decider had done it by hand.
 """
 
 import psycopg
@@ -11,6 +17,7 @@ from psycopg import sql
 from domain import money, values
 from domain.errors import Conflict, Forbidden, NotFound, ValidationError
 from services import audit, projects
+from services.access import PROJECT_NOT_FOUND
 from services.actors import Actor
 from services.paging import paginate
 from services.views import request_view
@@ -18,29 +25,62 @@ from store.postgres import atomic, insert
 
 NOT_FOUND = "Request not found."
 STATUSES = {"PENDING", "APPROVED", "REJECTED"}
-_FIELDS = {"name", "description", "justification", "proposed_start", "proposed_end"}
+SENDERS = {"NEW_PROJECT": {"MANAGER"}, "ARCHIVE_PROJECT": {"MANAGER"},
+           "TASK_LIMIT": {"EMPLOYEE"}, "OVERTIME": {"EMPLOYEE"}, "OTHER": {"MANAGER", "EMPLOYEE"}}
+_FIELDS = {"NEW_PROJECT": {"name", "description", "justification", "proposed_start", "proposed_end"},
+           "ARCHIVE_PROJECT": {"project_id", "justification"}, "TASK_LIMIT": {"task_limit", "justification"},
+           "OVERTIME": {"justification"}, "OTHER": {"name", "justification"}}
 
 
 def create_request(conn: psycopg.Connection, actor: Actor, data: dict) -> dict:
-    """Managers only (admins simply create the project)."""
-    if not actor.is_manager:
-        raise Forbidden("Only managers file project requests.")
-    values.only_allowed(data, _FIELDS)
-    clean = {
-        "name": values.text(data, "name"),
-        "description": values.text(data, "description", required=False, max_length=5000),
-        "justification": values.text(data, "justification", max_length=5000),
-        "proposed_start": values.date(data, "proposed_start", required=False),
-        "proposed_end": values.date(data, "proposed_end", required=False),
-        "requested_by": actor.user_id,
-    }
-    if clean["proposed_start"] and clean["proposed_end"] and clean["proposed_end"] < clean["proposed_start"]:
-        raise ValidationError("End date can't be before start date.", field="proposed_end")
+    """Send a request of a kind your role may send (SENDERS). The note is always required."""
+    kind = values.choice(data, "kind", set(SENDERS))
+    if actor.role not in SENDERS[kind]:
+        raise Forbidden("Your role can't send this kind of request.")
+    values.only_allowed(data, _FIELDS[kind] | {"kind"})
+    clean = {"kind": kind, "requested_by": actor.user_id,
+             "justification": values.text(data, "justification", max_length=5000)}
     with atomic(conn):
+        clean.update(_kind_fields(conn, actor, kind, data))
         row = insert(conn, "project_requests", clean)
+        summary = f"{actor.name} requested a new project: {row['name']}" if kind == "NEW_PROJECT" else \
+            f"{actor.name} sent a request: {row['name']}"
         audit.record_change(conn, actor, "CREATE", "project_requests", row["request_id"], None, request_view(row),
-                            f"{actor.name} requested a new project: {row['name']}")
+                            summary)
     return row
+
+
+def _kind_fields(conn: psycopg.Connection, actor: Actor, kind: str, data: dict) -> dict:
+    """The columns only this kind fills; `name` is the request's title for every kind."""
+    if kind == "NEW_PROJECT":
+        clean = {"name": values.text(data, "name"),
+                 "description": values.text(data, "description", required=False, max_length=5000),
+                 "proposed_start": values.date(data, "proposed_start", required=False),
+                 "proposed_end": values.date(data, "proposed_end", required=False)}
+        if clean["proposed_start"] and clean["proposed_end"] and clean["proposed_end"] < clean["proposed_start"]:
+            raise ValidationError("End date can't be before start date.", field="proposed_end")
+        return clean
+    if kind == "ARCHIVE_PROJECT":
+        project_id = values.integer(data, "project_id")
+        project = conn.execute("SELECT * FROM projects WHERE project_id = %s AND manager_id = %s",
+                               (project_id, actor.user_id)).fetchone()
+        if project is None:
+            raise NotFound(PROJECT_NOT_FOUND)
+        if project["is_archived"]:
+            raise Conflict("This project is already archived.")
+        return {"name": f"Archive {project['name']}", "project_id": project_id}
+    me = conn.execute("SELECT task_limit, overtime_allowed FROM users WHERE user_id = %s",
+                      (actor.user_id,)).fetchone()
+    if kind == "TASK_LIMIT":
+        limit = values.integer(data, "task_limit", minimum=1, maximum=10)
+        if limit <= me["task_limit"]:
+            raise ValidationError(f"Ask for more than your current limit of {me['task_limit']}.", field="task_limit")
+        return {"name": f"Raise my task limit to {limit}", "task_limit": limit}
+    if kind == "OVERTIME":
+        if me["overtime_allowed"]:
+            raise Conflict("Overtime is already allowed for you.")
+        return {"name": "Allow overtime"}
+    return {"name": values.text(data, "name")}  # OTHER: the subject
 
 
 def list_requests(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
