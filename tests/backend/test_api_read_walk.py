@@ -49,6 +49,8 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert get(b, "/projects/{id}", f"/projects/{pid}")["name"] == "Apollo"
     budget = get(b, "/projects/{id}/budget", f"/projects/{pid}/budget")
     assert {"budgetCents", "plannedCents", "consumedCents", "pendingCents", "remainingCents"} <= budget.keys()
+    assert {"consumedPercent", "plannedPercent", "pendingPercent"} <= budget.keys()
+    assert not any("_" in k for k in budget)  # every key reaches the website in camelCase
     assert budget["pendingCents"] > 0  # Alice's 90 minutes, not yet approved
     graph = get(e, "/projects/{id}/dependency-graph", f"/projects/{pid}/dependency-graph")
     assert len(graph["nodes"]) == 2 and len(graph["edges"]) == 1
