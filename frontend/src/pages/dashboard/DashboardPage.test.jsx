@@ -9,11 +9,11 @@ const APOLLO = {
   startDate: '2026-10-01', predictedEndDate: '2026-12-31', progressPercent: 12,
   atRisk: true, riskReasons: [{ code: 'DELIVERABLE_BEHIND', message: 'Deliverable Build is 0% done with 25% of its time gone.' }],
   budgetCents: 15_000_000, plannedCents: 3_197_600, consumedCents: 137_000, pendingCents: 153_800,
-  consumedPercent: 0, plannedOverBudget: false, remainingCents: 14_863_000, scheduleElapsedPercent: 14,
+  consumedPercent: 0, plannedPercent: 21, pendingPercent: 1, plannedOverBudget: false, remainingCents: 14_863_000, scheduleElapsedPercent: 14,
 }
 const HERMES = {
   ...APOLLO, projectId: 3, name: 'Hermes', status: 'PLANNING', progressPercent: 0, atRisk: false, riskReasons: [],
-  budgetCents: 8_000_000, plannedCents: 0, consumedCents: 0, pendingCents: 0,
+  budgetCents: 8_000_000, plannedCents: 0, consumedCents: 0, pendingCents: 0, plannedPercent: 0, pendingPercent: 0,
 }
 
 function renderDashboard(answers = { 'GET /dashboard/projects': [200, page([APOLLO, HERMES])] }) {
@@ -60,6 +60,13 @@ describe('DashboardPage', () => {
     await screen.findByRole('article', { name: 'Apollo' })
     expect(screen.getByLabelText('Projects shown')).toHaveTextContent('2')
     expect(screen.getByLabelText('At risk')).toHaveTextContent('1')
+  })
+
+  it('draws the budget chart between the counts and the cards', async () => {
+    renderDashboard()
+    const chart = await screen.findByRole('figure', { name: 'Budget by project' })
+    expect(screen.getByLabelText('At risk').compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(chart.compareDocumentPosition(screen.getByRole('article', { name: 'Apollo' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('links each card to its project', async () => {

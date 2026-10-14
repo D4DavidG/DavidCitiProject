@@ -7,6 +7,7 @@ import {
 import WarningIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckIcon from '@mui/icons-material/CheckCircleOutlined'
 import BudgetBar from '../../components/BudgetBar'
+import BudgetChart from '../../components/charts/BudgetChart'
 import PageHeader from '../../components/PageHeader'
 import PageState from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
@@ -124,6 +125,7 @@ export default function DashboardPage() {
           <Stat label="Projects shown" value={data?.total ?? 0} />
           <Stat label="At risk" value={items.filter((p) => p.atRisk).length} color="error.main" />
         </Box>
+        <Box sx={{ mb: 3 }}><BudgetChart projects={items} /></Box>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' } }}>
           {items.map((project) => <ProjectCard key={project.projectId} project={project} />)}
         </Box>
