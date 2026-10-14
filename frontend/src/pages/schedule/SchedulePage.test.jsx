@@ -3,7 +3,6 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import SchedulePage from './SchedulePage'
-import { PROJECT_COLOURS } from '../../theme/chartColours'
 import { page, renderAt, stubApi } from '../../test/utils'
 
 const WEEKS = ['2026-10-12', '2026-10-19', '2026-10-26']
@@ -85,7 +84,16 @@ describe('SchedulePage', () => {
     await bar(/Ben Okafor, Apollo, 25/)
     const legend = screen.getByRole('list', { name: 'Legend' })
     expect(within(legend).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Apollo', 'Zeus', 'Over capacity'])
-    expect(PROJECT_COLOURS).toHaveLength(5)
+  })
+
+  it('names five project colours in the legend, then the grey Other with how many share it', async () => {
+    const seven = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ projectId: id, name: `P${id}`, hours: 6 })) // 42 h: over
+    const busy = { ...BEN, weeks: WEEKS.map((w) => week(w, seven)) }
+    renderSchedule(() => [200, { ...page([busy]), weeks: WEEKS }])
+    await bar(/Ben Okafor, P7/)
+    const legend = screen.getByRole('list', { name: 'Legend' })
+    expect(within(legend).getAllByRole('listitem').map((li) => li.textContent))
+      .toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'Other (2)', 'Over capacity'])
   })
 
   it('marks an over-capacity week with words, the warning icon and a red outline', async () => {
