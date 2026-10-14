@@ -8,6 +8,7 @@ import AppLayout from './components/AppLayout'
 import ComingSoon from './components/ComingSoon'
 import PageState from './components/PageState'
 import AllocationPage from './pages/allocation/AllocationPage'
+import ApprovalsPage from './pages/approvals/ApprovalsPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
@@ -59,7 +60,7 @@ export function AppRoutes() {
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/projects/:id/dependencies" element={<DependencyPage />} />
         <Route path="/my-tasks" element={<RequireRole roles={['EMPLOYEE']}><MyTasksPage /></RequireRole>} />
-        <Route path="/approvals" element={<RequireRole roles={STAFF}><ComingSoon title="Approvals" /></RequireRole>} />
+        <Route path="/approvals" element={<RequireRole roles={STAFF}><ApprovalsPage /></RequireRole>} />
         <Route path="/people" element={<RequireRole roles={STAFF}><ComingSoon title="People" /></RequireRole>} />
         <Route path="/requests" element={<RequireRole roles={STAFF}><ComingSoon title="Project requests" /></RequireRole>} />
         <Route path="/notifications" element={<ComingSoon title="Notifications" />} />
