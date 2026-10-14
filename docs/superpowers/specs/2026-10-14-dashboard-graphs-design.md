@@ -19,7 +19,7 @@ The one over-budget row in the budget sketch is marked as an example: the seed h
 | # | Question | Answer | What it rules out |
 | --- | --- | --- | --- |
 | 1 | Which graphs? | **Three:** (a) deliverables timeline, (b) budget chart, (c) workload chart. (d) history charts are notes only | Pie charts, gauges, anything needing history the API doesn't keep |
-| 2 | How are they drawn? | **Our own React components: plain HTML boxes sized in percent.** No chart library | Recharts, Chart.js, D3: the bundle is already 698,430 bytes (`frontend/dist/assets/index-BXPqWMMV.js`, built 14 Oct) and Vite warns about it, and a new package is a new `npm audit` surface |
+| 2 | How are they drawn? | **Our own React components: plain HTML boxes sized in percent.** No chart library | Recharts, Chart.js, D3: the bundle was already 698,430 bytes when this was decided (`frontend/dist/assets/index-BXPqWMMV.js`, built 14 Oct; a clean build of the commit just before the charts, 4c2a604, measures 710.71 kB, and the finished charts 728.37 kB) and Vite warns about it, and a new package is a new `npm audit` surface |
 | 3 | Who does the maths? | **The server, for money.** It adds `plannedPercent` and `pendingPercent`; the browser only turns server percentages into widths, as `BudgetBar.jsx` already does | Dividing cents in the browser (CLAUDE.md §9) |
 | 4 | Colour rule | Colour has one job per chart: **status colours only mean state** (green done, red late or over); **project colours only mean "which project"** (chart c); everything else is navy or grey | Using red or green for a project; colour as the only signal |
 | 5 | Never colour alone | Late and over carry **a word and a warning icon** ("Late", "Over budget", "+5 h over"). **(changed)** Stripes only for print and Windows high-contrast mode, see section 4 | A red bar with no words |
@@ -472,4 +472,4 @@ Subagent-driven, after the pull board is finished and committed, one task each:
 - **"Colour has one job.** Green and red only mean done and late or over, always with a
   word and a warning icon. Project colours were checked with a colour-blindness
   validator, and the first set failed, so I changed it."
-- **"No chart library.** The bundle was already 698 kB; three small components were enough."
+- **"No chart library.** The bundle was already 711 kB before the charts; three small components were enough."

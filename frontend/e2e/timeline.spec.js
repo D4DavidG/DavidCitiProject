@@ -108,3 +108,18 @@ test('the late bar and fill are striped only in print and forced colours', async
   // forced-color-adjust: none keeps the bar's own red track instead of a system colour.
   expect(await row.getByTestId('bar').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(235, 180, 180)')
 })
+
+test("Apollo's timeline reads Design Done, Build In progress 0%, Launch Blocked, as the runbook says", async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Username').fill(process.env.E2E_MANAGER_USERNAME ?? 'ML460428') // Maria manages Apollo
+  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
+  await page.goto('/#/projects')
+  await page.getByRole('link', { name: 'Apollo' }).first().click()
+  const chart = page.getByRole('figure', { name: 'Deliverables timeline' })
+  await expect(chart).toBeVisible()
+  await expect(chart.getByRole('img', { name: / · Design · / })).toContainText('Done')
+  await expect(chart.getByRole('img', { name: / · Build · / })).toContainText('In progress 0%')
+  await expect(chart.getByRole('img', { name: / · Launch · / })).toContainText('Blocked')
+})

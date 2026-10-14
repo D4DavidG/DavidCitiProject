@@ -357,7 +357,7 @@ statements, and Playwright browser tests."
 | 2. Rules | Each business rule behaves as specified | Calls the services directly; never imports `api` | e.g. `tests/backend/test_work.py` |
 | 3. API | All 66 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route other than login is missed | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
 | Website | Screens behave correctly | Vitest + React Testing Library, with `fetch` stubbed (no database) | `frontend/src/**/*.test.jsx` |
-| Browser | The demo works in a real browser | Playwright: 20 tests in 7 files (one only takes README screenshots) | `frontend/e2e/` |
+| Browser | The demo works in a real browser | Playwright: 21 tests in 7 files (one only takes README screenshots) | `frontend/e2e/` |
 
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
@@ -653,7 +653,8 @@ Short answers. Paths are under `backend/tracker/` unless they say otherwise.
 29. **"Responsive?"** At 899 px and below, tables become cards and the sidebar a drawer. A Playwright
     tour fails on sideways scroll at 375 px. *`frontend/src/theme/responsive.js:4`;
     `frontend/e2e/tour.spec.js`*
-29a. **"Why no chart library?"** The bundle was already 698 kB, and three charts didn't need
+29a. **"Why no chart library?"** The bundle was already 711 kB before the charts (re-measured
+    15 Oct), and our three add about 18 kB (728 kB); a library would add more. No chart needed
     one. Each is boxes sized in percent. The server sends every percentage, so the browser
     never touches cents. The project colours failed a colour-blindness validator on the first
     try, so I changed them. *`frontend/src/components/charts/`;
