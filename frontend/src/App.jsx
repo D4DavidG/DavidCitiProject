@@ -7,6 +7,8 @@ import { STAFF, homePath, useAuth } from './auth/useAuth'
 import AppLayout from './components/AppLayout'
 import ComingSoon from './components/ComingSoon'
 import PageState from './components/PageState'
+import ChangePasswordPage from './pages/login/ChangePasswordPage'
+import LoginPage from './pages/login/LoginPage'
 import theme from './theme/theme'
 
 /** "/" sends you to your home screen, or to the login page. */
@@ -42,8 +44,8 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/login" element={<ComingSoon title="Sign in" />} />
-      <Route path="/change-password" element={<RequireRole><ComingSoon title="Change password" /></RequireRole>} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/change-password" element={<RequireRole><ChangePasswordPage /></RequireRole>} />
       <Route element={<SignedIn />}>
         <Route path="/dashboard" element={<RequireRole roles={STAFF}><ComingSoon title="Dashboard" /></RequireRole>} />
         <Route path="/allocation" element={<RequireRole roles={STAFF}><ComingSoon title="Allocation" /></RequireRole>} />
