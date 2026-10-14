@@ -12,6 +12,8 @@ import pytest
 
 import factories as f
 from api import app, routes
+from api.errors import to_response
+from domain.errors import Conflict, OverCapacity, ValidationError
 
 SECRET = "api-test-secret"
 NOW = dt.datetime(2026, 10, 14, 15, 0, tzinfo=dt.timezone.utc)
@@ -196,6 +198,15 @@ def test_over_capacity_is_409(conn, org):
     status, payload = alice.call("POST", f"/tasks/{task['taskId']}/time-entries",
                                  {"workDate": "2026-10-13", "minutes": 180})
     assert status == 409 and "capacity" in payload["error"]
+
+
+def test_over_capacity_answer_carries_its_code():
+    assert to_response(OverCapacity("x")) == (409, {"error": "x", "code": "OVER_CAPACITY"})
+
+
+def test_other_errors_have_no_code():
+    assert to_response(Conflict("x")) == (409, {"error": "x"})
+    assert to_response(ValidationError("x", field="work_date")) == (400, {"error": "x", "field": "workDate"})
 
 
 # --- shapes ---------------------------------------------------------------------------

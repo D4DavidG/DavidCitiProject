@@ -2,7 +2,8 @@
 
 Order matters: subclasses come before their parents, or a 409 OverCapacity
 would be answered as its parent's status. Every error body is { "error": "..." },
-plus "field" (camelCase) when a specific input is at fault.
+plus "field" (camelCase) when a specific input is at fault, and "code" when the
+error has a machine-readable tag (OVER_CAPACITY: the website asks to confirm).
 """
 
 from api.http import to_camel
@@ -21,7 +22,7 @@ STATUS = [
     (Forbidden, 403),               # signed in, but this role may never do this
     (NotFound, 404),                # doesn't exist, or exists and isn't yours
     (MethodNotAllowed, 405),
-    (OverCapacity, 409),            # would take someone past capacity without overtime
+    (OverCapacity, 409),            # past capacity without overtime: ask to confirm
     (DependencyCycle, 409),         # would make the dependency chain loop
     (Conflict, 409),                # well formed, but the current state refuses it
     (StorageUnavailable, 503),      # database unreachable; nothing changed
@@ -37,5 +38,7 @@ def to_response(exc: DomainError) -> tuple[int, dict]:
             body = {"error": str(exc)}
             if isinstance(exc, ValidationError) and exc.field:
                 body["field"] = to_camel(exc.field)
+            if exc.code:
+                body["code"] = exc.code
             return status, body
     return 500, {"error": UNEXPECTED}

@@ -9,6 +9,8 @@ there, so a specific error is never answered with its parent's status.
 class DomainError(Exception):
     """Base class for every error the app reports to a caller."""
 
+    code: str | None = None  # a machine-readable tag the website can act on; most errors have none
+
 
 class ValidationError(DomainError):
     """The request is malformed or a value is out of range (400)."""
@@ -39,7 +41,9 @@ class Conflict(DomainError):
 
 
 class OverCapacity(Conflict):
-    """Logging this time would take the person past their weekly capacity."""
+    """Logging this time would take the person past their weekly capacity: ask them to confirm."""
+
+    code = "OVER_CAPACITY"
 
 
 class DependencyCycle(Conflict):
