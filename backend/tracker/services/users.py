@@ -102,7 +102,14 @@ def _target(conn: psycopg.Connection, user_id: int) -> dict:
 # --- creation ---------------------------------------------------------------
 
 def bootstrap_admin(conn: psycopg.Connection, password: str) -> None:
-    """Create the first admin, AD000001, unless it exists. Run once by the migration step."""
+    """Create the first admin, AD000001, unless it exists. Run once by the migration step.
+
+    Every cold start calls this inside the migration lock, so the existence check comes
+    before the deliberately slow hash: otherwise simultaneous cold starts queue for
+    about a second each.
+    """
+    if conn.execute("SELECT 1 FROM users WHERE username = 'AD000001'").fetchone():
+        return
     with atomic(conn):
         row = conn.execute(
             sql.SQL("INSERT INTO users (username, first_name, last_name, email, role, password_hash)"

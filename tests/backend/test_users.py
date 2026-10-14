@@ -34,6 +34,18 @@ def test_bootstrap_admin_is_created_once(conn):
     assert rows == [{"username": "AD000001", "role": "ADMIN", "must_change_password": True}]
 
 
+def test_bootstrap_admin_skips_the_hash_once_the_admin_exists(conn, monkeypatch):
+    # Every Lambda cold start calls this inside the migration lock. On AWS (13 Oct) the
+    # 600k-round hash made simultaneous cold starts queue about 1 s each, up to 11 s.
+    users.bootstrap_admin(conn, "first-password")
+
+    def no_hash(_password):
+        raise AssertionError("hashed the bootstrap password although AD000001 exists")
+
+    monkeypatch.setattr(users.passwords, "hash_password", no_hash)
+    users.bootstrap_admin(conn, "first-password")
+
+
 def test_admin_creates_a_user_with_generated_username_and_password(conn, org):
     row, password = users.create_user(conn, org["admin"], {
         "first_name": "David", "last_name": "Guamao", "email": "david@acme.test", "role": "EMPLOYEE"})

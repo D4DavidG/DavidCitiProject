@@ -256,7 +256,7 @@ load test against the deployed URL.
 
   If any line says `UNEXPECTED`, paste the whole output to Claude.
 
-- [ ] **4.3 Load test on real AWS**
+- [x] **4.3 Load test on real AWS**
 
   ```sh
   python3 tools/loadtest.py
@@ -304,4 +304,4 @@ load test against the deployed URL.
 | 4.1 seed | pass | six accounts, Apollo/Zeus/Hermes, Iris pending, Legacy CRM archived |
 | 4.2 demo | pass | no `UNEXPECTED`; 10 refusals as designed; 0 integrity violations |
 | 4.3 load test, 10 users | pass | 209 req/s, p95 40–50 ms, 0 failed; login p50 1.1 s |
-| 4.3 load test, 25 users | | req/s, p95, failed |
+| 4.3 load test, 25 users | pass, 1 finding | 539 req/s, p95 57–65 ms, 2 of 16,184 with no response; cold starts queued about 1 s each (fixed in code, redeploy and rerun) |

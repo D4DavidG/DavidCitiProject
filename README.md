@@ -153,7 +153,8 @@ every route in the table called over HTTP by the two walk tests.
   (for example, archiving an archived task); the same guards are tested on other records;
 - the database-down branch inside a request (the cold-start one is tested);
 - the frontend, which is not built yet;
-- the load test has run at 10 users on AWS; 25 users only on LocalStack so far (below).
+- 2 of 16,184 requests at 25 users on AWS got no HTTP response (status 0) and are unexplained;
+  the Lambda logged no error for them (below).
 
 ### Load test
 
@@ -171,12 +172,22 @@ Results on AWS (CloudFront, Lambda at 512 MB, Aurora Serverless v2; 13 Oct, seed
 | Users | Reads | Throughput | p50 / p95 | Failed | Login p50 / p95 |
 | --- | --- | --- | --- | --- | --- |
 | 10 | 4,190 | 209 req/s | 28–35 / 40–50 ms | 0 | 1.10 / 1.13 s |
+| 25 | 16,184 | 539 req/s | 35–41 / 57–65 ms | 2 (0.01%, no response) | 1.11 / 1.13 s |
 
-The worst single requests (5 to 10 s, in the `max` column only) are most likely the
-first request on each new Lambda instance: a cold start opens a new TLS connection to
-Aurora and runs the migration check before answering. They don't reach the p95. A login
-costs about 1.1 s whatever the load, because the password hash (PBKDF2, 600,000 rounds)
-is deliberately slow and CPU-bound. 1024 MB of Lambda memory would roughly halve it.
+Inside Lambda a warm request takes 6 ms (p50) and 13 ms (p95), from the CloudWatch
+`REPORT` lines; the rest is the network to CloudFront and back.
+
+**What the load test found.** The `max` column (7 to 11 s) was cold starts, and the
+CloudWatch logs showed them as a staircase: 1.3, 2.4, 3.4, 4.5 ... 9.8 s, each about 1.07 s
+after the one before. Every cold start re-hashed the bootstrap admin's password
+(600,000 rounds, about 1 s) inside the migration's advisory lock, even though the
+admin already existed, so simultaneous cold starts queued. With the lock's 10 s timeout,
+a bigger burst would have started answering 503. Fixed 13 Oct: `bootstrap_admin` checks
+for the admin before hashing (test: `test_bootstrap_admin_skips_the_hash_once_the_admin_exists`).
+Not yet measured on AWS after the fix.
+
+A login costs about 1.1 s whatever the load, because the password hash is deliberately
+slow and CPU-bound. 1024 MB of Lambda memory would roughly halve it.
 
 Results on LocalStack (VDI, 13 Oct, seeded data):
 
