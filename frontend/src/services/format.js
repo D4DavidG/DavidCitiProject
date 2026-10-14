@@ -58,6 +58,12 @@ export function formatHours(minutes) {
   return parts.join(' ') || '0 min'
 }
 
+/** Booked hours a week (a whole number): 25 -> "25 h/wk"; spoken (for aria-labels) -> "25 hours a week". */
+export function formatPerWeek(hours, { spoken = false } = {}) {
+  if (!spoken) return `${hours} h/wk`
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'} a week`
+}
+
 /** 420 -> { hours: '7', minutes: '0' }: the text for the Hours and Minutes boxes when editing. */
 export function splitMinutes(minutes) {
   if (minutes === null || minutes === undefined) return { hours: '', minutes: '' }
