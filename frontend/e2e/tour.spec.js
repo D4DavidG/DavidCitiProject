@@ -15,12 +15,12 @@ const VIEWPORTS = { desktop: { width: 1440, height: 900 }, phone: { width: 375, 
 const ROLES = {
   manager: {
     username: process.env.E2E_MANAGER_USERNAME,
-    screens: ['/dashboard', '/allocation', '/projects', 'PROJECT', 'PROJECT:Resources', 'PROJECT:Budget',
+    screens: ['/dashboard', '/allocation', '/projects', 'PROJECT', 'PROJECT:Board', 'PROJECT:Resources', 'PROJECT:Budget',
       'PROJECT/dependencies', '/approvals', '/people', '/requests', '/notifications', '/account'],
   },
   employee: {
     username: process.env.E2E_EMPLOYEE_USERNAME,
-    screens: ['/my-tasks', '/projects', 'PROJECT', 'PROJECT/dependencies', '/notifications', '/account'],
+    screens: ['/my-tasks', '/projects', 'PROJECT', 'PROJECT:Board', 'PROJECT/dependencies', '/notifications', '/account'],
   },
 }
 
