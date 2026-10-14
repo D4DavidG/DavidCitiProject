@@ -20,7 +20,8 @@ const ROLES = {
   },
   employee: {
     username: process.env.E2E_EMPLOYEE_USERNAME,
-    screens: ['/my-tasks', '/projects', 'PROJECT', 'PROJECT:Board', 'PROJECT/dependencies', '/notifications', '/account'],
+    screens: ['/my-tasks', '/projects', 'PROJECT', 'PROJECT:Board', 'PROJECT/dependencies', '/requests', '/notifications',
+      '/account'],
   },
 }
 
