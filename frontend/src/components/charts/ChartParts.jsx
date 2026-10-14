@@ -13,9 +13,11 @@ const STRIPES = `repeating-linear-gradient(45deg, ${STRIPE} 0 2px, transparent 2
  * A chart's frame: a figure named by its heading, a one-line summary, then axis, rows, legend and note.
  * Marks carry data-mark; problem marks carry data-state="late" or "over" and get stripes only in
  * print and high-contrast mode, so colour is never the only signal.
- * @param {object} props title, summary, optional axis, legend, note; children are the rows (li)
+ * `scroll` puts the axis and rows in a box that scrolls sideways (the Schedule's 26 weeks), so the
+ * page itself never does; `legendFirst` puts the legend above the rows instead of below.
+ * @param {object} props title, summary, optional axis, legend, note, scroll, legendFirst; children are the rows (li)
  */
-export function ChartFigure({ title, summary, axis, legend, note, children }) {
+export function ChartFigure({ title, summary, axis, legend, note, scroll = false, legendFirst = false, children }) {
   const headingId = useId()
   return (
     <Card
@@ -33,10 +35,13 @@ export function ChartFigure({ title, summary, axis, legend, note, children }) {
     >
       <Typography id={headingId} variant="h3" component="h2">{title}</Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>{summary}</Typography>
-      {axis}
-      {/* Relative, so a reference line (Today, Budget) can be one absolute li spanning every row. */}
-      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, position: 'relative' }}>{children}</Box>
-      {legend}
+      {legendFirst && legend}
+      <Box sx={scroll ? { overflowX: 'auto' } : undefined}>
+        {axis}
+        {/* Relative, so a reference line (Today, Budget) can be one absolute li spanning every row. */}
+        <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, position: 'relative' }}>{children}</Box>
+      </Box>
+      {!legendFirst && legend}
       {note}
     </Card>
   )
@@ -48,6 +53,10 @@ ChartFigure.propTypes = {
   axis: PropTypes.node,
   legend: PropTypes.node,
   note: PropTypes.node,
+  /** Rows wider than the card scroll sideways inside it, with the axis. */
+  scroll: PropTypes.bool,
+  /** Show the legend above the rows rather than below. */
+  legendFirst: PropTypes.bool,
   children: PropTypes.node,
 }
 

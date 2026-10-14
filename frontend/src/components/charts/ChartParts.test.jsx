@@ -47,6 +47,19 @@ describe('chart parts', () => {
     expect(css).toMatch(/background-image:\s*repeating-linear-gradient[^;]*!important/)
   })
 
+  it('can scroll wide rows sideways inside the card, axis included, so the page never does', () => {
+    inTheme(<ChartFigure title="Wide" summary="S" scroll axis={<p>axis</p>}><li>row</li></ChartFigure>)
+    const rows = within(screen.getByRole('figure', { name: 'Wide' })).getByRole('list')
+    expect(rows.parentElement).toHaveStyle({ overflowX: 'auto' })
+    expect(rows.parentElement).toContainElement(screen.getByText('axis'))
+  })
+
+  it('can put the legend above the rows', () => {
+    inTheme(<ChartFigure title="Key first" summary="S" legendFirst legend={<p>key</p>}><li>row</li></ChartFigure>)
+    const rows = within(screen.getByRole('figure', { name: 'Key first' })).getByRole('list')
+    expect(screen.getByText('key').compareDocumentPosition(rows) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('gives two figures with the same title different heading ids', () => {
     inTheme(<><ChartFigure title="Same" summary="a" /><ChartFigure title="Same" summary="b" /></>)
     const [a, b] = screen.getAllByRole('figure', { name: 'Same' })
