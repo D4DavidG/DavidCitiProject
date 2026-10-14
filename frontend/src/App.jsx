@@ -17,6 +17,7 @@ import PeoplePage from './pages/people/PeoplePage'
 import DependencyPage from './pages/projects/DependencyPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
 import ProjectsPage from './pages/projects/ProjectsPage'
+import RequestsPage from './pages/requests/RequestsPage'
 import theme from './theme/theme'
 
 /** "/" sends you to your home screen, or to the login page. */
@@ -63,7 +64,7 @@ export function AppRoutes() {
         <Route path="/my-tasks" element={<RequireRole roles={['EMPLOYEE']}><MyTasksPage /></RequireRole>} />
         <Route path="/approvals" element={<RequireRole roles={STAFF}><ApprovalsPage /></RequireRole>} />
         <Route path="/people" element={<RequireRole roles={STAFF}><PeoplePage /></RequireRole>} />
-        <Route path="/requests" element={<RequireRole roles={STAFF}><ComingSoon title="Project requests" /></RequireRole>} />
+        <Route path="/requests" element={<RequireRole roles={STAFF}><RequestsPage /></RequireRole>} />
         <Route path="/notifications" element={<ComingSoon title="Notifications" />} />
         <Route path="/audit" element={<RequireRole roles={['ADMIN']}><ComingSoon title="Audit log" /></RequireRole>} />
         <Route path="*" element={<NotFound />} />
