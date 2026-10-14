@@ -14,7 +14,7 @@ from psycopg import sql
 
 from domain import values
 from domain.errors import AuthenticationError, Conflict, Forbidden, NotFound, ValidationError
-from services import audit, passwords, tokens
+from services import audit, passwords, sessions
 from services.actors import ADMIN, EMPLOYEE, MANAGER, Actor
 from services.paging import paginate
 from services.views import user_view
@@ -150,7 +150,7 @@ def create_user(conn: psycopg.Connection, actor: Actor, data: dict) -> tuple[dic
 # --- login and passwords ------------------------------------------------------
 
 def login(conn: psycopg.Connection, data: dict, secret: str, now: dt.datetime) -> dict:
-    """Check username and password; return a token and the user. One 401 for every failure."""
+    """Check username and password; return a new session and the user. One 401 for every failure."""
     username = (values.text(data, "username", max_length=20) or "").upper()
     password = values.text(data, "password", max_length=200)
     row = conn.execute(sql.SQL("SELECT {}, password_hash FROM users WHERE username = %s AND NOT is_archived")
@@ -165,11 +165,15 @@ def login(conn: psycopg.Connection, data: dict, secret: str, now: dt.datetime) -
     if not passwords.verify_password(password, row["password_hash"]):
         raise AuthenticationError(BAD_LOGIN)
     del row["password_hash"]
-    return {"token": tokens.issue(row["user_id"], secret, now), "user": row}
+    return {**sessions.start(conn, row["user_id"], secret, now), "user": row}
 
 
-def change_password(conn: psycopg.Connection, actor: Actor, data: dict, now: dt.datetime) -> dict:
-    """Change your own password; clears the forced change and ends tokens issued before `now`."""
+def change_password(conn: psycopg.Connection, actor: Actor, data: dict, secret: str,
+                    now: dt.datetime) -> tuple[dict, dict]:
+    """Change your own password; clears the forced change and ends every older session.
+
+    Returns the user and a fresh session, so the caller's own tab stays signed in.
+    """
     current = values.text(data, "current_password", max_length=200)
     new = values.text(data, "new_password", max_length=200)
     if len(new) < 8:
@@ -188,7 +192,9 @@ def change_password(conn: psycopg.Connection, actor: Actor, data: dict, now: dt.
                                             "password_changed_at": now})  # nosec B105
         audit.record_change(conn, actor, "UPDATE", "users", actor.user_id, _snapshot(before), _snapshot(row),
                             f"{_name(row)} changed their password")
-    return row
+        sessions.revoke_all(conn, actor.user_id, now)
+        session = sessions.start(conn, actor.user_id, secret, now)
+    return row, session
 
 
 def reset_password(conn: psycopg.Connection, actor: Actor, user_id: int, now: dt.datetime) -> str:
@@ -204,6 +210,7 @@ def reset_password(conn: psycopg.Connection, actor: Actor, user_id: int, now: dt
                                       "password_changed_at": now})  # nosec B105
         audit.record_change(conn, actor, "RESET_PASSWORD", "users", user_id, _snapshot(before), _snapshot(row),
                             f"{actor.name} reset the password for {_name(row)}")
+        sessions.revoke_all(conn, user_id, now)
     return password
 
 
@@ -302,8 +309,8 @@ def _manages_live_projects(conn: psycopg.Connection, user_id: int) -> bool:
                              (user_id,)).fetchone())
 
 
-def archive_user(conn: psycopg.Connection, actor: Actor, user_id: int) -> dict:
-    """Admin only. Archives the person and their live bookings, in one transaction."""
+def archive_user(conn: psycopg.Connection, actor: Actor, user_id: int, now: dt.datetime) -> dict:
+    """Admin only. Archives the person, their live bookings and their sessions, in one transaction."""
     if not actor.is_admin:
         raise Forbidden("Only admins archive accounts.")
     if user_id == actor.user_id:
@@ -316,8 +323,8 @@ def archive_user(conn: psycopg.Connection, actor: Actor, user_id: int) -> dict:
             raise Conflict(f"{_name(before)} still has live reports. Give them another line manager first.")
         if _manages_live_projects(conn, user_id):
             raise Conflict(f"{_name(before)} still manages live projects. Reassign them first.")
-        row = _update(conn, user_id, {"is_archived": True, "archived_at": dt.datetime.now(dt.timezone.utc),
-                                      "archived_by": actor.user_id})
+        row = _update(conn, user_id, {"is_archived": True, "archived_at": now, "archived_by": actor.user_id})
+        sessions.revoke_all(conn, user_id, now)
         audit.record_change(conn, actor, "ARCHIVE", "users", user_id, _snapshot(before), _snapshot(row),
                             f"{actor.name} archived {_name(row)}")
         for booking in conn.execute(

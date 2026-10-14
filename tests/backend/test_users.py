@@ -89,6 +89,7 @@ def test_login_with_username_returns_a_token_for_that_user(conn, org):
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
     result = users.login(conn, {"username": username.lower(), "password": org["alice_pw"]}, SECRET, NOW)
     assert tokens.verify(result["token"], SECRET, NOW).user_id == org["alice"].user_id
+    assert result["refresh_token"]
     assert result["user"]["must_change_password"] is True
 
 
@@ -101,7 +102,7 @@ def test_every_login_failure_gets_the_same_401(conn, org, case):
     elif case == "unknown user":
         credentials["username"] = "ZZ999999"
     else:
-        users.archive_user(conn, org["admin"], org["alice"].user_id)
+        users.archive_user(conn, org["admin"], org["alice"].user_id, NOW)
     with pytest.raises(AuthenticationError) as caught:
         users.login(conn, credentials, SECRET, NOW)
     assert str(caught.value) == users.BAD_LOGIN
@@ -129,7 +130,7 @@ def test_unknown_username_costs_the_same_hashing_as_a_wrong_password(conn, org, 
 
 
 def test_change_password_clears_the_forced_change(conn, org):
-    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"}, NOW)
+    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"}, SECRET, NOW)
     assert actors.load(conn, org["alice"].user_id).must_change_password is False
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
     users.login(conn, {"username": username, "password": "brand-new-pw"}, SECRET, NOW)
@@ -138,24 +139,24 @@ def test_change_password_clears_the_forced_change(conn, org):
 @pytest.mark.parametrize("new,field", [("short", "new_password"), (None, "new_password")])
 def test_new_password_rules(conn, org, new, field):
     with pytest.raises(ValidationError) as caught:
-        users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": new}, NOW)
+        users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": new}, SECRET, NOW)
     assert caught.value.field == field
 
 
 def test_new_password_must_differ_from_the_current_one(conn, org):
     with pytest.raises(ValidationError, match="differ"):
         users.change_password(conn, org["alice"], {"current_password": org["alice_pw"],
-                                                   "new_password": org["alice_pw"]}, NOW)
+                                                   "new_password": org["alice_pw"]}, SECRET, NOW)
 
 
 def test_wrong_current_password_is_refused(conn, org):
     with pytest.raises(ValidationError) as caught:
-        users.change_password(conn, org["alice"], {"current_password": "not-it-at-all", "new_password": "brand-new-pw"}, NOW)
+        users.change_password(conn, org["alice"], {"current_password": "not-it-at-all", "new_password": "brand-new-pw"}, SECRET, NOW)
     assert caught.value.field == "current_password"
 
 
 def test_admin_reset_generates_a_new_password_and_forces_a_change(conn, org):
-    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"}, NOW)
+    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"}, SECRET, NOW)
     new_password = users.reset_password(conn, org["admin"], org["alice"].user_id, NOW)
     assert actors.load(conn, org["alice"].user_id).must_change_password is True
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
@@ -281,7 +282,7 @@ def test_employees_cannot_list_users(conn, org):
 def test_archiving_a_person_archives_their_live_bookings(conn, org):
     proj = f.project(conn, org["admin"], org["boss"])
     f.booking(conn, org["admin"], proj, org["alice"])
-    users.archive_user(conn, org["admin"], org["alice"].user_id)
+    users.archive_user(conn, org["admin"], org["alice"].user_id, NOW)
     live = conn.execute("SELECT count(*) AS n FROM assignments WHERE user_id = %s AND NOT is_archived",
                         (org["alice"].user_id,)).fetchone()["n"]
     assert live == 0
@@ -289,18 +290,18 @@ def test_archiving_a_person_archives_their_live_bookings(conn, org):
 
 def test_archiving_a_manager_with_live_projects_or_reports_is_refused(conn, org):
     with pytest.raises(Conflict, match="report"):
-        users.archive_user(conn, org["admin"], org["boss"].user_id)
+        users.archive_user(conn, org["admin"], org["boss"].user_id, NOW)
     f.project(conn, org["admin"], org["other_boss"])
     with pytest.raises(Conflict, match="project"):
-        users.archive_user(conn, org["admin"], org["other_boss"].user_id)
+        users.archive_user(conn, org["admin"], org["other_boss"].user_id, NOW)
 
 
 def test_admin_cannot_archive_themselves(conn, org):
     with pytest.raises(Conflict):
-        users.archive_user(conn, org["admin"], org["admin"].user_id)
+        users.archive_user(conn, org["admin"], org["admin"].user_id, NOW)
 
 
 def test_reactivate_brings_a_person_back(conn, org):
-    users.archive_user(conn, org["admin"], org["alice"].user_id)
+    users.archive_user(conn, org["admin"], org["alice"].user_id, NOW)
     row = users.reactivate_user(conn, org["admin"], org["alice"].user_id)
     assert row["is_archived"] is False

@@ -1,8 +1,8 @@
 """Walk every mutating route once and prove each one writes at least one audit row.
 
 Add a route and forget record_change(), or forget to add the route here, and
-this fails. The only exemptions are login (not a change) and marking your own
-notifications read (inbox state, not business data).
+this fails. The only exemptions are login, refresh and logout (sessions, not
+business records) and marking your own notifications read (inbox state).
 """
 
 import json
@@ -11,7 +11,8 @@ import factories as f
 from api import routes
 from test_api import Client, username_of
 
-EXEMPT = {("POST", "/auth/login"), ("POST", "/notifications/{id}/read"), ("POST", "/notifications/read-all")}
+EXEMPT = {("POST", "/auth/login"), ("POST", "/notifications/{id}/read"), ("POST", "/notifications/read-all"),
+          ("POST", "/auth/refresh"), ("POST", "/auth/logout")}  # sessions, not business records
 
 
 def test_every_mutating_route_writes_an_audit_row(conn):

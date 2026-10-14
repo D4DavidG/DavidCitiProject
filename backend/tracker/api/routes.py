@@ -46,6 +46,8 @@ def _r(method, path, handler, roles=ANY, **kw):
 ROUTES = [
     _r("GET", "/health", h.health, public=True),
     _r("POST", "/auth/login", h.login, public=True),
+    _r("POST", "/auth/refresh", h.refresh, public=True),  # the refresh token in the body is the credential
+    _r("POST", "/auth/logout", h.logout, public=True, status=204),
     _r("GET", "/auth/me", h.me, allowed_before_password_change=True),
     _r("POST", "/auth/change-password", h.change_password, allowed_before_password_change=True),
 

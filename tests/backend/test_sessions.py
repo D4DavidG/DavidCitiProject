@@ -71,7 +71,7 @@ def test_reusing_a_rotated_token_revokes_everything(conn, org):
         sessions.rotate(conn, b, SECRET, NOW)
 
 
-@pytest.mark.parametrize("raw", [None, "", "x"])
+@pytest.mark.parametrize("raw", [None, "", "x", 123])
 def test_unknown_or_malformed_token_is_refused(conn, org, raw):
     sessions.start(conn, org["alice"].user_id, SECRET, NOW)
     with pytest.raises(AuthenticationError):
@@ -111,3 +111,7 @@ def test_sessions_are_not_audited(conn, org):
     raw = sessions.start(conn, org["alice"].user_id, SECRET, NOW)["refresh_token"]
     sessions.end(conn, sessions.rotate(conn, raw, SECRET, NOW)["refresh_token"], NOW)
     assert conn.execute("SELECT count(*) AS n FROM audit_log").fetchone()["n"] == before
+
+
+def test_end_ignores_a_token_that_is_not_text(conn, org):
+    assert sessions.end(conn, 123, NOW) is None

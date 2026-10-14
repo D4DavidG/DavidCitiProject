@@ -11,8 +11,8 @@ import psycopg
 
 from api.http import Request, camelize
 from domain.errors import ValidationError
-from services import (assignments, audit, dashboard, milestones, notifications, projects, requests, tasks,
-                      time_entries, tokens, users)
+from services import (assignments, audit, dashboard, milestones, notifications, projects, requests, sessions,
+                      tasks, time_entries, tokens, users)
 from services.actors import Actor
 from services.views import (audit_view, booking_view, entry_view, holder_view, milestone_view, notification_view, project_view,
                             request_view, task_view, user_view)
@@ -65,10 +65,26 @@ def health(ctx: Context) -> dict:
     return {"status": "ok"}
 
 
+def _session_view(ctx: Context, session: dict, row: dict | None = None) -> dict:
+    """The answer to login, refresh and change-password: both tokens, and the user if given."""
+    view = {"token": session["token"], "expiresAt": (ctx.now + tokens.LIFETIME).isoformat(),
+            "refreshToken": session["refresh_token"]}
+    if row is not None:
+        view["user"] = user_view(row, include_salary=True)
+    return view
+
+
 def login(ctx: Context) -> dict:
     result = users.login(ctx.conn, ctx.body, ctx.secret, ctx.now)
-    return {"token": result["token"], "expiresAt": (ctx.now + tokens.LIFETIME).isoformat(),
-            "user": user_view(result["user"], include_salary=True)}
+    return _session_view(ctx, result, result["user"])
+
+
+def refresh(ctx: Context) -> dict:
+    return _session_view(ctx, sessions.rotate(ctx.conn, ctx.body.get("refresh_token"), ctx.secret, ctx.now))
+
+
+def logout(ctx: Context) -> None:
+    sessions.end(ctx.conn, ctx.body.get("refresh_token"), ctx.now)
 
 
 def me(ctx: Context) -> dict:
@@ -76,7 +92,8 @@ def me(ctx: Context) -> dict:
 
 
 def change_password(ctx: Context) -> dict:
-    return user_view(users.change_password(ctx.conn, ctx.actor, ctx.body, ctx.now), include_salary=True)
+    row, session = users.change_password(ctx.conn, ctx.actor, ctx.body, ctx.secret, ctx.now)
+    return _session_view(ctx, session, row)
 
 
 # --- users ----------------------------------------------------------------------
@@ -111,7 +128,7 @@ def reset_password(ctx: Context) -> dict:
 
 
 def archive_user(ctx: Context) -> dict:
-    return user_view(users.archive_user(ctx.conn, ctx.actor, ctx.id), include_salary=True)
+    return user_view(users.archive_user(ctx.conn, ctx.actor, ctx.id, ctx.now), include_salary=True)
 
 
 def reactivate_user(ctx: Context) -> dict:

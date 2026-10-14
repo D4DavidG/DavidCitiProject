@@ -9,10 +9,14 @@ Edge cases: no line manager -> admins only; a lone admin -> nobody; archived use
 receive nothing.
 """
 
+import datetime as dt
+
 import pytest
 
 import factories as f
 from services import audit, notifications, tasks, time_entries, users
+
+NOW = dt.datetime(2026, 10, 14, 12, 0, tzinfo=dt.timezone.utc)
 
 
 def recipients_of_last_change(conn):
@@ -94,7 +98,7 @@ def test_manager_project_change_notifies_admins_only(conn, org, work):
 
 
 def test_archived_users_receive_nothing(conn, org):
-    users.archive_user(conn, org["admin"], org["admin2"].user_id)
+    users.archive_user(conn, org["admin"], org["admin2"].user_id, NOW)
     users.update_self(conn, org["alice"], {"first_name": "Alicia"})
     assert recipients_of_last_change(conn) == sorted([org["boss"].user_id, org["admin"].user_id])
 
@@ -113,7 +117,7 @@ def test_also_notify_adds_one_recipient(conn, org):
 def test_also_notify_never_reaches_the_actor_or_an_archived_user(conn, org):
     manager_change(conn, org, org["boss"].user_id)
     assert recipients_of_last_change(conn) == sorted([org["admin"].user_id, org["admin2"].user_id])
-    users.archive_user(conn, org["admin"], org["loner"].user_id)
+    users.archive_user(conn, org["admin"], org["loner"].user_id, NOW)
     manager_change(conn, org, org["loner"].user_id)
     assert recipients_of_last_change(conn) == sorted([org["admin"].user_id, org["admin2"].user_id])
 

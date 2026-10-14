@@ -28,9 +28,12 @@ logger = logging.getLogger(__name__)
 REFRESH_LIFETIME = dt.timedelta(hours=8)  # counted from login; rotation never extends it
 
 
-def _hash(raw: str) -> str:
-    """The SHA-256 of a refresh token, as 64 hex characters. Only this is stored."""
-    return hashlib.sha256(raw.encode()).hexdigest()
+def _hash(raw) -> str:
+    """The SHA-256 of a refresh token, as 64 hex characters. Only this is stored.
+
+    Anything that isn't text (missing, a number) hashes as "", which matches no row.
+    """
+    return hashlib.sha256((raw if isinstance(raw, str) else "").encode()).hexdigest()
 
 
 def _new_pair(conn: psycopg.Connection, user_id: int, secret: str, now: dt.datetime,
@@ -57,7 +60,7 @@ def rotate(conn: psycopg.Connection, raw: str | None, secret: str, now: dt.datet
             "SELECT r.refresh_token_id, r.user_id, r.expires_at, r.revoked_at, u.is_archived"
             " FROM refresh_tokens r JOIN users u ON u.user_id = r.user_id"
             " WHERE r.token_hash = %s FOR UPDATE OF r",
-            (_hash(raw or ""),),
+            (_hash(raw),),
         ).fetchone()
         if old is None or old["expires_at"] <= now or old["is_archived"]:
             raise AuthenticationError(tokens.INVALID_MESSAGE)
@@ -79,7 +82,7 @@ def end(conn: psycopg.Connection, raw: str | None, now: dt.datetime) -> None:
     """Sign out: revoke this refresh token if it is live. Never raises, never reveals anything."""
     with atomic(conn):
         conn.execute("UPDATE refresh_tokens SET revoked_at = %s WHERE token_hash = %s AND revoked_at IS NULL",
-                     (now, _hash(raw or "")))
+                     (now, _hash(raw)))
 
 
 def revoke_all(conn: psycopg.Connection, user_id: int, now: dt.datetime) -> None:

@@ -35,7 +35,7 @@ def event(method, path, body=None, token=None, query=None, raw_body=None, b64=Fa
 class Client:
     def __init__(self, conn):
         self.conn = conn
-        self.token = None
+        self.token = self.refresh_token = None
 
     def call(self, method, path, body=None, query=None, token="default", now=NOW, **kw):
         response = app.dispatch(event(method, path, body, self.token if token == "default" else token, query, **kw),
@@ -46,7 +46,7 @@ class Client:
     def login(self, username, password):
         status, payload = self.call("POST", "/auth/login", {"username": username, "password": password}, token=None)
         assert status == 200, payload
-        self.token = payload["token"]
+        self.token, self.refresh_token = payload["token"], payload.get("refreshToken")
         return payload
 
 
@@ -118,8 +118,9 @@ def test_every_route_except_public_ones_requires_a_token(conn, route):
     assert status == 401, payload
 
 
-def test_public_routes_are_exactly_login_and_health():
-    assert {(r.method, r.path) for r in routes.ROUTES if r.public} == {("POST", "/auth/login"), ("GET", "/health")}
+def test_public_routes_are_exactly_login_refresh_logout_and_health():
+    assert {(r.method, r.path) for r in routes.ROUTES if r.public} == {
+        ("POST", "/auth/login"), ("POST", "/auth/refresh"), ("POST", "/auth/logout"), ("GET", "/health")}
 
 
 def test_forged_token_is_401(conn, org):
@@ -132,6 +133,55 @@ def test_archived_users_token_stops_working(conn, org):
     client_for(conn, org, "admin").call("POST", f"/users/{org['alice'].user_id}/archive")
     status, _ = c.call("GET", "/auth/me")
     assert status == 401
+
+
+# --- sessions: refresh and logout ----------------------------------------------------
+
+def test_login_returns_a_refresh_token(conn, org):
+    payload = Client(conn).login(username_of(conn, org["alice"]), org["pw"]["alice"])
+    assert len(payload["refreshToken"]) >= 40 and payload["expiresAt"] == (NOW + tokens.LIFETIME).isoformat()
+
+
+def test_refresh_round_trip(conn, org):
+    c = client_for(conn, org, "alice")
+    first = c.refresh_token
+    status, payload = c.call("POST", "/auth/refresh", {"refreshToken": first}, token=None, now=LATER)
+    assert status == 200 and set(payload) == {"token", "expiresAt", "refreshToken"}
+    assert payload["expiresAt"] == (LATER + tokens.LIFETIME).isoformat()
+    assert c.call("GET", "/auth/me", token=payload["token"], now=LATER)[0] == 200
+    assert c.call("POST", "/auth/refresh", {"refreshToken": first}, token=None, now=LATER)[0] == 401  # reuse
+    second = payload["refreshToken"]
+    assert c.call("POST", "/auth/refresh", {"refreshToken": second}, token=None, now=LATER)[0] == 401  # all ended
+
+
+def test_logout_revokes_and_answers_204(conn, org):
+    c = client_for(conn, org, "alice")
+    assert c.call("POST", "/auth/logout", {"refreshToken": c.refresh_token}, token=None) == (204, None)
+    assert c.call("POST", "/auth/refresh", {"refreshToken": c.refresh_token}, token=None)[0] == 401
+    assert c.call("POST", "/auth/logout", {"refreshToken": c.refresh_token}, token=None) == (204, None)
+    assert c.call("POST", "/auth/logout", {}, token=None) == (204, None)
+
+
+def test_change_password_returns_a_working_session(conn, org):
+    c = client_for(conn, org, "alice")
+    old_refresh = c.refresh_token
+    status, payload = c.call("POST", "/auth/change-password",
+                             {"currentPassword": org["pw"]["alice"], "newPassword": "a-new-password"}, now=LATER)
+    assert status == 200 and {"token", "expiresAt", "refreshToken", "user"} <= set(payload)
+    assert payload["user"]["mustChangePassword"] is False
+    assert c.call("GET", "/auth/me", token=payload["token"], now=LATER2)[0] == 200
+    assert c.call("POST", "/auth/refresh", {"refreshToken": old_refresh}, token=None, now=LATER2)[0] == 401
+
+
+@pytest.mark.parametrize("action", ["reset-password", "archive"])
+def test_reset_and_archive_end_the_targets_refresh_tokens(conn, org, action):
+    alice = client_for(conn, org, "alice")
+    status, _ = client_for(conn, org, "admin").call("POST", f"/users/{org['alice'].user_id}/{action}")
+    assert status == 200
+    live = conn.execute("SELECT count(*) AS n FROM refresh_tokens WHERE user_id = %s AND revoked_at IS NULL",
+                        (org["alice"].user_id,)).fetchone()["n"]
+    assert live == 0
+    assert alice.call("POST", "/auth/refresh", {"refreshToken": alice.refresh_token}, token=None)[0] == 401
 
 
 def test_token_from_before_a_password_change_is_refused(conn, org):
