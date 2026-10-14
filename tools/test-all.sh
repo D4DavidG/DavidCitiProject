@@ -63,7 +63,8 @@ fi
 
 # 3. Website: Vitest + React Testing Library. Coverage mode runs every test too.
 header "3/6 Website tests (Vitest + coverage)"
-(cd frontend && npm run test:coverage) > "$LOGS/frontend.log" 2>&1
+# NO_COLOR: Vitest colours its summary even into a file, which hid the count from grep.
+(cd frontend && NO_COLOR=1 npm run test:coverage) > "$LOGS/frontend.log" 2>&1
 status=$?
 grep -E '^ +(Test Files|Tests) |^(Statements|Branches|Functions|Lines) ' "$LOGS/frontend.log"
 count="$(grep -E '^ +Tests ' "$LOGS/frontend.log" | grep -Eo '[0-9]+ passed' | head -1)"
