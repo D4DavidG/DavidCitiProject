@@ -116,7 +116,7 @@ screen per question, in the order a manager needs them:
 | **Project (question 4): deliverables, tasks, resources, budget** | **Dependency view (question 6)** |
 | ![Project page with deliverables and tasks](docs/screenshots/project.png) | ![Dependencies: Design, then Build, then Launch (blocked)](docs/screenshots/dependencies.png) |
 
-Also: login and the forced first password change; My tasks (employees move status and
+Also: login and the forced first password change; My account (your own name, email and password); My tasks (employees move status and
 log time); Approvals; People (accounts, capacity, overtime, password resets); Project
 requests; Notifications (a bell polled every 30 s and after every change); Audit log
 (admins, with before/after changes). On phones the sidebar becomes a drawer, tables
@@ -168,7 +168,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 372 passed
+.venv/bin/pytest -q                                                        # 373 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -193,7 +193,7 @@ every route in the table called over HTTP by the two walk tests.
 
 ```sh
 cd frontend
-npm test                                  # 175 passed: Vitest + React Testing Library
+npm test                                  # 185 passed: Vitest + React Testing Library
 npm run test:coverage                     # 93% of statements, 94% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app

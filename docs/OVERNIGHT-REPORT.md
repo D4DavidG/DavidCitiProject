@@ -22,11 +22,40 @@ behalf so you can overrule it. The plan being followed is
 | 11 | Project requests | Done |
 | 12 | Notifications | Done |
 | 13 | Audit log | Done |
-| 14 | Finish: coverage, README, guide | Not started |
+| 14 | Finish: coverage, screenshots, README, guide | Done |
+| Review | A fresh reviewer read all the night's work | Done: 5 fixes made (below) |
+
+**In one line:** every screen in `MVP.md` is built and tested. That's 185 website tests
+(93% coverage), 373 backend tests, and a real browser walking the demo. It's all committed
+on `David`, but not pushed or deployed.
 
 ## What you need to do this morning
 
-Filled in at the end of the run.
+In your terminal on the VDI, in this order:
+
+```sh
+cd ~/DavidCitiProject && source ~/.bashrc
+git log --oneline -25                 # tonight's commits, newest first
+git push origin David                 # back them up to GitHub
+./bin/deploy-backend.sh               # FIRST: two small backend fixes from tonight (names in lists,
+                                      # audit snapshots); without it My tasks and Approvals show no names
+./bin/deploy-frontend.sh              # builds the website, uploads it, prints the CloudFront URL
+```
+
+Then:
+
+1. **Open the website:** `https://d1gov8jpsxhwer.cloudfront.net`. Sign in as Maria; her
+   username is printed by `python3 tools/demo.py demo`, and the password is
+   `Demo-pass-2026`. The first load can take 15 s while the database wakes up.
+2. **Checklist step 3.5 (deep links):** open a project, press refresh, and check the page
+   comes back. With `#` addresses it should; this is the last unchecked AWS item.
+3. **Look at it yourself:** the layout and colours were checked only by screenshots (in
+   `docs/screenshots/`, also shown in the README).
+4. **Read "Decisions made for you" below,** and overrule anything you disagree with.
+5. **Practise the website demo:** `docs/GUIDE.md` §3, "The website script".
+
+If you'd rather not use the new permission setting during the day, remove the line
+`"Bash",` from `.claude/settings.local.json` (see Decisions).
 
 ## Done, task by task
 
@@ -57,7 +86,8 @@ Filled in at the end of the run.
   `src/theme/theme.js` (all pass the 4.5:1 accessibility minimum).
 - **Addresses use `#`** (`/#/projects/7`), so refreshing any page works on CloudFront
   without the rewrite rule we removed.
-- **Screens not built yet** show "Coming soon" instead of a broken page.
+- **Screens not built yet** showed "Coming soon" while the night went on. All were
+  built by Task 13, and the placeholder is gone.
 - **Tests:** 42 in total, all passing; lint clean; the production build works.
 
 ### Task 3: Login and change password
@@ -216,6 +246,73 @@ bandit is clean. It's a separate commit ("Name the project, deliverable, task an
   starter's `App.css` are removed.
 - **Tests:** 169 in total, all passing; the production build works.
 
+### Task 14: Finish
+
+- **Coverage:** website 93% of statements and 94% of lines (goal 80%); backend 96%
+  (100% for the API layer). The README lists what's uncovered, and why.
+- **Screenshots** of the dashboard, allocation grid, project, dependency view and the
+  phone layout, taken by Playwright against the local app (`docs/screenshots/`, shown in
+  the README). Looking at them found two layout bugs the tests couldn't see, both fixed:
+  - on phones the title was cut off and "Sign out" wrapped onto two lines;
+  - the dependency view's steps weren't lined up along the top.
+- **More tests** for the project page's manager actions (add/edit task, reopen, archive,
+  change a booking, edit the budget).
+- **README:** a "The website" section (screenshots, structure, rules) and "Frontend
+  tests" (commands, results, known gaps). **`docs/GUIDE.md`:** the website demo script,
+  updated numbers, the file map and the likely questions (e.g. "Where are the business
+  rules in the website?"). **`CLAUDE.md`:** traps 5 and 6 marked fixed, and the frontend
+  commands and conventions added.
+- `npm run lint` clean, `npm audit`: 0 vulnerabilities, `npm run build` works.
+
+### The fresh-eyes review, and what it changed
+
+A separate reviewer (a new Claude with none of tonight's memory) read all 16 commits,
+ran the tests, and checked the API contract. **No critical problems.** It found four
+important ones; I fixed them and one of its "minor" ones, each with a test that failed
+first:
+
+1. **No "My account" screen.** `MVP.md` says anyone can change their own name, email and
+   password and see their salary, and the guide's demo moment depends on it. **Added:**
+   click your name in the top bar. Name and email can be edited; capacity and salary are
+   shown; there's a link to Change password.
+2. **Reloading while the database woke up signed you out.** Now only a real "session
+   expired" (401) signs you out. A 503 keeps you signed in and shows "Can't reach the
+   server … Retry".
+3. **My backend change leaked into the audit log:** every time approval showed a fake
+   "personName" change. Fixed in the backend (test-first; 373 backend tests pass).
+4. **This report wasn't finished.** It is now.
+5. **"Over budget" didn't show when a project was less than 1% over,** because the server
+   rounds the percentage down (a bit over shows as 100%). Upgraded from minor because it
+   shows wrong budget information. It now uses the server's "remaining" figure.
+
+**Small things noted but not fixed** (your call; none affects the demo path):
+
+- The dashboard's "At risk" counter counts only the current page (12 cards), while
+  "Projects shown" is the total.
+- A project's "Reactivate" button shows nothing if the server refuses.
+- Archiving a deliverable says it "can be reactivated", but there's no screen to list
+  archived deliverables or tasks yet.
+- The dependency layout has no guard against a loop. The server already guarantees there
+  are none.
+- People dropdowns stop at 100 people; the line-manager dropdown leaves out admins; in
+  the audit log, archived people show as "User #id".
+- After an admin resets your password while you're signed in, you're blocked until you
+  reload.
+- Approving the last item on page 2 of Approvals shows an empty page instead of going
+  back to page 1.
+- The full "session expired → sign in → back where you were" path is tested in pieces,
+  not as one test.
+
+**Set aside by the reviewer, with my ruling:**
+
+- **No name search** on Approvals, Requests and My logged time. Those endpoints don't
+  take one; adding it is backend work outside tonight's plan.
+- **Approving an already-decided entry again** is allowed, and so is a reset that leaves
+  old tokens working for up to 8 h. Both are existing backend behaviour, unchanged tonight.
+- **The demo password is in the public repo.** That was already true; the guide says so.
+- **Phone layout** was checked in a browser only for the dashboard. The other pages are
+  checked by code and component tests (see "Not verified").
+
 ## Decisions made for you
 
 Each line is something the plan or your answers didn't settle, with what it costs if
@@ -249,12 +346,23 @@ it's wrong.
 - **The bell refreshes after every change in the app**, not only every 30 seconds.
   The API module announces each successful change, and the bell listens. Cost if
   wrong: none.
+- **Two backend changes tonight**, both test-first: lists now include the names they
+  already looked up, and approval audit snapshots no longer include the author's name.
+  The plan allowed backend changes only for bugs the website exposed; both were. Cost if
+  wrong: none, but AWS needs `./bin/deploy-backend.sh`.
+- **A "My account" page that wasn't in the plan:** the reviewer pointed out that `MVP.md`
+  requires it. Cost if wrong: one route to remove.
+- **"Edit project" and "Archive project"** instead of plain "Edit"/"Archive" on the project
+  page, because each deliverable has its own Edit and Archive buttons. Cost if wrong: none.
 - **Dates on screen:** plain dates (due dates, start dates) are shown exactly as stored;
   timestamps (when something happened) are shown in Eastern time, like the server. Cost
   if wrong: a one-line change in `format.js`.
 
 ## Not verified
 
+- **Phone layout of pages other than the dashboard,** in a real browser. They use the
+  same components (cards instead of tables, a drawer menu), but only the dashboard was
+  checked at 375 px by Playwright.
 - **The website on AWS.** Everything was tested locally: unit tests, and Playwright
   against the local API and database. It goes live only when you run
   `./bin/deploy-frontend.sh`, and checklist step 3.5 (refreshing a deep link) can only
