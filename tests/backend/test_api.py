@@ -14,9 +14,11 @@ import factories as f
 from api import app, routes
 from api.errors import to_response
 from domain.errors import Conflict, OverCapacity, ValidationError
+from services import tokens
 
 SECRET = "api-test-secret"
 NOW = dt.datetime(2026, 10, 14, 15, 0, tzinfo=dt.timezone.utc)
+LATER, LATER2 = NOW + dt.timedelta(seconds=1), NOW + dt.timedelta(seconds=2)  # tokens compare whole seconds
 
 
 def event(method, path, body=None, token=None, query=None, raw_body=None, b64=False):
@@ -35,9 +37,9 @@ class Client:
         self.conn = conn
         self.token = None
 
-    def call(self, method, path, body=None, query=None, token="default", **kw):
+    def call(self, method, path, body=None, query=None, token="default", now=NOW, **kw):
         response = app.dispatch(event(method, path, body, self.token if token == "default" else token, query, **kw),
-                                self.conn, SECRET, NOW)
+                                self.conn, SECRET, now)
         payload = json.loads(response["body"]) if response["body"] else None
         return response["statusCode"], payload
 
@@ -130,6 +132,30 @@ def test_archived_users_token_stops_working(conn, org):
     client_for(conn, org, "admin").call("POST", f"/users/{org['alice'].user_id}/archive")
     status, _ = c.call("GET", "/auth/me")
     assert status == 401
+
+
+def test_token_from_before_a_password_change_is_refused(conn, org):
+    first, second = client_for(conn, org, "alice"), client_for(conn, org, "alice")  # two tabs, same person
+    status, _ = first.call("POST", "/auth/change-password",
+                           {"currentPassword": org["pw"]["alice"], "newPassword": "a-new-password"}, now=LATER)
+    assert status == 200
+    assert second.call("GET", "/auth/me", now=LATER) == (401, {"error": tokens.INVALID_MESSAGE})
+
+
+def test_admin_reset_ends_the_targets_access_tokens(conn, org):
+    alice = client_for(conn, org, "alice")
+    status, _ = client_for(conn, org, "admin").call("POST", f"/users/{org['alice'].user_id}/reset-password", now=LATER)
+    assert status == 200
+    assert alice.call("GET", "/auth/me", now=LATER) == (401, {"error": tokens.INVALID_MESSAGE})
+
+
+def test_token_issued_after_the_change_works(conn, org):
+    alice = client_for(conn, org, "alice")
+    alice.call("POST", "/auth/change-password",
+               {"currentPassword": org["pw"]["alice"], "newPassword": "a-new-password"}, now=LATER)
+    status, payload = alice.call("POST", "/auth/login", {"username": username_of(conn, org["alice"]),
+                                                         "password": "a-new-password"}, token=None, now=LATER2)
+    assert alice.call("GET", "/auth/me", token=payload["token"], now=LATER2)[0] == 200
 
 
 def test_forced_password_change_blocks_everything_else(conn, org):

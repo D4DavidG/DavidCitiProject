@@ -76,7 +76,7 @@ def me(ctx: Context) -> dict:
 
 
 def change_password(ctx: Context) -> dict:
-    return user_view(users.change_password(ctx.conn, ctx.actor, ctx.body), include_salary=True)
+    return user_view(users.change_password(ctx.conn, ctx.actor, ctx.body, ctx.now), include_salary=True)
 
 
 # --- users ----------------------------------------------------------------------
@@ -107,7 +107,7 @@ def set_capacity(ctx: Context) -> dict:
 
 
 def reset_password(ctx: Context) -> dict:
-    return {"temporaryPassword": users.reset_password(ctx.conn, ctx.actor, ctx.id)}
+    return {"temporaryPassword": users.reset_password(ctx.conn, ctx.actor, ctx.id, ctx.now)}
 
 
 def archive_user(ctx: Context) -> dict:

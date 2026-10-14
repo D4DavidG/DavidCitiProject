@@ -168,8 +168,8 @@ def login(conn: psycopg.Connection, data: dict, secret: str, now: dt.datetime) -
     return {"token": tokens.issue(row["user_id"], secret, now), "user": row}
 
 
-def change_password(conn: psycopg.Connection, actor: Actor, data: dict) -> dict:
-    """Change your own password; clears the forced change after first login or a reset."""
+def change_password(conn: psycopg.Connection, actor: Actor, data: dict, now: dt.datetime) -> dict:
+    """Change your own password; clears the forced change and ends tokens issued before `now`."""
     current = values.text(data, "current_password", max_length=200)
     new = values.text(data, "new_password", max_length=200)
     if len(new) < 8:
@@ -184,14 +184,15 @@ def change_password(conn: psycopg.Connection, actor: Actor, data: dict) -> dict:
         before = _row(conn, actor.user_id)
         # bandit B105 mistakes the "must_change_password" flag for a hard-coded password.
         row = _update(conn, actor.user_id, {"password_hash": passwords.hash_password(new),
-                                            "must_change_password": False})  # nosec B105
+                                            "must_change_password": False,
+                                            "password_changed_at": now})  # nosec B105
         audit.record_change(conn, actor, "UPDATE", "users", actor.user_id, _snapshot(before), _snapshot(row),
                             f"{_name(row)} changed their password")
     return row
 
 
-def reset_password(conn: psycopg.Connection, actor: Actor, user_id: int) -> str:
-    """Admin only: a new generated password, shown once, and a forced change at next login."""
+def reset_password(conn: psycopg.Connection, actor: Actor, user_id: int, now: dt.datetime) -> str:
+    """Admin only: a new generated password, shown once, a forced change at next login, old tokens ended."""
     if not actor.is_admin:
         raise Forbidden("Only admins reset passwords.")
     password = passwords.generate_password()
@@ -199,7 +200,8 @@ def reset_password(conn: psycopg.Connection, actor: Actor, user_id: int) -> str:
         before = _target(conn, user_id)
         # bandit B105 mistakes the "must_change_password" flag for a hard-coded password.
         row = _update(conn, user_id, {"password_hash": passwords.hash_password(password),
-                                      "must_change_password": True})  # nosec B105
+                                      "must_change_password": True,
+                                      "password_changed_at": now})  # nosec B105
         audit.record_change(conn, actor, "RESET_PASSWORD", "users", user_id, _snapshot(before), _snapshot(row),
                             f"{actor.name} reset the password for {_name(row)}")
     return password

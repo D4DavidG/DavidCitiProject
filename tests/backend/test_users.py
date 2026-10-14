@@ -129,7 +129,7 @@ def test_unknown_username_costs_the_same_hashing_as_a_wrong_password(conn, org, 
 
 
 def test_change_password_clears_the_forced_change(conn, org):
-    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"})
+    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"}, NOW)
     assert actors.load(conn, org["alice"].user_id).must_change_password is False
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
     users.login(conn, {"username": username, "password": "brand-new-pw"}, SECRET, NOW)
@@ -138,25 +138,25 @@ def test_change_password_clears_the_forced_change(conn, org):
 @pytest.mark.parametrize("new,field", [("short", "new_password"), (None, "new_password")])
 def test_new_password_rules(conn, org, new, field):
     with pytest.raises(ValidationError) as caught:
-        users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": new})
+        users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": new}, NOW)
     assert caught.value.field == field
 
 
 def test_new_password_must_differ_from_the_current_one(conn, org):
     with pytest.raises(ValidationError, match="differ"):
         users.change_password(conn, org["alice"], {"current_password": org["alice_pw"],
-                                                   "new_password": org["alice_pw"]})
+                                                   "new_password": org["alice_pw"]}, NOW)
 
 
 def test_wrong_current_password_is_refused(conn, org):
     with pytest.raises(ValidationError) as caught:
-        users.change_password(conn, org["alice"], {"current_password": "not-it-at-all", "new_password": "brand-new-pw"})
+        users.change_password(conn, org["alice"], {"current_password": "not-it-at-all", "new_password": "brand-new-pw"}, NOW)
     assert caught.value.field == "current_password"
 
 
 def test_admin_reset_generates_a_new_password_and_forces_a_change(conn, org):
-    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"})
-    new_password = users.reset_password(conn, org["admin"], org["alice"].user_id)
+    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"}, NOW)
+    new_password = users.reset_password(conn, org["admin"], org["alice"].user_id, NOW)
     assert actors.load(conn, org["alice"].user_id).must_change_password is True
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
     users.login(conn, {"username": username, "password": new_password}, SECRET, NOW)
@@ -164,7 +164,7 @@ def test_admin_reset_generates_a_new_password_and_forces_a_change(conn, org):
 
 def test_only_admins_reset_passwords(conn, org):
     with pytest.raises(Forbidden):
-        users.reset_password(conn, org["boss"], org["alice"].user_id)
+        users.reset_password(conn, org["boss"], org["alice"].user_id, NOW)
 
 
 # --- self-service and admin edits -----------------------------------------

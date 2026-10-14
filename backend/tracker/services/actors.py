@@ -44,12 +44,19 @@ class Actor:
 
 
 def load(conn: psycopg.Connection, user_id: int, issued_at: int | None = None) -> Actor:
-    """The live (not archived) user with this id; otherwise the standard 401."""
+    """The live (not archived) user with this id; otherwise the standard 401.
+
+    `issued_at` is the token's issue time: a token issued before the user's last
+    password change (or admin reset) is refused, so changing a password ends old sessions.
+    """
     row = conn.execute(
-        "SELECT user_id, role, manager_id, first_name, last_name, must_change_password"
+        "SELECT user_id, role, manager_id, first_name, last_name, must_change_password, password_changed_at"
         " FROM users WHERE user_id = %s AND NOT is_archived",
         (user_id,),
     ).fetchone()
     if row is None:
+        raise AuthenticationError(INVALID_MESSAGE)
+    changed = row.pop("password_changed_at")
+    if changed is not None and issued_at is not None and issued_at < int(changed.timestamp()):
         raise AuthenticationError(INVALID_MESSAGE)
     return Actor(**row)
