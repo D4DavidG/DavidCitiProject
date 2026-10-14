@@ -103,7 +103,7 @@ def entry_view(row: dict) -> dict:
     view = _pick(row, {
         "entryId": "entry_id", "taskId": "task_id", "projectId": "project_id", "userId": "user_id",
         "workDate": "work_date", "minutes": "minutes", "note": "note", "status": "status",
-        "decidedBy": "decided_by", "decidedAt": "decided_at", "createdAt": "created_at",
+        "overCapacity": "over_capacity", "decidedBy": "decided_by", "decidedAt": "decided_at", "createdAt": "created_at",
         "updatedAt": "updated_at",
     })
     return _with_names(view, row, {"taskTitle": "task_title", "projectName": "project_name",

@@ -187,19 +187,31 @@ def test_base64_bodies_are_decoded(conn, org):
     assert (status, payload["description"]) == (200, "b64")
 
 
-def test_over_capacity_is_409(conn, org):
+def alice_at_2_hours(conn, org):
+    """Bob gives Alice a task and a 2 h week; returns (bob, alice, task path)."""
     bob = client_for(conn, org, "bob")
     ms = bob.call("POST", f"/projects/{org['apollo']['project_id']}/milestones",
                   {"name": "D", "startDate": "2026-10-01", "dueDate": "2026-11-30"})[1]
     task = bob.call("POST", f"/milestones/{ms['milestoneId']}/tasks",
                     {"title": "T", "estimateMinutes": 600, "assigneeUserId": org["alice"].user_id})[1]
     bob.call("PATCH", f"/users/{org['alice'].user_id}/capacity", {"weeklyCapacityHours": 2})
-    alice = client_for(conn, org, "alice")
-    status, payload = alice.call("POST", f"/tasks/{task['taskId']}/time-entries",
-                                 {"workDate": "2026-10-13", "minutes": 180})
+    return bob, client_for(conn, org, "alice"), f"/tasks/{task['taskId']}/time-entries"
+
+
+def test_over_capacity_is_409(conn, org):
+    _, alice, path = alice_at_2_hours(conn, org)
+    status, payload = alice.call("POST", path, {"workDate": "2026-10-13", "minutes": 180})
     assert status == 409
     assert payload == {"error": "This puts you 1 h over your 2 h week. Log anyway? Your manager will be told.",
                        "code": "OVER_CAPACITY"}
+
+
+def test_confirmed_over_capacity_is_201_and_marked(conn, org):
+    bob, alice, path = alice_at_2_hours(conn, org)
+    status, payload = alice.call("POST", path, {"workDate": "2026-10-13", "minutes": 180, "confirmOverCapacity": True})
+    assert status == 201 and payload["overCapacity"] is True
+    queue = bob.call("GET", "/approvals/time-entries")[1]["items"]
+    assert [e["overCapacity"] for e in queue] == [True]
 
 
 def test_over_capacity_answer_carries_its_code():
