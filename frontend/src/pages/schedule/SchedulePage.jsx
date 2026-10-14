@@ -264,7 +264,8 @@ export default function SchedulePage() {
         <ChartFigure
           title="Bookings, week by week"
           summary={summary}
-          scroll
+          scroll="Weeks, scrolls sideways"
+          scrollPaddingLeft={NAME}
           legendFirst
           legend={<ChartLegend items={legend} />}
           axis={(

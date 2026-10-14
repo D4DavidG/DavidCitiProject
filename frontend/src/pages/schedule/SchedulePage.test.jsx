@@ -119,6 +119,12 @@ describe('SchedulePage', () => {
     expect(await screen.findByText('Not booked')).toBeInTheDocument()
   })
 
+  it('lets the keyboard reach the scrolling weeks even when no bar can take focus', async () => {
+    renderSchedule(() => [200, { ...page([DAN]), weeks: WEEKS }])
+    await screen.findByText('Not booked')
+    expect(screen.getByRole('region', { name: 'Weeks, scrolls sideways' })).toHaveAttribute('tabindex', '0')
+  })
+
   it('shows project, hours and dates in a tooltip on hover', async () => {
     renderSchedule()
     await userEvent.hover(await bar(/Ben Okafor, Apollo, 25/))
