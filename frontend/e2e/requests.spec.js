@@ -28,6 +28,8 @@ async function openRequests(browser, username, size = { width: 1440, height: 900
 }
 
 test.skip(!ana || !maria, 'Set E2E_EMPLOYEE_USERNAME and E2E_MANAGER_USERNAME (seeded Ana and Maria).')
+// It writes data, so never against the live demo, even if E2E_BASE_URL is left set from an AWS run.
+test.skip(!(process.env.E2E_BASE_URL ?? 'http://localhost').includes('localhost'), 'Writes data: local stack only.')
 
 test('an employee asks, the manager answers, the employee sees it on a phone', async ({ browser }) => {
   const asker = await openRequests(browser, ana)

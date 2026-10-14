@@ -103,7 +103,7 @@ if listening 3000 && listening 3001; then
   if [ -n "$manager" ] && [ -n "$employee" ]; then
     echo "Manager $manager, employee $employee"
     tour="$(mktemp -d)"  # the screen tour's screenshots; outside the repo, never committed
-    # Pin both URLs to the local stack: pull.spec.js writes data, so an E2E_BASE_URL
+    # Pin both URLs to the local stack: pull.spec.js and requests.spec.js write data, so an E2E_BASE_URL
     # left exported from an AWS run must never send it to the live site.
     (cd frontend && E2E_BASE_URL=http://localhost:3000 E2E_API=http://localhost:3001/api/tracker \
       E2E_MANAGER_USERNAME="$manager" E2E_EMPLOYEE_USERNAME="$employee" E2E_ZEUS_MANAGER_USERNAME="$zeus" \
