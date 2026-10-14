@@ -70,6 +70,10 @@ for (const [role, { username, screens }] of Object.entries(ROLES)) {
           await expect(page.getByRole('figure', { name })).toBeVisible()
         }
         await page.waitForLoadState('networkidle')
+        // Park the pointer in a corner: after sign-in it rests where the button was, which can be over a chart row
+        // and leaves its tooltip open across the screenshot.
+        await page.mouse.move(0, 0)
+        await expect(page.getByRole('tooltip')).toHaveCount(0)
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
         if (overflow > 1) overflowing.push(`${screen} (${overflow}px)`)
         const name = screen.replace(/^\//, '').replace(/[/:]/g, '-').toLowerCase() || 'home'
