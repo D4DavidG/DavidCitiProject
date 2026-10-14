@@ -4,11 +4,12 @@ What to say to the Citi evaluators (15 Oct) and in later job interviews. It cove
 say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minute-demo).
 
 **Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
-final fix wave (the commit after `8fd9099`): 428 backend tests, 291 website tests, 21
+final fix wave and the project-manager notifications: 432 backend tests, 291 website tests, 21
 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
-pop-up, and the three charts. Every number below says when it was measured. Every claim
+pop-up, the three charts, and the project manager being notified of an employee's project
+work. Every number below says when it was measured. Every claim
 points at a file and line you can open.
 
 **Contents:** [1 Pitch](#1-the-pitch) · [2 Seven questions](#2-the-seven-questions) ·
@@ -31,7 +32,7 @@ points at a file and line you can open.
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 428 backend tests running against a real Postgres database,
+> with Terraform. There are 432 backend tests running against a real Postgres database,
 > and 291 website tests."
 
 ### 2 minutes
@@ -348,7 +349,7 @@ from the token."
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "428 backend tests against a real Postgres database, at
+**Headline (fresh, 14 Oct 2026):** "432 backend tests against a real Postgres database, at
 96% coverage, with the API layer at 100%. Plus 291 website tests at 94.84% of
 statements, and 21 Playwright browser tests."
 
@@ -365,7 +366,7 @@ statements, and 21 Playwright browser tests."
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct (after the pull board):** backend `428 passed in 14.57s`; coverage
+- **Fresh numbers, 14 Oct (after the pull board):** backend `432 passed in 18.99s`; coverage
   `1847 statements, 73 missed, 96%`. By folder: `api/` 100%, `function.py` 100%, `domain/`
   99%, `services/` 94.9%, `store/` 93.9%. Website: 31 files, `291 passed`, about a minute and
   a half. Website coverage: 94.84% of statements, 96.11% of lines, 90.64% of branches,
@@ -535,7 +536,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **428 backend, 291 website, 21 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **432 backend, 291 website, 21 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **96% of statements** (94% with
@@ -561,11 +562,12 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    blocked, not skipped: our AWS role has no API Gateway permission, and the Lambda sits in a
    network with no route out to send a push. *Point at: `frontend/src/components/NotificationBell.jsx:7-9` and `:30-72`; `docs/superpowers/specs/2026-10-14-websockets-findings.md` section 1*
 7. **"If Chloe logs hours or finishes a task, is her manager told?"** Yes. For an employee,
-   `record_change` notifies her line manager and every admin. Chloe reports to Sam, not
-   Maria, so Sam's bell goes up. A project manager who isn't her line manager hears nothing:
-   that is how it was designed (decision (a) in CLAUDE.md). *Point at: `services/audit.py:39-46` (the recipient rule); `tools/demo.py:37`*
+   `record_change` notifies her line manager, every admin and, when the change is to a
+   project's work (a task, logged time), that project's manager too. Chloe reports to Sam,
+   so Sam's bell goes up; if the task is on Maria's project, Maria's does as well. Someone
+   who is both is told once. The project manager was added on 14 Oct after this meeting. *Point at: `services/audit.py:41-47` (the recipient rule) and `:51-66` (finding the project's manager); `tests/backend/test_audit.py` (the four project-manager tests); `tools/demo.py:37`*
 8. **"Does every action make a notification?"** Every successful change writes one audit
-   row and notifies the people above the actor (employee: manager and admins; manager:
+   row and notifies the people above the actor (employee: line manager, admins and, for project work, the project's manager; manager:
    admins; admin: the other admins). Reads and refused requests are not logged. One test
    calls every write route and checks it left an audit row. *Point at: CLAUDE.md section 2 table; `tests/backend/test_api_audit_walk.py`*
 9. **"What if someone steals the access token? A 15-minute timer?"** Today: the token lasts
@@ -890,7 +892,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 428 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 432 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -907,7 +909,7 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 428 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
+| 432 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
 | 291 / 94.84% | Website tests / statements (96.11% of lines) | 14 Oct |
 | 66 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |

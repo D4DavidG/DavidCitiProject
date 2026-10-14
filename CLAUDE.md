@@ -23,7 +23,8 @@ outdated it.
   `docs/DEMO-RUNBOOK.md`. Three charts, built 14 Oct and not yet deployed (plain MUI
   boxes, no chart library; the server sends every percentage): a deliverables timeline on
   each project, and a budget chart and this week's workload on the dashboard
-  (`components/charts/`). Tests: 428 backend, 291 website, and 21 Playwright browser
+  (`components/charts/`). Also not deployed: an employee's project work now notifies the
+  project's manager too (`services/audit.py`). Tests: 432 backend, 291 website, and 21 Playwright browser
   tests in 7 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/tour.spec.js` screenshots every screen at desktop and phone width;
   `timeline`, `budget` and `workload` specs check the charts).

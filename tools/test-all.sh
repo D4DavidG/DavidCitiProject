@@ -7,8 +7,9 @@
 # lint, production build, then the Playwright browser tests if the local stack is up
 # (ports 3000 and 3001 listening; start it with ./bin/start-dev.sh).
 #
-# Browser-test usernames: E2E_MANAGER_USERNAME / E2E_EMPLOYEE_USERNAME if set, otherwise
-# looked up in the local database (Maria Lopez and Ana Ruiz from tools/demo.py seed).
+# Browser-test usernames: E2E_MANAGER_USERNAME / E2E_EMPLOYEE_USERNAME / E2E_ZEUS_MANAGER_USERNAME
+# if set, otherwise looked up in the local database (Maria Lopez, Ana Ruiz and Sam Patel
+# from tools/demo.py seed).
 # Browser tests always run against the local stack, never AWS. They include pull.spec.js,
 # which writes to the local database: a task (archived afterwards), audit rows, and bell
 # notifications for Maria and every admin.
@@ -98,13 +99,14 @@ if listening 3000 && listening 3001; then
   }
   manager="${E2E_MANAGER_USERNAME:-$(lookup maria.lopez@acme.test)}"
   employee="${E2E_EMPLOYEE_USERNAME:-$(lookup ana.ruiz@acme.test)}"
+  zeus="${E2E_ZEUS_MANAGER_USERNAME:-$(lookup sam.patel@acme.test)}"  # timeline.spec.js
   if [ -n "$manager" ] && [ -n "$employee" ]; then
     echo "Manager $manager, employee $employee"
     tour="$(mktemp -d)"  # the screen tour's screenshots; outside the repo, never committed
     # Pin both URLs to the local stack: pull.spec.js writes data, so an E2E_BASE_URL
     # left exported from an AWS run must never send it to the live site.
     (cd frontend && E2E_BASE_URL=http://localhost:3000 E2E_API=http://localhost:3001/api/tracker \
-      E2E_MANAGER_USERNAME="$manager" E2E_EMPLOYEE_USERNAME="$employee" \
+      E2E_MANAGER_USERNAME="$manager" E2E_EMPLOYEE_USERNAME="$employee" E2E_ZEUS_MANAGER_USERNAME="$zeus" \
       E2E_TOUR_DIR="$tour" npx playwright test --reporter=list) > "$LOGS/e2e.log" 2>&1
     status=$?
     tail -6 "$LOGS/e2e.log"

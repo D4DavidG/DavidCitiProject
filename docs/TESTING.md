@@ -13,7 +13,7 @@ checks one layer, from the database up to a real browser.
 | Kind | What it proves | Why this kind | Files | Command (from the repo root) | Time | Count today |
 | --- | --- | --- | --- | --- | --- | --- |
 | **Database rule tests** | Postgres itself refuses bad rows (each by its named rule), nothing can be deleted, the 5 integrity queries each catch a planted problem, migrations run once and all-or-nothing | The last line of defence must hold even if the Python is wrong | `tests/backend/test_schema.py`, `test_no_delete.py`, `test_integrity.py`, `test_migrate.py` | `.venv/bin/pytest -q tests/backend/test_schema.py tests/backend/test_no_delete.py tests/backend/test_integrity.py tests/backend/test_migrate.py` | 2 s | 72 |
-| **Business-rule (service) tests** | Every rule in `MVP.md`: who may do what, capacity and overtime, sign-off, budget maths, audit rows and who gets notified, money, the clock, password hashing, tokens | Fast and precise: they call the rules directly, never through HTTP (they never import `api`) | `tests/backend/test_users.py`, `test_work.py`, `test_projects.py`, `test_requests.py`, `test_dashboard.py`, `test_audit.py`, `test_domain.py`, `test_security.py` | `.venv/bin/pytest -q tests/backend/test_users.py tests/backend/test_work.py tests/backend/test_projects.py tests/backend/test_requests.py tests/backend/test_dashboard.py tests/backend/test_audit.py tests/backend/test_domain.py tests/backend/test_security.py` | 7 s | 229 |
+| **Business-rule (service) tests** | Every rule in `MVP.md`: who may do what, capacity and overtime, sign-off, budget maths, audit rows and who gets notified, money, the clock, password hashing, tokens | Fast and precise: they call the rules directly, never through HTTP (they never import `api`) | `tests/backend/test_users.py`, `test_work.py`, `test_projects.py`, `test_requests.py`, `test_dashboard.py`, `test_audit.py`, `test_domain.py`, `test_security.py` | `.venv/bin/pytest -q tests/backend/test_users.py tests/backend/test_work.py tests/backend/test_projects.py tests/backend/test_requests.py tests/backend/test_dashboard.py tests/backend/test_audit.py tests/backend/test_domain.py tests/backend/test_security.py` | 7 s | 233 |
 | **API tests** | Routing (both path shapes), every route needs a token, the role is read from the database, 404 not 403, error and list shapes, no DELETE route; every read route and every write route called once; the Lambda entry point | Proves the wiring between the web request and the rules, using real Lambda-shaped events | `tests/backend/test_api.py`, `test_api_read_walk.py`, `test_api_audit_walk.py`, `test_function.py` | `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py` | 4 s | 123 |
 | **"Writes really commit" test** | A change is actually saved, not left in a transaction that is never committed | Every other test rolls back on purpose, so only a test on its own database can catch "nothing is ever saved" | `tests/backend/test_store_commits.py` | `.venv/bin/pytest -q tests/backend/test_store_commits.py` | under 1 s | 2 |
 | **Race (concurrency) tests** | Two people pressing "Take this" at the same moment: only one wins, and nobody goes over their task limit | A race only shows up with two real database connections at once; the test waits until Postgres reports the second one blocked | `tests/backend/test_claim_race.py` | `.venv/bin/pytest -q tests/backend/test_claim_race.py` | under 1 s | 2 |
@@ -26,7 +26,7 @@ Plus two checks that are not tests but run with them: **lint** (ESLint reads the
 code for mistakes: `cd frontend && npm run lint`, clean, 5 s) and **bandit** (a security
 scanner for the Python, the same one CI runs: no issues, under 1 s).
 
-Backend total: `.venv/bin/pytest -q` printed `428 passed in 14.30s`.
+Backend total: `.venv/bin/pytest -q` printed `432 passed in 18.99s`.
 Website total: `npm test` printed `Test Files  31 passed (31)`, `Tests  291 passed (291)`, `Duration  87.70s`.
 
 The backend tests need local Postgres running. They build their own `tracker_test`
@@ -56,7 +56,7 @@ coverage misses.
 
 ```
 TOTAL                                        1847     73    96%
-428 passed in 15.92s
+432 passed in 18.99s
 ```
 
 96% means: of the 1,847 statements in our backend, the tests ran all but 73. It
@@ -244,19 +244,19 @@ to the local stack, even if `E2E_BASE_URL` is still set from an AWS run, because
 `pull.spec.js` writes data. Each run therefore adds one archived task, audit rows and
 bell notifications for Maria and every admin to the local database. It ends with a table
 and exits with an error code if any step failed. Last run, 14 Oct (after the final fix
-wave, with `E2E_ZEUS_MANAGER_USERNAME=SP345715` exported so the timeline spec runs too):
+wave, after the project-manager notifications were merged):
 
 ```
 Step            Result Detail
-Backend tests   PASS   428 passed, coverage 96%
+Backend tests   PASS   432 passed, coverage 96%
 Bandit          PASS   no issues
 Website tests   PASS   291 passed, lines 96.11%
 Lint            PASS   clean
 Build           PASS   frontend/dist
-Browser tests   PASS   16 passed, 5 skipped; screenshots in /tmp/tmp.zY2xqChhek
+Browser tests   PASS   20 passed, 1 skipped; screenshots in /tmp/tmp.eQA5nKou6q
 ```
 
-`tools/test-all.sh` does not set `E2E_ZEUS_MANAGER_USERNAME`, so the 4 timeline tests skip along with the screenshots test (5 skipped). The longer command in the table above, with Sam's username set, runs 20 and skips only the screenshots.
+`tools/test-all.sh` looks up Maria's, Ana's and Sam's usernames in the local database, so every browser test runs except the README screenshots one (it only runs with `E2E_SCREENSHOTS=1`).
 
 **Automated on every push?** Not yet. GitHub CI today runs only the bandit scan
 (`.github/workflows/python.actions.yml:27`), `npm audit`
