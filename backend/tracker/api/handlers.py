@@ -14,7 +14,7 @@ from domain.errors import ValidationError
 from services import (assignments, audit, dashboard, milestones, notifications, projects, requests, tasks,
                       time_entries, tokens, users)
 from services.actors import Actor
-from services.views import (audit_view, booking_view, entry_view, milestone_view, notification_view, project_view,
+from services.views import (audit_view, booking_view, entry_view, holder_view, milestone_view, notification_view, project_view,
                             request_view, task_view, user_view)
 
 
@@ -230,6 +230,24 @@ def update_task(ctx: Context) -> dict:
 
 def move_task(ctx: Context) -> dict:
     return task_view(tasks.move_task(ctx.conn, ctx.actor, ctx.id, ctx.body.get("status")))
+
+
+def claim_task(ctx: Context) -> dict:
+    return task_view(tasks.claim_task(ctx.conn, ctx.actor, ctx.id))
+
+
+def release_task(ctx: Context) -> dict:
+    return task_view(tasks.release_task(ctx.conn, ctx.actor, ctx.id))
+
+
+def board(ctx: Context) -> dict:
+    result = tasks.board(ctx.conn, ctx.actor, ctx.id)
+    return {**_whole(result["items"], task_view), "people": [holder_view(p) for p in result["people"]]}
+
+
+def ready_tasks(ctx: Context) -> dict:
+    result = tasks.ready_tasks(ctx.conn, ctx.actor)
+    return {**_whole(result["items"], task_view), "held": result["held"], "limit": result["limit"]}
 
 
 def archive_task(ctx: Context) -> dict:

@@ -67,6 +67,7 @@ ROUTES = [
     _r("POST", "/projects/{id}/reactivate", h.reactivate_project, {ADMIN}),
     _r("GET", "/projects/{id}/budget", h.project_budget, STAFF),
     _r("GET", "/projects/{id}/dependency-graph", h.dependency_graph),
+    _r("GET", "/projects/{id}/board", h.board),
 
     _r("GET", "/projects/{id}/assignments", h.list_bookings),
     _r("POST", "/projects/{id}/assignments", h.create_booking, STAFF, status=201),
@@ -88,9 +89,12 @@ ROUTES = [
     _r("POST", "/milestones/{id}/tasks", h.create_task, STAFF, status=201),
     _r("PATCH", "/tasks/{id}", h.update_task, STAFF),
     _r("POST", "/tasks/{id}/status", h.move_task, {EMPLOYEE}),
+    _r("POST", "/tasks/{id}/claim", h.claim_task, {EMPLOYEE}),
+    _r("POST", "/tasks/{id}/release", h.release_task, {EMPLOYEE}),
     _r("POST", "/tasks/{id}/archive", h.archive_task, STAFF),
     _r("POST", "/tasks/{id}/reactivate", h.reactivate_task, STAFF),
     _r("GET", "/me/tasks", h.my_tasks),
+    _r("GET", "/me/ready-tasks", h.ready_tasks, {EMPLOYEE}),
 
     _r("POST", "/tasks/{id}/time-entries", h.log_time, {EMPLOYEE}, status=201),
     _r("GET", "/me/time-entries", h.my_time),

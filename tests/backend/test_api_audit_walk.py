@@ -82,6 +82,8 @@ def test_every_mutating_route_writes_an_audit_row(conn):
     hit(b, "POST", "/milestones/{id}/reopen", f"/milestones/{m1['milestoneId']}/reopen")
     other = hit(b, "POST", "/milestones/{id}/tasks", f"/milestones/{m2['milestoneId']}/tasks",
                 {"title": "Spare", "estimateMinutes": 60})
+    hit(e, "POST", "/tasks/{id}/claim", f"/tasks/{other['taskId']}/claim")
+    hit(e, "POST", "/tasks/{id}/release", f"/tasks/{other['taskId']}/release")
     hit(b, "POST", "/tasks/{id}/archive", f"/tasks/{other['taskId']}/archive")
     hit(b, "POST", "/tasks/{id}/reactivate", f"/tasks/{other['taskId']}/reactivate")
     hit(b, "POST", "/milestones/{id}/archive", f"/milestones/{m2['milestoneId']}/archive")

@@ -248,3 +248,33 @@ def test_capacity_takes_task_limit_and_names_the_field_when_out_of_range(conn, o
     assert (status, payload) == (400, {"error": "Task limit must be between 1 and 10.", "field": "taskLimit"})
     status, payload = b.call("PATCH", f"/users/{uid}/capacity", {"taskLimit": 3})
     assert (status, payload["taskLimit"]) == (200, 3)
+
+
+# --- the pull board ---------------------------------------------------------------
+
+def test_only_employees_take_tasks_from_the_board(conn, org):
+    ms = f.deliverable(conn, org["bob"], org["apollo"])
+    bob, alice = client_for(conn, org, "bob"), client_for(conn, org, "alice")
+    status, made = bob.call("POST", f"/milestones/{ms['milestone_id']}/tasks", {"title": "Free", "estimateMinutes": 60})
+    assert status == 201
+    assert bob.call("POST", f"/tasks/{made['taskId']}/claim")[0] == 403
+    status, taken = alice.call("POST", f"/tasks/{made['taskId']}/claim")
+    assert status == 200
+    assert taken["status"] == "IN_PROGRESS" and taken["assigneeUserId"] == org["alice"].user_id
+
+
+def test_the_limit_refusal_is_409_with_the_server_message(conn, org):
+    ms = f.deliverable(conn, org["bob"], org["apollo"])
+    f.task(conn, org["bob"], ms, assignee=org["alice"])
+    f.task(conn, org["bob"], ms, assignee=org["alice"])
+    third = f.task(conn, org["bob"], ms)
+    status, payload = client_for(conn, org, "alice").call("POST", f"/tasks/{third['task_id']}/claim")
+    assert (status, payload) == (409, {"error": "You already hold 2 unfinished tasks, your limit. "
+                                                "Finish one first, or ask your manager to raise it."})
+
+
+def test_another_managers_board_is_byte_identical_to_a_missing_one(conn, org):
+    carol = client_for(conn, org, "carol")
+    other = carol.call("GET", f"/projects/{org['apollo']['project_id']}/board")
+    missing = carol.call("GET", "/projects/999999/board")
+    assert other == missing and other[0] == 404

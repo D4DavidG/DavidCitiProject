@@ -102,6 +102,13 @@ def test_every_read_route_answers_in_shape(conn, world):
     called.add(("POST", "/notifications/read-all"))
     assert b.call("GET", "/notifications/unread-count")[1]["count"] == 0
 
+    # `board` is taken above by /dashboard/projects; only Alice is booked on Apollo and Sketch is hers (TODO).
+    pull = get(b, "/projects/{id}/board", f"/projects/{pid}/board")
+    assert PAGE_KEYS <= pull.keys() and [t["title"] for t in pull["items"]] == ["Sketch"]
+    assert pull["people"] == [{"userId": world["alice"].user_id, "name": "Alice Tester", "held": 1, "limit": 2}]
+    ready = get(e, "/me/ready-tasks", "/me/ready-tasks")
+    assert (ready["total"], ready["held"], ready["limit"]) == (0, 1, 2)
+
     reads = {(r.method, r.path) for r in routes.ROUTES if r.method == "GET"}
     inbox_writes = {("POST", "/notifications/{id}/read"), ("POST", "/notifications/read-all")}
     assert (reads | inbox_writes) - called == set(), "read routes not exercised by this walk"
