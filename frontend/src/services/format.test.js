@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCents, formatDate, formatDateTime, formatHours } from './format'
+import { addDays, formatCents, formatDate, formatDateTime, formatDay, formatHours } from './format'
 
 describe('formatCents', () => {
   it('shows whole dollars with separators', () => {
@@ -31,6 +31,18 @@ describe('formatDate', () => {
 
   it('shows a dash for nothing', () => {
     expect(formatDate(null)).toBe('—')
+  })
+})
+
+describe('formatDay and addDays', () => {
+  it('shows a short day without the year', () => {
+    expect(formatDay('2026-10-12')).toBe('Oct 12')
+  })
+
+  it('moves a date by whole days, across month ends', () => {
+    expect(addDays('2026-10-12', 7)).toBe('2026-10-19')
+    expect(addDays('2026-10-26', 7)).toBe('2026-11-02')
+    expect(addDays('2026-10-12', -7)).toBe('2026-10-05')
   })
 })
 

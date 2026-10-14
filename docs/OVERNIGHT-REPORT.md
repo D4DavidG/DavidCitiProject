@@ -11,8 +11,8 @@ behalf so you can overrule it. The plan being followed is
 | --- | --- | --- |
 | 1 | Tooling, API client, formatting | Done |
 | 2 | Session, theme, layout, routing | Done |
-| 3 | Login and change password | Not started |
-| 4 | Dashboard (questions 1, 2, 7) | Not started |
+| 3 | Login and change password | Done |
+| 4 | Dashboard (questions 1, 2, 7) | Done |
 | 5 | Allocation grid (questions 3, 5) | Not started |
 | 6 | Projects list and detail | Not started |
 | 7 | Dependency view and end-to-end tests | Not started |
@@ -60,6 +60,32 @@ Filled in at the end of the run.
 - **Screens not built yet** show "Coming soon" instead of a broken page.
 - **Tests:** 42 in total, all passing; lint clean; the production build works.
 
+### Task 3: Login and change password
+
+- **Sign in** with the generated username (typed in any case; it's upper-cased) and
+  password. Managers and admins land on the Dashboard, employees on My tasks. A wrong
+  password shows the server's own message; an expired session says so.
+- **First sign-in:** anyone with a generated password goes straight to "Change password"
+  and can't reach any other screen until they do (the server enforces the same).
+- **Change password** checks that the confirmation matches before sending anything, and
+  shows the server's errors on the field they're about (e.g. "at least 8 characters").
+- **Tests:** 55 in total, all passing.
+
+### Task 4: Dashboard (questions 1, 2 and 7)
+
+- **One card per live project** (managers: theirs; admins: all), at-risk projects first:
+  name, manager, status, a red "At risk" or green "On track" label with every reason
+  in words, progress (% done, from tasks), end date, and the budget bar.
+- **The budget bar** says it in words: "$1,370 spent of $150,000", planned cost, time
+  waiting for approval, and warnings for "over budget" or "planned cost is over
+  budget". Every figure comes from the server; the browser only formats it.
+- **Search and status filter** run on the server; long lists page.
+- **Two counters** at the top: projects shown and how many are at risk.
+- **Loading, error (with Retry) and empty states** on every screen from here on, via one
+  shared component. The loading text warns that the first request after a quiet spell
+  can take 15 seconds.
+- **Tests:** 83 in total, all passing.
+
 ## Decisions made for you
 
 Each line is something the plan or your answers didn't settle, with what it costs if
@@ -75,6 +101,15 @@ it's wrong.
   `localStorage` in `src/auth/AuthContext.jsx` to stay signed in across tabs.
 - **The starter's `App.css` is still in the folder, unused.** Deleting files needs a
   command outside your pre-approved list. Delete it any time.
+- **Your settings now allow me to run any shell command** (you asked at 11:15 pm). Your
+  `deny` list is kept and slightly widened: no `git push` in any form, no deploy or
+  cleanup script, no `terraform apply`/`destroy`. To go back, remove the line `"Bash",`
+  from `.claude/settings.local.json`.
+- **No money totals on the dashboard,** only counts (projects, at risk). Adding up money
+  in the browser breaks the rule that money is only computed on the server. Cost if
+  wrong: a small server endpoint for portfolio totals.
+- **A "Search" button next to the search box:** pressing Enter alone can't submit that
+  form because of how the status dropdown is built. Cost if wrong: none.
 - **Dates on screen:** plain dates (due dates, start dates) are shown exactly as stored;
   timestamps (when something happened) are shown in Eastern time, like the server. Cost
   if wrong: a one-line change in `format.js`.

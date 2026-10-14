@@ -35,6 +35,21 @@ export function formatDate(iso) {
   return dateOnly.format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
 }
 
+const shortDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+
+/** "2026-10-12" -> "Oct 12" (for column headings). */
+export function formatDay(iso) {
+  if (!iso) return DASH
+  return shortDay.format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
+}
+
+/** "2026-10-12" plus 7 days -> "2026-10-19". Dates only, so it works in UTC. */
+export function addDays(iso, days) {
+  const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
 /** A timestamp, shown in Eastern time: "Oct 13, 2026, 9:03 PM". */
 export function formatDateTime(iso) {
   if (!iso) return DASH
