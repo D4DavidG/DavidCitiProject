@@ -13,7 +13,7 @@ behalf so you can overrule it. The plan being followed is
 | 2 | Session, theme, layout, routing | Done |
 | 3 | Login and change password | Done |
 | 4 | Dashboard (questions 1, 2, 7) | Done |
-| 5 | Allocation grid (questions 3, 5) | Not started |
+| 5 | Allocation grid (questions 3, 5) | Done |
 | 6 | Projects list and detail | Not started |
 | 7 | Dependency view and end-to-end tests | Not started |
 | 8 | My tasks | Not started |
@@ -85,6 +85,20 @@ Filled in at the end of the run.
   shared component. The loading text warns that the first request after a quiet spell
   can take 15 seconds.
 - **Tests:** 83 in total, all passing.
+
+### Task 5: Allocation grid (questions 3 and 5)
+
+- **People down the side, six weeks across.** Each cell shows hours booked against that
+  person's own capacity ("45 / 40 h"). Over capacity is red with "+5 h over"; logged
+  time past capacity says "overtime" in orange.
+- **Where the hours come from:** hover (or tab to) a cell to see "Apollo 25 h, Zeus 20
+  h". Screen readers get the same sentence.
+- **Worst first:** the server sorts by each person's worst week; each row says
+  "Over-allocated" or "OK", plus their capacity and whether overtime is allowed.
+- **"Only over-allocated" switch**, previous/next week and "This week" buttons. If
+  nobody is over capacity, it says "No one is over capacity in these weeks."
+- **On phones** the grid scrolls sideways with the name column pinned.
+- **Tests:** 94 in total, all passing.
 
 ## Decisions made for you
 

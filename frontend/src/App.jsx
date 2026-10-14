@@ -11,6 +11,8 @@ import AllocationPage from './pages/allocation/AllocationPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
+import ProjectDetailPage from './pages/projects/ProjectDetailPage'
+import ProjectsPage from './pages/projects/ProjectsPage'
 import theme from './theme/theme'
 
 /** "/" sends you to your home screen, or to the login page. */
@@ -51,8 +53,8 @@ export function AppRoutes() {
       <Route element={<SignedIn />}>
         <Route path="/dashboard" element={<RequireRole roles={STAFF}><DashboardPage /></RequireRole>} />
         <Route path="/allocation" element={<RequireRole roles={STAFF}><AllocationPage /></RequireRole>} />
-        <Route path="/projects" element={<ComingSoon title="Projects" />} />
-        <Route path="/projects/:id" element={<ComingSoon title="Project" />} />
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/projects/:id/dependencies" element={<ComingSoon title="Dependencies" />} />
         <Route path="/my-tasks" element={<RequireRole roles={['EMPLOYEE']}><ComingSoon title="My tasks" /></RequireRole>} />
         <Route path="/approvals" element={<RequireRole roles={STAFF}><ComingSoon title="Approvals" /></RequireRole>} />

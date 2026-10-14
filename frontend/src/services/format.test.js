@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, formatCents, formatDate, formatDateTime, formatDay, formatHours } from './format'
+import {
+  addDays, centsToDollarsInput, formatCents, formatDate, formatDateTime, formatDay, formatHours, parseDollars,
+} from './format'
 
 describe('formatCents', () => {
   it('shows whole dollars with separators', () => {
@@ -11,6 +13,31 @@ describe('formatCents', () => {
   it('shows a dash when there is no amount', () => {
     expect(formatCents(null)).toBe('—')
     expect(formatCents(undefined)).toBe('—')
+  })
+})
+
+describe('parseDollars', () => {
+  it('turns typed dollars into integer cents without floating-point maths', () => {
+    expect(parseDollars('12,500')).toBe(1_250_000)
+    expect(parseDollars('$150000')).toBe(15_000_000)
+    expect(parseDollars('19.99')).toBe(1999)
+    expect(parseDollars('0.1')).toBe(10)
+    expect(parseDollars(' 7 ')).toBe(700)
+  })
+
+  it('refuses anything that is not an amount', () => {
+    expect(parseDollars('')).toBeNull()
+    expect(parseDollars('abc')).toBeNull()
+    expect(parseDollars('1.234')).toBeNull()
+    expect(parseDollars('-5')).toBeNull()
+  })
+})
+
+describe('centsToDollarsInput', () => {
+  it('shows cents as an editable dollar amount', () => {
+    expect(centsToDollarsInput(1_250_000)).toBe('12500')
+    expect(centsToDollarsInput(1999)).toBe('19.99')
+    expect(centsToDollarsInput(10)).toBe('0.10')
   })
 })
 

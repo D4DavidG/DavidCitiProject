@@ -21,6 +21,26 @@ export function formatCents(cents) {
   return dollars.format(cents / 100)
 }
 
+/**
+ * What someone typed as dollars ("12,500", "$19.99") -> integer cents, or null if it
+ * isn't an amount. Done on the digits as text, never with floating-point maths, so
+ * "0.1" is exactly 10 cents. This and centsToDollarsInput are the only conversions.
+ */
+export function parseDollars(text) {
+  const cleaned = String(text ?? '').trim().replace(/[$,\s]/g, '')
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(cleaned)
+  if (!match) return null
+  return Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'))
+}
+
+/** Integer cents -> the text to put back in a dollars input: 1250000 -> "12500", 1999 -> "19.99". */
+export function centsToDollarsInput(cents) {
+  if (cents === null || cents === undefined) return ''
+  const whole = Math.floor(cents / 100)
+  const rest = cents % 100
+  return rest ? `${whole}.${String(rest).padStart(2, '0')}` : String(whole)
+}
+
 /** 90 -> "1 h 30 min", 120 -> "2 h", 45 -> "45 min" (the server's wording). */
 export function formatHours(minutes) {
   const hours = Math.floor(minutes / 60)
