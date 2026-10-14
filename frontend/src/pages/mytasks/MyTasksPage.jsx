@@ -146,14 +146,14 @@ export default function MyTasksPage() {
       <PageHeader title="My tasks" subtitle="Move your tasks along as you work, and log the time you spend on them." />
       {message && <Alert severity={message.severity} sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
 
-      <PageState loading={tasks.loading} error={tasks.error} onRetry={tasks.reload} empty={tasks.data && items.length === 0 ? 'No open tasks. Nice work.' : null}>
+      <PageState loading={tasks.loading && !tasks.data} error={tasks.error} onRetry={tasks.reload} empty={tasks.data && items.length === 0 ? 'No open tasks. Nice work.' : null}>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
           {items.map((task) => <TaskCard key={task.taskId} task={task} onMove={move} onLog={setLogging} />)}
         </Box>
       </PageState>
 
       <Typography variant="h2" sx={{ mt: 4, mb: 1 }}>Ready to take</Typography>
-      <PageState loading={ready.loading} error={ready.error} onRetry={ready.reload}>
+      <PageState loading={ready.loading && !ready.data} error={ready.error} onRetry={ready.reload}>
         {ready.data && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {`You hold ${ready.data.held} of ${ready.data.limit}`}

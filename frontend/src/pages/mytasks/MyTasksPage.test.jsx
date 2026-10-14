@@ -114,6 +114,23 @@ describe('MyTasksPage', () => {
     expect(calls.filter((c) => c.path === '/me/tasks').length).toBe(2)
   })
 
+  it('keeps the other Ready cards on screen while the lists reload after Take this', async () => {
+    const OTHER = { ...GO_LIVE, taskId: 31, title: 'Write runbook' }
+    const calls = renderPage({
+      'GET /me/ready-tasks': [200, page([GO_LIVE, OTHER], { held: 1, limit: 3 })],
+      'POST /tasks/30/claim': [200, { ...GO_LIVE, assigneeUserId: 3, status: 'IN_PROGRESS' }],
+    })
+    const other = await screen.findByRole('article', { name: 'Write runbook' })
+    let unmounted = false
+    const watch = new MutationObserver(() => { if (!other.isConnected) unmounted = true })
+    watch.observe(document.body, { childList: true, subtree: true })
+    await userEvent.click(within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' }))
+    await waitFor(() => expect(calls.filter((c) => c.path === '/me/ready-tasks').length).toBe(2))
+    await screen.findByText('You took Go-live checklist.')
+    watch.disconnect()
+    expect(unmounted).toBe(false)
+  })
+
   it("shows the server's refusal when I'm at my limit", async () => {
     const refusal = 'You already hold 2 unfinished tasks, your limit. Finish one first, or ask your manager to raise it.'
     renderPage({
