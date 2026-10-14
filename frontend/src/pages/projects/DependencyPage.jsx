@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link, useParams } from 'react-router'
-import { Alert, Box, Button, Card, CardContent, IconButton, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowIcon from '@mui/icons-material/ArrowForward'
 import LinkOffIcon from '@mui/icons-material/LinkOff'
@@ -25,20 +25,17 @@ function Node({ node, needs, canManage, onUnlink }) {
           <Typography id={titleId} variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>{node.name}</Typography>
           <StatusChip status={node.status} />
         </Box>
-        <Typography variant="body2" color="text.secondary">Due {formatDate(node.dueDate)} · {node.progressPercent}% done</Typography>
+        <Typography variant="body2" color="text.secondary">Due {formatDate(node.dueDate)} · {node.progressPercent}% of hours done</Typography>
         {needs.length > 0 && <Typography variant="body2">Needs {needs.map((n) => n.name).join(', ')}</Typography>}
         {node.status === 'BLOCKED' && waiting.length > 0 && (
           <Typography variant="body2" color="error.main">Waiting for {waiting.map((n) => n.name).join(', ')} to be done.</Typography>
         )}
         {canManage && needs.map((dep) => (
-          <Box key={dep.milestoneId}>
-            <Tooltip title={`Remove the link to ${dep.name}`}>
-              <IconButton size="small" aria-label={`Remove the link to ${dep.name}`} onClick={() => onUnlink(node, dep)}>
-                <LinkOffIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Typography component="span" variant="caption" color="text.secondary">{dep.name}</Typography>
-          </Box>
+          // Words, not just an icon: a phone has no hover to reveal a tooltip.
+          <Button key={dep.milestoneId} size="small" color="inherit" startIcon={<LinkOffIcon fontSize="small" />}
+            onClick={() => onUnlink(node, dep)} sx={{ justifySelf: 'start', color: 'text.secondary' }}>
+            Remove link to {dep.name}
+          </Button>
         ))}
       </CardContent>
     </Card>

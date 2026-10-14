@@ -42,18 +42,22 @@ describe('ProjectDetailPage', () => {
     renderDetail()
     const build = await screen.findByRole('region', { name: 'Build' })
     expect(within(build).getByText('In progress')).toBeInTheDocument()
-    expect(within(build).getByText('0% · 0 of 2 tasks done')).toBeInTheDocument()
+    expect(within(build).getByText('0% of estimated hours · 0 of 2 tasks done')).toBeInTheDocument()
     expect(within(build).getByText(/due nov 12, 2026/i)).toBeInTheDocument()
     await userEvent.click(within(build).getByRole('button', { name: /show tasks/i }))
     expect(await within(build).findByText('Portal UI')).toBeInTheDocument()
     expect(within(build).getByText('Ben Okafor')).toBeInTheDocument()
   })
 
-  it("shows the server's refusal when signing off unfinished work", async () => {
-    renderDetail(USERS.manager, { 'POST /milestones/11/sign-off': [409, { error: '2 tasks are not done yet.' }] })
+  it("shows the server's refusal when a sign-off is refused", async () => {
+    const ready = { ...BUILD, status: 'IN_PROGRESS', doneTaskCount: 2, progressPercent: 100 }
+    renderDetail(USERS.manager, {
+      'GET /projects/1/milestones': [200, page([ready])],
+      'POST /milestones/11/sign-off': [409, { error: 'Design must be signed off first.' }],
+    })
     const build = await screen.findByRole('region', { name: 'Build' })
     await userEvent.click(within(build).getByRole('button', { name: /sign off/i }))
-    expect(await screen.findByText('2 tasks are not done yet.')).toBeInTheDocument()
+    expect(await screen.findByText('Design must be signed off first.')).toBeInTheDocument()
   })
 
   it('adds a deliverable', async () => {
@@ -93,6 +97,32 @@ describe('ProjectDetailPage', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Budget' }))
     expect(await screen.findByText('$1,370 spent of $150,000')).toBeInTheDocument()
     expect(screen.getByText('$148,630')).toBeInTheDocument()
+    expect(screen.getByText('<1%')).toBeInTheDocument() // $1,370 of $150,000 is spent, so not "0%"
+  })
+
+  it('says what the project percentage is measured in', async () => {
+    renderDetail()
+    expect(await screen.findByText('12% of estimated hours done')).toBeInTheDocument()
+  })
+
+  it('offers sign-off only when the work is done, and says why not otherwise', async () => {
+    // A deliverable reads DONE only once signed off; "ready" is all tasks done and not blocked.
+    const launchReady = { ...BUILD, milestoneId: 12, name: 'Launch', status: 'IN_PROGRESS', doneTaskCount: 2, progressPercent: 100 }
+    const testsBlocked = { ...BUILD, milestoneId: 13, name: 'Tests', status: 'BLOCKED', taskCount: 1, doneTaskCount: 1 }
+    renderDetail(USERS.manager, { 'GET /projects/1/milestones': [200, page([DESIGN, BUILD, launchReady, testsBlocked])] })
+    const build = await screen.findByRole('region', { name: 'Build' })
+    expect(within(build).getByRole('button', { name: /sign off/i })).toBeDisabled()
+    expect(within(build).getByText(/2 tasks left to finish/i)).toBeInTheDocument()
+    const tests = screen.getByRole('region', { name: 'Tests' })
+    expect(within(tests).getByRole('button', { name: /sign off/i })).toBeDisabled()
+    expect(within(tests).getByText(/waiting for what it depends on/i)).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Launch' })).getByRole('button', { name: /sign off/i })).toBeEnabled()
+  })
+
+  it('writes "1 task", not "1 tasks"', async () => {
+    renderDetail()
+    const design = await screen.findByRole('region', { name: 'Design' })
+    expect(within(design).getByText(/1 of 1 task done/)).toBeInTheDocument()
   })
 
   it('archives only after confirming, and never says "delete"', async () => {

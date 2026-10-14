@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
-import { Alert, Box, Button } from '@mui/material'
+import { Alert, Box, Button, Link as MuiLink } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
@@ -62,9 +62,13 @@ export default function ResourcesTab({ projectId, bookings, canManage, onChanged
 
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
-      <Alert severity="info" action={<Button component={Link} to="/allocation" color="inherit" size="small">Allocation grid</Button>}>
-        Booking past someone&apos;s weekly capacity is allowed: it shows in red on the Allocation grid.
-      </Alert>
+      {canManage && (
+        // The link sits in the sentence: as an Alert action it wrapped into a stray-looking word on phones.
+        <Alert severity="info">
+          Booking past someone&apos;s weekly capacity is allowed: it shows in red on
+          the <MuiLink component={Link} to="/allocation" color="inherit" sx={{ fontWeight: 600 }}>Allocation grid</MuiLink>.
+        </Alert>
+      )}
       {canManage && (
         <Box><Button variant="contained" startIcon={<AddIcon />} onClick={() => setBooking(true)}>Book someone</Button></Box>
       )}

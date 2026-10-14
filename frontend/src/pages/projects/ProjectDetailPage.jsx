@@ -101,7 +101,7 @@ export default function ProjectDetailPage() {
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
             <StatusChip status={p.status} size="medium" />
-            <Typography variant="body2">{p.progressPercent}% done</Typography>
+            <Typography variant="body2">{p.progressPercent}% of estimated hours done</Typography>
             <Typography variant="body2" color="text.secondary">{formatDate(p.startDate)} – {formatDate(p.predictedEndDate)}</Typography>
             {manager.data && <Chip variant="outlined" label={`Managed by ${fullName(manager.data)}`} />}
           </Box>

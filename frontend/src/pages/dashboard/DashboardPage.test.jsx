@@ -23,11 +23,16 @@ function renderDashboard(answers = { 'GET /dashboard/projects': [200, page([APOL
 }
 
 describe('DashboardPage', () => {
+  it("tells a manager these are their own projects, not the company's", async () => {
+    renderDashboard()
+    expect(await screen.findByText(/the projects you manage/i)).toBeInTheDocument()
+  })
+
   it('shows a card per project with its status and progress', async () => {
     renderDashboard()
     const card = await screen.findByRole('article', { name: 'Apollo' })
     expect(within(card).getByText('Active')).toBeInTheDocument()
-    expect(within(card).getByText('12% done')).toBeInTheDocument()
+    expect(within(card).getByText('12% of estimated hours done')).toBeInTheDocument()
     expect(within(card).getByText('Maria Lopez')).toBeInTheDocument()
   })
 

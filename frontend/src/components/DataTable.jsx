@@ -4,8 +4,10 @@ import {
 } from '@mui/material'
 import { useIsMobile } from '../theme/responsive'
 
+/** A cell's content; an empty value shows a dash, so a card row never looks like it failed to load. */
 function cell(column, row) {
-  return column.render ? column.render(row) : row[column.key]
+  const value = column.render ? column.render(row) : row[column.key]
+  return value === null || value === undefined || value === '' ? '—' : value
 }
 
 /**

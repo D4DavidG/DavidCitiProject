@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types'
 import { Box, Chip, LinearProgress, Typography } from '@mui/material'
-import { formatCents } from '../services/format'
+import { formatCents, spentPercent } from '../services/format'
 
 /**
  * Question 7: budget consumed versus planned. All figures and the percentage come
@@ -27,8 +27,14 @@ export default function BudgetBar({
           value={Math.min(consumedPercent ?? 0, 100)}
           color={over ? 'error' : 'primary'}
           aria-label="Budget spent"
-          sx={{ my: 1, height: 8, borderRadius: 4 }}
+          // A neutral track, so an almost-empty bar can't be mistaken for a full one.
+          sx={{ my: 1, height: 8, borderRadius: 4, bgcolor: 'grey.200' }}
         />
+      )}
+      {hasBudget && (
+        <Typography variant="caption" sx={{ display: 'block' }}>
+          {spentPercent(consumedPercent, consumedCents).replace('<1%', 'Under 1%')} of budget spent
+        </Typography>
       )}
       <Typography variant="caption" color="text.secondary">
         planned {formatCents(plannedCents)}

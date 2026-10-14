@@ -41,6 +41,15 @@ export function centsToDollarsInput(cents) {
   return rest ? `${whole}.${String(rest).padStart(2, '0')}` : String(whole)
 }
 
+/**
+ * The server's whole-number "budget spent" percentage as text. It rounds down, so a
+ * project that has spent something but under 1% would read "0%": show "<1%" instead.
+ */
+export function spentPercent(consumedPercent, consumedCents) {
+  if (consumedPercent === null || consumedPercent === undefined) return DASH
+  return consumedPercent === 0 && consumedCents > 0 ? '<1%' : `${consumedPercent}%`
+}
+
 /** 90 -> "1 h 30 min", 120 -> "2 h", 45 -> "45 min" (the server's wording). */
 export function formatHours(minutes) {
   const hours = Math.floor(minutes / 60)

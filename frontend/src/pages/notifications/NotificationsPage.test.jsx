@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import NotificationsPage from './NotificationsPage'
-import { page, renderAt, stubApi } from '../../test/utils'
+import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
 
 const UNREAD = { notificationId: 5, auditId: 50, summary: 'Ana Ruiz logged 8 h on task Portal UI', entityType: 'time_entries', entityId: 30, isRead: false, readAt: null, createdAt: '2026-10-14T01:03:25+00:00' }
 const READ = { ...UNREAD, notificationId: 4, summary: 'Ana Ruiz changed their email', isRead: true, readAt: '2026-10-14T02:00:00+00:00' }
@@ -48,8 +48,15 @@ describe('NotificationsPage', () => {
     await waitFor(() => expect(calls.at(-1).query.unread).toBe('true'))
   })
 
-  it('says when there is nothing new', async () => {
+  it('says when there is nothing new, and offers nothing to mark', async () => {
     renderPage({ 'GET /notifications': [200, page([])] })
     expect(await screen.findByText(/no notifications/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /mark all as read/i })).toBeDisabled()
+  })
+
+  it('explains to an employee what they will be notified about', async () => {
+    stubApi({ 'GET /notifications': [200, page([])] })
+    renderAt(<NotificationsPage />, { path: '/notifications', auth: session(USERS.employee) })
+    expect(await screen.findByText(/changes made by the people who report to you/i)).toBeInTheDocument()
   })
 })

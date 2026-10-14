@@ -24,6 +24,12 @@ describe('PeoplePage', () => {
     expect(within(table).getByText('$100,000')).toBeInTheDocument()
   })
 
+  it('says "Hidden" where the server does not share a salary, so it is not mistaken for none', async () => {
+    renderPeople(USERS.manager)
+    const table = await screen.findByRole('table', { name: 'People' })
+    expect(within(table).getByText('Hidden')).toBeInTheDocument() // Dev Shah's salary isn't shared
+  })
+
   it('searches and filters by role on the server', async () => {
     const calls = renderPeople()
     await screen.findByRole('table', { name: 'People' })

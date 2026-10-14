@@ -39,6 +39,12 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(calls.at(-1).query.includeArchived).toBe('true'))
   })
 
+  it('does not promise employees a budget they cannot see', async () => {
+    renderList(USERS.employee)
+    await screen.findByRole('link', { name: 'Apollo' })
+    expect(screen.queryByText(/budget/i)).not.toBeInTheDocument()
+  })
+
   it('offers "New project" to admins only', async () => {
     renderList(USERS.manager)
     await screen.findByRole('link', { name: 'Apollo' })

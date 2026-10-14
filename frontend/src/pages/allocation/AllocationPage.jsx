@@ -25,7 +25,8 @@ function WeekCell({ week, capacity }) {
   const label = `Week of ${formatDay(week.week)}: ${week.bookedHours} of ${capacity} hours booked (${breakdown(week.projects)})`
   return (
     <TableCell sx={{ p: 0.5 }}>
-      <Tooltip title={breakdown(week.projects)} describeChild arrow>
+      {/* A tap opens it on phones (MUI's default needs a 700 ms press) and it stays up to be read. */}
+      <Tooltip title={breakdown(week.projects)} describeChild arrow enterTouchDelay={0} leaveTouchDelay={4000}>
         <Box
           tabIndex={0}
           data-over={String(week.overAllocated)}
@@ -90,7 +91,7 @@ export default function AllocationPage() {
     <>
       <PageHeader
         title="Allocation"
-        subtitle="Hours booked per person per week, across every project. Hover a week to see which projects the hours come from."
+        subtitle="Hours booked per person per week, across every project. Hover or tap a week to see which projects the hours come from."
       />
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>

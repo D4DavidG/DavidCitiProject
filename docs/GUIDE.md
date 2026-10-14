@@ -97,10 +97,10 @@ Maria: her username is printed by `python3 tools/demo.py demo`, and the password
 | --- | --- | --- |
 | 1 | You land on **Dashboard** | "A manager's first screen answers questions 1, 2 and 7: every project's status, whether it's at risk and why, and budget spent against planned. At-risk projects come first." |
 | 2 | Point at Apollo's red **At risk** and its reason | "The reason is in words, worked out by the server from the deliverables, the dates and the money." |
-| 3 | **Allocation** in the menu | "Questions 3 and 5: people down the side, weeks across. Ben is red: 45 hours booked against 40." Hover his cell: "25 on Apollo, 20 on Zeus. Neither manager could see that alone, because it spans projects." |
+| 3 | **Allocation** in the menu | "Questions 3 and 5: people down the side, weeks across. Ben is red: 45 hours booked against 40." Hover (or tap, on a phone) his cell: "25 on Apollo, 20 on Zeus. Neither manager could see that alone, because it spans projects." |
 | 4 | Flip **Only over-allocated** | "The server filters and sorts the worst first. A week with nobody over says so; that's good news, not an empty table." |
 | 5 | **Projects**, then **Apollo** | "Question 4: deliverables with progress computed from their tasks." Open **Show tasks** on Build. |
-| 6 | Click **Sign off** on Build | The server refuses: "2 tasks are not done yet." "The rule is enforced on the server; the screen just shows its answer." |
+| 6 | Point at **Sign off** on Build: greyed out, with "2 tasks left to finish" beside it | "Sign-off needs every task done and everything it depends on signed off. The screen says why it isn't ready, and the server enforces the same rule: the terminal demo shows it refusing." |
 | 7 | **Resources** and **Budget** tabs | "Who is booked for how many hours, and the money: planned from bookings, spent from approved time." |
 | 8 | **Dependency view** | "Question 6: read left to right. Launch is blocked until Build is done. Try to add a loop and the server says no." |
 | 9 | Make the window narrow (or open it on your phone) | "Responsive: the menu becomes a drawer, tables become cards, the grid scrolls sideways." |

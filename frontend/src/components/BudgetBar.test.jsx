@@ -13,6 +13,11 @@ describe('BudgetBar', () => {
     expect(screen.getByText(/\$1,538 waiting for approval/)).toBeInTheDocument()
   })
 
+  it('says "under 1%" rather than 0% when something has been spent', () => {
+    render(<BudgetBar {...apollo} consumedPercent={0} />)
+    expect(screen.getByText(/under 1% of budget spent/i)).toBeInTheDocument()
+  })
+
   it('fills the bar to the share spent, from the server', () => {
     render(<BudgetBar {...apollo} consumedPercent={42} />)
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '42')

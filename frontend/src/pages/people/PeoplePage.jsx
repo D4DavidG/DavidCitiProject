@@ -114,7 +114,7 @@ export default function PeoplePage() {
     },
     { key: 'jobTitle', label: 'Job title' },
     { key: 'capacity', label: 'Capacity', render: (p) => `${p.weeklyCapacityHours} h/week${p.overtimeAllowed ? ' · overtime' : ''}` },
-    ...(showSalary ? [{ key: 'salary', label: 'Salary', align: 'right', render: (p) => formatCents(p.annualSalaryCents) }] : []),
+    ...(showSalary ? [{ key: 'salary', label: 'Salary', align: 'right', render: (p) => (p.annualSalaryCents === undefined ? 'Hidden' : formatCents(p.annualSalaryCents)) }] : []),
     {
       key: 'actions',
       label: '',
@@ -148,7 +148,7 @@ export default function PeoplePage() {
       {message && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
 
       <Box component="form" onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); setPageNumber(1) }} sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, alignItems: 'center' }}>
-        <TextField id="people-search" label="Search people" size="small" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} sx={{ flex: '1 1 220px' }} helperText="Name, username or email" />
+        <TextField id="people-search" label="Search people" size="small" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} sx={{ flex: '1 1 220px' }} placeholder="Name, username or email" />
         <Button type="submit" variant="outlined">Search</Button>
         <TextField id="people-role" select label="Role" size="small" value={role} onChange={(e) => { setRole(e.target.value); setPageNumber(1) }} sx={{ minWidth: 160 }}>
           <MenuItem value="">All roles</MenuItem>

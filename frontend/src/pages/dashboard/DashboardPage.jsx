@@ -10,6 +10,7 @@ import BudgetBar from '../../components/BudgetBar'
 import PageHeader from '../../components/PageHeader'
 import PageState from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
+import { useAuth } from '../../auth/useAuth'
 import { formatDate } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -57,7 +58,7 @@ function ProjectCard({ project }) {
 
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="body2">{project.progressPercent}% done</Typography>
+            <Typography variant="body2">{project.progressPercent}% of estimated hours done</Typography>
             <Typography variant="body2" color="text.secondary">Ends {formatDate(project.predictedEndDate)}</Typography>
           </Box>
           <LinearProgress variant="determinate" value={project.progressPercent} aria-label="Progress" sx={{ mt: 0.5, height: 6, borderRadius: 3 }} color="success" />
@@ -90,6 +91,7 @@ ProjectCard.propTypes = {
  * with status, risk and budget. At-risk projects come first (the server orders them).
  */
 export default function DashboardPage() {
+  const { user } = useAuth()
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -104,7 +106,10 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Every live project's status, risk and budget. At-risk projects come first." />
+      <PageHeader
+        title="Dashboard"
+        subtitle={`${user.role === 'ADMIN' ? "Every live project's" : 'The projects you manage:'} status, risk and budget. At-risk projects come first.`}
+      />
 
       <Box component="form" onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); setPageNumber(1) }} sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
         <TextField id="dashboard-search" label="Search projects" size="small" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} sx={{ flex: '1 1 220px' }} />

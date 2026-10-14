@@ -62,7 +62,9 @@ describe('DependencyPage', () => {
   it('removes a link', async () => {
     const calls = renderGraph(USERS.manager, { 'POST /milestones/12/dependencies/11/archive': [200, LAUNCH] })
     const launch = await screen.findByRole('article', { name: 'Launch' })
-    await userEvent.click(within(launch).getByRole('button', { name: /remove the link to build/i }))
+    const remove = within(launch).getByRole('button', { name: /remove link to build/i })
+    expect(remove).toHaveTextContent('Remove link to Build') // visible words, not only an icon
+    await userEvent.click(remove)
     await waitFor(() => expect(calls.some((c) => c.path === '/milestones/12/dependencies/11/archive')).toBe(true))
   })
 
@@ -70,7 +72,7 @@ describe('DependencyPage', () => {
     renderGraph(USERS.employee)
     await screen.findByRole('region', { name: 'Step 1' })
     expect(screen.queryByRole('button', { name: /add a link/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /remove the link/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /remove link/i })).not.toBeInTheDocument()
   })
 
   it('explains an empty project', async () => {

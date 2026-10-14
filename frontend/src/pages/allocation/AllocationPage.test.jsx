@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AllocationPage from './AllocationPage'
 import { page, renderAt, stubApi } from '../../test/utils'
@@ -58,6 +58,13 @@ describe('AllocationPage', () => {
     expect(within(row).getByLabelText(/week of oct 12: 45 of 40 hours booked \(apollo 25 h, zeus 20 h\)/i)).toBeInTheDocument()
     await userEvent.hover(within(row).getByText('45 / 40 h'))
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Apollo 25 h, Zeus 20 h')
+  })
+
+  it('opens the project breakdown on a tap, for phones (no hover)', async () => {
+    renderGrid()
+    const row = await screen.findByRole('row', { name: /Ben Okafor/ })
+    fireEvent.touchStart(within(row).getByText('45 / 40 h'))
+    expect(await screen.findByRole('tooltip', {}, { timeout: 200 })).toHaveTextContent('Apollo 25 h, Zeus 20 h')
   })
 
   it('marks weeks logged past capacity as overtime', async () => {

@@ -3,7 +3,7 @@ import PropTypes from 'prop-types'
 import { Box, Card, CardContent, Typography } from '@mui/material'
 import BudgetBar from '../../components/BudgetBar'
 import PageState from '../../components/PageState'
-import { formatCents } from '../../services/format'
+import { formatCents, spentPercent } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
 
@@ -22,7 +22,7 @@ export default function BudgetTab({ projectId }) {
     ['Spent (approved time)', formatCents(data.consumedCents)],
     ['Waiting for approval', formatCents(data.pendingCents)],
     ['Remaining', formatCents(data.remainingCents)],
-    ['Budget spent', data.consumedPercent === null ? '—' : `${data.consumedPercent}%`],
+    ['Budget spent', spentPercent(data.consumedPercent, data.consumedCents)],
     ['Schedule elapsed', `${data.scheduleElapsedPercent}%`],
   ]
 

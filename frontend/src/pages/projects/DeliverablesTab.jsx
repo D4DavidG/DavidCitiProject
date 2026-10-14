@@ -18,9 +18,23 @@ const FIELDS = [
   { name: 'dueDate', label: 'Due date', type: 'date', required: true },
 ]
 
+/**
+ * Why a deliverable can't be signed off yet, in words, or null when it can. Mirrors the
+ * server's rule in milestones.sign_off (no open tasks; nothing it depends on unsigned,
+ * which the server reports as status BLOCKED) so the button isn't a dead end. The server
+ * still has the final say.
+ */
+function signOffBlocker(d) {
+  const left = d.taskCount - d.doneTaskCount
+  if (left > 0) return `${left} ${left === 1 ? 'task' : 'tasks'} left to finish`
+  if (d.status === 'BLOCKED') return 'waiting for what it depends on'
+  return null
+}
+
 function Deliverable({ deliverable, canManage, people, onAction, onEdit, onArchive, onChanged }) {
   const [open, setOpen] = useState(false)
   const titleId = `deliverable-${deliverable.milestoneId}`
+  const notReady = signOffBlocker(deliverable)
   return (
     <Card component="section" aria-labelledby={titleId}>
       <CardContent sx={{ display: 'grid', gap: 1 }}>
@@ -33,7 +47,9 @@ function Deliverable({ deliverable, canManage, people, onAction, onEdit, onArchi
         </Box>
         {deliverable.description && <Typography variant="body2" color="text.secondary">{deliverable.description}</Typography>}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-          <Typography variant="body2">{deliverable.progressPercent}% · {deliverable.doneTaskCount} of {deliverable.taskCount} tasks done</Typography>
+          <Typography variant="body2">
+            {deliverable.progressPercent}% of estimated hours · {deliverable.doneTaskCount} of {deliverable.taskCount} {deliverable.taskCount === 1 ? 'task' : 'tasks'} done
+          </Typography>
           <Typography variant="body2" color="text.secondary">Due {formatDate(deliverable.dueDate)}</Typography>
         </Box>
         <LinearProgress variant="determinate" value={deliverable.progressPercent} color="success" aria-label="Progress" sx={{ height: 6, borderRadius: 3 }} />
@@ -43,9 +59,12 @@ function Deliverable({ deliverable, canManage, people, onAction, onEdit, onArchi
         <Button size="small" onClick={() => setOpen(!open)}>{open ? 'Hide tasks' : 'Show tasks'}</Button>
         {canManage && (deliverable.completedAt
           ? <Button size="small" onClick={() => onAction(deliverable, 'reopen')}>Reopen</Button>
-          : <Button size="small" onClick={() => onAction(deliverable, 'sign-off')}>Sign off</Button>)}
+          : <Button size="small" disabled={Boolean(notReady)} onClick={() => onAction(deliverable, 'sign-off')}>Sign off</Button>)}
         {canManage && <Button size="small" onClick={() => onEdit(deliverable)}>Edit</Button>}
         {canManage && <Button size="small" color="inherit" onClick={() => onArchive(deliverable)}>Archive</Button>}
+        {canManage && !deliverable.completedAt && notReady && (
+          <Typography variant="caption" color="text.secondary">Sign-off opens when it&apos;s done: {notReady}.</Typography>
+        )}
       </CardActions>
     </Card>
   )

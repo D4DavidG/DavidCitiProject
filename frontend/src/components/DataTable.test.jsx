@@ -30,6 +30,16 @@ describe('DataTable', () => {
     responsive.useIsMobile.mockReturnValue(false)
   })
 
+  it('shows a dash for an empty value instead of a blank row', () => {
+    responsive.useIsMobile.mockReturnValue(true)
+    render(<DataTable columns={[{ key: 'name', label: 'Name' }, { key: 'note', label: 'Note' }]}
+      rows={[{ id: 1, name: 'Ana Ruiz', note: null }, { id: 2, name: 'Ben Okafor', note: '' }]} rowKey="id" label="People" />)
+    const cards = screen.getAllByRole('listitem')
+    expect(within(cards[0]).getByText('—')).toBeInTheDocument()
+    expect(within(cards[1]).getByText('—')).toBeInTheDocument()
+    responsive.useIsMobile.mockReturnValue(false)
+  })
+
   it('shows the empty message when there are no rows', () => {
     render(<DataTable columns={columns} rows={[]} rowKey="id" label="People" empty="Nobody booked yet." />)
     expect(screen.getByText('Nobody booked yet.')).toBeInTheDocument()

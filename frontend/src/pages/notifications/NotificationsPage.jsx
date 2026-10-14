@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, Pagination, Switch, Typography } from '@mui/material'
 import PageHeader from '../../components/PageHeader'
+import { useAuth } from '../../auth/useAuth'
 import PageState from '../../components/PageState'
 import { formatDateTime } from '../../services/format'
 import { request } from '../../services/request'
@@ -11,7 +12,15 @@ import { useApi } from '../../services/useApi'
  * whoever made it: an employee's line manager and the admins; a manager's admins.
  * This page is your own inbox of those one-line summaries.
  */
+/** Who notifies whom follows the org chart, so the explanation depends on your role. */
+const SUBTITLES = {
+  ADMIN: 'Changes made by everyone else in the organisation.',
+  MANAGER: 'Changes made by the people who report to you.',
+  EMPLOYEE: 'Changes made by the people who report to you. Your own changes notify your manager and the admins, so this list is often empty.',
+}
+
 export default function NotificationsPage() {
+  const { user } = useAuth()
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
   const [error, setError] = useState(null)
@@ -31,12 +40,13 @@ export default function NotificationsPage() {
   }
 
   const items = notifications.data?.items ?? []
+  const nothingUnread = items.every((n) => n.isRead)
   return (
     <>
       <PageHeader
         title="Notifications"
-        subtitle="What changed, made by people you oversee (or, for admins, by everyone)."
-        actions={<Button variant="outlined" onClick={() => write('/notifications/read-all')}>Mark all as read</Button>}
+        subtitle={SUBTITLES[user.role]}
+        actions={<Button variant="outlined" disabled={nothingUnread} onClick={() => write('/notifications/read-all')}>Mark all as read</Button>}
       />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <FormControlLabel

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link, useNavigate } from 'react-router'
-import { Box, Button, Chip, FormControlLabel, MenuItem, Pagination, Switch, TextField } from '@mui/material'
+import { Box, Button, Chip, FormControlLabel, MenuItem, Link as MuiLink, Pagination, Switch, TextField } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
@@ -62,7 +62,12 @@ export default function ProjectsPage() {
   const { data, error, loading, reload } = useApi(load)
 
   const columns = [
-    { key: 'name', label: 'Project', render: (p) => <Link to={`/projects/${p.projectId}`}>{p.name}</Link> },
+    {
+      key: 'name',
+      label: 'Project',
+      // MUI's Link, so it takes the theme's colour like every other link (not the browser's default blue).
+      render: (p) => <MuiLink component={Link} to={`/projects/${p.projectId}`} underline="hover" sx={{ fontWeight: 600 }}>{p.name}</MuiLink>,
+    },
     {
       key: 'status',
       label: 'Status',
@@ -83,7 +88,9 @@ export default function ProjectsPage() {
     <>
       <PageHeader
         title="Projects"
-        subtitle="Open a project for its deliverables, resources and budget."
+        subtitle={user.role === 'EMPLOYEE'
+          ? 'The projects you are booked on. Open one for its deliverables and who is working on it.'
+          : 'Open a project for its deliverables, resources and budget.'}
         actions={isAdmin && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>New project</Button>}
       />
 
