@@ -12,15 +12,16 @@ David.
 **Rule:** if something here goes out of date, fix it in the same commit as the code that
 outdated it.
 
-### Where things stand (updated 14 Oct, morning)
+### Where things stand (updated 14 Oct, evening)
 
 - **Built:** backend, database and every website screen in `MVP.md`. All of it is
-  deployed to AWS and checked there, except three uncommitted 14 Oct changes (Hours and
-  Minutes boxes, **Copy username and password**, the login-timing fix at
-  `services/users.py:157-162`): on AWS after the next `./bin/deploy-backend.sh` and
-  `./bin/deploy-frontend.sh`. Tests: 375 backend, 219 website, and 8 Playwright browser
-  tests in 3 files (`e2e/demo.spec.js` walks the demo; `e2e/tour.spec.js` screenshots
-  every screen at desktop and phone width).
+  deployed to AWS and checked there, except four 14 Oct changes that are committed but
+  not deployed (Hours and Minutes boxes, **Copy username and password**, the login-timing
+  fix at `services/users.py:159-164`, and the pull board with migration
+  `002_task_limit.sql`): on AWS after the next `./bin/deploy-backend.sh` and
+  `./bin/deploy-frontend.sh`. Tests: 423 backend, 231 website, and 9 Playwright browser
+  tests in 4 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
+  puts back a task; `e2e/tour.spec.js` screenshots every screen at desktop and phone width).
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);
@@ -35,7 +36,7 @@ outdated it.
   - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
     email or texts (role and network), and the design for any future reset flow;
   - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
-    a per-person task limit), proposed and not built.
+    a per-person task limit), built 14 Oct (66 routes, two migration files).
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
   and cleanup scripts, and `terraform apply`/`destroy`. Every other shell command runs
@@ -50,8 +51,6 @@ outdated it.
     `password_changed_at`;
   - changing your own email needs no current password (`update_self` in
     `services/users.py`); it matters once an emailed reset exists;
-  - pull board designed (`docs/superpowers/specs/2026-10-14-pull-board-design.md`),
-    waiting for David's review. Until it is built: 62 routes, one migration file.
 
 ---
 
@@ -70,7 +69,7 @@ disagrees.
 | Overtime | Each person has `weekly_capacity_hours` (default 40) and `overtime_allowed` (default off), set by their line manager or an admin. Logging past capacity in a Mon-to-Sun week is refused (409) unless allowed; when allowed, the week is flagged |
 | Over-allocation | Bookings above a person's capacity are **allowed and flagged** (question 5), not refused. One booking is 1 to 40 h/week; no overlapping live bookings per person per project |
 | Approver | The line manager (`users.manager_id`) **or any admin** approves or rejects logged time. Nobody approves their own |
-| Tasks | Deliverables hold tasks (estimate, assignee, To Do / In Progress / Done). The manager creates and assigns; the assignee moves status and logs time. Deliverable status is **computed**; the manager signs off, refused until all tasks and dependencies are done |
+| Tasks | Deliverables hold tasks (estimate, assignee, To Do / In Progress / Done). The manager creates; employees pull Ready tasks (Take this, up to their `task_limit`, default 2); managers can still assign. The assignee moves status and logs time. Deliverable status is **computed**; the manager signs off, refused until all tasks and dependencies are done |
 | Invariant | `GET /admin/integrity-check`: 5 queries that must return no rows (no dependency loops; nothing live under an archived project; every record has its CREATE audit row; no time logged outside a booking; no signed-off deliverable with unfinished work). Runs after every database test |
 | Schema | `TEXT` + `CHECK` instead of `ENUM`; numbered migrations in `store/migrations/`. Full design: `docs/superpowers/specs/2026-10-13-database-design.md` |
 | Wire naming (§2.4) | camelCase in JSON, snake_case in Python and Postgres, converted only in `api/http.py` (incoming keys, computed results) and `services/views.py` (each record's fields, by name) |
@@ -96,7 +95,7 @@ backend/tracker/                 # one Lambda; the URL segment is /api/tracker/.
 ├── requirements.txt             # psycopg[binary] only
 ├── .gitignore                   # the pip packages start-dev.sh vendors here (trap 4)
 ├── store/
-│   ├── migrations/001_init.sql  # numbered SQL files; never edit one that has run on Aurora
+│   ├── migrations/              # 001_init.sql, 002_task_limit.sql: numbered SQL files; never edit one that has run on Aurora
 │   ├── migrate.py               # applies new migrations on cold start, under an advisory lock
 │   ├── integrity.py             # the 5 integrity queries
 │   └── postgres.py              # connection, atomic(), queries; psycopg errors -> domain errors

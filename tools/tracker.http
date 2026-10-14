@@ -64,6 +64,15 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/projects/{{projectId}}/dependency-graph
 Authorization: Bearer {{token}}
 
+### Pull board for one project: tasks with a status, an assignee, who holds how many (held / limit).
+GET {{baseUrl}}/projects/{{projectId}}/board
+Authorization: Bearer {{token}}
+
+### Ready tasks the signed-in employee could take, with their held / limit. Employees only:
+# as the admin this answers 403, so log in as an employee (for example Ana) to try it.
+GET {{baseUrl}}/me/ready-tasks
+Authorization: Bearer {{token}}
+
 ### Audit log, newest first (admin only). Every change, with before/after state.
 GET {{baseUrl}}/admin/audit-log?page=1&pageSize=20
 Authorization: Bearer {{token}}

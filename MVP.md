@@ -45,6 +45,9 @@ Modelled on Jira, GitHub Projects and OpenProject, not on a payroll system.
 
 - **Tasks:** each deliverable is broken into tasks. The project's manager creates them,
   gives each an estimate in hours and minutes, and assigns it to someone booked on the project.
+- **Pull:** the manager can leave a task unassigned; it shows as Ready, and anyone booked
+  on the project takes it with Take this, up to their task limit (default 2). Managers can
+  still assign, even past it.
 - **Ticking work off:** the assignee moves their task from To Do to In Progress to Done.
 - **Progress** of a deliverable is the share of its estimated hours that are done.
   "Blocked" shows automatically while a deliverable it depends on isn't finished.
@@ -56,14 +59,15 @@ Modelled on Jira, GitHub Projects and OpenProject, not on a payroll system.
   logged it.
 - **Capacity:** each person has a weekly capacity (default 40 hours) and an "overtime
   allowed" switch, set by their line manager. With the switch off, logging hours past
-  capacity is refused. With it on, the week is flagged as overtime.
+  capacity is refused. With it on, the week is flagged as overtime. The same person also
+  has a task limit (default 2, 1 to 10): how many unfinished tasks they may take themselves.
 
 ## Who can do what
 
 | Action | Admin | Manager | Employee |
 | --- | --- | --- | --- |
 | Create, archive and restore users; reset passwords; edit salaries | yes | no | no |
-| Set weekly capacity and "overtime allowed" | anyone | own reports | no |
+| Set weekly capacity, "overtime allowed" and task limit | anyone | own reports | no |
 | Edit own name and email; see own salary | yes | yes | yes |
 | Create projects, approve requests, assign managers, archive or restore projects | yes | no | no |
 | Request a new project | n/a | yes | no |
@@ -71,6 +75,7 @@ Modelled on Jira, GitHub Projects and OpenProject, not on a payroll system.
 | Deliverables and dependencies: create, edit, sign off, archive | all | own projects | no |
 | Tasks: create, assign, estimate | all | own projects | no |
 | Move a task's status; log time on it | no | no | own assigned tasks |
+| Take a Ready task; put back your own | no | no | booked on the project |
 | Approve or reject logged time | anyone | own reports | no |
 | See projects | all, including archived | the ones they manage | booked on, active only |
 | Audit log | yes | no | no |
@@ -113,7 +118,7 @@ at risk       = past end date and not complete, OR a deliverable overdue,
 ## Screens
 
 Login, Change password, Dashboard, Projects (list and detail, with Deliverables, Tasks,
-Resources and Budget tabs), Dependency view, Allocation grid, People, My tasks (update
+Board, Resources and Budget tabs), Dependency view, Allocation grid, People, My tasks (Ready to take; update
 status, log time), Approvals (logged time), Project requests, Notifications, Audit log
 (admin).
 

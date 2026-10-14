@@ -108,7 +108,7 @@ Start in **Tab B (Maria)**. Every label below was checked against the frontend c
 | 2 | **Allocation** in the menu | People down the side, weeks across. Ben's row shows **Over-allocated**; his cells for the weeks of 12 and 19 Oct read "45 / 40 h" and "+5 h over" | "Questions 3 and 5. Ben is booked 25 h on Apollo and 20 h on Zeus. Neither manager could see that alone." |
 | 3 | Hover (or tap) Ben's red cell | "Apollo 25 h, Zeus 20 h" | "Each cell says where its hours come from." |
 | 4 | Switch on **Only over-allocated** | Only people over capacity in a shown week | "The server filters and sorts the worst first." |
-| 5 | **Projects**, then **Apollo** | Tabs **Deliverables**, **Resources**, **Budget**. Design **Signed off**; Build "0 of 2 tasks done"; Launch blocked | "Question 4: progress comes from the tasks." |
+| 5 | **Projects**, then **Apollo** | Tabs **Deliverables**, **Resources**, **Budget**, **Board**. Design **Signed off**; Build "0 of 2 tasks done"; Launch blocked | "Question 4: progress comes from the tasks." |
 | 6 | **Show tasks** on Build | Portal API (Ana, in progress), Portal UI (Ben, to do) | |
 | 7 | Point at **Sign off** on Build | Greyed out, with "Sign-off opens when it's done: 2 tasks left to finish." | "The screen says why, and the server enforces the same rule." |
 | 8 | **Resources**, then **Budget** tabs | Bookings in hours per week; planned from bookings, spent from approved time | "Spend only counts approved time, at the rate frozen when it was logged." |
@@ -116,6 +116,29 @@ Start in **Tab B (Maria)**. Every label below was checked against the frontend c
 | 10 | Make the window narrow (375 px) | **Open menu** button replaces the sidebar; tables turn into cards | "Responsive: drawer menu, cards, the grid scrolls sideways." |
 
 Maria's dashboard shows only Apollo. Zeus is Sam's project, and Maria gets a 404 on it.
+
+### The pull-board moment (Ana and Maria)
+
+Maria's bell counts every unread notification, so after this moment and the audit-log moment
+it shows a running total, not exactly 1. Ana holds Portal API (1 of her limit of 2), so she
+can take one more.
+
+| # | Tab | Click | You should see |
+| --- | --- | --- | --- |
+| 1 | A (Ana) | **Projects**, then **Apollo**, then the **Board** tab | Four columns: **Ready**, **To do**, **In progress**, **Done**. **Go-live checklist** is in Ready, with a **Take this** button |
+| 2 | A (Ana) | **Take this** on Go-live checklist | The card moves to **In progress** with Ana's name on it. She now holds 2 of 2 |
+| 3 | B (Maria) | **Reload the page** (F5), then click the bell | The bell shows **1** more than before, and the notification reads "Ana Ruiz took task Go-live checklist" |
+| 4 | A (Ana) | **Put back** on that card | The card returns to Ready as "Unassigned". Do this last, so the seed is as the terminal demo expects |
+
+Say: "Employees pull work instead of waiting to be assigned, up to a limit their manager
+sets. Two people pressing Take this at the same moment can't both get it: a row lock in
+Postgres decides, and a test runs that race on two database connections." (`services/tasks.py`
+`claim_task`, `tests/backend/test_claim_race.py`.) The task sits on the Launch deliverable,
+which is blocked, and it can still be taken: Ready doesn't depend on deliverable status.
+
+**Don't put back Portal UI as Ben.** `tools/demo.py:252-253` looks up Ben's "Portal UI" in his
+own task list, so a put-back (which unassigns it) makes the terminal demo fail with
+`StopIteration`. Putting back Go-live checklist is safe.
 
 ### The audit-log moment (three tabs)
 
@@ -229,28 +252,28 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 11 s (10.5 to 16.5 s) | `375 passed in 10.45s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  24 passed (24)` and `Tests  219 passed (219)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 14 s (10.5 to 16.5 s) | `423 passed in 13.52s` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  24 passed (24)` and `Tests  231 passed (231)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 219 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 231 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
 
 | Command | Takes | Numbers (14 Oct) |
 | --- | --- | --- |
-| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 13 s | `TOTAL 1783 75 96%`: api 100%, function.py 100%, domain 99%, services 94.5%, store 93.9% |
-| `cd frontend && npm run test:coverage` | about a minute | Statements 93.32%, Branches 89.44%, Functions 88.98%, Lines 94.98% |
+| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 13 s | `TOTAL 1847 73 96%`: api 100%, function.py 100%, domain 99%, services 94.9%, store 93.9% |
+| `cd frontend && npm run test:coverage` | about a minute | Statements 93.58%, Branches 89.94%, Functions 89.29%, Lines 95.15% |
 
 The rubric asks for 80% overall and 90% on API and error paths. What the missing 4% is,
 honestly: mostly guards (already archived, not found, nothing to change), **plus five real
 rules with no test**: reactivating a deliverable clears its sign-off (`milestones.py:197`),
-reactivating a task clears its deliverable's sign-off (`tasks.py:146`), adding a dependency
+reactivating a task clears its deliverable's sign-off (`tasks.py:215`), adding a dependency
 clears a sign-off (`milestones.py:291`), archived deliverables can't take part in
 dependencies (`milestones.py:268`), and refusing to demote a manager who still runs live
-projects (`users.py:237`). The service's "can't depend on itself" check (`milestones.py:266`)
+projects (`users.py:239`). The service's "can't depend on itself" check (`milestones.py:266`)
 is untested too, but the database's own CHECK for that rule is. Also the database going
 down mid-request (`postgres.py:121`) and turning a foreign-key violation into a 404
 (`postgres.py:117-119`). Don't say "it's only repeat guards".
@@ -278,6 +301,7 @@ instead of failing.
 | Spec | Checks | Needs |
 | --- | --- | --- |
 | `demo.spec.js` (2 tests) | Manager walks the seven questions: Apollo "At risk", Ben "Over-allocated" with "Apollo 25 h, Zeus 20 h", the Build deliverable, Launch "Blocked". Then at 375x812: no sideways scroll, **Open menu** shows Allocation | `E2E_MANAGER_USERNAME`, or `E2E_ADMIN_PASSWORD` to look Maria up |
+| `pull.spec.js` (1 test) | An employee takes a Ready task from the Board and puts it back. **Writes data** (makes and archives its own Ready task, plus audit rows and bell notifications), so **run it locally only, never against AWS**. "Go-live checklist" stays free for the live demo | `E2E_ADMIN_PASSWORD`, or `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME`. Ana must hold at most 1 task |
 | `tour.spec.js` (5 tests) | Every screen for manager and employee, desktop and phone, fails on sideways scroll, saves a screenshot of each. Plus: refreshing a deep link keeps the page. Read-only, safe on AWS | `E2E_TOUR_DIR`, `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME` |
 | `screenshots.spec.js` (1) | Not a test: rewrites the README pictures in `docs/screenshots/` | `E2E_SCREENSHOTS=1` and `E2E_ADMIN_PASSWORD`. Don't run it live |
 
@@ -307,7 +331,7 @@ E2E_MANAGER_USERNAME=ML460428 npx playwright test demo
 It is covered by website screen tests with a faked API (`MyTasksPage.test.jsx`,
 `ApprovalsPage.test.jsx`), backend tests (`test_work.py`, "line manager or admin approves")
 and by `demo.py seed` against the real API, but not end to end in a browser. The README
-already says so (`README.md:244-245`).
+already says so (`README.md:253-254`).
 
 ---
 

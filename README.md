@@ -63,12 +63,13 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
 - **Wire format:** JSON is camelCase; Python and SQL are snake_case. `services/views.py`
   names every output field, so a password hash can never leak.
 
-### Data model (`backend/tracker/store/migrations/001_init.sql`)
+### Data model (`backend/tracker/store/migrations/001_init.sql` and `002_task_limit.sql`)
 
 `users`, `projects`, `assignments` (bookings, "Resources" on screen), `milestones`
 (deliverables), `milestone_dependencies`, `tasks`, `time_entries`, `project_requests`,
 `audit_log`, `notifications`: ten tables for the app, plus `schema_migrations`, which the
-migration runner keeps for itself. Money is integer cents. Nothing is deleted: a trigger
+migration runner keeps for itself. `002_task_limit.sql` adds one column, `users.task_limit`
+(1 to 10, default 2), because the first file never changes once it has run on Aurora. Money is integer cents. Nothing is deleted: a trigger
 refuses `DELETE` on every application table, and records are archived and reactivated
 instead.
 
@@ -107,6 +108,13 @@ They run after every database test.
   budget, status, bookings, deliverables, tasks.
 - **Tasks:** employees move the tasks assigned to them and log time on them. They can't
   log on a future date or outside their booking, or more than 24 hours a day.
+- **Pull board:** a manager can leave a task unassigned, and it shows as Ready. An
+  employee booked on the project presses **Take this** (it becomes theirs and In progress),
+  up to their task limit (default 2), and **Put back** returns it. Managers can still assign
+  past the limit. In `services/tasks.py`, `claim_task` and `release_task` lock the task row,
+  then the person's row, inside the same `atomic()` that writes the CLAIM or RELEASE audit
+  row, so two people can't take one task and one person can't slip past the limit
+  (`tests/backend/test_claim_race.py` runs both races on separate connections).
 - **Capacity:** logging past a person's weekly capacity is refused unless their manager
   switched overtime on. Booking someone past capacity is allowed but flagged.
 - **Approval:** the line manager or an admin approves logged time. Only approved time
@@ -128,8 +136,9 @@ screen per question, in the order a manager needs them:
 | ![Project page with deliverables and tasks](docs/screenshots/project.png) | ![Dependencies: Design, then Build, then Launch (blocked)](docs/screenshots/dependencies.png) |
 
 Also: login and the forced first password change; My account (your own name, email and password); My tasks (employees move status and
-log time, typed in two boxes, Hours and Minutes); Approvals; People (accounts, capacity,
-overtime, password resets; a new or reset password is shown once, with a **Copy username
+log time, typed in two boxes, Hours and Minutes; a **Ready to take** section); a **Board** tab on each project
+(Ready, To do, In progress, Done, with Take this, Put back and Assign); Approvals; People (accounts, capacity,
+overtime, task limit, password resets; a new or reset password is shown once, with a **Copy username
 and password** button); Project
 requests; Notifications (a bell polled every 30 s and after every change); Audit log
 (admins, with before/after changes). On phones the sidebar becomes a drawer, tables
@@ -185,7 +194,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 375 passed
+.venv/bin/pytest -q                                                        # 423 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -212,7 +221,7 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 219 passed: Vitest + React Testing Library
+npm test                                  # 231 passed: Vitest + React Testing Library
 npm run test:coverage                     # 93% of statements, 95% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
@@ -233,10 +242,10 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
 - guard branches in the services for ids that don't exist or records already archived
   (for example, archiving an archived task); the same guards are tested on other records;
 - a handful of real rules with no test yet: reactivating a deliverable or task clears a
-  sign-off (`milestones.py:197`, `tasks.py:146`); adding a dependency clears a sign-off
+  sign-off (`milestones.py:197`, `tasks.py:215`); adding a dependency clears a sign-off
   (`milestones.py:291`); archived deliverables can't be in dependencies
   (`milestones.py:268`); a manager who still runs live projects can't be demoted
-  (`users.py:237`);
+  (`users.py:239`);
 - the database-down branch inside a request (the cold-start one is tested);
 - in the frontend, mostly the People screen's less-used paths: an
   admin editing a person, "Show archived" and paging; plus the Reactivate buttons for an

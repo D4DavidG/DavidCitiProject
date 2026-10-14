@@ -28,8 +28,8 @@ below says when it was measured. Every claim points at a file and line you can o
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 375 backend tests running against a real Postgres database,
-> and 219 website tests."
+> with Terraform. There are 423 backend tests running against a real Postgres database,
+> and 231 website tests."
 
 ### 2 minutes
 
@@ -119,7 +119,7 @@ browser -> CloudFront (/api/tracker*) -> Lambda Function URL
   shared by every layer.
 
 **Point at:** `backend/tracker/function.py:58-71`, `api/app.py:36-49` (`dispatch`),
-`api/routes.py:121` (`match`), `api/errors.py:17-41`.
+`api/routes.py:125` (`match`), `api/errors.py:17-41`.
 
 ---
 
@@ -164,15 +164,15 @@ All of it is built by Terraform (infra/).
 | Folder | What's in it |
 | --- | --- |
 | `function.py` | The entry point: the connection, and migrations on cold start under a lock |
-| `api/` | `routes.py` (all 62 routes and their roles), `app.py` (auth), `errors.py`, `handlers.py`, `http.py` |
+| `api/` | `routes.py` (all 66 routes and their roles), `app.py` (auth), `errors.py`, `handlers.py`, `http.py` |
 | `services/` | Every business rule, one file per subject |
 | `domain/` | Errors, money, clock, values: shared by every layer |
-| `store/` | `postgres.py` (connection and `atomic()`), `migrate.py`, `integrity.py`, `migrations/001_init.sql` |
+| `store/` | `postgres.py` (connection and `atomic()`), `migrate.py`, `integrity.py`, `migrations/001_init.sql`, `migrations/002_task_limit.sql` |
 
 Dependencies only point downward: `api` to `services` to `store` to Postgres, and every
 layer uses `domain`.
 
-**The ten tables**, all in one file, `store/migrations/001_init.sql`:
+**The ten tables**, all in `store/migrations/001_init.sql`, plus one later column, `users.task_limit`, in `002_task_limit.sql`:
 
 | Table | One row is | On screen |
 | --- | --- | --- |
@@ -211,7 +211,7 @@ every change ──► audit_log ──► notifications (one per person told)
 | UNIQUE | 5, plus a unique index on `lower(email)` | A username is used once; two people can't share an email, whatever the capitals |
 | Exclusion constraint | 1 (`assignments_no_overlap`) | The same person can't be booked twice on the same project for overlapping dates |
 | Triggers | 10 | DELETE is refused on 9 tables; `audit_log` refuses UPDATE and DELETE |
-| Migration files | 1 | `001_init.sql` |
+| Migration files | 2 | `001_init.sql`, then `002_task_limit.sql` (adds `users.task_limit`, CHECK 1 to 10) |
 | Integrity queries | 5 | No dependency loops, no time logged outside a booking, ... (`store/integrity.py`) |
 
 **Questions they'll likely ask about the tables:**
@@ -293,7 +293,7 @@ from the token."
 - **Unknown usernames cost the same as real ones** (fixed 14 Oct in the working tree; on
   AWS after the next backend deploy). When the username isn't found, login hashes the
   typed password once at the current round count and throws the result away, then gives
-  the same 401 as a wrong password (`services/users.py:157-162`). Nothing is hashed at
+  the same 401 as a wrong password (`services/users.py:159-164`). Nothing is hashed at
   import, so cold starts stay fast. Test:
   `test_unknown_username_costs_the_same_hashing_as_a_wrong_password`
   (`tests/backend/test_users.py:110`). It counts the hashing work, not the clock, so it
@@ -321,22 +321,22 @@ from the token."
   benefit at this size.
 - *"Does a password change end old sessions?"* No, a known gap. Until the user changes a
   reset password, an old token can only reach `/auth/me` and change-password, which asks
-  for the current password, the one the admin just generated (`services/users.py:178`).
+  for the current password, the one the admin just generated (`services/users.py:180`).
   Once the user has changed it, an old token works fully again until it expires (up to
   8 h): the token carries only the user id, and `verify` checks the signature and expiry,
   never when it was issued (`services/tokens.py:47-59`). Archiving the user kills every
   token at once. The fix: a `password_changed_at` column, and refuse tokens issued before
   it. (Read from the code, not tested.)
 - *"Can a stolen session change the email?"* Yes, a known gap: `update_self` changes the
-  email with no current-password check (`services/users.py:208-219`). Harmless today,
+  email with no current-password check (`services/users.py:210-221`). Harmless today,
   because nothing is ever emailed; it matters once an emailed reset exists. The fix: ask
   for the current password, or notify the old address.
-- *"Any string-built SQL?"* Three queries use f-strings, but only to join **constant** SQL
+- *"Any string-built SQL?"* Four queries use f-strings, but only to join **constant** SQL
   fragments. Values are still parameters (`services/milestones.py:77`;
-  `services/tasks.py:158, 164`). bandit reported no issues locally on 14 Oct, with two
+  `services/tasks.py:227, 233, 240`). bandit reported no issues locally on 14 Oct, with two
   `# nosec B105` false positives on the key `must_change_password`.
 - *"Can a manager see salaries?"* No. A manager who books someone could work out their rate
-  from the planned cost, and the README says so (`README.md:347-348`).
+  from the planned cost, and the README says so (`README.md:356-357`).
 
 **Point at:** `backend/tracker/api/app.py:22-33`, `services/access.py`,
 `services/passwords.py`, `services/tokens.py`.
@@ -345,8 +345,8 @@ from the token."
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "375 backend tests against a real Postgres database, at
-96% coverage, with the API layer at 100%. Plus 219 website tests at about 93% of
+**Headline (fresh, 14 Oct 2026):** "423 backend tests against a real Postgres database, at
+96% coverage, with the API layer at 100%. Plus 231 website tests at about 93% of
 statements, and Playwright browser tests."
 
 **What (three layers, plus the website):**
@@ -355,20 +355,20 @@ statements, and Playwright browser tests."
 | --- | --- | --- | --- |
 | 1. Database | Postgres refuses bad rows | One test per named constraint; a DELETE test for every application table | `tests/backend/test_schema.py`, `test_no_delete.py:31-46` |
 | 2. Rules | Each business rule behaves as specified | Calls the services directly; never imports `api` | e.g. `tests/backend/test_work.py` |
-| 3. API | All 62 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route other than login is missed | `test_api_read_walk.py:105-107`, `test_api_audit_walk.py` |
+| 3. API | All 66 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route other than login is missed | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
 | Website | Screens behave correctly | Vitest + React Testing Library, with `fetch` stubbed (no database) | `frontend/src/**/*.test.jsx` |
-| Browser | The demo works in a real browser | Playwright: 8 tests in 3 files (one only takes README screenshots) | `frontend/e2e/` |
+| Browser | The demo works in a real browser | Playwright: 9 tests in 4 files (one only takes README screenshots) | `frontend/e2e/` |
 
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct:** backend `375 passed in 10.45s`; coverage `1783 statements, 75
-  missed, 96%`. By folder: `api/` 100%, `function.py` 100%, `domain/` 99%, `services/`
-  94.5%, `store/` 93.9%. Website: 24 files, `219 passed`, about a minute. Website
-  coverage: 93.32% of statements, 94.98% of lines, 89.44% of branches, 88.98% of
-  functions. Lint: clean.
+- **Fresh numbers, 14 Oct (after the pull board):** backend `423 passed in 13.52s`; coverage
+  `1847 statements, 73 missed, 96%`. By folder: `api/` 100%, `function.py` 100%, `domain/`
+  99%, `services/` 94.9%, `store/` 93.9%. Website: 24 files, `231 passed`, about a minute and
+  a half. Website coverage: 93.58% of statements, 95.15% of lines, 89.94% of branches,
+  89.29% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
-  `docs/DEMO-RUNBOOK.md:266`; not rerun for this check). Playwright was not rerun after the
+  `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
   later 14 Oct changes; none of its tests log time, type an estimate or click Copy.
 
 **Why this way:** the rubric asks for 80% overall and 90% on API and error paths. Real
@@ -381,20 +381,22 @@ transactions.
 - **But five real rules have no test:**
   - reactivating a signed-off deliverable clears its sign-off (`milestones.py:197`);
   - adding a dependency on unfinished work clears a sign-off (`milestones.py:291`);
-  - reactivating an unfinished task under a signed-off deliverable clears it (`tasks.py:146`);
+  - reactivating an unfinished task under a signed-off deliverable clears it (`tasks.py:215`);
   - archived deliverables can't take part in dependencies (`milestones.py:268`);
-  - you can't demote a manager who still runs live projects (`users.py:237`).
+  - you can't demote a manager who still runs live projects (`users.py:239`).
 - The service's "can't depend on itself" check (`milestones.py:266`) is untested, but
-  the database's own CHECK for the same rule is (`test_schema.py:156`).
+  the database's own CHECK for the same rule is (`test_schema.py:167`).
 - The database going down mid-request is untested (`store/postgres.py:121`). The
   cold-start 503 is tested (`test_function.py:61`).
-- There are **no concurrency tests**. The row lock, the exclusion constraint under a race,
-  and the advisory lock rest on Postgres guarantees and one AWS observation.
+- The two pull-board row locks (claim) are tested under a race, on separate connections
+  (`tests/backend/test_claim_race.py:92, 101`). The **other** concurrency guarantees have
+  no test: the capacity row lock, the exclusion constraint under a race, and the advisory
+  lock rest on Postgres guarantees and one AWS observation.
 - **No browser test logs time and approves it.** That journey is covered by website tests
-  with the API faked (`MyTasksPage.test.jsx:42`, `ApprovalsPage.test.jsx:35`) and by
-  backend tests (`test_work.py:248`, `test_schema.py:201`).
+  with the API faked (`MyTasksPage.test.jsx:47`, `ApprovalsPage.test.jsx:35`) and by
+  backend tests (`test_work.py:248`, `test_schema.py:212`).
 
-**If they push:** *"Real HTTP?"* The 62-route walk is in-process. Real HTTP is exercised by
+**If they push:** *"Real HTTP?"* The 66-route walk is in-process. Real HTTP is exercised by
 `tools/demo.py` and Playwright, through CloudFront on AWS.
 
 **Re-check before quoting** (each runs on the VDI from the repo folder):
@@ -414,9 +416,9 @@ endpoint's 95th percentile was 65 ms or less (13 Oct)."
 
 **Supporting points:**
 
-- 16,184 requests at 25 users. p95 was 57 to 65 ms per endpoint (`README.md:265`).
+- 16,184 requests at 25 users. p95 was 57 to 65 ms per endpoint (`README.md:274`).
 - Inside the Lambda, a warm request takes **6 ms at the median and 13 ms at p95**, from
-  the CloudWatch REPORT lines (`README.md:267-268`).
+  the CloudWatch REPORT lines (`README.md:276-277`).
 - A login takes about 1.1 s whatever the load: p50 1.11 s, p95 1.13 s at 512 MB. That's
   on purpose, because the password hash is deliberately slow (`infra/lambda.tf:11`).
 - The dashboard costs a fixed number of queries however many projects there are. Money is
@@ -432,7 +434,7 @@ endpoint's 95th percentile was 65 ms or less (13 Oct)."
    are recorded in the README.
    There are no raw logs in the repo, so the numbers can't be reproduced from it.
 2. **2 of the 16,184 requests got no response** (status 0), and the Lambda logged no error.
-   That is unexplained (`README.md:246-247`).
+   That is unexplained (`README.md:255-256`).
 
 **If they push: "What breaks at 10x?"**
 
@@ -449,7 +451,7 @@ more Lambda memory.
 Also: **not every list is paginated in SQL.** Bookings, deliverables, tasks and My tasks
 return the whole list in a one-page envelope (`_whole`, `api/handlers.py:51-54`).
 
-**Point at:** `README.md:260-281`, `tools/loadtest.py`, `services/dashboard.py`.
+**Point at:** `README.md:269-290`, `tools/loadtest.py`, `services/dashboard.py`.
 
 ---
 
@@ -468,7 +470,7 @@ on AWS, I found it by measuring, and it ends with a fix and a test.
   starts can't migrate at once. Inside that lock, each one re-hashed the first admin's
   password at 600,000 rounds, about a second, even though the admin already existed. So
   they queued one behind another. I changed it to check whether the admin exists before
-  hashing (`services/users.py:110-111`), and added the test
+  hashing (`services/users.py:112-113`), and added the test
   `test_bootstrap_admin_skips_the_hash_once_the_admin_exists`."
 - **Result:** "After the fix, 25 simultaneous cold starts each answered in 0.17 to 0.30 s
   (13 Oct, recorded in the README)."
@@ -540,14 +542,16 @@ Short answers. Paths are under `backend/tracker/` unless they say otherwise.
    it. Bookings are allowed and flagged; logged time past capacity is refused unless
    overtime is on. *`services/assignments.py:1-7`; `services/time_entries.py:71-73`*
 
-5a. **"Is this a push or a pull system? How does work get to people?"** Today it's push:
-   the project's manager (or an admin) creates each task and assigns it to someone booked
-   on the project. Nothing assigns work automatically. A pull board is **designed, not
-   built**: employees press **Take this** on Ready tasks, up to a per-person limit their
-   line manager sets (default 2); managers can still assign past it, and the board flags
-   it; a row lock stops two people taking the same task.
-   *`services/tasks.py:1-7, 65-82`; [pull board design](superpowers/specs/2026-10-14-pull-board-design.md)
-   (proposed, waiting for my yes)*
+5a. **"Is this a push or a pull system? How does work get to people?"** Both. The manager (or an admin) creates each
+   task, and can still assign it to someone booked on the project, even past that
+   person's limit. A task left unassigned is Ready, and an employee booked on the project
+   presses **Take this** (the pull board, **built 14 Oct**), up to a per-person limit their
+   line manager sets (default 2). **Put back** returns it. Two row locks, task first and
+   then person, stop two people taking one task and one person passing the limit, and the
+   race tests prove both on separate connections. Nothing assigns work automatically.
+   *`services/tasks.py:145-167` (claim), `170-186` (release);
+   `tests/backend/test_claim_race.py:92, 101`;
+   [pull board design](superpowers/specs/2026-10-14-pull-board-design.md)*
 
 ### Architecture
 
@@ -572,7 +576,7 @@ Short answers. Paths are under `backend/tracker/` unless they say otherwise.
     `frontend/src/services/format.js:29-34`*
 12. **"What does the EXCLUDE constraint do?"** It refuses two live, overlapping bookings for
     one person on one project, even when two requests race. It needs `btree_gist`.
-    *`001_init.sql:5, 78-80`; `tests/backend/test_schema.py:119, 131`*
+    *`001_init.sql:5, 78-80`; `tests/backend/test_schema.py:130, 142`*
 13. **"Two managers book the same person at once?"** They must be on different projects,
     so both succeed and the grid flags the overload. On the same project, the constraint
     refuses the second. There is no parallel test. *`001_init.sql:78-80`;
@@ -601,7 +605,7 @@ Short answers. Paths are under `backend/tracker/` unless they say otherwise.
     once the user sets a new password, an old token works again until it expires (see
     [§6](#6-security)). *`services/actors.py:50`; `api/app.py:29-30`*
 21. **"Privilege escalation?"** Only admins create users or change roles. Nobody changes
-    their own role or salary. *`services/users.py:222-228`; `api/routes.py:53-60`*
+    their own role or salary. *`services/users.py:224-230`; `api/routes.py:53-60`*
 22. **"Where are the secrets?"** Terraform generates them and passes them in as Lambda
     environment variables. They sit in Terraform state, which I accept for a workshop.
     *`infra/secrets.tf:6, 14`*
@@ -656,7 +660,8 @@ Short answers. Paths are under `backend/tracker/` unless they say otherwise.
 32. **"Time zones?"** Lambda and Aurora run in UTC. "Today" and Monday-to-Sunday weeks come
     from one `America/New_York` constant. *`domain/clock.py:9, 17-24`*
 33. **"What would you do differently?"** Deploy to AWS on day one, and write concurrency
-    tests alongside the locking code.
+    tests alongside the locking code. (I did that for the claim locks, `test_claim_race.py`,
+    and not for the rest.)
 34. **"A time you were wrong?"** I estimated a login at about 0.5 s at 512 MB; AWS measured
     1.15 s. The comment at `infra/lambda.tf:11` still says 0.5 s.
 
@@ -672,13 +677,13 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Each layer only calls the one below it" | "Dependencies only point downward" | `api/app.py:17` imports store; services run SQL |
 | "Four layers: api, services, store, Postgres" | "api, services, store, plus domain shared by all" | `domain/` exists and every layer uses it |
 | "Every API route is tested over HTTP" | "Every route is called in-process with a Lambda-shaped event; real HTTP is covered by the demo script and Playwright" | `test_api.py` calls `app.dispatch()` |
-| "The uncovered 4% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:146`, `users.py:237` |
+| "The uncovered 4% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:239` |
 | "The rule tests prove the layers are separate" | "The rule tests show services don't need HTTP; the import direction is what keeps them separate" | No test enforces imports |
-| "Real Postgres, not mocks" (right after "219 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:221-222` |
+| "Real Postgres, not mocks" (right after "231 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
 | "The staircase went up to 11 s" | "Up to about 10 s in the logs (9.8 s)" | 7 to 11 s was the load-test client's `max` column |
-| "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:267-268` |
-| "25 cold starts took 0.2 s each" | "0.17 to 0.30 s each" | `README.md:277-278` |
+| "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:276-277` |
+| "25 cold starts took 0.2 s each" | "0.17 to 0.30 s each" | `README.md:286-287` |
 | "Every write is wrapped in atomic()" | "Every multi-statement write" | Marking notifications read is one UPDATE |
 | "DELETE is refused on every table" | "On every application table" | `schema_migrations` has no trigger |
 | "The integrity check runs after every test" | "After every database test" | Unit tests and `no_integrity_check` tests skip it |
@@ -696,7 +701,8 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 **Gaps and next steps, in order:**
 
 1. A browser test of the employee journey: log time, then a manager approves it.
-2. Concurrency tests for the row lock, the exclusion constraint and the advisory lock.
+2. Concurrency tests for the exclusion constraint and the advisory lock (the two claim
+   row locks are done).
 3. Tests for the five untested rules, and for the database dropping mid-request.
 4. RDS Proxy, and risk sorting in SQL so the dashboard pages in the database.
 5. Security: a `password_changed_at` column so a password change ends old sessions; the
@@ -705,8 +711,9 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
    deploy; see [§6](#6-security).)
 6. Email: a private endpoint to SES and a single-use, expiring set-password link
    ([findings](superpowers/specs/2026-10-14-email-and-sms-findings.md)).
-7. The pull board: **Take this**, a per-person task limit
-   ([spec](superpowers/specs/2026-10-14-pull-board-design.md), designed, not built).
+7. The pull board (**Take this**, a per-person task limit) is **built**
+   ([spec](superpowers/specs/2026-10-14-pull-board-design.md)); still to do: deploy it
+   to AWS and check it there.
 8. Small website bugs:
    - "Mark all as read" is enabled based only on the current page; the server marks all;
    - the "At risk" counter counts one page;
@@ -718,7 +725,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 375 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 423 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -735,9 +742,9 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 375 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 219 / 93% | Website tests / statements (95% of lines) | 14 Oct |
-| 62 | Routes in the one route table | 14 Oct |
+| 423 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
+| 231 / 93% | Website tests / statements (95% of lines) | 14 Oct |
+| 66 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 10 + 1 | Tables: ten for the app, plus `schema_migrations` | 14 Oct |
 | 41 / 26 | CHECK rules / foreign keys | 14 Oct |
@@ -753,7 +760,7 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 - Email/SMS: blocked by role + VPC (no `ses:` permission, no way out of the network), so
   passwords are shown once instead (answer 22a).
-- Pull board: designed, spec ready, not built (still 62 routes, 1 migration; answer 5a).
+- Pull board: built 14 Oct (66 routes, 2 migrations; answer 5a). Local only until the next deploy.
 
 **Ten files** (under `backend/tracker/` unless shown)
 

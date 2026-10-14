@@ -40,11 +40,11 @@ What's done and what isn't, honestly:
 | Part | State |
 | --- | --- |
 | Database (10 tables, rules enforced by Postgres) | Done, tested, deployed to Aurora |
-| Backend API (62 routes, roles, audit log, notifications) | Done, tested, deployed to Lambda |
+| Backend API (66 routes, roles, audit log, notifications) | Done and tested. 62 of the routes are on Lambda; the 4 pull-board routes and migration `002_task_limit.sql` arrive with the next `./bin/deploy-backend.sh` |
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
-| Tests | Backend: 375 passing, 96% coverage, 100% for the API layer. Frontend: 219 passing, 93% coverage, plus 8 browser (Playwright) tests in 3 files (14 Oct) |
+| Tests | Backend: 375 passing, 96% coverage, 100% for the API layer. Frontend: 231 passing, 93% coverage, plus 9 browser (Playwright) tests in 4 files (14 Oct) |
 | AWS deployment | Verified 13 Oct: health, login, token, 404s, demo, load test |
-| Frontend (React, Material UI) | **Every screen built and tested**, live on AWS since 14 Oct (website deployed 11:35 UTC). The later 14 Oct changes (Hours and Minutes boxes, the Copy username and password button, the login-timing fix) are local until the next `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
+| Frontend (React, Material UI) | **Every screen built and tested**, live on AWS since 14 Oct (website deployed 11:35 UTC). The later 14 Oct changes (Hours and Minutes boxes, the Copy username and password button, the login-timing fix, the pull board) are local until the next `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
 
 ---
 
@@ -57,7 +57,7 @@ and JSON. Things you can show:
 | --- | --- | --- |
 | Click through the app as a manager: dashboard, allocation grid, a project, its dependencies | The CloudFront URL, or `http://localhost:3000` locally | 3 |
 | Run the whole story: the seven answers, then ten requests the rules refuse | `python3 tools/demo.py demo` | 3 |
-| Prove the code works | `.venv/bin/pytest -q` (375 backend tests, ~11 s) and `cd frontend && npm test` (219, about a minute) | 3, 9 |
+| Prove the code works | `.venv/bin/pytest -q` (423 backend tests, ~11 s) and `cd frontend && npm test` (231, about a minute) | 3, 9 |
 | Show it's live on AWS | `curl .../health`, the demo against AWS, the AWS console | 5 |
 | Show raw API answers (JSON) | `curl` with a login token | 4 |
 | Look inside the database | `psql` or DBeaver, on the local copy | 4 |
@@ -118,7 +118,7 @@ Maria: her username is printed by `python3 tools/demo.py demo`, and the password
 | 5 | Point at **4 and 6** | "Deliverables, with completion worked out from their tasks, and the dependency chain. Launch is blocked because Build isn't done." |
 | 6 | Point at **Trying to break the rules** | "Every one of these is a real request the server refused. Logging past 40 hours, a loop in the dependencies, someone else's project (404, not 403, so you can't tell it exists), deleting anything (there is no delete: records are archived)." |
 | 7 | Point at **5 integrity checks, 0 violations** | "Five database queries that must always return nothing: no dependency loops, no time logged outside a booking, and so on. They run after every database test, and here on live data." |
-| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "375 backend tests against a real Postgres database, not mocks. 219 website tests, which fake the API so they need no database. Plus a real browser test that walks this exact demo." |
+| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "423 backend tests against a real Postgres database, not mocks. 231 website tests, which fake the API so they need no database. Plus a real browser test that walks this exact demo." |
 | 9 | Optional: `(set -a; source ENVIRONMENT.config; python3 tools/console.py logs)` | "Here are those requests arriving in AWS's logs." |
 | 10 | Tell one story from section 8, "Things that went wrong" | Evaluators score curiosity and observation. These stories show both. |
 
@@ -128,8 +128,9 @@ the map). Good ones to have ready:
 - **The 40-hour rule:** `backend/tracker/services/time_entries.py`, function
   `_check_limits`, and its test `tests/backend/test_work.py` (search for `capacity`).
 - **No double-booking:** the `EXCLUDE` constraint in
-  `backend/tracker/store/migrations/001_init.sql`. Postgres itself refuses an
-  overlapping booking for the same person on the same project.
+  `backend/tracker/store/migrations/001_init.sql` (there are two migration files; the
+  second, `002_task_limit.sql`, only adds each person's task limit). Postgres itself
+  refuses an overlapping booking for the same person on the same project.
 - **Who may do what:** `backend/tracker/api/routes.py`, one table listing every
   endpoint and which roles may call it.
 
@@ -269,9 +270,9 @@ backend/tracker/                     the whole backend: one Lambda
                                      tasks, time_entries, requests, dashboard (the seven answers),
                                      audit (log and notifications), passwords, tokens, access, views
   domain/                            small shared pieces: errors, money (cents), clock (Eastern time), values
-  store/                             the database: migrations/001_init.sql (all tables and rules),
+  store/                             the database: migrations/ (001_init.sql: all tables and rules; 002_task_limit.sql),
                                      migrate.py, integrity.py (the 5 checks), postgres.py
-tests/backend/                       375 tests; conftest.py builds the test database
+tests/backend/                       423 tests; conftest.py builds the test database
 frontend/src/                        the website (React + Material UI):
   services/request.js                the one module that calls the API (token, JSON, errors, 401)
   services/format.js                 the only code that turns cents, minutes and dates into text
@@ -401,13 +402,13 @@ counted as the next day.
 
 ### Testing
 
-**"How did you test it?"** 375 backend tests with pytest, against a real PostgreSQL database,
+**"How did you test it?"** 423 backend tests with pytest, against a real PostgreSQL database,
 not mocks. Each test runs inside a transaction that's rolled back, so tests can't
 affect each other, and the integrity check runs after each database test.
 
 - **Unit and rule tests:** call the services directly (every business rule).
 - **API tests:** send Lambda-shaped events, in-process, through the same entry point AWS
-  uses. Two "walk" tests call every one of the 62 routes, and fail if someone adds a
+  uses. Two "walk" tests call every one of the 66 routes, and fail if someone adds a
   route without testing it. Real HTTP is exercised by `tools/demo.py` and Playwright.
 - **Database tests:** prove Postgres itself refuses each kind of bad row.
 - **Load test:** `tools/loadtest.py`, run on LocalStack and on AWS.
@@ -416,16 +417,16 @@ affect each other, and the integrity check runs after each database test.
 rubric asks for 90%). The uncovered 4% is mostly repeat guard branches ("this id doesn't
 exist" on records where the same check is already tested elsewhere) and the
 database-down branch inside a request. But a handful of real rules are still untested:
-reactivating a deliverable or task clears a sign-off (`milestones.py:197`, `tasks.py:146`),
+reactivating a deliverable or task clears a sign-off (`milestones.py:197`, `tasks.py:215`),
 adding a dependency clears a sign-off (`milestones.py:291`), archived deliverables can't be
 in dependencies (`milestones.py:268`), and a manager who still runs live projects can't be
-demoted (`users.py:237`). The list is in the README under "Known gaps".
+demoted (`users.py:239`). The list is in the README under "Known gaps".
 
 **"How do you know the tests actually test something?"** For new tests, I deliberately
 broke the code (removed a sort, a filter, a check) and confirmed the right test failed.
 Every behavioural fix ships with the test that fails without it.
 
-**"And the frontend?"** 219 tests with Vitest and React Testing Library (Jest's API),
+**"And the frontend?"** 231 tests with Vitest and React Testing Library (Jest's API),
 93% coverage. They render each screen with the API stubbed (no database) and check what a
 person would see and what gets sent (cents, minutes from the Hours and Minutes boxes, only
 the changed fields). On top of that, Playwright drives a real browser against the real local API and database through the demo, and checks
@@ -483,8 +484,10 @@ were found. Be ready to explain any file in section 7; that's the real test.
 **"What would you do next?"** An end-to-end test of the employee journey (log time, a
 manager approves it), token refresh (now it's expiry plus log in again), emailed password
 reset (blocked on AWS: no email permission and no way out of the network; see
-`docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`), and a pull board for tasks
-(designed, not built: `docs/superpowers/specs/2026-10-14-pull-board-design.md`).
+`docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`), and running the pull
+board (built 14 Oct: Take this, Put back, a task limit; see
+`docs/superpowers/specs/2026-10-14-pull-board-design.md`) on AWS. It is tested locally
+only until the next deploy.
 
 **"What would you do differently?"** Start the AWS deploy on day one: two of the most
 interesting problems only showed up there.
@@ -497,8 +500,8 @@ Run from `~/DavidCitiProject` on the VDI.
 
 ```sh
 # Tests
-.venv/bin/pytest -q                                   # backend tests (expect 375 passed)
-(cd frontend && npm test)                             # website tests (expect 219 passed)
+.venv/bin/pytest -q                                   # backend tests (expect 423 passed)
+(cd frontend && npm test)                             # website tests (expect 231 passed)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)   # real browser, needs ./bin/start-dev.sh running
 .venv/bin/pytest --cov --cov-report=term-missing      # with the coverage table
 .venv/bin/pytest -q -k capacity                       # only tests with "capacity" in the name
@@ -529,7 +532,7 @@ git add -u && git commit -m "..." && git push origin David
 | Word | Meaning here |
 | --- | --- |
 | **API** | The backend's set of addresses (routes) that accept requests and answer with JSON |
-| **Route / endpoint** | One address plus method, like `GET /projects`. We have 62 |
+| **Route / endpoint** | One address plus method, like `GET /projects`. We have 66 |
 | **JSON** | The text format the API answers in: `{"name": "Apollo"}` |
 | **Lambda** | AWS runs our function only when a request arrives; we never manage a server |
 | **Cold start** | The first request to a brand-new copy of the Lambda, which has to start up first |

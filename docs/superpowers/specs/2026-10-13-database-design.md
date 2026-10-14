@@ -146,7 +146,7 @@ All settled with David on 13 Oct.
 | --- | --- | --- | --- |
 | Create, archive and restore users; reset passwords; edit salaries | yes | no | no |
 | Change usernames | no one | no | no |
-| Set capacity and "overtime allowed" | anyone | own reports | no |
+| Set capacity, "overtime allowed" and task limit | anyone | own reports | no |
 | Edit own name and email; see own salary | yes | yes | yes |
 | Create projects, approve requests, assign managers, archive or restore projects | yes | no | no |
 | Request a new project | n/a | yes | no |
@@ -154,6 +154,7 @@ All settled with David on 13 Oct.
 | Deliverables and dependencies: create, edit, sign off, archive | all | own projects | no |
 | Tasks: create, assign, estimate, archive | all | own projects | no |
 | Move a task's status; log time on it | no | no | own assigned tasks |
+| Take a Ready task; put back your own (added 14 Oct) | no | no | booked on the project |
 | Approve or reject time | anyone | own reports | no |
 | See projects | all, including archived | managed | booked on, active only |
 | Audit log | yes | no | no |
@@ -161,11 +162,18 @@ All settled with David on 13 Oct.
 Managers and admins have no tasks or hours of their own, and are never booked. A
 project's name stays admin-only. A manager chain must not loop (a service rule).
 
+**Added 14 Oct (migration `002_task_limit.sql`):** `users.task_limit INTEGER NOT NULL
+DEFAULT 2`, with a CHECK that it is 1 to 10 (`users_task_limit_range`). It is the most
+unfinished tasks a person may take themselves (Take this); a manager can still assign past
+it. It is set with capacity and "overtime allowed". Section 4 below shows `001_init.sql`
+as first written and is not edited, because that file never changes once it has run.
+
 ## 3. Files
 
 ```
 backend/tracker/store/
 ├── migrations/001_init.sql   # section 4
+├── migrations/002_task_limit.sql  # adds users.task_limit (14 Oct)
 ├── migrate.py                # section 5
 ├── integrity.py              # section 6
 └── postgres.py               # connect(), atomic(), error translation; section 3.1

@@ -1,8 +1,6 @@
 # Pull board design
 
-Status: **proposed to David in chat on 14 Oct 2026; waiting for his yes on this spec
-before the build plan.** Nothing here is built yet: the route table still has 62 routes
-and there is one migration file.
+Status: **Built 14 Oct 2026**; plan: `docs/superpowers/plans/2026-10-14-pull-board.md`.
 
 **Why, in David's words:** "We don't want a push system, we want a pull system." Today a
 manager hands each task to a person (push). With a pull board, the manager fills a column
