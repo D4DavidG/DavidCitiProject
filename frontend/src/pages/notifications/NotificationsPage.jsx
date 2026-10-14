@@ -1,10 +1,10 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, Pagination, Switch, Typography } from '@mui/material'
 import PageHeader from '../../components/PageHeader'
 import { useAuth } from '../../auth/useAuth'
 import PageState from '../../components/PageState'
 import { formatDateTime } from '../../services/format'
-import { request } from '../../services/request'
+import { onUnreadChange, request } from '../../services/request'
 import { useApi } from '../../services/useApi'
 
 /**
@@ -28,6 +28,10 @@ export default function NotificationsPage() {
     query: { unread: unreadOnly ? 'true' : undefined, page: pageNumber, pageSize: 20 },
   }), [unreadOnly, pageNumber])
   const notifications = useApi(load)
+  const { reload } = notifications
+
+  // The bell announces a new unread count; refresh the list so the new item shows up.
+  useEffect(() => onUnreadChange(() => { reload() }), [reload])
 
   async function write(path) {
     setError(null)

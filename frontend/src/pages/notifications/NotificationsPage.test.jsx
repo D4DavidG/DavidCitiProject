@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
+import { announceUnreadChange } from '../../services/request'
 import userEvent from '@testing-library/user-event'
 import NotificationsPage from './NotificationsPage'
 import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
@@ -25,6 +26,15 @@ describe('NotificationsPage', () => {
     expect(within(unread).getByText('Oct 13, 2026, 9:03 PM')).toBeInTheDocument()
     expect(within(unread).getByText('New')).toBeInTheDocument()
     expect(within(screen.getByRole('listitem', { name: /changed their email/i })).queryByText('New')).not.toBeInTheDocument()
+  })
+
+  it('reloads its list when the unread count changes', async () => {
+    let items = [UNREAD]
+    renderPage({ 'GET /notifications': () => [200, page(items)] })
+    await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    items = [{ ...UNREAD, notificationId: 6, summary: 'Chloe Kim moved task Cut over databases to todo' }, UNREAD]
+    await act(async () => { announceUnreadChange() })
+    expect(await screen.findByRole('listitem', { name: /chloe kim moved task/i })).toBeInTheDocument()
   })
 
   it('marks one as read', async () => {

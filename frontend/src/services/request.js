@@ -38,6 +38,24 @@ export function onWrite(listener) {
   return () => writeListeners.delete(listener)
 }
 
+const unreadListeners = new Set()
+
+/**
+ * Be told when the unread-notification count changed (the bell saw a different number).
+ * The Notifications page uses this to reload its list. Returns a function that stops listening.
+ * @param {() => void} listener
+ * @returns {() => void}
+ */
+export function onUnreadChange(listener) {
+  unreadListeners.add(listener)
+  return () => unreadListeners.delete(listener)
+}
+
+/** Tell every onUnreadChange listener that the count changed. Called by the notification bell. */
+export function announceUnreadChange() {
+  unreadListeners.forEach((listener) => listener())
+}
+
 /** Remember (or forget, with null) the token sent as `Authorization: Bearer`. */
 export function setToken(value) {
   token = value

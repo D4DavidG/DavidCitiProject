@@ -140,7 +140,7 @@ log time, typed in two boxes, Hours and Minutes; a **Ready to take** section); a
 (Ready, To do, In progress, Done, with Take this, Put back and Assign); Approvals; People (accounts, capacity,
 overtime, task limit, password resets; a new or reset password is shown once, with a **Copy username
 and password** button); Project
-requests; Notifications (a bell polled every 30 s and after every change); Audit log
+requests; Notifications (a bell polled every 10 s while the tab is visible, at once when you return to it, and after every change, with a pop-up when something new arrives); Audit log
 (admins, with before/after changes). On phones the sidebar becomes a drawer, tables
 become cards and the grid scrolls sideways (<img src="docs/screenshots/phone-dashboard.png" alt="Dashboard at phone width" width="120">).
 
@@ -221,7 +221,7 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 236 passed: Vitest + React Testing Library
+npm test                                  # 241 passed: Vitest + React Testing Library
 npm run test:coverage                     # 93% of statements, 95% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app

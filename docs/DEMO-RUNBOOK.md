@@ -91,8 +91,8 @@ others, the first block of `python3 tools/demo.py demo` prints every username.
    - Tab C: Admin (`AD000001`)
 
    Type the address into each new tab. **Don't use "Duplicate tab"**: it copies the sign-in.
-   A signed-in tab keeps Aurora awake, because the bell asks the server every 30 s
-   (`NotificationBell.jsx:7`). That is an inference, not measured.
+   A signed-in tab keeps Aurora awake, because the bell asks the server every 10 s while it is visible
+   (`NotificationBell.jsx:8`). That is an inference, not measured.
 3. Maximise the browser (desktop width). Keep a phone, or the browser's device toolbar
    (F12, then Ctrl+Shift+M), ready for the phone-width step.
 
@@ -146,7 +146,7 @@ own task list, so a put-back (which unassigns it) makes the terminal demo fail w
 | --- | --- | --- | --- |
 | 1 | A (Ana) | Your name in the top bar (**My account**), then **Edit my details** | A form with First name, Last name, Email |
 | 2 | A (Ana) | Change **First name** to `Anna`, click **Save** | The account page shows the new name. The server wrote one audit row: "Anna Ruiz updated their profile" |
-| 3 | B (Maria) | **Reload the page** (F5) | The bell shows **1**. Without a reload it updates within 30 s, on its next poll. Only the tab that made the change updates at once |
+| 3 | B (Sam or Maria: whoever is Ana's line manager; Chloe reports to Sam, Ana and Ben to Maria, so watch the right manager) | Wait up to 10 s, or just switch to this window | The bell shows **1** and a pop-up with the summary and a **View** button appears (6 s). The bell updates within 10 s while the tab is visible, and at once when you switch back to it |
 | 4 | B (Maria) | Click the bell | The notification "Anna Ruiz updated their profile" |
 | 5 | C (Admin) | **Audit log** in the menu (admins only). Optional: **Record type** filter, then **Apply** | Newest row at the top: Ana's profile change |
 | 6 | C (Admin) | **Show changes** on that row | A Field / Before / After table listing only what changed: `firstName` `Ana` → `Anna` (and probably `updatedAt`) |
@@ -253,11 +253,11 @@ All counts and times measured on the VDI on 14 Oct 2026.
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
 | Backend (pytest) | `.venv/bin/pytest -q` | about 14 s (10.5 to 16.5 s) | `425 passed in 12.84s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  24 passed (24)` and `Tests  236 passed (236)` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  24 passed (24)` and `Tests  241 passed (241)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 236 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 241 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
@@ -419,7 +419,7 @@ skip it.
 | Every login takes about 1.1 s | Deliberately slow password hashing (PBKDF2, 600,000 rounds) | Nothing to fix. Say why |
 | Signed out after 8 hours (401) | The login token expired; no refresh tokens, by design | Sign in again |
 | Maria's bell shows 15, not 1 | Old unread notifications | As Maria: **Notifications**, **Mark all as read**, before the demo |
-| Maria's bell doesn't move | It only polls every 30 s | Reload Maria's tab |
+| The manager's bell doesn't move | Wrong manager (Chloe reports to Sam, Ana and Ben to Maria), or the tab is hidden (it pauses, then checks at once when you switch back) | Watch the right manager's window; wait 10 s |
 | `demo.py` refusal 1 says `UNEXPECTED` (201) | Ben's pending time was rejected, his overtime was turned on, or it's 19 Oct or later | Explain the rule from `time_entries.py` instead; don't rerun it |
 | `demo.py` crashes looking up a person | Someone's email was changed | Change it back in the website |
 | `ExpiredToken` or `InvalidClientTokenId` from AWS commands | Workshop AWS credentials are temporary | `./bin/setup-participant.sh` in your own terminal |
