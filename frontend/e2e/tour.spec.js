@@ -15,7 +15,7 @@ const VIEWPORTS = { desktop: { width: 1440, height: 900 }, phone: { width: 375, 
 const ROLES = {
   manager: {
     username: process.env.E2E_MANAGER_USERNAME,
-    screens: ['/dashboard', '/allocation', '/projects', 'PROJECT', 'PROJECT:Board', 'PROJECT:Resources', 'PROJECT:Budget',
+    screens: ['/dashboard', '/allocation', '/schedule', '/projects', 'PROJECT', 'PROJECT:Board', 'PROJECT:Resources', 'PROJECT:Budget',
       'PROJECT/dependencies', '/approvals', '/people', '/requests', '/notifications', '/account'],
   },
   employee: {
@@ -28,6 +28,7 @@ const ROLES = {
 // Charts that must be on screen, by screen key. The overflow check below then covers them at both widths.
 const FIGURES = {
   '/dashboard': ['Workload this week · all projects', 'Budget by project'],
+  '/schedule': ['Bookings, week by week'],
   PROJECT: ['Deliverables timeline'],
 }
 
