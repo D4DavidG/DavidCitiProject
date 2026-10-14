@@ -153,7 +153,7 @@ every route in the table called over HTTP by the two walk tests.
   (for example, archiving an archived task); the same guards are tested on other records;
 - the database-down branch inside a request (the cold-start one is tested);
 - the frontend, which is not built yet;
-- the load test has run only against LocalStack, not AWS (below).
+- the load test has run at 10 users on AWS; 25 users only on LocalStack so far (below).
 
 ### Load test
 
@@ -165,6 +165,18 @@ p50/p95/max per endpoint and failures by status. It exits 1 if anything failed.
 TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py                        # 10 users, 20 s
 TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py --users 25 --seconds 60
 ```
+
+Results on AWS (CloudFront, Lambda at 512 MB, Aurora Serverless v2; 13 Oct, seeded data):
+
+| Users | Reads | Throughput | p50 / p95 | Failed | Login p50 / p95 |
+| --- | --- | --- | --- | --- | --- |
+| 10 | 4,190 | 209 req/s | 28–35 / 40–50 ms | 0 | 1.10 / 1.13 s |
+
+The worst single requests (5 to 10 s, in the `max` column only) are most likely the
+first request on each new Lambda instance: a cold start opens a new TLS connection to
+Aurora and runs the migration check before answering. They don't reach the p95. A login
+costs about 1.1 s whatever the load, because the password hash (PBKDF2, 600,000 rounds)
+is deliberately slow and CPU-bound. 1024 MB of Lambda memory would roughly halve it.
 
 Results on LocalStack (VDI, 13 Oct, seeded data):
 
@@ -179,8 +191,7 @@ has a 1,024 open-file limit, and past about 15 parallel Lambda environments it l
 `Could not start new environment ... Too many open files`. Our Lambda logged no
 unhandled errors, and the demo and integrity check were clean afterwards.
 Throughput levels off at about 60 req/s because the emulator runs everything on
-one VDI. The same command against the CloudFront URL measures real AWS, where the
-limits are Lambda concurrency and Aurora's connection count.
+one VDI. On AWS the same 10 users got 3.5 times the throughput with no failures.
 
 ## Live demo from the terminal
 

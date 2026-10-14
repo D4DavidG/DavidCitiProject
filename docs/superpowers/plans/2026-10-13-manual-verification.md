@@ -14,7 +14,8 @@ load test against the deployed URL.
 **Rules while doing this:**
 
 - Never paste the participant code, the LocalStack token or any password into a file in
-  the repo. Placeholders below look like `<this>`.
+  the repo. No command below needs anything typed into it: values come from Terraform
+  or a hidden prompt.
 - Don't run `bin/cleanup-environment.sh`. It destroys everything.
 - Tick each box (`- [x]`) and fill in the results table at the end. Then paste the table
   to Claude, with the full output of any step that failed.
@@ -54,7 +55,7 @@ load test against the deployed URL.
 
 ## Part 1: Push and CI (10 min)
 
-- [ ] **1.1 Push the branch**
+- [x] **1.1 Push the branch**
 
   ```sh
   git push origin David
@@ -89,7 +90,7 @@ load test against the deployed URL.
 
 ## Part 2: Deploy the backend to AWS (20 to 25 min, mostly waiting)
 
-- [ ] **2.1 Load your variables and check them**
+- [x] **2.1 Load your variables and check them**
 
   ```sh
   source ~/.bashrc
@@ -97,7 +98,7 @@ load test against the deployed URL.
   ```
   Expected: `us-east-2 c7dabfc1`.
 
-- [ ] **2.2 Deploy**
+- [x] **2.2 Deploy**
 
   ```sh
   ./bin/deploy-backend.sh
@@ -112,26 +113,30 @@ load test against the deployed URL.
   | `Error acquiring the state lock` | Another Terraform run is going. Wait, or ask Claude before using `force-unlock` |
   | Anything else red | Paste the last 40 lines to Claude |
 
-- [ ] **2.3 Save the URL and the first admin password** (run this right after 2.2: a
-  later local `start-dev.sh` switches Terraform back to LocalStack)
+- [x] **2.3 Load the URL and the first admin password into this terminal.** Run this
+  right after 2.2: a later local `start-dev.sh` switches Terraform back to LocalStack.
+  Nothing to type by hand: the address mixes `1` and `l`, and a typo gives `000`.
 
   ```sh
-  (set -a; source ENVIRONMENT.config; terraform -chdir=infra output -raw api_base_url; echo; \
-   terraform -chdir=infra output -raw bootstrap_admin_password; echo)
+  export TRACKER_API="$(set -a; source ENVIRONMENT.config; terraform -chdir=infra output -raw api_base_url)/api/tracker"
+  BOOT="$(set -a; source ENVIRONMENT.config; terraform -chdir=infra output -raw bootstrap_admin_password)"
+  echo "$TRACKER_API"; echo "password is ${#BOOT} characters"
   ```
-  Expected: two lines, `https://dxxxxxxxxxxxx.cloudfront.net` and a 16-character
-  password. Keep the password out of the repo (a password manager, or a file in
-  `private/`).
+  Expected: `https://d1gov8jpsxhwer.cloudfront.net/api/tracker` (yours, 13 Oct) and
+  `password is 16 characters`. These variables last only while this terminal is open. In
+  a new terminal, run 2.3 again (it works until a local deploy re-points Terraform).
 
-  ```sh
-  export TRACKER_API=https://<dxxxxxxxxxxxx.cloudfront.net>/api/tracker
-  ```
+  There are no `<...>` placeholders to type into commands in this checklist: bash reads
+  `<` as "read from a file". Anything secret is either loaded from Terraform or typed
+  at a hidden prompt.
 
 ---
 
 ## Part 3: The first-deploy checks (`CLAUDE.md` §7) (15 min)
 
-- [ ] **3.1 Health, which also proves the database and the schema (§7 checks 5 and 6)**
+- [x] **3.1 Health, which also proves the database and the schema (§7 checks 5 and 6)**
+  **Result 13 Oct: pass.** `200` in 14 to 16 s from cold (the Lambda log shows 13.3 s of
+  it was Aurora waking up; the Lambda's own start took 0.6 s).
 
   ```sh
   curl -s -w '\n%{http_code} in %{time_total}s\n' $TRACKER_API/health
@@ -150,10 +155,13 @@ load test against the deployed URL.
     (set -a; source ENVIRONMENT.config; aws logs tail /aws/lambda/coding-workshop-tracker-c7dabfc1 --since 10m --format short | tail -40)
     ```
 
-- [ ] **3.2 Log in, and time it (§7.4)**
+- [x] **3.2 Log in, and time it (§7.4)**
+  **Result 13 Oct: pass.** Login 1 took 15.9 s (Aurora waking), logins 2 and 3 took
+  1.15 s each. That's slower than the 0.5 s estimate, but under the 1.5 s line.
+
+  Uses `$BOOT` from 2.3; don't set it by hand.
 
   ```sh
-  BOOT='<bootstrap password from 2.3>'
   for i in 1 2 3; do curl -s -o /dev/null -w "login $i: %{http_code} in %{time_total}s\n" \
     -H 'content-type: application/json' -d "{\"username\":\"AD000001\",\"password\":\"$BOOT\"}" \
     $TRACKER_API/auth/login; done
@@ -165,7 +173,8 @@ load test against the deployed URL.
   If logins 2 and 3 take over 3 s: tell Claude. The fix is `memory_size = 1024` in
   `infra/lambda.tf`, then deploying again.
 
-- [ ] **3.3 The login token survives CloudFront on a GET (§7.3)**
+- [x] **3.3 The login token survives CloudFront on a GET (§7.3)**
+  **Result 13 Oct: pass.** `/auth/me` returned AD000001 and `200`.
 
   ```sh
   TOKEN=$(curl -s -H 'content-type: application/json' \
@@ -179,13 +188,18 @@ load test against the deployed URL.
   **Fail:** `401` and "Your session is invalid or has expired". That means CloudFront
   dropped the header. To confirm, call the Lambda directly and skip CloudFront:
   ```sh
-  (set -a; source ENVIRONMENT.config; terraform -chdir=infra output lambda_urls)
-  curl -s -w '\n%{http_code}\n' -H "Authorization: Bearer $TOKEN" <lambda url>/auth/me
+  LAMBDA=$(set -a; source ENVIRONMENT.config; terraform -chdir=infra output -json lambda_urls \
+    | python3 -c 'import sys, json; print(list(json.load(sys.stdin).values())[0].rstrip("/"))')
+  curl -s -w '\n%{http_code}\n' -H "Authorization: Bearer $TOKEN" $LAMBDA/auth/me
   ```
   If that returns 200, CloudFront is the cause. Tell Claude: the fix is a code change
   (send the token in a custom header as well).
 
-- [ ] **3.4 API 404s survive CloudFront (§7.1)**
+- [x] **3.4 API 404s survive CloudFront (§7.1)**
+  **Result 13 Oct: failed, fixed, passed.** The first deploy returned `HTTP/2 403`,
+  `server: AmazonS3`, `<Code>AccessDenied</Code>`. The `custom_error_response` block was
+  removed from `infra/cloudfront.tf` and deployed again. `/no-such-endpoint-2` then
+  returned `404`, `application/json`, `{"error": "No such endpoint."}`.
 
   ```sh
   curl -s -i $TRACKER_API/no-such-endpoint | head -12
@@ -206,24 +220,30 @@ load test against the deployed URL.
 
 ## Part 4: Seed, demo and load test against AWS (10 min)
 
-- [ ] **4.1 Seed the demo data, and set the admin's real password**
+- [x] **4.1 Seed the demo data, and set the admin's real password**
 
-  Pick a new admin password (8 or more characters) and store it with the other one.
+  Pick a new admin password (8 or more characters) and store it somewhere safe outside
+  the repo (a password manager). The first line asks for it at a hidden prompt: type it
+  and press Enter. Nothing shows while you type; that's normal.
 
   ```sh
-  TRACKER_ADMIN_PASSWORD="$BOOT" TRACKER_NEW_ADMIN_PASSWORD='<your new admin password>' \
-    python3 tools/demo.py seed
+  read -rsp 'New admin password (8+ characters): ' NEWPW; echo; echo "${#NEWPW} characters"
+  TRACKER_ADMIN_PASSWORD="$BOOT" TRACKER_NEW_ADMIN_PASSWORD="$NEWPW" python3 tools/demo.py seed
+  export TRACKER_ADMIN_PASSWORD="$NEWPW"
   ```
   Expected last line: `Done. Every seeded person's password is Demo-pass-2026. ...`.
   Running it again prints `Already seeded` and changes nothing. From now on the admin's
-  password is your new one: `$BOOT` no longer works.
+  password is your new one: `$BOOT` no longer works. If it says
+  `must change their password first`, the `$NEWPW` line was empty: run all three lines
+  again.
 
-- [ ] **4.2 Run the demo. This is also the authenticated 404 check through CloudFront.**
+- [x] **4.2 Run the demo. This is also the authenticated 404 check through CloudFront.**
 
   ```sh
-  export TRACKER_ADMIN_PASSWORD='<your new admin password>'
   python3 tools/demo.py demo
   ```
+  (It uses `TRACKER_ADMIN_PASSWORD` from 4.1. In a new terminal, run 2.3 first, then
+  `read -rsp 'Admin password: ' TRACKER_ADMIN_PASSWORD; echo; export TRACKER_ADMIN_PASSWORD`.)
   Expected:
   - **1, 2 and 7:** Apollo and Zeus marked `AT RISK` with their reasons, Hermes
     `on track`.
@@ -276,12 +296,12 @@ load test against the deployed URL.
 | --- | --- | --- |
 | 0.3 local suite | | `___ passed` |
 | 1.2 CI (Python / Terraform / React) | | |
-| 2.2 deploy | | minutes taken: |
-| 3.1 health | | first-try status, then time: |
-| 3.2 login latency | | login 2: `__ s`, login 3: `__ s` |
-| 3.3 token through CloudFront | | status: |
-| 3.4 404 through CloudFront | | status and content-type: |
-| 4.1 seed | | |
-| 4.2 demo | | any `UNEXPECTED`? integrity violations: |
-| 4.3 load test, 10 users | | req/s, p95, failed |
+| 2.2 deploy | pass | first deploy, then a redeploy for the 404 fix (45 s) |
+| 3.1 health | pass | `200`, 14 to 16 s cold (Aurora waking) |
+| 3.2 login latency | pass | login 2: `1.15 s`, login 3: `1.15 s` (login 1: 15.9 s cold) |
+| 3.3 token through CloudFront | pass | `200` |
+| 3.4 404 through CloudFront | fail, fixed, pass | `403` S3 XML, then `404` `application/json` |
+| 4.1 seed | pass | six accounts, Apollo/Zeus/Hermes, Iris pending, Legacy CRM archived |
+| 4.2 demo | pass | no `UNEXPECTED`; 10 refusals as designed; 0 integrity violations |
+| 4.3 load test, 10 users | pass | 209 req/s, p95 40–50 ms, 0 failed; login p50 1.1 s |
 | 4.3 load test, 25 users | | req/s, p95, failed |

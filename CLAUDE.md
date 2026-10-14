@@ -417,12 +417,14 @@ deployed URL:
 2. **Deep links.** S3 behind origin access control answers 403, not 404, for a missing
    key, so refreshing `/projects/7` may show an AccessDenied page. `HashRouter` avoids it.
 3. **`Authorization` reaches the Lambda on GET requests through CloudFront.** CloudFront
-   treats that header specially. If it is dropped, switch to a custom header.
+   treats that header specially. If it is dropped, switch to a custom header. **Observed 13
+   Oct: it arrives.** `GET /auth/me` with a Bearer token returned 200 through CloudFront.
 4. **Login latency.** A 128 MB Lambda gets a small slice of a CPU, so PBKDF2 at 600k
    rounds can take seconds there, even though it is fast in LocalStack. On 13 Oct one
    VDI core took 0.14 s, which estimates about 2 s at 128 MB, so `memory_size` is now
-   512 (`infra/lambda.tf:11`), estimated at about 0.5 s. Time a real login on AWS to
-   confirm.
+   512 (`infra/lambda.tf:11`), estimated at about 0.5 s. **Observed 13 Oct: 1.15 s** per
+   warm login through CloudFront (15.9 s for the first one, with Aurora waking). Acceptable;
+   1024 MB would roughly halve it if evaluators notice.
 5. **First request after idle.** Aurora Serverless v2 with `min_capacity = 0`
    (`infra/rds.tf:27`) pauses itself. Resuming it, plus a Lambda cold start, takes many
    seconds. Warm the app up a minute before the demo.
