@@ -1,0 +1,195 @@
+import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Route } from 'react-router'
+import SchedulePage from './SchedulePage'
+import { PROJECT_COLOURS } from '../../theme/chartColours'
+import { page, renderAt, stubApi } from '../../test/utils'
+
+const WEEKS = ['2026-10-12', '2026-10-19', '2026-10-26']
+const apollo = (hours) => ({ projectId: 1, name: 'Apollo', hours })
+const zeus = (hours) => ({ projectId: 2, name: 'Zeus', hours })
+function week(iso, projects) {
+  const booked = projects.reduce((sum, p) => sum + p.hours, 0)
+  return { week: iso, bookedHours: booked, overAllocated: booked > 40, overByHours: Math.max(booked - 40, 0), projects }
+}
+// Ben: Apollo 25 h for two weeks then 10 h; Zeus 20 h for two weeks; 45 h (5 over) in each of the first two.
+const BEN = {
+  userId: 4, name: 'Ben Okafor', jobTitle: 'Developer', capacityHours: 40, status: 'OVER_ALLOCATED',
+  weeks: [week(WEEKS[0], [apollo(25), zeus(20)]), week(WEEKS[1], [apollo(25), zeus(20)]), week(WEEKS[2], [apollo(10)])],
+}
+const CHLOE = {
+  userId: 5, name: 'Chloe Kim', jobTitle: 'Analyst', capacityHours: 40, status: 'OK',
+  weeks: [week(WEEKS[0], [zeus(30)]), week(WEEKS[1], [zeus(30)]), week(WEEKS[2], [])],
+}
+const DAN = {
+  userId: 6, name: 'Dan Wu', jobTitle: 'Tester', capacityHours: 40, status: 'OK',
+  weeks: WEEKS.map((w) => week(w, [])),
+}
+
+function renderSchedule(answer = () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }]) {
+  const calls = stubApi({ 'GET /dashboard/allocation': answer })
+  renderAt(<SchedulePage />, {
+    path: '/schedule',
+    extraRoutes: <Route path="/projects/:id" element={<p>Project page</p>} />,
+  })
+  return calls
+}
+
+/** Press Tab until `element` has focus (the controls come first). */
+async function tabTo(element) {
+  for (let i = 0; i < 40 && document.activeElement !== element; i += 1) await userEvent.tab()
+  expect(element).toHaveFocus()
+}
+
+const bar = (name) => screen.findByRole('link', { name })
+const colourOf = (link) => within(link).getByTestId('bar').style.backgroundColor
+
+describe('SchedulePage', () => {
+  it('draws a bar per project across the weeks it has hours, split where the hours change', async () => {
+    renderSchedule()
+    expect(await bar('Ben Okafor, Apollo, 25 hours a week, Oct 12 to Oct 25')).toHaveTextContent('Apollo · 25 h/wk')
+    expect(screen.getByRole('link', { name: 'Ben Okafor, Apollo, 10 hours a week, Oct 26 to Nov 1' })).toHaveTextContent('Apollo · 10 h/wk')
+    expect(screen.getByRole('link', { name: 'Ben Okafor, Zeus, 20 hours a week, Oct 12 to Oct 25' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Chloe Kim, Zeus, 30 hours a week, Oct 12 to Oct 25' })).toBeInTheDocument()
+  })
+
+  it('colours a bar by its project, the same in every row', async () => {
+    renderSchedule()
+    const benZeus = await bar(/Ben Okafor, Zeus/)
+    expect(colourOf(screen.getByRole('link', { name: /Ben Okafor, Apollo, 25/ }))).toBe('rgb(28, 92, 171)') // PROJECT_COLOURS[0]
+    expect(colourOf(benZeus)).toBe(colourOf(screen.getByRole('link', { name: /Chloe Kim, Zeus/ })))
+  })
+
+  it('keeps a project\'s colour when a filter or page leaves only other projects in view', async () => {
+    renderSchedule(({ query }) => [200, { ...page(query.overOnly === 'true' ? [CHLOE] : [BEN, CHLOE]), weeks: WEEKS }])
+    const before = colourOf(await bar(/Chloe Kim, Zeus/))
+    await userEvent.click(screen.getByLabelText(/over capacity only/i))
+    await waitFor(() => expect(screen.queryByText('Ben Okafor')).not.toBeInTheDocument())
+    expect(colourOf(screen.getByRole('link', { name: /Chloe Kim, Zeus/ }))).toBe(before)
+    expect(before).not.toBe('rgb(28, 92, 171)') // Zeus alone would have taken the first colour
+  })
+
+  it('names the project colours in a legend, with over capacity', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    const legend = screen.getByRole('list', { name: 'Legend' })
+    expect(within(legend).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Apollo', 'Zeus', 'Over capacity'])
+    expect(PROJECT_COLOURS).toHaveLength(5)
+  })
+
+  it('marks an over-capacity week with words, the warning icon and a red outline', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    const over = screen.getAllByText('+5 h over')
+    expect(over).toHaveLength(2)
+    const words = over[0].closest('[data-testid="over-words"]')
+    expect(words).toHaveTextContent('Week of Oct 12: 45 of 40 hours booked, +5 h over')
+    expect(within(words).getByTestId('WarningAmberRoundedIcon')).toBeInTheDocument()
+    expect(document.querySelectorAll('[data-state="over"]')).toHaveLength(2)
+  })
+
+  it('says when someone has nothing booked', async () => {
+    renderSchedule(() => [200, { ...page([DAN]), weeks: WEEKS }])
+    expect(await screen.findByText('Not booked')).toBeInTheDocument()
+  })
+
+  it('shows project, hours and dates in a tooltip on hover', async () => {
+    renderSchedule()
+    await userEvent.hover(await bar(/Ben Okafor, Apollo, 25/))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Apollo · 25 h/wk · Oct 12 – Oct 25')
+  })
+
+  it('shows the same tooltip when a bar gets keyboard focus', async () => {
+    // jsdom says :focus-visible only for a test's first Tab; a browser says it for every keyboard
+    // focus (e2e/schedule.spec.js checks there). So answer as a browser would.
+    const matches = Element.prototype.matches
+    vi.spyOn(Element.prototype, 'matches').mockImplementation(function focusVisible(selector) {
+      return selector === ':focus-visible' ? this === document.activeElement : matches.call(this, selector)
+    })
+    renderSchedule()
+    await tabTo(await bar(/Ben Okafor, Zeus/))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Zeus · 20 h/wk · Oct 12 – Oct 25')
+  })
+
+  it('on a phone, shows the tooltip on the first tap and opens the project on the second', async () => {
+    renderSchedule()
+    const link = await bar(/Ben Okafor, Zeus/)
+    fireEvent.touchStart(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('tooltip', {}, { timeout: 200 })).toHaveTextContent('Zeus · 20 h/wk · Oct 12 – Oct 25')
+    expect(screen.queryByText('Project page')).not.toBeInTheDocument()
+    fireEvent.touchStart(link)
+    fireEvent.click(link)
+    expect(await screen.findByText('Project page')).toBeInTheDocument()
+  })
+
+  it('opens the project when a bar is clicked', async () => {
+    renderSchedule()
+    await userEvent.click(await bar(/Ben Okafor, Zeus/))
+    expect(await screen.findByText('Project page')).toBeInTheDocument()
+  })
+
+  it('opens the project when Enter is pressed on a bar', async () => {
+    renderSchedule()
+    await tabTo(await bar(/Ben Okafor, Apollo, 25/))
+    await userEvent.keyboard('{Enter}')
+    expect(await screen.findByText('Project page')).toBeInTheDocument()
+  })
+
+  it('asks for 8 weeks from this week, then moves a week at a time', async () => {
+    const calls = renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    expect(calls[0].query).toMatchObject({ weeks: '8', page: '1' })
+    expect(calls[0].query.weekFrom).toBeUndefined()
+    await userEvent.click(screen.getByRole('button', { name: /next week/i }))
+    await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-19'))
+    await userEvent.click(screen.getByRole('button', { name: /previous week/i }))
+    await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-12'))
+    await userEvent.click(screen.getByRole('button', { name: /this week/i }))
+    await waitFor(() => expect(calls.at(-1).query.weekFrom).toBeUndefined())
+  })
+
+  it('shows 8, 13 or 26 weeks', async () => {
+    const calls = renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    await userEvent.click(screen.getByRole('button', { name: '13 weeks' }))
+    await waitFor(() => expect(calls.at(-1).query.weeks).toBe('13'))
+    await userEvent.click(screen.getByRole('button', { name: '26 weeks' }))
+    await waitFor(() => expect(calls.at(-1).query.weeks).toBe('26'))
+  })
+
+  it('asks the server for over-capacity people only when the switch is on', async () => {
+    const calls = renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    await userEvent.click(screen.getByLabelText(/over capacity only/i))
+    await waitFor(() => expect(calls.at(-1).query.overOnly).toBe('true'))
+  })
+
+  it('pages by person', async () => {
+    const calls = renderSchedule(() => [200, { ...page([BEN], { total: 30, totalPages: 2 }), weeks: WEEKS }])
+    await bar(/Ben Okafor, Apollo, 25/)
+    await userEvent.click(screen.getByRole('button', { name: /page 2/i }))
+    await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+  })
+
+  it('says so when there is no one to show', async () => {
+    renderSchedule(({ query }) => [200, { ...page(query.overOnly === 'true' ? [] : [CHLOE]), weeks: WEEKS }])
+    await bar(/Chloe Kim, Zeus/)
+    await userEvent.click(screen.getByLabelText(/over capacity only/i))
+    expect(await screen.findByText(/no one is over capacity in these weeks/i)).toBeInTheDocument()
+  })
+
+  it('shows the server\'s error with a Retry button', async () => {
+    renderSchedule(() => [500, { error: 'The database is waking up.' }])
+    expect(await screen.findByText('The database is waking up.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
+  })
+
+  it('has a heading for the grid and labels the weeks', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    expect(screen.getByRole('figure', { name: /bookings, week by week/i })).toBeInTheDocument()
+    expect(screen.getByText('Oct 26')).toBeInTheDocument()
+  })
+})
