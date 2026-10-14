@@ -12,6 +12,7 @@ import { formatDate } from '../../services/format'
 import { fullName, usePeopleOptions } from '../../services/people'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import BoardTab from './BoardTab'
 import BudgetTab from './BudgetTab'
 import DeliverablesTab from './DeliverablesTab'
 import ResourcesTab from './ResourcesTab'
@@ -110,6 +111,7 @@ export default function ProjectDetailPage() {
             <Tab value="deliverables" label="Deliverables" />
             <Tab value="resources" label="Resources" />
             {showBudget && <Tab value="budget" label="Budget" />}
+            <Tab value="board" label="Board" />
           </Tabs>
 
           {tab === 'deliverables' && <DeliverablesTab projectId={projectId} canManage={canManage} people={people} />}
@@ -119,6 +121,7 @@ export default function ProjectDetailPage() {
             </PageState>
           )}
           {tab === 'budget' && showBudget && <BudgetTab projectId={projectId} />}
+          {tab === 'board' && <BoardTab projectId={projectId} canManage={canManage} />}
 
           {editing && <EditProjectDialog project={p} isAdmin={isAdmin} onClose={() => setEditing(false)} onSaved={() => project.reload()} />}
           {archiving && (

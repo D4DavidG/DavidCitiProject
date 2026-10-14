@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProjectDetailPage from './ProjectDetailPage'
-import { APOLLO, BOOKINGS, BUDGET, BUILD, BUILD_TASKS, DESIGN, MARIA } from './fixtures'
+import { APOLLO, BOARD_PEOPLE, BOARD_TASKS, BOOKINGS, BUDGET, BUILD, BUILD_TASKS, DESIGN, MARIA } from './fixtures'
 import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
+
+const BOARD = page(BOARD_TASKS, { people: BOARD_PEOPLE })
 
 function renderDetail(user = USERS.manager, answers = {}) {
   const calls = stubApi({
@@ -29,10 +31,10 @@ describe('ProjectDetailPage', () => {
     expect(await screen.findByText(/Maria Lopez/)).toBeInTheDocument()
   })
 
-  it('has Deliverables, Resources and Budget tabs, and a link to the dependency view', async () => {
+  it('has Deliverables, Resources, Budget and Board tabs, and a link to the dependency view', async () => {
     renderDetail()
     await screen.findByRole('heading', { name: 'Apollo' })
-    for (const name of ['Deliverables', 'Resources', 'Budget']) {
+    for (const name of ['Deliverables', 'Resources', 'Budget', 'Board']) {
       expect(screen.getByRole('tab', { name })).toBeInTheDocument()
     }
     expect(screen.getByRole('link', { name: /dependency view/i })).toHaveAttribute('href', '/projects/1/dependencies')
@@ -230,5 +232,83 @@ describe('ProjectDetailPage', () => {
   it('answers a project that is not yours the same as a missing one', async () => {
     renderDetail(USERS.manager, { 'GET /projects/1': [404, { error: 'Project not found.' }] })
     expect(await screen.findByText('Project not found.')).toBeInTheDocument()
+  })
+  describe('Board tab', () => {
+    const openBoard = async () => userEvent.click(await screen.findByRole('tab', { name: 'Board' }))
+    const boardCalls = (calls) => calls.filter((c) => c.method === 'GET' && c.path === '/projects/1/board')
+
+    it('has a Board tab with Ready, To do, In progress and Done columns', async () => {
+      renderDetail(USERS.manager, { 'GET /projects/1/board': [200, BOARD] })
+      await openBoard()
+      for (const [column, title] of [['Ready', 'Go-live checklist'], ['To do', 'Portal UI'], ['In progress', 'Portal API'], ['Done', 'Wireframes']]) {
+        expect(within(await screen.findByRole('region', { name: column })).getByRole('article', { name: title })).toBeInTheDocument()
+      }
+      expect(screen.getByText('Ana Ruiz 1 / 2')).toBeInTheDocument()
+      expect(within(screen.getByRole('article', { name: 'Portal UI' })).getByText('Build · 40 h')).toBeInTheDocument()
+    })
+
+    it('flags anyone holding more than their limit', async () => {
+      const people = [BOARD_PEOPLE[0], { userId: 4, name: 'Ben Okafor', held: 3, limit: 2 }]
+      renderDetail(USERS.manager, { 'GET /projects/1/board': [200, page(BOARD_TASKS, { people })] })
+      await openBoard()
+      expect(await screen.findByText('Ben Okafor 3 / 2, over limit')).toBeInTheDocument()
+    })
+
+    it('lets an employee take a Ready task and put back their own', async () => {
+      const calls = renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [200, {}],
+        'POST /tasks/32/release': [200, {}],
+      })
+      await openBoard()
+      const ready = await screen.findByRole('article', { name: 'Go-live checklist' })
+      expect(screen.queryByRole('button', { name: 'Assign' })).not.toBeInTheDocument()
+      expect(within(screen.getByRole('article', { name: 'Portal UI' })).queryByRole('button')).not.toBeInTheDocument()
+      await userEvent.click(within(ready).getByRole('button', { name: 'Take this' }))
+      await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toBe(true))
+      await userEvent.click(within(screen.getByRole('article', { name: 'Portal API' })).getByRole('button', { name: 'Put back' }))
+      await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/tasks/32/release')).toBe(true))
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(3))
+    })
+
+    it("shows the server's refusal at the limit", async () => {
+      const refusal = 'You already hold 2 unfinished tasks, your limit. Finish one first, or ask your manager to raise it.'
+      renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [409, { error: refusal }],
+      })
+      await openBoard()
+      await userEvent.click(within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' }))
+      expect(await screen.findByText(refusal)).toBeInTheDocument()
+    })
+
+    it('lets the manager assign every card outside Done', async () => {
+      const calls = renderDetail(USERS.manager, {
+        'GET /projects/1/board': [200, BOARD],
+        'PATCH /tasks/30': [200, {}],
+      })
+      await openBoard()
+      await screen.findByRole('article', { name: 'Go-live checklist' })
+      expect(screen.getAllByRole('button', { name: 'Assign' })).toHaveLength(3)
+      expect(within(screen.getByRole('region', { name: 'Done' })).queryByRole('button', { name: 'Assign' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Take this' })).not.toBeInTheDocument()
+      await userEvent.click(within(screen.getByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Assign' }))
+      const dialog = screen.getByRole('dialog')
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Assignee' }))
+      await userEvent.click(await screen.findByRole('option', { name: 'Ben Okafor' }))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Assign' }))
+      await waitFor(() => expect(calls.find((c) => c.method === 'PATCH' && c.path === '/tasks/30').body).toEqual({ assigneeUserId: 4 }))
+    })
+
+    it('shows "already taken" and reloads the board when someone got there first', async () => {
+      const calls = renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [409, { error: 'This task is already taken.' }],
+      })
+      await openBoard()
+      await userEvent.click(within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' }))
+      expect(await screen.findByText('This task is already taken.')).toBeInTheDocument()
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
+    })
   })
 })
