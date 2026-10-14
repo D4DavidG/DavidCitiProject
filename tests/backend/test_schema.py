@@ -102,6 +102,35 @@ def test_archive_flag_and_timestamp_agree(conn):
                    (person["user_id"],)) == "users_archive_consistent"
 
 
+def test_users_have_password_changed_at_null_by_default(conn):
+    assert rows.user(conn)["password_changed_at"] is None
+
+
+# --- refresh tokens (sessions) ---------------------------------------------
+
+
+def test_refresh_token_hash_must_be_64_hex(conn):
+    person = rows.user(conn)
+    assert refused(conn, "INSERT INTO refresh_tokens (user_id, token_hash, created_at, expires_at)"
+                         " VALUES (%s, 'abc', now(), now() + interval '1 hour')",
+                   (person["user_id"],)) == "refresh_tokens_hash_format"
+
+
+def test_refresh_token_must_expire_after_creation(conn):
+    person = rows.user(conn)
+    assert refused(conn, "INSERT INTO refresh_tokens (user_id, token_hash, created_at, expires_at)"
+                         " VALUES (%s, repeat('b', 64), now(), now())",
+                   (person["user_id"],)) == "refresh_tokens_expiry_after_creation"
+
+
+def test_replaced_by_needs_revoked_at(conn):
+    person = rows.user(conn)
+    first = rows.refresh_token(conn, person)
+    second = rows.refresh_token(conn, person, token_hash="c" * 64)
+    assert refused(conn, "UPDATE refresh_tokens SET replaced_by = %s WHERE refresh_token_id = %s",
+                   (second["refresh_token_id"], first["refresh_token_id"])) == "refresh_tokens_replaced_needs_revoked"
+
+
 # --- projects, bookings, requests ----------------------------------------
 
 def test_project_end_cannot_precede_start(conn, world):
