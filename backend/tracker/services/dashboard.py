@@ -70,6 +70,8 @@ def _figures(project: dict, money: dict, today: dt.date) -> dict:
         "remaining_cents": budget - money["consumed_cents"],
         "planned_over_budget": money["planned_cents"] > budget,
         "consumed_percent": (money["consumed_cents"] * 100 // budget) if budget else None,
+        "planned_percent": (money["planned_cents"] * 100 // budget) if budget else None,
+        "pending_percent": (money["pending_cents"] * 100 // budget) if budget else None,
         "schedule_elapsed_percent": int(_elapsed_percent(project["start_date"], project["predicted_end_date"], today)),
     }
 

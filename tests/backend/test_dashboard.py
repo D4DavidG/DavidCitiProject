@@ -67,9 +67,29 @@ def test_project_card_combines_status_progress_risk_and_money(conn, org):
     # Design is 13 of 60 days in (22%) with 0% of its work done: more than 15 points behind.
     assert card["at_risk"] is True
     assert [r["code"] for r in card["risk_reasons"]] == ["DELIVERABLE_BEHIND"]
-    for key in ("budget_cents", "planned_cents", "consumed_cents", "pending_cents", "consumed_percent"):
+    for key in ("budget_cents", "planned_cents", "consumed_cents", "pending_cents", "consumed_percent",
+                "planned_percent", "pending_percent"):
         assert card[key] == budget[key], key  # the card and the budget screen never disagree
     assert (card["consumed_cents"], card["pending_cents"]) == (9_614, 4_807)
+
+
+def test_planned_and_pending_percent_are_whole_numbers_rounded_down(conn, org):
+    approved = log(conn, org["alice"], org["task"], "2026-10-12", 2)
+    log(conn, org["alice"], org["task"], "2026-10-13", 1)  # 4,807 c stays pending
+    time_entries.decide_entry(conn, org["bob"], approved["entry_id"], approve=True)
+    pid = org["apollo"]["project_id"]
+    budget = dashboard.project_budget(conn, org["bob"], pid)
+    assert (budget["planned_percent"], budget["pending_percent"]) == (25, 0)  # 1,263,554 of 5,000,000
+    projects.update_project(conn, org["admin"], pid, {"budget_cents": 900_000})
+    budget = dashboard.project_budget(conn, org["bob"], pid)
+    assert budget["pending_percent"] == 0     # 0.53%: rounded down, not to nearest
+    assert budget["planned_percent"] == 140   # bookings cost more than the budget: past 100
+
+
+def test_no_budget_gives_no_percentages(conn, org):
+    projects.update_project(conn, org["admin"], org["zeus"]["project_id"], {"budget_cents": 0})
+    budget = dashboard.project_budget(conn, org["carol"], org["zeus"]["project_id"])
+    assert (budget["consumed_percent"], budget["planned_percent"], budget["pending_percent"]) == (None, None, None)
 
 
 def test_at_risk_projects_come_first_with_their_reasons(conn, org):

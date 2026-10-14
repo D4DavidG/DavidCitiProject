@@ -77,7 +77,7 @@ def test_every_read_route_answers_in_shape(conn, world):
     board = get(b, "/dashboard/projects", "/dashboard/projects")
     assert PAGE_KEYS <= board.keys() and [c["name"] for c in board["items"]] == ["Apollo"]
     assert {"atRisk", "riskReasons", "progressPercent", "budgetCents", "plannedCents", "consumedCents",
-            "pendingCents", "managerName"} <= board["items"][0].keys()
+            "pendingCents", "managerName", "plannedPercent", "pendingPercent"} <= board["items"][0].keys()
     grid = get(b, "/dashboard/allocation", "/dashboard/allocation", {"weekFrom": "2026-10-12", "weeks": "2"})
     assert PAGE_KEYS <= grid.keys() and grid["weeks"] == ["2026-10-12", "2026-10-19"]
     alice_row = next(p for p in grid["items"] if p["userId"] == world["alice"].user_id)
