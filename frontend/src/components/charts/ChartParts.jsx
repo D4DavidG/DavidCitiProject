@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import PropTypes from 'prop-types'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
@@ -15,7 +16,7 @@ const STRIPES = `repeating-linear-gradient(45deg, ${STRIPE} 0 2px, transparent 2
  * @param {object} props title, summary, optional axis, legend, note; children are the rows (li)
  */
 export function ChartFigure({ title, summary, axis, legend, note, children }) {
-  const headingId = `chart-${title.replace(/\W+/g, '-').toLowerCase()}`
+  const headingId = useId()
   return (
     <Card
       component="figure"
@@ -26,7 +27,7 @@ export function ChartFigure({ title, summary, axis, legend, note, children }) {
         bgcolor: '#FFFFFF',
         '& [data-mark]': { forcedColorAdjust: 'none' },
         '@media print, (forced-colors: active)': {
-          '& [data-state="late"], & [data-state="over"]': { backgroundImage: STRIPES },
+          '& [data-state="late"], & [data-state="over"]': { backgroundImage: `${STRIPES} !important` },
         },
       }}
     >

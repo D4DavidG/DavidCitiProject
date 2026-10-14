@@ -35,4 +35,16 @@ describe('chart parts', () => {
     expect(css).toMatch(/repeating-linear-gradient\(45deg/)
     expect(css).toMatch(/forced-color-adjust:\s*none/)
   })
+
+  it('keeps stripes above a mark\'s inline background shorthand', () => {
+    inTheme(<ChartFigure title="T2" summary="S"><li data-mark data-state="late" style={{ background: '#C62828' }}>x</li></ChartFigure>)
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent).join('')
+    expect(css).toMatch(/background-image:\s*repeating-linear-gradient[^;]*!important/)
+  })
+
+  it('gives two figures with the same title different heading ids', () => {
+    inTheme(<><ChartFigure title="Same" summary="a" /><ChartFigure title="Same" summary="b" /></>)
+    const [a, b] = screen.getAllByRole('figure', { name: 'Same' })
+    expect(a.getAttribute('aria-labelledby')).not.toBe(b.getAttribute('aria-labelledby'))
+  })
 })
