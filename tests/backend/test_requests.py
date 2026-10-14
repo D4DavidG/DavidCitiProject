@@ -127,8 +127,17 @@ def test_approval_creates_the_project_managed_by_the_requester(conn, org):
 
 def test_approval_needs_dates(conn, org):
     req = file(conn, org["bob"], proposed_start=None, proposed_end=None)
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as no_start:
         requests.approve_request(conn, org["admin"], req["request_id"], {})
+    with pytest.raises(ValidationError) as no_end:
+        requests.approve_request(conn, org["admin"], req["request_id"], {"start_date": "2026-11-01"})
+    assert (no_start.value.field, no_end.value.field) == ("start_date", "predicted_end_date")
+
+
+def test_proposed_end_cannot_precede_the_start(conn, org):
+    with pytest.raises(ValidationError) as refused:
+        file(conn, org["bob"], proposed_start="2026-11-01", proposed_end="2026-10-01")
+    assert refused.value.field == "proposed_end"
 
 
 def test_rejection_records_the_note(conn, org):
