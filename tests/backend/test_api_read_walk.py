@@ -121,6 +121,13 @@ def test_logged_time_names_the_person_task_and_project(conn, world):
     assert (mine[0]["taskTitle"], mine[0]["projectName"]) == ("Sketch", "Apollo")
 
 
+def test_logging_time_says_which_day_it_was_for(conn, world):
+    # Without the day, a week logged in one sitting reads as five identical notifications.
+    summary = conn.execute("SELECT summary FROM audit_log WHERE entity_type = 'time_entries' AND action = 'CREATE'"
+                           " AND entity_id = %s", (world["entry"]["entry_id"],)).fetchone()["summary"]
+    assert "2026-10-13" in summary and "Sketch" in summary
+
+
 def test_approving_time_snapshots_only_the_entry_not_the_joined_names(conn, world):
     # The approval reads the entry joined to its author's name; that name must not leak
     # into the audit snapshot, or every approval would show a fake "personName" change.

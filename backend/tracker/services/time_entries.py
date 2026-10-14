@@ -95,7 +95,8 @@ def log_time(conn: psycopg.Connection, actor: Actor, task_id: int, data: dict) -
                      hourly_rate_cents=money.hourly_rate_cents(salary))
         row = insert(conn, "time_entries", clean)
         audit.record_change(conn, actor, "CREATE", "time_entries", row["entry_id"], None, entry_view(row),
-                            f"{actor.name} logged {hours_text(row['minutes'])} on task {task['title']}")
+                            f"{actor.name} logged {hours_text(row['minutes'])} for {row['work_date'].isoformat()}"
+                            f" on task {task['title']}")
     return row
 
 
