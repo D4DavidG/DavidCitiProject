@@ -183,6 +183,16 @@ describe('SchedulePage', () => {
     await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
   })
 
+  it('goes back to page 1 when the weeks change, since who is worst depends on them', async () => {
+    const calls = renderSchedule(() => [200, { ...page([BEN], { total: 30, totalPages: 2 }), weeks: WEEKS }])
+    await bar(/Ben Okafor, Apollo, 25/)
+    await userEvent.click(screen.getByRole('button', { name: /page 2/i }))
+    await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+    await userEvent.click(screen.getByRole('button', { name: /next week/i }))
+    await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-19'))
+    expect(calls.at(-1).query.page).toBe('1')
+  })
+
   it('says so when there is no one to show', async () => {
     renderSchedule(({ query }) => [200, { ...page(query.overOnly === 'true' ? [] : [CHLOE]), weeks: WEEKS }])
     await bar(/Chloe Kim, Zeus/)
