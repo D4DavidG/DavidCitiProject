@@ -184,7 +184,8 @@ after the one before. Every cold start re-hashed the bootstrap admin's password
 admin already existed, so simultaneous cold starts queued. With the lock's 10 s timeout,
 a bigger burst would have started answering 503. Fixed 13 Oct: `bootstrap_admin` checks
 for the admin before hashing (test: `test_bootstrap_admin_skips_the_hash_once_the_admin_exists`).
-Not yet measured on AWS after the fix.
+Measured on AWS after the fix (25 users, same day): 25 simultaneous cold starts each
+answered in 0.17 to 0.30 s, with no queue.
 
 A login costs about 1.1 s whatever the load, because the password hash is deliberately
 slow and CPU-bound. 1024 MB of Lambda memory would roughly halve it.
