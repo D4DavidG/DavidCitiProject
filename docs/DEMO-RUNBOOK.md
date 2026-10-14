@@ -104,11 +104,11 @@ Start in **Tab B (Maria)**. Every label below was checked against the frontend c
 
 | # | Click | You should see | Say |
 | --- | --- | --- | --- |
-| 1 | You land on **Dashboard** | Apollo's card with a red **At risk** chip and the reason "Deliverable Build is 0% done with 27% of its time gone." (27% on 14 Oct; it rises 2.5 points a day, so 30% on Thu 15 Oct.) Budget: the amount "spent of $150,000", and "**Under 1%** of budget spent" | "Questions 1, 2 and 7: status, risk with the reason in words, budget spent against planned. At-risk first." |
+| 1 | You land on **Dashboard** | Apollo's card with a red **At risk** chip and the reason "Deliverable Build is 0% done with 27% of its time gone." (27% on 14 Oct; it rises 2.5 points a day, so 30% on Thu 15 Oct.) Budget: the amount "spent of $150,000", and "**Under 1%** of budget spent". Above the filters, **Workload this week · all projects** with Ben at "45 / 40 h" and "+5 h over". **Budget by project** with Apollo's sliver of spend | "Questions 1, 2 and 7: status, risk with the reason in words, budget spent against planned. At-risk first." |
 | 2 | **Allocation** in the menu | People down the side, weeks across. Ben's row shows **Over-allocated**; his cells for the weeks of 12 and 19 Oct read "45 / 40 h" and "+5 h over" | "Questions 3 and 5. Ben is booked 25 h on Apollo and 20 h on Zeus. Neither manager could see that alone." |
 | 3 | Hover (or tap) Ben's red cell | "Apollo 25 h, Zeus 20 h" | "Each cell says where its hours come from." |
 | 4 | Switch on **Only over-allocated** | Only people over capacity in a shown week | "The server filters and sorts the worst first." |
-| 5 | **Projects**, then **Apollo** | Tabs **Deliverables**, **Resources**, **Budget**, **Board**. Design **Signed off**; Build "0 of 2 tasks done"; Launch blocked | "Question 4: progress comes from the tasks." |
+| 5 | **Projects**, then **Apollo** | Tabs **Deliverables**, **Resources**, **Budget**, **Board**. **Deliverables timeline** above the cards: Design green "Done", Build "In progress 0%", Launch "Blocked". Design **Signed off**; Build "0 of 2 tasks done"; Launch blocked | "Question 4: progress comes from the tasks." |
 | 6 | **Show tasks** on Build | Portal API (Ana, in progress), Portal UI (Ben, to do) | |
 | 7 | Point at **Sign off** on Build | Greyed out, with "Sign-off opens when it's done: 2 tasks left to finish." | "The screen says why, and the server enforces the same rule." |
 | 8 | **Resources**, then **Budget** tabs | Bookings in hours per week; planned from bookings, spent from approved time | "Spend only counts approved time, at the rate frozen when it was logged." |
@@ -116,6 +116,8 @@ Start in **Tab B (Maria)**. Every label below was checked against the frontend c
 | 10 | Make the window narrow (375 px) | **Open menu** button replaces the sidebar; tables turn into cards | "Responsive: drawer menu, cards, the grid scrolls sideways." |
 
 Maria's dashboard shows only Apollo. Zeus is Sam's project, and Maria gets a 404 on it.
+
+To show **Over budget** live in the budget chart, an admin sets Zeus's budget to $2,000 first (an audited edit). Zeus is Sam's, so look at it as the admin, not as Maria.
 
 ### The pull-board moment (Ana and Maria)
 
@@ -252,12 +254,12 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 14 s (10.5 to 16.5 s) | `425 passed in 12.84s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  24 passed (24)` and `Tests  241 passed (241)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 14 s (10.5 to 16.5 s) | `428 passed in 12.84s` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  31 passed (31)` and `Tests  291 passed (291)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 241 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 291 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage

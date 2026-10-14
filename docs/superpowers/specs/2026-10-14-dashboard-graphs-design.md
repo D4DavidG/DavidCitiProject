@@ -1,6 +1,6 @@
 # Dashboard graphs design
 
-Status: **Approved by David on 14 Oct (design in chat); build after the pull board.**
+Status: **Built 14 Oct (plan `docs/superpowers/plans/2026-10-14-dashboard-graphs.md`).**
 Nothing here is built yet. Five changes from the chat design are marked **(changed)**;
 each has its reason next to it, and David can reverse any of them with one word.
 

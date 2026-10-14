@@ -19,9 +19,13 @@ outdated it.
   not deployed (Hours and Minutes boxes, **Copy username and password**, the login-timing
   fix at `services/users.py:159-164`, and the pull board with migration
   `002_task_limit.sql`): on AWS after the next `./bin/deploy-backend.sh` and
-  `./bin/deploy-frontend.sh`. Tests: 425 backend, 241 website, and 9 Playwright browser
-  tests in 4 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
-  puts back a task; `e2e/tour.spec.js` screenshots every screen at desktop and phone width).
+  `./bin/deploy-frontend.sh`. Three charts, built 14 Oct and not yet deployed (plain MUI
+  boxes, no chart library; the server sends every percentage): a deliverables timeline on
+  each project, and a budget chart and this week's workload on the dashboard
+  (`components/charts/`). Tests: 428 backend, 291 website, and 20 Playwright browser
+  tests in 7 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
+  puts back a task; `e2e/tour.spec.js` screenshots every screen at desktop and phone width;
+  `timeline`, `budget` and `workload` specs check the charts).
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);
@@ -43,6 +47,8 @@ outdated it.
   without a prompt (a blanket `"Bash"` allow, added 14 Oct at David's request; delete
   that line to go back). Hand him the exact commands for the denied ones.
 - **Open items:**
+  - deploy the three charts: `git push origin David`, then `./bin/deploy-backend.sh` (the
+    server's `plannedPercent` and `pendingPercent`) and `./bin/deploy-frontend.sh`;
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
   - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8);
@@ -550,7 +556,8 @@ The detail is in the plan:
 - **Frontend rules in practice:** every API call goes through `src/services/request.js`;
   only `src/services/format.js` turns cents, minutes and dates into text (and typed
   dollars into cents); field names are exactly the API's camelCase; forms are
-  `components/FormDialog.jsx` (edit sends only changed fields); MUI icons are named
+  `components/FormDialog.jsx` (edit sends only changed fields); chart colours come only from
+  `src/theme/chartColours.js`; MUI icons are named
   `…Outlined` in v9 (check `node_modules/@mui/icons-material/<Name>.js` exists).
 - **Terraform:** snake_case, a comment on every resource, and `terraform validate`
   before committing.

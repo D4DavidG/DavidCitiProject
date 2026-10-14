@@ -135,6 +135,8 @@ screen per question, in the order a manager needs them:
 | **Project (question 4): deliverables, tasks, resources, budget** | **Dependency view (question 6)** |
 | ![Project page with deliverables and tasks](docs/screenshots/project.png) | ![Dependencies: Design, then Build, then Launch (blocked)](docs/screenshots/dependencies.png) |
 
+Three charts, drawn with plain MUI boxes and no chart library: a deliverables timeline on each project, and a budget chart and this week's workload on the dashboard. The server sends every percentage.
+
 Also: login and the forced first password change; My account (your own name, email and password); My tasks (employees move status and
 log time, typed in two boxes, Hours and Minutes; a **Ready to take** section); a **Board** tab on each project
 (Ready, To do, In progress, Done, with Take this, Put back and Assign); Approvals; People (accounts, capacity,
@@ -155,6 +157,9 @@ frontend/src/
                         RequireRole (signed-out -> login, must change password -> there first)
   components/           layout, DataTable (table on desktop, cards on phones), FormDialog,
                         BudgetBar, StatusChip, PageState (loading / error with Retry / empty)
+  components/charts/    the timeline, budget and workload charts, and their shared figure,
+                        row and legend
+  theme/chartColours.js the only chart colours, checked with a colour-blindness validator
   pages/                one folder per screen
 ```
 
@@ -194,7 +199,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 425 passed
+.venv/bin/pytest -q                                                        # 428 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -221,7 +226,7 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 241 passed: Vitest + React Testing Library
+npm test                                  # 291 passed: Vitest + React Testing Library
 npm run test:coverage                     # 93% of statements, 95% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app

@@ -28,8 +28,8 @@ below says when it was measured. Every claim points at a file and line you can o
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 425 backend tests running against a real Postgres database,
-> and 241 website tests."
+> with Terraform. There are 428 backend tests running against a real Postgres database,
+> and 291 website tests."
 
 ### 2 minutes
 
@@ -345,8 +345,8 @@ from the token."
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "425 backend tests against a real Postgres database, at
-96% coverage, with the API layer at 100%. Plus 241 website tests at about 93% of
+**Headline (fresh, 14 Oct 2026):** "428 backend tests against a real Postgres database, at
+96% coverage, with the API layer at 100%. Plus 291 website tests at about 93% of
 statements, and Playwright browser tests."
 
 **What (three layers, plus the website):**
@@ -357,14 +357,14 @@ statements, and Playwright browser tests."
 | 2. Rules | Each business rule behaves as specified | Calls the services directly; never imports `api` | e.g. `tests/backend/test_work.py` |
 | 3. API | All 66 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route other than login is missed | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
 | Website | Screens behave correctly | Vitest + React Testing Library, with `fetch` stubbed (no database) | `frontend/src/**/*.test.jsx` |
-| Browser | The demo works in a real browser | Playwright: 9 tests in 4 files (one only takes README screenshots) | `frontend/e2e/` |
+| Browser | The demo works in a real browser | Playwright: 20 tests in 7 files (one only takes README screenshots) | `frontend/e2e/` |
 
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct (after the pull board):** backend `425 passed in 14.57s`; coverage
+- **Fresh numbers, 14 Oct (after the pull board):** backend `428 passed in 14.57s`; coverage
   `1847 statements, 73 missed, 96%`. By folder: `api/` 100%, `function.py` 100%, `domain/`
-  99%, `services/` 94.9%, `store/` 93.9%. Website: 24 files, `241 passed`, about a minute and
+  99%, `services/` 94.9%, `store/` 93.9%. Website: 31 files, `291 passed`, about a minute and
   a half. Website coverage: 93.66% of statements, 95.2% of lines, 89.94% of branches,
   89.37% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
@@ -653,6 +653,11 @@ Short answers. Paths are under `backend/tracker/` unless they say otherwise.
 29. **"Responsive?"** At 899 px and below, tables become cards and the sidebar a drawer. A Playwright
     tour fails on sideways scroll at 375 px. *`frontend/src/theme/responsive.js:4`;
     `frontend/e2e/tour.spec.js`*
+29a. **"Why no chart library?"** The bundle was already 698 kB, and three charts didn't need
+    one. Each is boxes sized in percent. The server sends every percentage, so the browser
+    never touches cents. The project colours failed a colour-blindness validator on the first
+    try, so I changed them. *`frontend/src/components/charts/`;
+    `frontend/src/theme/chartColours.js`*
 
 ### Testing, performance, process
 
@@ -684,7 +689,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Every API route is tested over HTTP" | "Every route is called in-process with a Lambda-shaped event; real HTTP is covered by the demo script and Playwright" | `test_api.py` calls `app.dispatch()` |
 | "The uncovered 4% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:239` |
 | "The rule tests prove the layers are separate" | "The rule tests show services don't need HTTP; the import direction is what keeps them separate" | No test enforces imports |
-| "Real Postgres, not mocks" (right after "241 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
+| "Real Postgres, not mocks" (right after "291 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
 | "The staircase went up to 11 s" | "Up to about 10 s in the logs (9.8 s)" | 7 to 11 s was the load-test client's `max` column |
 | "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:278-279` |
@@ -727,12 +732,14 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
    - approving an already-decided entry again is allowed (`services/time_entries.py:125-145`).
 9. Unexplained: 2 of 16,184 load-test requests got no response.
 10. Ask the evaluators whether archive counts as the D in CRUD.
+11. (d) History charts: a burn-up chart (work done over time) and budget spent over time.
+    Both need history the API doesn't keep (no snapshots per day or week).
 
 **The AI-use answer:**
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 425 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 428 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -749,8 +756,8 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 425 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 241 / 93% | Website tests / statements (95% of lines) | 14 Oct |
+| 428 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
+| 291 / 93% | Website tests / statements (95% of lines) | 14 Oct |
 | 66 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 10 + 1 | Tables: ten for the app, plus `schema_migrations` | 14 Oct |
