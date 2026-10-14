@@ -365,8 +365,8 @@ statements, and Playwright browser tests."
 - **Fresh numbers, 14 Oct (after the pull board):** backend `428 passed in 14.57s`; coverage
   `1847 statements, 73 missed, 96%`. By folder: `api/` 100%, `function.py` 100%, `domain/`
   99%, `services/` 94.9%, `store/` 93.9%. Website: 31 files, `291 passed`, about a minute and
-  a half. Website coverage: 93.66% of statements, 95.2% of lines, 89.94% of branches,
-  89.37% of functions. Lint: clean.
+  a half. Website coverage: 94.83% of statements, 96.1% of lines, 90.59% of branches,
+  91.02% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
   `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
   later 14 Oct changes; none of its tests log time, type an estimate or click Copy.
@@ -536,8 +536,8 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **96% of statements** (94% with
-   branches), the API layer 100%. Website **93.6% statements, 95.2% lines, 89.9% branches,
-   89.3% functions** (`docs/TESTING.md` figures, measured earlier on 14 Oct). Browser tests
+   branches), the API layer 100%. Website **94.8% statements, 96.1% lines, 90.6% branches,
+   91.0% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after the charts). Browser tests
    and load tests get no percentage, on purpose: their measure is journeys walked, and speed
    and failures. *Point at: `docs/TESTING.md` section 2*
 3. **"Selenium or Playwright?"** Playwright. It waits by itself for a button to be clickable

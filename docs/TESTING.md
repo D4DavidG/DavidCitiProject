@@ -76,16 +76,16 @@ To see which lines were missed: `.venv/bin/pytest --cov=backend/tracker --cov-re
 `cd frontend && npm run test:coverage` printed:
 
 ```
-Statements   : 93.62% ( 954/1019 )
-Branches     : 89.94% ( 751/835 )
-Functions    : 89.29% ( 342/383 )
-Lines        : 95.18% ( 830/872 )
+Statements   : 94.83% ( 1212/1278 )
+Branches     : 90.59% ( 905/999 )
+Functions    : 91.02% ( 426/468 )
+Lines        : 96.1% ( 1035/1077 )
 ```
 
 V8 is the JavaScript engine inside Chrome and Node; it counts what ran while the
-component tests ran. Read the four lines as: 954 of 1,019 instructions ran; 751 of 835
-yes/no paths were taken; 342 of 383 functions were called (many of the missing ones are
-small click handlers on rarely used buttons); 830 of 872 lines ran. The one module that
+component tests ran. Read the four lines as: 1,212 of 1,278 instructions ran; 905 of 999
+yes/no paths were taken; 426 of 468 functions were called (many of the missing ones are
+small click handlers on rarely used buttons); 1,035 of 1,077 lines ran. The one module that
 talks to the API, `services/request.js`, is at 100% of lines and functions and 97% of
 branches.
 
@@ -103,7 +103,7 @@ branches.
 | Rubric target | Goal | Today | Met? |
 | --- | --- | --- | --- |
 | Backend code coverage | 80% | 96% of statements (94% with branches) | Yes |
-| Frontend code coverage | 80% | 93.6% statements, 95.2% lines, 89.9% branches, 89.3% functions | Yes |
+| Frontend code coverage | 80% | 94.8% statements, 96.1% lines, 90.6% branches, 91.0% functions | Yes |
 | API endpoints (all CRUD) | 90% | `api/` 100%; every route called by the two walk tests | Yes |
 | Error handling | 90% | `api/errors.py` 100%; `test_api_read_walk.py` covers malformed input and a crash returning 500 | Yes |
 | Critical user paths end to end | 100% | Manager's demo walk, pull board, every screen for manager and employee | Partly. Not end to end yet: an employee logs time and the manager approves it (component tests only, `README.md:253-254`); an admin creates, edits, archives and reactivates a project; the forced password change at first sign-in |
