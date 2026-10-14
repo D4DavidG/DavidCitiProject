@@ -23,7 +23,13 @@ local stack (section 7), but reaches AWS only after `./bin/deploy-backend.sh` an
 - overtime as a warning: logging past capacity without overtime opens **Over your weekly
   capacity** with **Log anyway** / **Cancel**; confirmed time shows **Over capacity** on
   My logged time and Approvals (migration `004_over_capacity.sql`, same cold start).
-  AWS today: the old flat refusal, "... Ask your manager to allow overtime."
+  AWS today: the old flat refusal, "... Ask your manager to allow overtime.";
+- 15-minute access tokens with refresh tokens: the website stays signed in by swapping its
+  refresh token on its own; **Sign out** ends the session on the server; changing a
+  password ends every older session (two routes, `/auth/refresh` and `/auth/logout`, and
+  migration `005_sessions.sql`, same cold start). Deploy backend and website together:
+  today's AWS website knows no refresh, so against the new backend it would sign out
+  after 15 minutes. AWS today: one 8-hour token.
 
 Until you deploy, Path A on AWS has no charts in steps 1 and 5, no Board (so no "The
 pull-board moment"), and a slower bell with no pop-up in "The audit-log moment". Demo
@@ -193,7 +199,7 @@ deploy above, only the copy button differs (step 3).
 | 2 | C (Admin) | Fill in First name `Test`, Last name `Person`, Email `test.person@acme.local`, Role **Employee**, Line manager **Maria Lopez**; click **Create** | An **Account created** dialog: the name, the **Username** (initials plus 6 digits, like `TP123456`) and the **Temporary password** (12 characters), with "This password is shown only once" |
 | 3 | C (Admin) | **Copy username and password**, then **Done**. On AWS, until the next `./bin/deploy-frontend.sh`, the button is **Copy password** and copies only the password: read the username aloud | The button says **Copied**. The clipboard holds two lines: `Username: ...` and `Temporary password: ...` |
 | 4 | Private window | Open the site, paste the username and password into **Sign in** | The **Change password** page: "Choose your own password before continuing. The one you were given only works once." |
-| 5 | Private window | **Current password** (the temporary one), **New password** and **Confirm new password** (8 characters or more), then **Change password** | The person's home screen. Until this step, the website sends every other screen back to **Change password** (`RequireRole.jsx:26-27`); only the API answers 403 (`api/app.py:29-30`) |
+| 5 | Private window | **Current password** (the temporary one), **New password** and **Confirm new password** (8 characters or more), then **Change password** | The person's home screen. Until this step, the website sends every other screen back to **Change password** (`RequireRole.jsx:26-27`); only the API answers 403 (`api/app.py:30-31`) |
 
 Say: "Usernames are generated and never change, the password is random and shown once,
 and the person can't do anything until they choose their own." If the dialog says
@@ -275,20 +281,20 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `506 passed in 19.44s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  31 passed (31)` and `Tests  302 passed (302)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `536 passed in 21.69s` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  31 passed (31)` and `Tests  313 passed (313)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 302 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 313 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
 
 | Command | Takes | Numbers (14 Oct) |
 | --- | --- | --- |
-| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 20 s | `TOTAL 1920 68 96%`: api 100%, function.py 100%, domain 99%, services 95.5%, store 93.9% |
-| `cd frontend && npm run test:coverage` | about a minute and a half (115 s) | Statements 94.78%, Branches 91.24%, Functions 90.63%, Lines 95.88% |
+| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 20 s | `TOTAL 1990 68 97%`: api 100%, function.py 100%, domain 99%, services 95.7%, store 93.9% |
+| `cd frontend && npm run test:coverage` | about a minute and a half (115 s) | Statements 94.85%, Branches 91.34%, Functions 90.8%, Lines 95.93% |
 
 The rubric asks for 80% overall and 90% on API and error paths. What the missing 4% is,
 honestly: mostly guards (already archived, not found, nothing to change), **plus five real
@@ -423,7 +429,8 @@ what it shows. None of them changes data.
 1. Install the REST Client extension: `code --install-extension humao.rest-client`
 2. Open `tools/tracker.http`. Click **Send Request** above `login`; it asks for AD000001's
    password (nothing secret is stored in the file).
-3. Click **Send Request** above any other request; they reuse the login token for 8 hours.
+3. Click **Send Request** above any other request; they reuse the login token, which
+   lasts 15 minutes (on AWS until the next deploy: 8 hours). After that, run `login` again.
 4. To use the local copy instead of AWS, change `@baseUrl = {{aws}}` to `@baseUrl = {{local}}`
    (needs section 7 running).
 
@@ -444,7 +451,8 @@ skip it.
 | `503 "The database is not ready. Please try again shortly."` | Aurora is waking up | Wait 30 s and retry, up to 3 times. The website keeps you signed in and offers **Retry** |
 | First page or login takes about 15 s | Aurora was asleep | Expected. Warm up with `curl -s $TRACKER_API/health` before you start |
 | Every login takes about 1.1 s | Deliberately slow password hashing (PBKDF2, 600,000 rounds) | Nothing to fix. Say why |
-| Signed out after 8 hours (401) | The login token expired; no refresh tokens, by design | Sign in again |
+| Signed out after 8 hours (401) | Every refresh token dies 8 hours after login, by design (AWS until the next deploy: the one 8-hour token expired) | Sign in again |
+| Signed out in two tabs at once | A duplicated tab copies the refresh token; when the second copy refreshes, it looks like a stolen token, so every session of that person ends | Sign in again; use one tab per person (or a private window) |
 | Maria's bell shows 15, not 1 | Old unread notifications | As Maria: **Notifications**, **Mark all as read**, before the demo |
 | The manager's bell doesn't move | Wrong manager (Chloe reports to Sam, Ana and Ben to Maria), or the tab is hidden (it pauses, then checks at once when you switch back) | Watch the right manager's window; wait 10 s |
 | `demo.py` refusal 1 says `UNEXPECTED` (201) | Ben's pending time was rejected, his overtime was turned on, or it's 19 Oct or later | Explain the rule from `time_entries.py` instead; don't rerun it |

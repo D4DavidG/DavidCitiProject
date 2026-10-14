@@ -4,12 +4,13 @@ What to say to the Citi evaluators (15 Oct) and in later job interviews. It cove
 say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minute-demo).
 
 **Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
-final fix wave, the project-manager notifications and requests for everyone, and the overtime warning: 506 backend
-tests, 302 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
+final fix wave, the project-manager notifications and requests for everyone, the overtime warning, and 15-minute
+tokens with refresh: 536 backend tests, 313 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
 pop-up, the three charts, the project manager being notified of an employee's project
-work, and requests for everyone (migration 003). Every number below says when it was measured. Every claim
+work, requests for everyone (migration 003), the overtime warning (migration 004), and
+15-minute access tokens with refresh tokens (migration 005). Every number below says when it was measured. Every claim
 points at a file and line you can open.
 
 **Contents:** [1 Pitch](#1-the-pitch) · [2 Seven questions](#2-the-seven-questions) ·
@@ -32,8 +33,8 @@ points at a file and line you can open.
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 506 backend tests running against a real Postgres database,
-> and 302 website tests."
+> with Terraform. There are 536 backend tests running against a real Postgres database,
+> and 313 website tests."
 
 ### 2 minutes
 
@@ -122,8 +123,8 @@ browser -> CloudFront (/api/tracker*) -> Lambda Function URL
   `function.py`, then `api/`, `services/`, `store/`, Postgres underneath, and `domain/`
   shared by every layer.
 
-**Point at:** `backend/tracker/function.py:58-71`, `api/app.py:36-49` (`dispatch`),
-`api/routes.py:126` (`match`), `api/errors.py:17-41`.
+**Point at:** `backend/tracker/function.py:58-71`, `api/app.py:37-50` (`dispatch`),
+`api/routes.py:128` (`match`), `api/errors.py:17-41`.
 
 ---
 
@@ -168,7 +169,7 @@ All of it is built by Terraform (infra/).
 | Folder | What's in it |
 | --- | --- |
 | `function.py` | The entry point: the connection, and migrations on cold start under a lock |
-| `api/` | `routes.py` (all 66 routes and their roles), `app.py` (auth), `errors.py`, `handlers.py`, `http.py` |
+| `api/` | `routes.py` (all 68 routes and their roles), `app.py` (auth), `errors.py`, `handlers.py`, `http.py` |
 | `services/` | Every business rule, one file per subject |
 | `domain/` | Errors, money, clock, values: shared by every layer |
 | `store/` | `postgres.py` (connection and `atomic()`), `migrate.py`, `integrity.py`, `migrations/001_init.sql`, `migrations/002_task_limit.sql` |
@@ -301,19 +302,23 @@ from the token."
   the same 401 as a wrong password (`services/users.py:159-164`). Nothing is hashed at
   import, so cold starts stay fast. Test:
   `test_unknown_username_costs_the_same_hashing_as_a_wrong_password`
-  (`tests/backend/test_users.py:110`). It counts the hashing work, not the clock, so it
+  (`tests/backend/test_users.py:111`). It counts the hashing work, not the clock, so it
   isn't flaky. Before the fix, the dummy hash had only 1,000 rounds and answered much faster.
-- **Token:** a signed token (HS256 JWT, standard library only) that lasts 8 hours and
-  carries only the user id (`services/tokens.py:20, 39-59`). Its secret is a Terraform
-  `random_password` (`infra/secrets.tf:6`).
+- **Tokens:** login returns two. The access token is a signed HS256 JWT (standard library
+  only) that lasts **15 minutes** and carries only the user id and its issue time
+  (`services/tokens.py:21, 47-66`). Its secret is a Terraform `random_password`
+  (`infra/secrets.tf:6`). The refresh token is 32 random bytes; only its SHA-256 is stored
+  (`refresh_tokens`, migration 005). `POST /auth/refresh` swaps it for a new pair and
+  retires the old one; every refresh token dies 8 hours after login
+  (`services/sessions.py:28, 55-78`).
 - **Gate 1, the route table:** a role that may never do something gets a 403
-  (`api/routes.py`, checked at `api/app.py:31-32`).
+  (`api/routes.py`, checked at `api/app.py:32-33`).
 - **Gate 2, the services:** they check ownership. A project you can't see answers 404 with
   wording byte-identical to a missing one, so nobody can probe ids
   (`services/access.py:17-27`; test `test_api.py:163-167`).
 - **The role is re-read on every authenticated request** with one primary-key lookup, so a
-  demotion or an archive takes effect on the next request (`api/app.py:22-33`;
-  `services/actors.py:46-55`; test `test_api.py:145-152`).
+  demotion or an archive takes effect on the next request (`api/app.py:22-34`;
+  `services/actors.py:46-62`; test `test_api.py:145-152`).
 
 **If they push:**
 
@@ -321,19 +326,25 @@ from the token."
   rounds. One limit: if the round count is raised later, users with older hashes still
   verify at the old count, so a wrong password for them would be cheaper. Not the case
   today. Not yet timed on AWS.
-- *"No refresh token?"* It's deliberate. Re-reading the role already gives fast
-  revocation, and a refresh token would add storage, rotation and revocation for no
-  benefit at this size.
-- *"Does a password change end old sessions?"* No, a known gap. Until the user changes a
-  reset password, an old token can only reach `/auth/me` and change-password, which asks
-  for the current password, the one the admin just generated (`services/users.py:180`).
-  Once the user has changed it, an old token works fully again until it expires (up to
-  8 h): the token carries only the user id, and `verify` checks the signature and expiry,
-  never when it was issued (`services/tokens.py:47-59`). Archiving the user kills every
-  token at once. The fix: a `password_changed_at` column, and refuse tokens issued before
-  it. (Read from the code, not tested.)
+- *"Why a refresh token?"* So a stolen access token is useful for 15 minutes at most,
+  while people still stay signed in for a working day. The website refreshes on its own:
+  on a 401 it calls `/auth/refresh` once (shared by every call waiting), retries once,
+  and only then signs out (`frontend/src/services/request.js`).
+- *"What if the refresh token is stolen?"* Rotation: each use retires it. If a retired one
+  comes back, someone has a copy, so every session of that user ends and a warning is
+  logged (`services/sessions.py:66-77`; test `test_reusing_a_rotated_token_revokes_everything`).
+- *"Why not an HttpOnly cookie?"* Stronger against script injection, but locally the page
+  (:3000) and the proxy (:3001) are different origins and the proxy answers
+  `Access-Control-Allow-Origin: *`, which browsers never combine with cookies. Rotation
+  limits the damage instead (design §2, `docs/superpowers/specs/2026-10-14-tokens-design.md`).
+- *"Does a password change end old sessions?"* Yes, since 14 Oct. A change or an admin
+  reset sets `users.password_changed_at`, every access token issued before it is refused
+  (`services/actors.py:59-61`), and every refresh token of that user is revoked
+  (`services/users.py:195, 213`). Your own change answers with a fresh session, so your
+  tab stays signed in. Archiving does the same. Tests: `test_token_from_before_a_password_change_is_refused`,
+  `test_reset_and_archive_end_the_targets_refresh_tokens` (`tests/backend/test_api.py`).
 - *"Can a stolen session change the email?"* Yes, a known gap: `update_self` changes the
-  email with no current-password check (`services/users.py:210-221`). Harmless today,
+  email with no current-password check (`services/users.py:219-230`). Harmless today,
   because nothing is ever emailed; it matters once an emailed reset exists. The fix: ask
   for the current password, or notify the old address.
 - *"Any string-built SQL?"* Four queries use f-strings, but only to join **constant** SQL
@@ -343,15 +354,15 @@ from the token."
 - *"Can a manager see salaries?"* No. A manager who books someone could work out their rate
   from the planned cost, and the README says so (`README.md:356-357`).
 
-**Point at:** `backend/tracker/api/app.py:22-33`, `services/access.py`,
-`services/passwords.py`, `services/tokens.py`.
+**Point at:** `backend/tracker/api/app.py:22-34`, `services/access.py`,
+`services/passwords.py`, `services/tokens.py`, `services/sessions.py`.
 
 ---
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "506 backend tests against a real Postgres database, at
-96% coverage, with the API layer at 100%. Plus 302 website tests at 94.78% of
+**Headline (fresh, 14 Oct 2026):** "536 backend tests against a real Postgres database, at
+97% coverage, with the API layer at 100%. Plus 313 website tests at 94.85% of
 statements, and 22 Playwright browser tests."
 
 **What (three layers, plus the website):**
@@ -360,18 +371,18 @@ statements, and 22 Playwright browser tests."
 | --- | --- | --- | --- |
 | 1. Database | Postgres refuses bad rows | One test per named constraint; a DELETE test for every application table | `tests/backend/test_schema.py`, `test_no_delete.py:31-46` |
 | 2. Rules | Each business rule behaves as specified | Calls the services directly; never imports `api` | e.g. `tests/backend/test_work.py` |
-| 3. API | All 66 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route other than login is missed | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
+| 3. API | All 68 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route is missed (the audit walk exempts only login, refresh, logout and marking notifications read) | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
 | Website | Screens behave correctly | Vitest + React Testing Library, with `fetch` stubbed (no database) | `frontend/src/**/*.test.jsx` |
 | Browser | The demo works in a real browser | Playwright: 22 tests in 8 files (one only takes README screenshots) | `frontend/e2e/` |
 
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct (after the overtime warning):** backend `506 passed in 19.44s`;
-  coverage `1920 statements, 68 missed, 96%`. By folder: `api/` 100%, `function.py` 100%,
-  `domain/` 99%, `services/` 95.5%, `store/` 93.9%. Website: 31 files, `302 passed`, about
-  a minute and a half. Website coverage: 94.78% of statements, 95.88% of lines, 91.24% of
-  branches, 90.47% of functions. Lint: clean.
+- **Fresh numbers, 14 Oct (after the 15-minute tokens):** backend `536 passed in 21.69s`;
+  coverage `1990 statements, 68 missed, 97%`. By folder: `api/` 100%, `function.py` 100%,
+  `domain/` 99%, `services/` 95.7%, `store/` 93.9%. Website: 31 files, `313 passed`, about
+  a minute and a half. Website coverage: 94.85% of statements, 95.93% of lines, 91.34% of
+  branches, 90.8% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
   `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
   later 14 Oct changes; none of its tests log time, type an estimate or click Copy.
@@ -382,13 +393,13 @@ transactions.
 
 **Why not more:**
 
-- Most of the uncovered 4% is repeat guards: already archived, not found, nothing to change.
+- Most of the uncovered 3% is repeat guards: already archived, not found, nothing to change.
 - **But five real rules have no test:**
   - reactivating a signed-off deliverable clears its sign-off (`milestones.py:197`);
   - adding a dependency on unfinished work clears a sign-off (`milestones.py:291`);
   - reactivating an unfinished task under a signed-off deliverable clears it (`tasks.py:215`);
   - archived deliverables can't take part in dependencies (`milestones.py:268`);
-  - you can't demote a manager who still runs live projects (`users.py:239`).
+  - you can't demote a manager who still runs live projects (`users.py:248`).
 - The service's "can't depend on itself" check (`milestones.py:266`) is untested, but
   the database's own CHECK for the same rule is (`test_schema.py:167`).
 - The database going down mid-request is untested (`store/postgres.py:121`). The
@@ -537,12 +548,12 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **506 backend, 302 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **536 backend, 313 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
-   ran; it shows what ran, not what was checked. Backend **96% of statements** (94% with
-   branches), the API layer 100%. Website **94.78% statements, 95.88% lines, 91.24% branches,
-   90.47% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after requests for everyone). Browser tests
+   ran; it shows what ran, not what was checked. Backend **97% of statements** (95% with
+   branches), the API layer 100%. Website **94.85% statements, 95.93% lines, 91.34% branches,
+   90.8% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after the 15-minute tokens). Browser tests
    and load tests get no percentage, on purpose: their measure is journeys walked, and speed
    and failures. *Point at: `docs/TESTING.md` section 2*
 3. **"Selenium or Playwright?"** Playwright. It waits by itself for a button to be clickable
@@ -572,12 +583,13 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    admins; admin: the other admins). A decision on a request also notifies whoever asked
    (`also_notify`). Reads and refused requests are not logged. One test
    calls every write route and checks it left an audit row. *Point at: CLAUDE.md section 2 table; `tests/backend/test_api_audit_walk.py`*
-9. **"What if someone steals the access token? A 15-minute timer?"** Today: the token lasts
-   8 hours, carries only the user id, and the role is re-read from the database on every
-   request, so archiving a user or demoting them takes effect at once. The gap: there is no
-   refresh token and no revoke, so a stolen token works until it expires, and a password
-   change doesn't end old sessions. **Queued, not built:** a 15-minute access token plus a
-   refresh token stored in Postgres. *Point at: `services/tokens.py:20, 47-59`; `api/app.py:22-33`*
+9. **"What if someone steals the access token? A 15-minute timer?"** Built 14 Oct (not on
+   AWS until the next deploy). The access token lasts 15 minutes; a refresh token (only its
+   SHA-256 stored) gets a new pair at `POST /auth/refresh` and is retired on use; reusing a
+   retired one ends every session of that user; `POST /auth/logout` revokes it; a password
+   change, reset or archive ends the user's older sessions. The role is still re-read on
+   every request. *Point at: `services/tokens.py:21`; `services/sessions.py`;
+   `services/actors.py:59-61`; `api/app.py:22-34`; `frontend/src/services/request.js` (refresh once, retry once)*
 10. **"Total number of projects?"** Built. The dashboard's first counter, "Projects shown",
     is the server's count for the current search and status filter (all of them when no
     filter is set). "At risk" beside it counts only the cards on the current page. The budget
@@ -585,7 +597,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 11. **"How can you delete projects?"** You can't, by design: an admin archives (and can
     reactivate), and a Postgres trigger refuses any DELETE on every application table. The
     rubric's D in CRUD is met by archive; we haven't yet asked an evaluator whether that
-    counts. **Built 14 Oct (not on AWS until the next deploy):** a manager asks an admin to archive a project from the Requests page; approving runs the same `archive_project`. *Point at: `store/migrations/001_init.sql:239-255`; `api/routes.py:66`; `services/requests.py` (`_apply`)*
+    counts. **Built 14 Oct (not on AWS until the next deploy):** a manager asks an admin to archive a project from the Requests page; approving runs the same `archive_project`. *Point at: `store/migrations/001_init.sql:239-255`; `api/routes.py:68`; `services/requests.py` (`_apply`)*
 12. **"History for employees?"** Today an admin can open the audit log and filter by person,
     record type and date, with before and after state. **Queued, not built:** a History tab
     per person that their line manager can read. *Point at: `frontend/src/pages/audit/AuditLogPage.jsx:99-103`*
@@ -659,9 +671,11 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
 | Database encrypted, in the VPC | Reading data at rest; direct internet access (no `publicly_accessible` setting, so AWS's private default; not re-checked from outside on 14 Oct) | `infra/rds.tf:20-22` | Came with the workshop repo |
 | Secrets generated by Terraform | A guessable or committed signing key or admin password | `infra/secrets.tf:6, 14`; injected at `infra/locals.tf:115-116` | We added the token key and admin password. The template's database password is a `random_pet` name (`infra/rds.tf:15`) |
 | Passwords hashed: PBKDF2, 600,000 rounds, random salt | A stolen database revealing passwords | `services/passwords.py:18, 27-44` | We added |
-| Signed token (HS256), 8 h expiry | Forged or endless sessions | `services/tokens.py:20-22, 47-59` | We added |
-| Role re-read from the database on every request | A demoted or archived person keeping access | `api/app.py:22-33`; `services/actors.py:46-55` | We added |
-| Forced password change at first login | Using the admin-generated password for real work | `api/app.py:29-30`; `api/routes.py:49-50` | We added |
+| Signed access token (HS256), 15 min expiry | Forged or endless sessions | `services/tokens.py:21, 47-66` | We added |
+| Refresh tokens: hashed, rotated, reuse ends every session, 8 h from login | A stolen token used for long; a copied refresh token | `services/sessions.py`; `store/migrations/005_sessions.sql` | We added (14 Oct; AWS after the next deploy) |
+| Password change, reset or archive ends older sessions | A thief keeping access after the password changes | `services/actors.py:59-61` (`password_changed_at`); `services/users.py:195, 213, 327` | We added (14 Oct; AWS after the next deploy) |
+| Role re-read from the database on every request | A demoted or archived person keeping access | `api/app.py:22-34`; `services/actors.py:46-62` | We added |
+| Forced password change at first login | Using the admin-generated password for real work | `api/app.py:30-31`; `api/routes.py:51-52` | We added |
 | 404, never 403, with identical wording | Probing which ids exist | `services/access.py:17-27` | We added |
 | Unknown username costs the same hashing | Learning which usernames exist from reply time | `services/users.py:159-164` | We added (14 Oct; AWS after the next deploy) |
 | Parameterised SQL only | SQL injection | `store/postgres.py`; bandit B608 clean | We added |
@@ -673,8 +687,11 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
 
 **Known gaps (each checked against the code on 14 Oct):**
 
-- Tokens survive a password change: they carry no issue time (`services/tokens.py:47-59`).
-- No refresh token and no way to revoke one token; a stolen token works up to 8 hours.
+- The refresh token lives in `sessionStorage`, not an HttpOnly cookie, so injected script
+  could copy it; rotation makes the second user of a copy sign both out. A duplicated tab
+  copies it too, and whichever copy refreshes second signs both out.
+- A stolen access token still works for up to 15 minutes; one access token can't be revoked
+  on its own (a password change ends them all).
 - No rate limiting on login or anywhere else (no throttle in `backend/tracker/` or `infra/`).
 - Changing your own email needs no current password (`update_self` in `services/users.py`).
 - The Lambda URL itself has no authorisation (`authorization_type = "NONE"`, template); every
@@ -713,7 +730,7 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
 ### Architecture
 
 6. **"Walk me through one request."** See [§3](#3-architecture). *`function.py:58-71`;
-   `api/app.py:36-49`*
+   `api/app.py:37-50`*
 7. **"Why one Lambda?"** One database, one rule set: one connection, one deploy, no
    duplicated code. *`infra/locals.tf` finds services by `backend/*/requirements.txt`*
 8. **"How are the layers separated?"** By import direction: nothing below `api` imports
@@ -756,13 +773,16 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
 
 ### Security
 
-19. **"Why JWT, not sessions?"** Lambda instances share no memory. The token holds only the
-    user id, and the role is re-read per request. *`services/tokens.py:39-59`*
-20. **"Can you revoke a token?"** Archiving the user kills it at once. A reset doesn't:
-    once the user sets a new password, an old token works again until it expires (see
-    [§6](#6-security)). *`services/actors.py:50`; `api/app.py:29-30`*
+19. **"Why JWT, not sessions?"** Lambda instances share no memory. The access token holds
+    only the user id and issue time, and the role is re-read per request. The refresh
+    tokens are rows in Postgres, so any instance can check them. *`services/tokens.py:47-66`; `services/sessions.py`*
+20. **"Can you revoke a token?"** A refresh token, yes: Sign out revokes it
+    (`POST /auth/logout`). Every session of a user ends on a password change, an admin
+    reset or archiving them: their refresh tokens are revoked and access tokens issued
+    before the change are refused. One access token can't be revoked alone; it dies within
+    15 minutes. *`services/sessions.py:81-92`; `services/actors.py:59-61`; `api/app.py:28-29`*
 21. **"Privilege escalation?"** Only admins create users or change roles. Nobody changes
-    their own role or salary. *`services/users.py:224-230`; `api/routes.py:53-60`*
+    their own role or salary. *`services/users.py:233-239`; `api/routes.py:55-62`*
 22. **"Where are the secrets?"** Terraform generates them and passes them in as Lambda
     environment variables. They sit in Terraform state, which I accept for a workshop.
     *`infra/secrets.tf:6, 14`*
@@ -845,7 +865,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Each layer only calls the one below it" | "Dependencies only point downward" | `api/app.py:17` imports store; services run SQL |
 | "Four layers: api, services, store, Postgres" | "api, services, store, plus domain shared by all" | `domain/` exists and every layer uses it |
 | "Every API route is tested over HTTP" | "Every route is called in-process with a Lambda-shaped event; real HTTP is covered by the demo script and Playwright" | `test_api.py` calls `app.dispatch()` |
-| "The uncovered 4% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:239` |
+| "The uncovered 3% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:248` |
 | "The rule tests prove the layers are separate" | "The rule tests show services don't need HTTP; the import direction is what keeps them separate" | No test enforces imports |
 | "Real Postgres, not mocks" (right after "302 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
@@ -873,8 +893,9 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
    row locks are done).
 3. Tests for the five untested rules, and for the database dropping mid-request.
 4. RDS Proxy, and risk sorting in SQL so the dashboard pages in the database.
-5. Security: a `password_changed_at` column so a password change ends old sessions; the
-   current password before an email change; refresh tokens. (Login timing for unknown
+5. Security: the current password before an email change; the refresh token in an
+   HttpOnly cookie instead of `sessionStorage` (needs a proxy change locally). (Built 14 Oct:
+   15-minute tokens, refresh tokens, and a password change ending old sessions. Login timing for unknown
    usernames was fixed on 14 Oct in the working tree, on AWS after the next backend
    deploy; see [§6](#6-security).)
 6. Email: a private endpoint to SES and a single-use, expiring set-password link
@@ -897,7 +918,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 506 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 536 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -914,15 +935,15 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 506 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 302 / 94.78% | Website tests / statements (95.88% of lines) | 14 Oct |
-| 66 | Routes in the one route table | 14 Oct |
+| 536 / 97% | Backend tests / coverage (API layer 100%) | 14 Oct |
+| 313 / 94.85% | Website tests / statements (95.93% of lines) | 14 Oct |
+| 68 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
-| 10 + 1 | Tables: ten for the app, plus `schema_migrations` | 14 Oct |
-| 41 / 26 | CHECK rules / foreign keys | 14 Oct |
-| 1 / 10 | Exclusion constraint (no double-booking on one project) / triggers (no DELETE; audit log append-only) | 14 Oct |
+| 11 + 1 | Tables: eleven for the app (with `refresh_tokens`), plus `schema_migrations` | 14 Oct, after migration 005 |
+| 50 / 29 | CHECK rules / foreign keys (counted in `pg_constraint`) | 14 Oct, after migration 005 |
+| 1 / 11 | Exclusion constraint (no double-booking on one project) / triggers (no DELETE; audit log append-only) | 14 Oct, after migration 005 |
 | 600,000 | PBKDF2 rounds; login about 1.1 s at 512 MB | 13 Oct |
-| 8 h | Token lifetime; no refresh token | code |
+| 15 min / 8 h | Access token / refresh tokens, counted from login | code |
 | 539 req/s | 25 users on AWS, p95 57 to 65 ms (read-only, tiny data) | 13 Oct |
 | 6 / 13 ms | Inside the Lambda, p50 / p95 | 13 Oct |
 | 9.8 s vs 10 s | Last staircase step vs the lock timeout; after the fix, 0.17 to 0.30 s | 13 Oct |
@@ -933,6 +954,8 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 - Email/SMS: blocked by role + VPC (no `ses:` permission, no way out of the network), so
   passwords are shown once instead (answer 22a).
 - Pull board: built 14 Oct (66 routes, 2 migrations; answer 5a). Local only until the next deploy.
+- Tokens: 15-minute access token plus a rotating refresh token, built 14 Oct (68 routes,
+  migration 005; answer 9). Local only until the next deploy; deploy backend and website together.
 
 **Ten files** (under `backend/tracker/` unless shown)
 

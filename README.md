@@ -49,6 +49,13 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
 - **`api/routes.py`** is the one route table: method, path, which roles may call it.
   `api/app.py` reads the token, then **re-reads the user's role from the database** on
   every request, so a demoted user's old token can't keep powers it no longer has.
+- **Sessions (`services/tokens.py`, `services/sessions.py`).** Login returns a 15-minute
+  access token (a JWT) and a refresh token (random, only its SHA-256 stored in
+  `refresh_tokens`). `POST /auth/refresh` swaps the refresh token for a new pair and
+  retires the old one; a retired token coming back means someone has a copy, so every
+  session of that user ends. Every refresh token dies 8 hours after login. A password
+  change, an admin reset or archiving a user ends that user's sessions
+  (`users.password_changed_at`, migration 005).
 - **`api/errors.py`** is the one table from domain error to status: 400 validation,
   401 not signed in, 403 role can't, 404 missing *or not yours* (identical messages,
   so ids can't be probed), 409 state refuses (over capacity, dependency loop), 503
@@ -165,11 +172,12 @@ become cards and the grid scrolls sideways (<img src="docs/screenshots/phone-das
 ```
 frontend/src/
   services/request.js   the one module that calls the API: base URL, token, JSON, errors
-                        as { status, message, field }; a 401 signs out in one place
+                        as { status, message, field }; on a 401 it refreshes once and
+                        retries, and only if that fails signs out, in one place
   services/format.js    the only code that turns cents, minutes and dates into text (and
                         typed dollars into cents, as text, never floating point; typed
                         hours and minutes into minutes)
-  auth/                 session (token in sessionStorage, probed with /auth/me on load),
+  auth/                 session (both tokens in sessionStorage, probed with /auth/me on load),
                         RequireRole (signed-out -> login, must change password -> there first)
   components/           layout, DataTable (table on desktop, cards on phones), FormDialog,
                         BudgetBar, StatusChip, PageState (loading / error with Retry / empty)
@@ -215,13 +223,13 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 506 passed
+.venv/bin/pytest -q                                                        # 536 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
-.venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
+.venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 97% of our code
 ```
 
-Against the rubric's coverage goals (`docs/full-stack.md`): backend 96% (goal 80%);
+Against the rubric's coverage goals (`docs/full-stack.md`): backend 97% (goal 80%);
 the API layer (`api/`: routing, auth, error mapping, every handler) 100% (goal 90%), with
 every route in the table called by the two walk tests. They run in-process: a
 Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exercised by
@@ -233,17 +241,18 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 | `test_migrate.py`, `test_store_commits.py`, `test_function.py` | migrations are all-or-nothing and run once; writes really commit; cold start, first admin, 503s |
 | `test_integrity.py` | each integrity query catches a deliberately planted violation |
 | `test_users.py`, `test_audit.py`, `test_projects.py`, `test_work.py`, `test_requests.py`, `test_dashboard.py` | every business rule, calling services directly |
-| `test_api.py` | routing (both path shapes), every non-public route needs a token, role from the database, 404 not 403, error and list shapes, no DELETE anywhere |
+| `test_api.py` | routing (both path shapes), every non-public route needs a token, role from the database, 404 not 403, error and list shapes, no DELETE anywhere, refresh and logout over HTTP, a password change ends older tokens |
 | `test_api_audit_walk.py` | calls every write route and checks each one left an audit row |
 | `test_api_read_walk.py` | calls every read route and checks its shape; audit-log filters; malformed queries and bodies; a crash is a 500 with a generic message (`{"error": ...}`) |
-| `test_domain.py`, `test_security.py` | validation, money, the Eastern-time clock, hashing (and that production stays at 600k rounds), tokens |
+| `test_domain.py`, `test_security.py` | validation, money, the Eastern-time clock, hashing (and that production stays at 600k rounds), tokens (valid at 14:59, refused at 15:00) |
+| `test_sessions.py` | refresh tokens: only the hash is stored, rotation, fixed 8-hour expiry, reuse ends every session, logout twice is fine |
 
 ### Frontend tests
 
 ```sh
 cd frontend
-npm test                                  # 302 passed: Vitest + React Testing Library
-npm run test:coverage                     # 94.78% of statements, 95.88% of lines
+npm test                                  # 313 passed: Vitest + React Testing Library
+npm run test:coverage                     # 94.85% of statements, 95.93% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
 ```
@@ -258,9 +267,9 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
   `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
   `requests.spec.js`: an employee asks her line manager, he rejects it with a note from
   To decide, and she reads the answer at phone width.
-- Against the rubric's goals: frontend 94.78% of statements (goal 80%); the demo journey end to end.
+- Against the rubric's goals: frontend 94.85% of statements (goal 80%); the demo journey end to end.
 
-**Known gaps (the uncovered 4% of the backend, 5% of the frontend):**
+**Known gaps (the uncovered 3% of the backend, 5% of the frontend):**
 
 - a manager cannot put a task back to Ready from the screen (the Assign dialog has no
   empty choice); the API allows it (`PATCH /tasks/{id}` with `assigneeUserId: null`);
@@ -370,8 +379,13 @@ The first request after a deploy migrates Aurora and creates `AD000001`.
 - **Cost arithmetic in SQL.** Budget and risk figures sum `minutes x rate / 60` in SQL,
   one aggregate query rather than a row-by-row loop, using the same rounding as
   `domain/money.py`. The budget test pins the two together.
-- **No refresh tokens.** Tokens expire after 8 hours, then sign in again. One token can't be
-  revoked, but the user is re-read on every request, so archiving them ends all their tokens.
+- **Refresh token in the response body, not a cookie.** It sits in `sessionStorage` next to
+  the access token. An HttpOnly cookie would hide it from page scripts, but locally the
+  page (:3000) and the proxy (:3001) are different origins and the proxy answers
+  `Access-Control-Allow-Origin: *`, which browsers never combine with cookies. Rotation
+  and reuse detection limit a copied token: the second use signs both sides out. A
+  duplicated browser tab copies `sessionStorage`, so whichever copy refreshes second
+  signs both out ([design](./docs/superpowers/specs/2026-10-14-tokens-design.md)).
 - **Secrets in Terraform state.** The JWT secret and the first admin's password are
   generated by Terraform, so they are in its state file. The forced password change
   limits the exposure.
@@ -385,11 +399,8 @@ The first request after a deploy migrates Aurora and creates `AD000001`.
   endpoint, and our role can't create either. So a new or reset password is shown once to
   the admin and must be changed at first sign-in
   ([findings](./docs/superpowers/specs/2026-10-14-email-and-sms-findings.md)).
-- **Known security gaps.** A password change doesn't end old sessions: a token carries
-  only the user id, and `verify` never checks when it was issued
-  (`services/tokens.py:47-59`); the fix is a `password_changed_at` column. And changing
-  your own email needs no current password (`update_self`, `services/users.py`), which
-  would matter once an emailed reset exists.
+- **Known security gap.** Changing your own email needs no current password
+  (`update_self`, `services/users.py`), which would matter once an emailed reset exists.
 
 ## Contributing
 

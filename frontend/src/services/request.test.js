@@ -212,6 +212,18 @@ describe('request() after the 15-minute access token expires', () => {
     expect(refreshed).toHaveBeenCalledWith({ token: 'new', refreshToken: 'new-refresh' })
   })
 
+  it('signs out when the refresh cannot reach the server', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    serve({ '/projects': [[401, {}]] })
+    const answering = fetchMock.getMockImplementation()
+    fetchMock.mockImplementation((url, init) => (url.endsWith('/auth/refresh')
+      ? Promise.reject(new TypeError('Failed to fetch'))
+      : answering(url, init)))
+    await expect(request('GET', '/projects')).rejects.toMatchObject({ status: 401 })
+    expect(handler).toHaveBeenCalledOnce()
+  })
+
   it('signs out without calling the server when there is no refresh token', async () => {
     const handler = vi.fn()
     setUnauthorizedHandler(handler)

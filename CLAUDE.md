@@ -33,7 +33,12 @@ outdated it.
   (migration `004_over_capacity.sql`; spec `docs/superpowers/specs/2026-10-14-overtime-design.md`):
   logging past weekly capacity without overtime answers 409 with `code: "OVER_CAPACITY"`,
   the website asks **Log anyway**, and the resent entry is saved, marked "Over capacity"
-  and the manager is told. Tests: 506 backend, 302 website, and 22 Playwright browser
+  and the manager is told. Also not deployed: **15-minute access tokens and refresh
+  tokens** (migration `005_sessions.sql`; spec
+  `docs/superpowers/specs/2026-10-14-tokens-design.md`): `POST /auth/refresh` rotates the
+  refresh token (reuse of an old one ends every session of that user), `POST /auth/logout`
+  revokes it, and a password change, reset or archive ends the user's older sessions.
+  Tests: 536 backend, 313 website, and 22 Playwright browser
   tests in 8 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
   `e2e/tour.spec.js` screenshots every screen at desktop and phone width;
@@ -52,8 +57,8 @@ outdated it.
   - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
     email or texts (role and network), and the design for any future reset flow;
   - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
-    a per-person task limit), built 14 Oct (66 routes; four migration files since
-    `004_over_capacity.sql`).
+    a per-person task limit), built 14 Oct (68 routes; five migration files since
+    `005_sessions.sql`).
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
   and cleanup scripts, and `terraform apply`/`destroy`. Every other shell command runs
@@ -62,13 +67,11 @@ outdated it.
 - **Open items:**
   - deploy the three charts and requests for everyone: `git push origin David`, then
     `./bin/deploy-backend.sh` (the server's `plannedPercent` and `pendingPercent`, and
-    migrations 003 and 004 on the first cold start) and `./bin/deploy-frontend.sh`;
+    migrations 003 to 005 on the first cold start) and `./bin/deploy-frontend.sh`
+    (deploy both together: the old website knows no refresh and signs out after 15 min);
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
   - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8);
-  - old sessions survive a password change: tokens carry only the user id and `verify`
-    never checks when one was issued (`services/tokens.py:47-59`); fix with
-    `password_changed_at`;
   - changing your own email needs no current password (`update_self` in
     `services/users.py`); it matters once an emailed reset exists;
 
@@ -84,7 +87,7 @@ disagrees.
 | Question | Decision |
 | --- | --- |
 | Manager model (plan §2.1) | (a) org chart. `users.manager_id` is the line manager. Any manager staffs anyone onto projects they manage. Employees never choose projects |
-| Accounts | Admin creates accounts. The server generates the username (`^[A-Z]{2}[0-9]{6}$`, initials plus 6 digits, **never changes**) and a 12-character password (`secrets`), shown once. Login is by username. A forced change on first login (every route but change-password and "me" answers 403). Self-edit: name and email only. Forgotten password: admin reset. Emailed reset code is a stretch goal. Checked 14 Oct: the Lambda can't send email or texts. Its role has no `ses:` permission, and it sits in a VPC with no NAT gateway or email/SNS endpoint, which our role can't create |
+| Accounts | Admin creates accounts. The server generates the username (`^[A-Z]{2}[0-9]{6}$`, initials plus 6 digits, **never changes**) and a 12-character password (`secrets`), shown once. Login is by username and returns a 15-minute access token plus a refresh token (8 h from login, rotated on each use; `services/sessions.py`). A forced change on first login (every route but change-password and "me" answers 403). Self-edit: name and email only. Forgotten password: admin reset. Emailed reset code is a stretch goal. Checked 14 Oct: the Lambda can't send email or texts. Its role has no `ses:` permission, and it sits in a VPC with no NAT gateway or email/SNS endpoint, which our role can't create |
 | Consumed cost (§2.2) | **Time logged on tasks** (date, minutes, note), as in Jira and OpenProject, not Workday. Only the task's assignee logs. Only approved entries cost money, at the `hourly_rate_cents` frozen on the entry when logged. Clock in/out, pay periods, overtime review and overtime premiums were **removed on 13 Oct** as payroll features |
 | Overtime | Each person has `weekly_capacity_hours` (default 40) and `overtime_allowed` (default off), set by their line manager or an admin. Logging past capacity in a Mon-to-Sun week without overtime **asks first** (409, `code: "OVER_CAPACITY"`, changed 14 Oct); resent with `confirmOverCapacity: true` it is saved, marked `over_capacity`, and the notification says by how much. When allowed, it is saved unmarked and the week is flagged |
 | Over-allocation | Bookings above a person's capacity are **allowed and flagged** (question 5), not refused. One booking is 1 to 40 h/week; no overlapping live bookings per person per project |
@@ -116,7 +119,7 @@ backend/tracker/                 # one Lambda; the URL segment is /api/tracker/.
 ├── requirements.txt             # psycopg[binary] only
 ├── .gitignore                   # the pip packages start-dev.sh vendors here (trap 4)
 ├── store/
-│   ├── migrations/              # 001_init.sql to 004_over_capacity.sql; never edit one that has run on Aurora
+│   ├── migrations/              # 001_init.sql to 005_sessions.sql; never edit one that has run on Aurora
 │   ├── migrate.py               # applies new migrations on cold start, under an advisory lock
 │   ├── integrity.py             # the 5 integrity queries
 │   └── postgres.py              # connection, atomic(), queries; psycopg errors -> domain errors
@@ -127,6 +130,7 @@ backend/tracker/                 # one Lambda; the URL segment is /api/tracker/.
 ├── services/                    # business rules, no framework or HTTP imports
 │   ├── auth.py  users.py  projects.py  deliverables.py  resources.py
 │   ├── timesheets.py  budget.py  dashboard.py  requests.py
+│   ├── tokens.py  sessions.py   # 15-minute access token; refresh tokens (rotation, reuse detection)
 │   └── audit.py                 # record_change(): audit row + notifications
 └── api/
     ├── routes.py                # the one route table: method, path, roles, handler
@@ -245,7 +249,8 @@ resources, budget, dependencies, tasks (created, assigned, claimed from the boar
 back, status moved), time entries (logged, edited, approved, rejected), capacity,
 overtime and task-limit settings, and requests of every kind and their decisions (a
 decision also notifies the asker, through `record_change(..., also_notify=)`). Reads
-are not logged.
+are not logged. Nor are sessions (login, refresh, logout): a refresh every 15 minutes
+would flood the log and the admins' bells.
 Refused requests (403, 404, 409) changed nothing, so they are not logged either.
 
 | Actor's role (stored in the DB at the time) | Who is notified |
@@ -514,8 +519,9 @@ deployed URL:
   Lambda handler is a plain `handler(event, context)`. Don't add FastAPI or MongoDB.
 - **Plan §16 rules out email notifications.** That still holds. The in-app
   notifications in §2 above are a different feature, and they are in scope.
-- **The rubric expects token refresh.** It lists "token expiration and refresh". We do
-  expiry plus a clean re-login, and list refresh tokens as a deliberate omission (§16).
+- **The rubric expects token refresh.** It lists "token expiration and refresh". Built
+  14 Oct: a 15-minute access token and a rotating refresh token in the response body
+  (not a cookie; why is in `docs/superpowers/specs/2026-10-14-tokens-design.md` §2).
 - **How scoring works.** Five technical scores (Implementation, Design, Code, Testing,
   Experience) and three soft-skill scores (Curious, Observant, Driven), each 1 to 10. The
   final score is the average of the two averages, and 9 or above is excellent.
