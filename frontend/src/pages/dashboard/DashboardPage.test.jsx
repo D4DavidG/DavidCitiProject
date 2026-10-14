@@ -89,6 +89,7 @@ describe('DashboardPage', () => {
   it('says so when there are no projects', async () => {
     renderDashboard({ 'GET /dashboard/projects': [200, page([])] })
     expect(await screen.findByText(/no projects to show/i)).toBeInTheDocument()
+    expect(screen.queryByRole('figure', { name: 'Budget by project' })).not.toBeInTheDocument()
   })
 
   it('shows the error and retries', async () => {
@@ -97,6 +98,7 @@ describe('DashboardPage', () => {
       'GET /dashboard/projects': () => (++attempts === 1 ? [503, { error: 'The database is not ready. Please try again shortly.' }] : [200, page([APOLLO])]),
     })
     expect(await screen.findByText(/database is not ready/i)).toBeInTheDocument()
+    expect(screen.queryByRole('figure', { name: 'Budget by project' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /retry/i }))
     expect(await screen.findByRole('article', { name: 'Apollo' })).toBeInTheDocument()
   })
