@@ -306,6 +306,27 @@ def test_logging_less_never_asks(conn, org):
     assert row["over_capacity"] is False
 
 
+def test_trimming_a_rejected_entry_past_capacity_still_asks(conn, org):
+    # A rejected entry is outside the totals; editing it brings it back, so it is checked like new work.
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20})
+    mon = log(conn, org["alice"], t, "2026-10-12", 8)
+    time_entries.decide_entry(conn, org["bob"], mon["entry_id"], approve=False)
+    log(conn, org["alice"], t, "2026-10-13", 10)
+    log(conn, org["alice"], t, "2026-10-14", 10)
+    with pytest.raises(OverCapacity, match="7 h over"):
+        time_entries.edit_entry(conn, org["alice"], mon["entry_id"], {"minutes": 7 * 60})
+
+
+def test_note_only_edit_of_a_rejected_entry_still_checks_the_24_hour_day(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    wrong = log(conn, org["alice"], t, "2026-10-12", 20)
+    time_entries.decide_entry(conn, org["bob"], wrong["entry_id"], approve=False)
+    log(conn, org["alice"], t, "2026-10-12", 20)
+    with pytest.raises(Conflict, match="24"):
+        time_entries.edit_entry(conn, org["alice"], wrong["entry_id"], {"note": "fixed"})
+
+
 def test_allowed_overtime_is_not_marked(conn, org):
     t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
     users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20, "overtime_allowed": True})

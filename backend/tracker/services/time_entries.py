@@ -120,8 +120,8 @@ def log_time(conn: psycopg.Connection, actor: Actor, task_id: int, data: dict) -
 
 
 def edit_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, data: dict) -> dict:
-    """Change your own entry. It goes back to pending approval. Only a change of hours or date
-    rechecks the limits and the over-capacity mark."""
+    """Change your own entry. It goes back to pending approval. A change of hours or date, or any
+    edit of a rejected entry, rechecks the limits and the over-capacity mark."""
     values.only_allowed(data, _FIELDS)
     confirmed = _confirmed(data)
     clean = _clean(data, partial=True)
@@ -134,8 +134,11 @@ def edit_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, data: dict
             raise NotFound(NOT_FOUND)
         merged = {**before, **clean}
         over, mark = 0, before["over_capacity"]  # a note-only edit checks nothing and keeps its mark
-        if "minutes" in clean or "work_date" in clean:
-            less = merged["work_date"] == before["work_date"] and merged["minutes"] <= before["minutes"]
+        # A rejected entry isn't in the totals; going back to pending brings it in, so it is new work.
+        rejoining = before["status"] == "REJECTED"
+        if rejoining or "minutes" in clean or "work_date" in clean:
+            less = (not rejoining and merged["work_date"] == before["work_date"]
+                    and merged["minutes"] <= before["minutes"])
             # Logging less never asks, and never marks an entry that was inside capacity.
             over = _check_limits(conn, actor.user_id, before["project_id"], merged["work_date"], merged["minutes"],
                                  entry_id, confirmed or less)

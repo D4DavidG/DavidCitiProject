@@ -4,7 +4,7 @@ What to say to the Citi evaluators (15 Oct) and in later job interviews. It cove
 say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minute-demo).
 
 **Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
-final fix wave, the project-manager notifications and requests for everyone, and the overtime warning: 504 backend
+final fix wave, the project-manager notifications and requests for everyone, and the overtime warning: 506 backend
 tests, 302 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
@@ -32,7 +32,7 @@ points at a file and line you can open.
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 504 backend tests running against a real Postgres database,
+> with Terraform. There are 506 backend tests running against a real Postgres database,
 > and 302 website tests."
 
 ### 2 minutes
@@ -350,7 +350,7 @@ from the token."
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "504 backend tests against a real Postgres database, at
+**Headline (fresh, 14 Oct 2026):** "506 backend tests against a real Postgres database, at
 96% coverage, with the API layer at 100%. Plus 302 website tests at 94.78% of
 statements, and 22 Playwright browser tests."
 
@@ -367,7 +367,7 @@ statements, and 22 Playwright browser tests."
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct (after the overtime warning):** backend `504 passed in 20.14s`;
+- **Fresh numbers, 14 Oct (after the overtime warning):** backend `506 passed in 19.44s`;
   coverage `1920 statements, 68 missed, 96%`. By folder: `api/` 100%, `function.py` 100%,
   `domain/` 99%, `services/` 95.5%, `store/` 93.9%. Website: 31 files, `302 passed`, about
   a minute and a half. Website coverage: 94.78% of statements, 95.88% of lines, 91.24% of
@@ -537,7 +537,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **504 backend, 302 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **506 backend, 302 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **96% of statements** (94% with
@@ -897,7 +897,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 504 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 506 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -914,7 +914,7 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 504 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
+| 506 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
 | 302 / 94.78% | Website tests / statements (95.88% of lines) | 14 Oct |
 | 66 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
