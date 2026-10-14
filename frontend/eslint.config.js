@@ -26,4 +26,9 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    // Node-side files: the Playwright config and end-to-end tests.
+    files: ['e2e/**/*.js', 'playwright.config.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
 ])

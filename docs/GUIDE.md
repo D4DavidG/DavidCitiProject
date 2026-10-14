@@ -41,17 +41,18 @@ What's done and what isn't, honestly:
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
 | Tests | 370 passing; 96% coverage overall, 100% for the API layer |
 | AWS deployment | Verified 13 Oct: health, login, token, 404s, demo, load test |
-| Frontend (React, Material UI) | **Not started.** It's the next build step |
+| Frontend (React, Material UI) | **Demo screens built and tested** (14 Oct, overnight): login, dashboard, allocation grid, projects, deliverables, dependency view. Live on AWS after `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
 
 ---
 
 ## 2. What you can do with it right now
 
-There's no website yet, so everything runs from a **terminal** and is shown as
-**text and JSON**. That's normal for a backend. Five things you can show:
+There's a **website** for the demo screens, and the **terminal** shows the rest as text
+and JSON. Things you can show:
 
 | You can... | How | Section |
 | --- | --- | --- |
+| Click through the app as a manager: dashboard, allocation grid, a project, its dependencies | The CloudFront URL (after `./bin/deploy-frontend.sh`), or `http://localhost:3000` locally | 3 |
 | Run the whole story: the seven answers, then every rule refusing bad input | `python3 tools/demo.py demo` | 3 |
 | Prove the code works | `.venv/bin/pytest -q`: 370 tests in about 12 s | 3, 9 |
 | Show it's live on AWS | `curl .../health`, the demo against AWS, the AWS console | 5 |
@@ -83,7 +84,27 @@ with: `(set -a; source ENVIRONMENT.config; terraform -chdir=infra output -raw ap
 
 Also open `README.md` in VS Code, and on GitHub in a browser tab.
 
-### The script
+### The website script (lead with this)
+
+Open `https://d1gov8jpsxhwer.cloudfront.net` (after `./bin/deploy-frontend.sh`; locally,
+`http://localhost:3000` once `./bin/start-dev.sh` is running). Sign in as the manager
+Maria: her username is printed by `python3 tools/demo.py demo`, and the password is
+`Demo-pass-2026`.
+
+| Step | Click | Say |
+| --- | --- | --- |
+| 1 | You land on **Dashboard** | "A manager's first screen answers questions 1, 2 and 7: every project's status, whether it's at risk and why, and budget spent against planned. At-risk projects come first." |
+| 2 | Point at Apollo's red **At risk** and its reason | "The reason is in words, worked out by the server from the deliverables, the dates and the money." |
+| 3 | **Allocation** in the menu | "Questions 3 and 5: people down the side, weeks across. Ben is red: 45 hours booked against 40." Hover his cell: "25 on Apollo, 20 on Zeus. Neither manager could see that alone, because it spans projects." |
+| 4 | Flip **Only over-allocated** | "The server filters and sorts the worst first. A week with nobody over says so; that's good news, not an empty table." |
+| 5 | **Projects**, then **Apollo** | "Question 4: deliverables with progress computed from their tasks." Open **Show tasks** on Build. |
+| 6 | Click **Sign off** on Build | The server refuses: "2 tasks are not done yet." "The rule is enforced on the server; the screen just shows its answer." |
+| 7 | **Resources** and **Budget** tabs | "Who is booked for how many hours, and the money: planned from bookings, spent from approved time." |
+| 8 | **Dependency view** | "Question 6: read left to right. Launch is blocked until Build is done. Try to add a loop and the server says no." |
+| 9 | Make the window narrow (or open it on your phone) | "Responsive: the menu becomes a drawer, tables become cards, the grid scrolls sideways." |
+| 10 | Then the terminal script below, from step 6 | The refusals, the integrity check and the tests. |
+
+### The terminal script
 
 | Step | Do | Say |
 | --- | --- | --- |

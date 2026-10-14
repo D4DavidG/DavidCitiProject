@@ -14,7 +14,7 @@ behalf so you can overrule it. The plan being followed is
 | 3 | Login and change password | Done |
 | 4 | Dashboard (questions 1, 2, 7) | Done |
 | 5 | Allocation grid (questions 3, 5) | Done |
-| 6 | Projects list and detail | Not started |
+| 6 | Projects list and detail | Done |
 | 7 | Dependency view and end-to-end tests | Not started |
 | 8 | My tasks | Not started |
 | 9 | Approvals | Not started |
@@ -100,6 +100,27 @@ Filled in at the end of the run.
 - **On phones** the grid scrolls sideways with the name column pinned.
 - **Tests:** 94 in total, all passing.
 
+### Task 6: Projects list and project detail (questions 1, 4, 7; the CRUD)
+
+- **Projects list:** search, status filter, and (admins) "Show archived". A table on
+  desktop, cards on phones. Admins get "New project": name, manager, dates and a budget
+  typed in dollars.
+- **Project page:** status, % done, dates and manager, then three tabs (employees don't
+  see Budget), plus a "Dependency view" button.
+  - **Deliverables:** each shows status, progress ("0% · 0 of 2 tasks done") and due date.
+    "Show tasks" lists the tasks with assignee, estimate and status. Managers can add or
+    edit deliverables and tasks, sign off (the server refuses unfinished work and its
+    message is shown, e.g. "2 tasks are not done yet"), reopen, and archive.
+  - **Resources:** who's booked, hours per week and dates. "Book someone", edit, archive.
+    A note explains that booking past capacity is allowed and shows on the Allocation grid.
+  - **Budget:** the budget bar plus seven figures: budget, planned, spent, waiting for
+    approval, remaining, % spent, % of schedule gone.
+- **Archive, never delete:** every archive asks first, and explains that the record is
+  kept and can be reactivated. The word "delete" appears nowhere.
+- **Who can change what:** buttons only appear for the project's manager or an admin.
+  Employees get a read-only view (the server enforces the same).
+- **Tests:** 122 in total, all passing.
+
 ## Decisions made for you
 
 Each line is something the plan or your answers didn't settle, with what it costs if
@@ -124,6 +145,12 @@ it's wrong.
   wrong: a small server endpoint for portfolio totals.
 - **A "Search" button next to the search box:** pressing Enter alone can't submit that
   form because of how the status dropdown is built. Cost if wrong: none.
+- **No "over capacity" warning on the booking itself:** the bookings endpoint doesn't
+  return capacity, so the Resources tab points to the Allocation grid, where
+  over-allocation is worked out. Cost if wrong: add capacity to the bookings endpoint.
+- **Money and hours are typed in human units:** budgets in dollars ("150,000") and
+  estimates in hours ("2.5"). They're converted to cents and minutes in one place, with
+  text-based parsing (no rounding errors). Cost if wrong: none.
 - **Dates on screen:** plain dates (due dates, start dates) are shown exactly as stored;
   timestamps (when something happened) are shown in Eastern time, like the server. Cost
   if wrong: a one-line change in `format.js`.
