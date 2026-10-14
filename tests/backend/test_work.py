@@ -7,7 +7,7 @@ import pytest
 
 import factories as f
 from domain.errors import Conflict, DependencyCycle, Forbidden, NotFound, OverCapacity, ValidationError
-from services import milestones, projects, tasks, time_entries, users
+from services import assignments, milestones, projects, tasks, time_entries, users
 
 
 @pytest.fixture
@@ -477,3 +477,60 @@ def test_put_back_keeps_logged_time_and_stops_further_logging(conn, org):
     assert owner == org["alice"].user_id
     with pytest.raises(Forbidden):
         log(conn, org["alice"], t, "2026-10-13", 1)
+
+
+# --- board and Ready to take --------------------------------------------------------
+
+def test_board_lists_every_live_task_and_each_booked_persons_load(conn, org):
+    ready(conn, org)
+    f.task(conn, org["bob"], org["build"], assignee=org["alice"], title="Mine")
+    gone = f.task(conn, org["bob"], org["design"], title="Gone")
+    tasks.archive_task(conn, org["bob"], gone["task_id"])
+    result = tasks.board(conn, org["alice"], org["apollo"]["project_id"])
+    assert {t["title"] for t in result["items"]} == {"Ready one", "Mine"}
+    by_title = {t["title"]: t for t in result["items"]}
+    assert (by_title["Mine"]["milestone_name"], by_title["Mine"]["assignee_name"]) == ("Build", "Alice Tester")
+    assert result["people"] == [
+        {"user_id": org["alice"].user_id, "name": "Alice Tester", "held": 1, "task_limit": 2},
+        {"user_id": org["eve"].user_id, "name": "Eve Tester", "held": 0, "task_limit": 2}]
+
+
+def test_two_bookings_on_one_project_list_a_person_and_a_task_once(conn, org):
+    f.booking(conn, org["bob"], org["apollo"], org["alice"], start_date="2027-01-01", end_date="2027-03-31")
+    ready(conn, org)
+    assert [p["name"] for p in tasks.board(conn, org["bob"], org["apollo"]["project_id"])["people"]] == [
+        "Alice Tester", "Eve Tester"]
+    assert [t["title"] for t in tasks.ready_tasks(conn, org["alice"])["items"]] == ["Ready one"]
+
+
+def test_board_of_a_project_you_cannot_see_is_not_found(conn, org):
+    with pytest.raises(NotFound, match="^Project not found.$"):
+        tasks.board(conn, org["carol"], org["apollo"]["project_id"])
+
+
+def test_ready_tasks_are_unassigned_unfinished_live_tasks_on_my_booked_projects(conn, org):
+    ready(conn, org)
+    f.task(conn, org["bob"], org["design"], assignee=org["eve"], title="Assigned")
+    finished = f.task(conn, org["bob"], org["design"], assignee=org["eve"], title="Finished")
+    tasks.move_task(conn, org["eve"], finished["task_id"], "DONE")
+    tasks.update_task(conn, org["bob"], finished["task_id"], {"assignee_user_id": None})
+    archived = f.task(conn, org["bob"], org["design"], title="Archived")
+    tasks.archive_task(conn, org["bob"], archived["task_id"])
+    zeus_ms = f.deliverable(conn, org["carol"], org["zeus"], name="Zeus work")
+    f.task(conn, org["carol"], zeus_ms, title="Elsewhere")
+    result = tasks.ready_tasks(conn, org["alice"])
+    assert ([t["title"] for t in result["items"]], result["held"], result["limit"]) == (["Ready one"], 0, 2)
+
+
+# Review Focus 4
+def test_manager_clears_a_task_held_by_someone_no_longer_booked(conn, org):
+    t = ready(conn, org)
+    tasks.claim_task(conn, org["alice"], t["task_id"])
+    booking_id = conn.execute("SELECT assignment_id FROM assignments WHERE user_id = %s AND project_id = %s",
+                              (org["alice"].user_id, org["apollo"]["project_id"])).fetchone()["assignment_id"]
+    assignments.archive_booking(conn, org["bob"], booking_id)
+    with pytest.raises(NotFound, match="^Task not found.$"):
+        tasks.release_task(conn, org["alice"], t["task_id"])
+    tasks.update_task(conn, org["bob"], t["task_id"], {"assignee_user_id": None})
+    assert tasks.held_count(conn, org["alice"].user_id) == 0
+    assert [x["task_id"] for x in tasks.ready_tasks(conn, org["eve"])["items"]] == [t["task_id"]]

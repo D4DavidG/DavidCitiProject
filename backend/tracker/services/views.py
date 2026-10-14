@@ -133,3 +133,8 @@ def audit_view(row: dict) -> dict:
         "entityType": "entity_type", "entityId": "entity_id", "beforeState": "before_state",
         "afterState": "after_state", "summary": "summary", "createdAt": "created_at",
     })
+
+
+def holder_view(row: dict) -> dict:
+    """A booked person's load on a board: how many unfinished tasks they hold, and their limit."""
+    return _pick(row, {"userId": "user_id", "name": "name", "held": "held", "limit": "task_limit"})

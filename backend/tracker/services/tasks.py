@@ -232,3 +232,28 @@ def my_tasks(conn: psycopg.Connection, actor: Actor) -> list[dict]:
     """Your open tasks on live projects, oldest first."""
     return conn.execute(f"{_WITH_NAMES} WHERE t.assignee_user_id = %s AND t.status <> 'DONE' AND NOT t.is_archived"
                         " AND NOT p.is_archived ORDER BY m.due_date, t.task_id", (actor.user_id,)).fetchall()
+
+
+def board(conn: psycopg.Connection, actor: Actor, project_id: int) -> dict:
+    """A project's board: every live task, and each booked person's held count and limit."""
+    visible_project(conn, actor, project_id)  # 404 if it isn't yours
+    items = conn.execute(f"{_WITH_NAMES} WHERE t.project_id = %s AND NOT t.is_archived"
+                         " ORDER BY m.due_date, t.task_id", (project_id,)).fetchall()
+    # EXISTS, not a join: a person with two live bookings on the project is listed once.
+    people = conn.execute(
+        sql.SQL("SELECT u.user_id, u.first_name || ' ' || u.last_name AS name, {} AS held, u.task_limit"
+                " FROM users u WHERE NOT u.is_archived AND EXISTS (SELECT 1 FROM assignments a"
+                " WHERE a.user_id = u.user_id AND a.project_id = %s AND NOT a.is_archived)"
+                " ORDER BY u.last_name, u.first_name").format(HELD), (project_id,)).fetchall()
+    return {"items": items, "people": people}
+
+
+def ready_tasks(conn: psycopg.Connection, actor: Actor) -> dict:
+    """Ready to take: unassigned, unfinished tasks on projects you are booked on, plus your held count and limit."""
+    items = conn.execute(
+        sql.SQL("{} WHERE t.assignee_user_id IS NULL AND t.status <> 'DONE' AND NOT t.is_archived"
+                " AND NOT p.is_archived AND EXISTS (SELECT 1 FROM assignments a"
+                " WHERE a.project_id = t.project_id AND a.user_id = %s AND NOT a.is_archived)"
+                " ORDER BY m.due_date, t.task_id").format(sql.SQL(_WITH_NAMES)), (actor.user_id,)).fetchall()
+    limit = conn.execute("SELECT task_limit FROM users WHERE user_id = %s", (actor.user_id,)).fetchone()["task_limit"]
+    return {"items": items, "held": held_count(conn, actor.user_id), "limit": limit}
