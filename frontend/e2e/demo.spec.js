@@ -11,8 +11,12 @@ const DEMO_PASSWORD = 'Demo-pass-2026' // every seeded account's password (tools
 let maria
 
 test.beforeAll(async ({ request }) => {
+  if (process.env.E2E_MANAGER_USERNAME) { // e.g. against AWS, where the demo printed the usernames
+    maria = process.env.E2E_MANAGER_USERNAME
+    return
+  }
   const adminPassword = process.env.E2E_ADMIN_PASSWORD
-  test.skip(!adminPassword, 'Set E2E_ADMIN_PASSWORD to the admin password of the environment under test.')
+  test.skip(!adminPassword, 'Set E2E_ADMIN_PASSWORD (or E2E_MANAGER_USERNAME) for the environment under test.')
   const login = await request.post(`${API}/auth/login`, { data: { username: 'AD000001', password: adminPassword } })
   expect(login.ok(), 'admin login').toBeTruthy()
   const { token } = await login.json()
