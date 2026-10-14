@@ -116,11 +116,15 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 342 passed
+.venv/bin/pytest -q                                                        # 357 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
-.venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 92% of our code
+.venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
 ```
+
+Against the rubric's coverage goals (`docs/full-stack.md`): backend 96% (goal 80%);
+the API layer (`api/`: routing, auth, error mapping, every handler) 100% (goal 90%), with
+every route in the table called over HTTP by the two walk tests.
 
 | File | What it proves |
 | --- | --- |
@@ -130,16 +134,43 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # on
 | `test_users.py`, `test_audit.py`, `test_projects.py`, `test_work.py`, `test_requests.py`, `test_dashboard.py` | every business rule, calling services directly |
 | `test_api.py` | routing (both path shapes), every non-public route needs a token, role from the database, 404 not 403, error and list shapes, no DELETE anywhere |
 | `test_api_audit_walk.py` | calls every write route and checks each one left an audit row |
+| `test_api_read_walk.py` | calls every read route and checks its shape; audit-log filters; malformed queries and bodies; a crash is a bare 500 |
 | `test_domain.py`, `test_security.py` | validation, money, the Eastern-time clock, hashing (and that production stays at 600k rounds), tokens |
 
-**Known gaps (the uncovered 8%):**
+**Known gaps (the uncovered 4%):**
 
-- audit-log filters by entity and date;
-- a few "not found" branches for ids that don't exist;
-- malformed query-parameter values;
+- guard branches in the services for ids that don't exist or records already archived
+  (for example, archiving an archived task); the same guards are tested on other records;
 - the database-down branch inside a request (the cold-start one is tested);
 - the frontend, which is not built yet;
-- no load test yet.
+- the load test has run only against LocalStack, not AWS (below).
+
+### Load test
+
+`tools/loadtest.py` (standard library, like the demo) runs N simulated managers
+looping over the dashboard's reads, then a burst of logins, and prints throughput,
+p50/p95/max per endpoint and failures by status. It exits 1 if anything failed.
+
+```sh
+TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py                        # 10 users, 20 s
+TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py --users 25 --seconds 60
+```
+
+Results on LocalStack (VDI, 13 Oct, seeded data):
+
+| Users | Reads | Throughput | p50 / p95 | Failed | Login p50 |
+| --- | --- | --- | --- | --- | --- |
+| 10 | 1,348 | 60 req/s | 108 / 225 ms | 0 | 1.0 s |
+| 15 | 1,819 | 59 req/s | | 3 (0.2%) | 1.1 s |
+| 25 | 2,120 | 35 req/s | 340 / 2,700 ms | 58 (2.7%) | 2.3 s |
+
+Every failure was a 500 from LocalStack itself, not from our code: its container
+has a 1,024 open-file limit, and past about 15 parallel Lambda environments it logs
+`Could not start new environment ... Too many open files`. Our Lambda logged no
+unhandled errors, and the demo and integrity check were clean afterwards.
+Throughput levels off at about 60 req/s because the emulator runs everything on
+one VDI. The same command against the CloudFront URL measures real AWS, where the
+limits are Lambda concurrency and Aurora's connection count.
 
 ## Live demo from the terminal
 

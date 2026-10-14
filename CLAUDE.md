@@ -527,6 +527,7 @@ Demo against the running API (local proxy, or the deployed URL via `TRACKER_API`
 ```sh
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py seed   # once: users, projects, tasks, time
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then every refusal
+TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py    # concurrent reads + logins; LocalStack fails past ~15 users (its file limit)
 terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first password (per environment)
 ```
 
