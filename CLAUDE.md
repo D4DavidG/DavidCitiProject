@@ -538,6 +538,7 @@ TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py seed   # once: users, projects,
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then every refusal
 TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py    # concurrent reads + logins; LocalStack fails past ~15 users (its file limit)
 terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first password (per environment)
+(set -a; source ENVIRONMENT.config; python3 tools/console.py logs)  # AWS console, signed in (lambda|logs|rds|cloudfront|s3)
 ```
 
 ## 12. Safe to ignore

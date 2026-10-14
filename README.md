@@ -5,6 +5,7 @@ workshop (13 to 15 Oct 2026). It answers the client's seven questions from live 
 React with Material UI on the front (in progress), Python on AWS Lambda behind it,
 PostgreSQL (Aurora) underneath, deployed with Terraform and the repo's shell scripts.
 
+- How it works, how to demo it, likely questions: [docs/GUIDE.md](./docs/GUIDE.md)
 - Scope, rules and screens: [MVP.md](./MVP.md)
 - Database design and reasoning: [docs/superpowers/specs/2026-10-13-database-design.md](./docs/superpowers/specs/2026-10-13-database-design.md)
 - Workshop guides: [docs/README.md](./docs/README.md)
