@@ -4,11 +4,12 @@ import { createContext, useContext } from 'react'
  * The session: who is signed in, and the actions that change that.
  * @typedef {{
  *   user: object|null,
- *   status: 'loading'|'signedOut'|'signedIn',
+ *   status: 'loading'|'signedOut'|'signedIn'|'unavailable',
  *   sessionExpired: boolean,
  *   login: (username: string, password: string) => Promise<object>,
  *   logout: () => void,
  *   refreshUser: () => Promise<object>,
+ *   retrySession: () => void,
  * }} Session
  */
 export const AuthContext = createContext(null)

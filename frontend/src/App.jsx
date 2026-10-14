@@ -6,6 +6,7 @@ import RequireRole from './auth/RequireRole'
 import { STAFF, homePath, useAuth } from './auth/useAuth'
 import AppLayout from './components/AppLayout'
 import PageState from './components/PageState'
+import AccountPage from './pages/account/AccountPage'
 import AllocationPage from './pages/allocation/AllocationPage'
 import ApprovalsPage from './pages/approvals/ApprovalsPage'
 import AuditLogPage from './pages/audit/AuditLogPage'
@@ -25,6 +26,7 @@ import theme from './theme/theme'
 function Home() {
   const { status, user } = useAuth()
   if (status === 'loading') return <PageState loading />
+  if (status === 'unavailable') return <RequireRole><span /></RequireRole> // shows the Retry state
   return <Navigate to={status === 'signedIn' ? homePath(user) : '/login'} replace />
 }
 
@@ -67,6 +69,7 @@ export function AppRoutes() {
         <Route path="/people" element={<RequireRole roles={STAFF}><PeoplePage /></RequireRole>} />
         <Route path="/requests" element={<RequireRole roles={STAFF}><RequestsPage /></RequireRole>} />
         <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/account" element={<AccountPage />} />
         <Route path="/audit" element={<RequireRole roles={['ADMIN']}><AuditLogPage /></RequireRole>} />
         <Route path="*" element={<NotFound />} />
       </Route>

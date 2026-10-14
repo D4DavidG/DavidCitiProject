@@ -4,7 +4,7 @@ import BudgetBar from './BudgetBar'
 import StatusChip from './StatusChip'
 
 describe('BudgetBar', () => {
-  const apollo = { budgetCents: 15_000_000, plannedCents: 3_197_600, consumedCents: 137_000, pendingCents: 153_800, consumedPercent: 0, plannedOverBudget: false }
+  const apollo = { budgetCents: 15_000_000, plannedCents: 3_197_600, consumedCents: 137_000, pendingCents: 153_800, consumedPercent: 0, plannedOverBudget: false, remainingCents: 14_863_000 }
 
   it('states spent against budget, and planned, in words', () => {
     render(<BudgetBar {...apollo} />)
@@ -18,8 +18,14 @@ describe('BudgetBar', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '42')
   })
 
+  it('warns when spending is just over budget, even though the percentage rounds down to 100', () => {
+    // The server floors the percentage, so $5 over a $150,000 budget reads 100%.
+    render(<BudgetBar {...apollo} consumedCents={15_000_500} consumedPercent={100} remainingCents={-500} />)
+    expect(screen.getByText(/over budget/i)).toBeInTheDocument()
+  })
+
   it('caps the bar at 100% and warns when over budget', () => {
-    render(<BudgetBar {...apollo} consumedPercent={130} />)
+    render(<BudgetBar {...apollo} consumedPercent={130} remainingCents={-4_500_000} />)
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100')
     expect(screen.getByText(/over budget/i)).toBeInTheDocument()
   })

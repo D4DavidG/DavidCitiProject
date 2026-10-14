@@ -7,9 +7,12 @@ import { formatCents } from '../services/format'
  * from the server; this only formats them (no money arithmetic in the browser).
  * Consumed = approved time; pending = logged but not yet approved; planned = bookings.
  */
-export default function BudgetBar({ budgetCents, consumedCents, plannedCents, pendingCents, consumedPercent, plannedOverBudget }) {
+export default function BudgetBar({
+  budgetCents, consumedCents, plannedCents, pendingCents, consumedPercent, remainingCents, plannedOverBudget,
+}) {
   const hasBudget = budgetCents > 0
-  const over = hasBudget && consumedPercent > 100
+  // The server's remaining figure, not the (rounded-down) percentage: $5 over still reads 100%.
+  const over = hasBudget && remainingCents < 0
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
@@ -47,5 +50,7 @@ BudgetBar.propTypes = {
   pendingCents: PropTypes.number,
   /** consumed / budget, as the server computed it; null without a budget. */
   consumedPercent: PropTypes.number,
+  /** budget - consumed, from the server; negative means over budget. */
+  remainingCents: PropTypes.number,
   plannedOverBudget: PropTypes.bool,
 }

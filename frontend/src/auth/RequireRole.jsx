@@ -11,10 +11,17 @@ import PageState from '../components/PageState'
  * can't use.
  */
 export default function RequireRole({ roles, children }) {
-  const { status, user } = useAuth()
+  const { status, user, retrySession } = useAuth()
   const location = useLocation()
 
   if (status === 'loading') return <PageState loading />
+  if (status === 'unavailable') {
+    return (
+      <Box sx={{ p: 3 }}>
+        <PageState error="Can't reach the server to check your session. The database may be waking up; try again in a few seconds." onRetry={retrySession} />
+      </Box>
+    )
+  }
   if (status !== 'signedIn') return <Navigate to="/login" replace state={{ from: location.pathname }} />
   if (user.mustChangePassword && location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />

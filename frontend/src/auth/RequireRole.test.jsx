@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import RequireRole from './RequireRole'
 import { USERS, renderAt, session } from '../test/utils'
@@ -41,6 +42,15 @@ describe('RequireRole', () => {
   it('sends someone who must change their password to that page first', () => {
     renderGuarded(session({ ...USERS.manager, mustChangePassword: true }), ['MANAGER'])
     expect(screen.getByText('change password page')).toBeInTheDocument()
+  })
+
+  it('offers a retry when the session could not be checked, without signing out', async () => {
+    const retrySession = vi.fn()
+    renderGuarded(session(null, { status: 'unavailable', retrySession }), ['MANAGER'])
+    expect(screen.queryByText('login page')).not.toBeInTheDocument()
+    expect(screen.getByText(/can't reach the server/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /retry/i }))
+    expect(retrySession).toHaveBeenCalled()
   })
 
   it('shows a loading state while the session is being checked', () => {

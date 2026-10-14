@@ -49,6 +49,17 @@ describe('AuthProvider', () => {
     expect(sessionStorage.getItem('acme.token')).toBeNull()
   })
 
+  it('keeps the token and offers a retry when the server is unavailable, rather than signing out', async () => {
+    sessionStorage.setItem('acme.token', 'stored-token')
+    let attempts = 0
+    stubApi({
+      'GET /auth/me': () => (++attempts === 1 ? [503, { error: 'The database is not ready. Please try again shortly.' }] : [200, USERS.manager]),
+    })
+    renderProvider()
+    await screen.findByText('status: unavailable')
+    expect(sessionStorage.getItem('acme.token')).toBe('stored-token')
+  })
+
   it('logs in, stores the token and the user', async () => {
     const calls = stubApi({ 'POST /auth/login': [200, { token: 'new-token', user: USERS.manager }] })
     renderProvider()

@@ -61,10 +61,10 @@ export default function AppLayout({ children }) {
           </Typography>
           <NotificationBell />
           {!isMobile && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Button component={NavLink} to="/account" aria-label="My account" color="inherit" sx={{ gap: 1 }}>
               <Typography variant="body2">{user.firstName} {user.lastName}</Typography>
               <Chip size="small" label={ROLE_LABELS[user.role]} />
-            </Box>
+            </Button>
           )}
           <Button onClick={logout} aria-label="Sign out" sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Sign out</Button>
         </Toolbar>
@@ -74,7 +74,8 @@ export default function AppLayout({ children }) {
         <Drawer open={open} onClose={() => setOpen(false)} sx={{ '& .MuiDrawer-paper': { width: DRAWER_WIDTH } }}>
           <Box sx={{ p: 2 }}>
             <Typography variant="subtitle2">{user.firstName} {user.lastName}</Typography>
-            <Typography variant="caption" color="text.secondary">{ROLE_LABELS[user.role]}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{ROLE_LABELS[user.role]}</Typography>
+            <Button component={NavLink} to="/account" size="small" sx={{ px: 0 }} onClick={() => setOpen(false)}>My account</Button>
           </Box>
           <NavList role={user.role} onNavigate={() => setOpen(false)} />
         </Drawer>

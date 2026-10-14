@@ -39,6 +39,12 @@ describe('routes', () => {
     expect(await screen.findByText(/not available for your role/i)).toBeInTheDocument()
   })
 
+  it('offers a retry at / when the session could not be checked, instead of the login page', async () => {
+    renderApp('/', session(null, { status: 'unavailable', retrySession: () => {} }))
+    expect(await screen.findByRole('button', { name: /retry/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /sign in/i })).not.toBeInTheDocument()
+  })
+
   it('answers an unknown address with a not-found page', async () => {
     renderApp('/nowhere', session(USERS.manager))
     expect(await screen.findByText(/page not found/i)).toBeInTheDocument()
