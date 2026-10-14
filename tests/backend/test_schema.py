@@ -151,10 +151,60 @@ def test_request_decision_fields_agree(conn, world):
 
 def test_one_project_per_request(conn, world):
     sql = ("INSERT INTO project_requests (requested_by, name, justification, status, decided_by,"
-           " decided_at, created_project_id) VALUES (%(m)s, 'X', 'Because', 'APPROVED', %(m)s, now(), %(p)s)")
-    params = {"m": world["manager"]["user_id"], "p": world["apollo"]["project_id"]}
+           " decided_at, created_project_id) VALUES (%(m)s, 'X', 'Because', 'APPROVED', %(a)s, now(), %(p)s)")
+    params = {"m": world["manager"]["user_id"], "a": world["alice"]["user_id"], "p": world["apollo"]["project_id"]}
     conn.execute(sql, params)
     assert refused(conn, sql, params) == "requests_one_project"
+
+
+# Requests of every kind (migration 003)
+NEW_REQUEST = ("INSERT INTO project_requests (requested_by, name, justification, kind, project_id, task_limit,"
+               " proposed_start) VALUES (%(m)s, 'X', 'Because', %(kind)s, %(p)s, %(limit)s, %(start)s)")
+
+
+def ask(world, kind, project=None, limit=None, start=None):
+    """Parameters for NEW_REQUEST: one request of this kind from the manager."""
+    return {"m": world["manager"]["user_id"], "kind": kind, "p": project, "limit": limit, "start": start}
+
+
+def test_request_kind_must_be_known(conn, world):
+    assert refused(conn, NEW_REQUEST, ask(world, "RAISE")) == "requests_kind_valid"
+
+
+def test_archive_request_needs_a_project(conn, world):
+    assert refused(conn, NEW_REQUEST, ask(world, "ARCHIVE_PROJECT")) == "requests_project_iff_archive"
+    assert refused(conn, NEW_REQUEST, ask(world, "NEW_PROJECT", project=world["apollo"]["project_id"])) \
+        == "requests_project_iff_archive"
+
+
+@pytest.mark.parametrize("kind, limit", [("TASK_LIMIT", None), ("TASK_LIMIT", 11), ("OVERTIME", 3)])
+def test_task_limit_request_needs_a_limit_in_range(conn, world, kind, limit):
+    assert refused(conn, NEW_REQUEST, ask(world, kind, limit=limit)) == "requests_limit_iff_task_limit"
+
+
+def test_only_new_project_requests_have_dates(conn, world):
+    assert refused(conn, NEW_REQUEST, ask(world, "OTHER", start="2026-11-01")) == "requests_dates_only_new_project"
+
+
+def test_nobody_decides_their_own_request(conn, world):
+    assert refused(conn, "INSERT INTO project_requests (requested_by, name, justification, kind, status,"
+                         " decided_by, decided_at) VALUES (%(m)s, 'X', 'Because', 'OTHER', 'REJECTED', %(m)s, now())",
+                   {"m": world["manager"]["user_id"]}) == "requests_not_self_decided"
+
+
+def test_only_an_approved_new_project_links_a_project(conn, world):
+    alice = world["alice"]["user_id"]
+    assert refused(conn, "INSERT INTO project_requests (requested_by, name, justification, kind, project_id, status,"
+                         " decided_by, decided_at, created_project_id) VALUES (%(m)s, 'X', 'Because',"
+                         " 'ARCHIVE_PROJECT', %(p)s, 'APPROVED', %(a)s, now(), %(p)s)",
+                   {"m": world["manager"]["user_id"], "a": alice, "p": world["zeus"]["project_id"]}) \
+        == "requests_project_iff_approved"
+
+
+def test_old_shaped_request_is_still_a_project_request(conn, world):
+    row = conn.execute("INSERT INTO project_requests (requested_by, name, justification) VALUES (%s, 'X', 'Because')"
+                       " RETURNING kind", (world["manager"]["user_id"],)).fetchone()
+    assert row["kind"] == "NEW_PROJECT"
 
 
 # --- deliverables, dependencies, tasks, time -----------------------------
