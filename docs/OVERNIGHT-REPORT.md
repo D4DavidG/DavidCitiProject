@@ -33,7 +33,8 @@ screen.
 **Update, 14 Oct midday:**
 - **Pushed:** you pushed everything through `1d1ea98`.
 - **Website deployed:** at 11:35 UTC.
-- **Backend:** the deploy ran, but its result wasn't checked afterwards.
+- **Backend deployed:** a rerun of `deploy-backend.sh` reported "0 added, 0 changed,
+  0 destroyed", so AWS already runs the current code.
 - **Checklist step 3.5 (deep links):** passed on AWS.
 - **Permissions:** the blanket shell permission described in Decisions has been removed
   again, at your request.
