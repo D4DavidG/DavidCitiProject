@@ -5,7 +5,7 @@ say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minu
 
 **Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
 final fix wave, the project-manager notifications and requests for everyone, the overtime warning, and 15-minute
-tokens with refresh: 536 backend tests, 313 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
+tokens with refresh: 536 backend tests, 314 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
 pop-up, the three charts, the project manager being notified of an employee's project
@@ -34,7 +34,7 @@ points at a file and line you can open.
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
 > with Terraform. There are 536 backend tests running against a real Postgres database,
-> and 313 website tests."
+> and 314 website tests."
 
 ### 2 minutes
 
@@ -362,7 +362,7 @@ from the token."
 ## 7. Testing
 
 **Headline (fresh, 14 Oct 2026):** "536 backend tests against a real Postgres database, at
-97% coverage, with the API layer at 100%. Plus 313 website tests at 94.85% of
+97% coverage, with the API layer at 100%. Plus 314 website tests at 94.93% of
 statements, and 22 Playwright browser tests."
 
 **What (three layers, plus the website):**
@@ -380,8 +380,8 @@ statements, and 22 Playwright browser tests."
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
 - **Fresh numbers, 14 Oct (after the 15-minute tokens):** backend `536 passed in 21.69s`;
   coverage `1990 statements, 68 missed, 97%`. By folder: `api/` 100%, `function.py` 100%,
-  `domain/` 99%, `services/` 95.7%, `store/` 93.9%. Website: 31 files, `313 passed`, about
-  a minute and a half. Website coverage: 94.85% of statements, 95.93% of lines, 91.34% of
+  `domain/` 99%, `services/` 95.7%, `store/` 93.9%. Website: 31 files, `314 passed`, about
+  a minute and a half. Website coverage: 94.93% of statements, 96.02% of lines, 91.34% of
   branches, 90.8% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
   `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
@@ -548,11 +548,11 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **536 backend, 313 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **536 backend, 314 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **97% of statements** (95% with
-   branches), the API layer 100%. Website **94.85% statements, 95.93% lines, 91.34% branches,
+   branches), the API layer 100%. Website **94.93% statements, 96.02% lines, 91.34% branches,
    90.8% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after the 15-minute tokens). Browser tests
    and load tests get no percentage, on purpose: their measure is journeys walked, and speed
    and failures. *Point at: `docs/TESTING.md` section 2*
@@ -936,7 +936,7 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 | Number | What | Measured |
 | --- | --- | --- |
 | 536 / 97% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 313 / 94.85% | Website tests / statements (95.93% of lines) | 14 Oct |
+| 314 / 94.93% | Website tests / statements (96.02% of lines) | 14 Oct |
 | 68 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 11 + 1 | Tables: eleven for the app (with `refresh_tokens`), plus `schema_migrations` | 14 Oct, after migration 005 |

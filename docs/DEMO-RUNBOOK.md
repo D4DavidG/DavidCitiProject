@@ -282,11 +282,11 @@ All counts and times measured on the VDI on 14 Oct 2026.
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
 | Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `536 passed in 21.69s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  31 passed (31)` and `Tests  313 passed (313)` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  31 passed (31)` and `Tests  314 passed (314)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 313 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 314 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
@@ -294,7 +294,7 @@ API at `fetch`. Say it that way.
 | Command | Takes | Numbers (14 Oct) |
 | --- | --- | --- |
 | `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 20 s | `TOTAL 1990 68 97%`: api 100%, function.py 100%, domain 99%, services 95.7%, store 93.9% |
-| `cd frontend && npm run test:coverage` | about a minute and a half (115 s) | Statements 94.85%, Branches 91.34%, Functions 90.8%, Lines 95.93% |
+| `cd frontend && npm run test:coverage` | about a minute and a half (115 s) | Statements 94.93%, Branches 91.34%, Functions 90.8%, Lines 96.02% |
 
 The rubric asks for 80% overall and 90% on API and error paths. What the missing 4% is,
 honestly: mostly guards (already archived, not found, nothing to change), **plus five real

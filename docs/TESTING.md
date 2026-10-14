@@ -17,7 +17,7 @@ checks one layer, from the database up to a real browser.
 | **API tests** | Routing (both path shapes), every route needs a token, the role is read from the database, 404 not 403, error and list shapes, no DELETE route; every read route and every write route called once; the Lambda entry point | Proves the wiring between the web request and the rules, using real Lambda-shaped events | `tests/backend/test_api.py`, `test_api_read_walk.py`, `test_api_audit_walk.py`, `test_function.py` | `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py` | 4 s | 137 |
 | **"Writes really commit" test** | A change is actually saved, not left in a transaction that is never committed | Every other test rolls back on purpose, so only a test on its own database can catch "nothing is ever saved" | `tests/backend/test_store_commits.py` | `.venv/bin/pytest -q tests/backend/test_store_commits.py` | under 1 s | 2 |
 | **Race (concurrency) tests** | Two people pressing "Take this" at the same moment: only one wins, and nobody goes over their task limit | A race only shows up with two real database connections at once; the test waits until Postgres reports the second one blocked | `tests/backend/test_claim_race.py` | `.venv/bin/pytest -q tests/backend/test_claim_race.py` | under 1 s | 2 |
-| **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (31 files, beside the code they test) | `cd frontend && npm test` | 115 s | 313 |
+| **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (31 files, beside the code they test) | `cd frontend && npm test` | 115 s | 314 |
 | **Browser tests** (Playwright) | A real Chrome against the real running app: the demo walk (the seven questions, plus the phone menu), the pull board (Ana takes a task and puts it back), requests (Ana asks, Maria rejects with a note, Ana reads it on a phone), the screen tour (every screen for a manager and an employee, desktop and phone, no sideways scrolling, a deep-link refresh), the three charts (timeline: Late words and icon, tooltips on hover, tap and focus, print stripes; budget: the Budget line's position, tooltips; workload: gridlines and bars line up, Tab opens the tooltip, print stripes, contrast), README screenshots (only when asked) | The only test that sees what David sees: real login, real API, real database, real layout | `frontend/e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `tour.spec.js`, `timeline.spec.js`, `budget.spec.js`, `workload.spec.js`, `screenshots.spec.js` | `cd frontend && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_ZEUS_MANAGER_USERNAME=SP345715 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test` | 66 s | 22 tests in 8 files: 21 passed, 1 skipped (screenshots, on purpose) |
 | **Load test** | How fast the API answers with many users at once, and whether anything fails | Speed and failures under load can't be seen one request at a time | `tools/loadtest.py` | AWS (asks for the AWS admin password, then runs): `read -rsp 'Admin password: ' TRACKER_ADMIN_PASSWORD && export TRACKER_ADMIN_PASSWORD && TRACKER_API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker python3 tools/loadtest.py --users 25 --seconds 60`. Locally, leave out `TRACKER_API` and keep to 10 users or fewer: LocalStack itself fails past about 15 (`README.md:296-303`) | 20 to 60 s | Last run on AWS, 13 Oct: 16,184 reads at 539 per second, 2 failed (`README.md:269-275`). Not rerun today |
 | **k6 load test (planned)** | The same as the load test, with the industry tool named in the meeting notes ("sk8", `notes.txt:6`) | Evaluators may expect a named tool; k6 also gives standard reports | not built yet | none yet; k6 is not installed on the VDI (`which k6` prints nothing) | | 0 |
@@ -27,7 +27,7 @@ code for mistakes: `cd frontend && npm run lint`, clean, 5 s) and **bandit** (a 
 scanner for the Python, the same one CI runs: no issues, under 1 s).
 
 Backend total: `.venv/bin/pytest -q` printed `536 passed in 21.69s`.
-Website total: `npm test` printed `Test Files  31 passed (31)`, `Tests  313 passed (313)`, about a minute and a half.
+Website total: `npm test` printed `Test Files  31 passed (31)`, `Tests  314 passed (314)`, about a minute and a half.
 
 The backend tests need local Postgres running. They build their own `tracker_test`
 database (`tests/backend/pg.py:13`) and never touch the app's data.
@@ -76,18 +76,18 @@ To see which lines were missed: `.venv/bin/pytest --cov=backend/tracker --cov-re
 `cd frontend && npm run test:coverage` printed:
 
 ```
-Statements   : 94.85% ( 1291/1361 )
+Statements   : 94.93% ( 1292/1361 )
 Branches     : 91.34% ( 950/1040 )
 Functions    : 90.8% ( 454/500 )
-Lines        : 95.93% ( 1109/1156 )
+Lines        : 96.02% ( 1110/1156 )
 ```
 
 V8 is the JavaScript engine inside Chrome and Node; it counts what ran while the
-component tests ran. Read the four lines as: 1,291 of 1,361 instructions ran; 950 of 1,040
+component tests ran. Read the four lines as: 1,292 of 1,361 instructions ran; 950 of 1,040
 yes/no paths were taken; 454 of 500 functions were called (many of the missing ones are
-small click handlers on rarely used buttons); 1,109 of 1,156 lines ran. The one module that
-talks to the API, `services/request.js`, is at 100% of functions, 98.5% of lines and 97.8%
-of branches (the one line not run is a refresh answer of 200 with no token in it).
+small click handlers on rarely used buttons); 1,110 of 1,156 lines ran. The one module that
+talks to the API, `services/request.js`, is at 100% of lines and functions and 97.8% of
+branches.
 
 ### Browser tests and load tests: no percentage, on purpose
 
@@ -104,7 +104,7 @@ of branches (the one line not run is a refresh answer of 200 with no token in it
 | Rubric target | Goal | Today | Met? |
 | --- | --- | --- | --- |
 | Backend code coverage | 80% | 97% of statements (95% with branches) | Yes |
-| Frontend code coverage | 80% | 94.85% statements, 95.93% lines, 91.34% branches, 90.8% functions | Yes |
+| Frontend code coverage | 80% | 94.93% statements, 96.02% lines, 91.34% branches, 90.8% functions | Yes |
 | API endpoints (all CRUD) | 90% | `api/` 100%; every route called by the two walk tests | Yes |
 | Error handling | 90% | `api/errors.py` 100%; `test_api_read_walk.py` covers malformed input and a crash returning 500 | Yes |
 | Critical user paths end to end | 100% | Manager's demo walk, pull board, an employee's request and its answer, every screen for manager and employee | Partly. Not end to end yet: an employee logs time and the manager approves it (component tests only, `README.md:253-254`); an admin creates, edits, archives and reactivates a project; the forced password change at first sign-in |

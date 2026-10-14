@@ -251,8 +251,8 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 313 passed: Vitest + React Testing Library
-npm run test:coverage                     # 94.85% of statements, 95.93% of lines
+npm test                                  # 314 passed: Vitest + React Testing Library
+npm run test:coverage                     # 94.93% of statements, 96.02% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
 ```
@@ -267,7 +267,7 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
   `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
   `requests.spec.js`: an employee asks her line manager, he rejects it with a note from
   To decide, and she reads the answer at phone width.
-- Against the rubric's goals: frontend 94.85% of statements (goal 80%); the demo journey end to end.
+- Against the rubric's goals: frontend 94.93% of statements (goal 80%); the demo journey end to end.
 
 **Known gaps (the uncovered 3% of the backend, 5% of the frontend):**
 
