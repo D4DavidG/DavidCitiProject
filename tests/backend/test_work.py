@@ -7,7 +7,7 @@ import pytest
 
 import factories as f
 from domain.errors import Conflict, DependencyCycle, Forbidden, NotFound, OverCapacity, ValidationError
-from services import milestones, tasks, time_entries, users
+from services import milestones, projects, tasks, time_entries, users
 
 
 @pytest.fixture
@@ -294,3 +294,186 @@ def test_shrinking_a_booking_past_logged_time_is_refused(conn, org):
     booking = assignments.list_bookings(conn, org["bob"], org["apollo"]["project_id"])[0]
     with pytest.raises(Conflict, match="outside"):
         assignments.update_booking(conn, org["bob"], booking["assignment_id"], {"start_date": "2026-10-13"})
+
+
+# --- the pull board ----------------------------------------------------------------
+
+LIMIT_TAIL = " Finish one first, or ask your manager to raise it."
+
+
+def ready(conn, org, ms="design", **kw):
+    """A Ready task: no assignee, TODO, on one of Apollo's deliverables."""
+    return f.task(conn, org["bob"], org[ms], title="Ready one", **kw)
+
+
+def newest_audit(conn):
+    return conn.execute("SELECT audit_id, action, entity_type, summary FROM audit_log"
+                        " ORDER BY audit_id DESC LIMIT 1").fetchone()
+
+
+def audit_count(conn):
+    return conn.execute("SELECT count(*) AS n FROM audit_log").fetchone()["n"]
+
+
+def test_take_this_assigns_me_and_starts_the_task(conn, org):
+    row = tasks.claim_task(conn, org["alice"], ready(conn, org)["task_id"])
+    assert (row["assignee_user_id"], row["status"]) == (org["alice"].user_id, "IN_PROGRESS")
+    assert row["completed_at"] is None
+
+
+def test_only_employees_take_tasks(conn, org):
+    t = ready(conn, org)
+    with pytest.raises(Forbidden, match="^Only employees take tasks.$"):
+        tasks.claim_task(conn, org["bob"], t["task_id"])
+
+
+def test_a_task_on_a_project_you_are_not_booked_on_is_not_found(conn, org):
+    outsider, _ = f.person(conn, org["admin"], manager=org["bob"])
+    t = ready(conn, org)
+    with pytest.raises(NotFound, match="^Task not found.$"):
+        tasks.claim_task(conn, outsider, t["task_id"])
+
+
+def test_an_archived_task_cannot_be_taken(conn, org):
+    t = ready(conn, org)
+    tasks.archive_task(conn, org["bob"], t["task_id"])
+    with pytest.raises(Conflict, match="^This task is archived.$"):
+        tasks.claim_task(conn, org["alice"], t["task_id"])
+
+
+def test_a_done_task_cannot_be_taken(conn, org):
+    t = ready(conn, org, assignee=org["alice"])
+    tasks.move_task(conn, org["alice"], t["task_id"], "DONE")
+    tasks.update_task(conn, org["bob"], t["task_id"], {"assignee_user_id": None})
+    with pytest.raises(Conflict, match="^This task is already done.$"):
+        tasks.claim_task(conn, org["eve"], t["task_id"])
+
+
+def test_a_taken_task_cannot_be_taken_again_even_by_its_holder(conn, org):
+    t = ready(conn, org)
+    tasks.claim_task(conn, org["alice"], t["task_id"])
+    with pytest.raises(Conflict, match="^This task is already taken.$"):
+        tasks.claim_task(conn, org["eve"], t["task_id"])
+    with pytest.raises(Conflict, match="^This task is already taken.$"):
+        tasks.claim_task(conn, org["alice"], t["task_id"])
+
+
+def test_the_limit_refuses_a_third_task(conn, org):
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    t = ready(conn, org)
+    with pytest.raises(Conflict) as caught:
+        tasks.claim_task(conn, org["alice"], t["task_id"])
+    assert str(caught.value) == "You already hold 2 unfinished tasks, your limit." + LIMIT_TAIL
+
+
+def test_the_limit_message_is_singular_at_a_limit_of_1(conn, org):
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"task_limit": 1})
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    t = ready(conn, org)
+    with pytest.raises(Conflict) as caught:
+        tasks.claim_task(conn, org["alice"], t["task_id"])
+    assert str(caught.value) == "You already hold 1 unfinished task, your limit." + LIMIT_TAIL
+
+
+def test_held_counts_only_unfinished_live_tasks_on_live_projects(conn, org):
+    alice = org["alice"]
+    f.task(conn, org["bob"], org["design"], assignee=alice)                    # TODO: counts
+    done = f.task(conn, org["bob"], org["design"], assignee=alice)
+    tasks.move_task(conn, alice, done["task_id"], "DONE")                      # done: doesn't
+    gone = f.task(conn, org["bob"], org["design"], assignee=alice)
+    tasks.archive_task(conn, org["bob"], gone["task_id"])                      # archived: doesn't
+    f.booking(conn, org["carol"], org["zeus"], alice)
+    f.task(conn, org["carol"], f.deliverable(conn, org["carol"], org["zeus"]), assignee=alice)
+    projects.archive_project(conn, org["admin"], org["zeus"]["project_id"])    # archived project: doesn't
+    assert tasks.held_count(conn, alice.user_id) == 1
+
+
+def test_a_manager_can_assign_past_the_limit(conn, org):
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    third = ready(conn, org)
+    tasks.update_task(conn, org["bob"], third["task_id"], {"assignee_user_id": org["alice"].user_id})
+    assert tasks.held_count(conn, org["alice"].user_id) == 3
+
+
+def test_put_back_returns_the_task_to_ready(conn, org):
+    t = ready(conn, org)
+    tasks.claim_task(conn, org["alice"], t["task_id"])
+    row = tasks.release_task(conn, org["alice"], t["task_id"])
+    assert (row["assignee_user_id"], row["status"]) == (None, "TODO")
+
+
+def test_only_the_holder_puts_a_task_back(conn, org):
+    t = ready(conn, org)
+    tasks.claim_task(conn, org["alice"], t["task_id"])
+    with pytest.raises(Forbidden, match="^Only the task's assignee can put it back.$"):
+        tasks.release_task(conn, org["eve"], t["task_id"])
+
+
+def test_an_archived_task_cannot_be_put_back(conn, org):
+    t = ready(conn, org)
+    tasks.claim_task(conn, org["alice"], t["task_id"])
+    tasks.archive_task(conn, org["bob"], t["task_id"])
+    with pytest.raises(Conflict, match="^This task is archived.$"):
+        tasks.release_task(conn, org["alice"], t["task_id"])
+
+
+def test_a_done_task_cannot_be_put_back(conn, org):
+    t = ready(conn, org)
+    tasks.claim_task(conn, org["alice"], t["task_id"])
+    tasks.move_task(conn, org["alice"], t["task_id"], "DONE")
+    with pytest.raises(Conflict, match="^This task is done. Move it back to In progress first.$"):
+        tasks.release_task(conn, org["alice"], t["task_id"])
+
+
+def test_take_and_put_back_each_write_one_audit_row_and_notify_the_line_manager(conn, org):
+    t = ready(conn, org)
+
+    def recipients(audit_id):
+        rows = conn.execute("SELECT recipient_user_id FROM notifications WHERE audit_id = %s"
+                            " ORDER BY recipient_user_id", (audit_id,)).fetchall()
+        return [r["recipient_user_id"] for r in rows]
+
+    expected = sorted([org["bob"].user_id, org["admin"].user_id])
+    before = audit_count(conn)
+    tasks.claim_task(conn, org["alice"], t["task_id"])
+    assert audit_count(conn) == before + 1
+    took = newest_audit(conn)
+    assert (took["action"], took["entity_type"], took["summary"]) == ("CLAIM", "tasks", "Alice Tester took task Ready one")
+    assert recipients(took["audit_id"]) == expected
+
+    tasks.release_task(conn, org["alice"], t["task_id"])
+    assert audit_count(conn) == before + 2
+    put = newest_audit(conn)
+    assert (put["action"], put["entity_type"], put["summary"]) == ("RELEASE", "tasks",
+                                                                   "Alice Tester put back task Ready one")
+    assert recipients(put["audit_id"]) == expected
+
+
+def test_a_task_on_a_blocked_deliverable_can_still_be_taken(conn, org):
+    milestones.add_dependency(conn, org["bob"], org["build"]["milestone_id"], org["design"]["milestone_id"])
+    assert status_of(conn, org["bob"], org["build"]) == "BLOCKED"
+    assert tasks.claim_task(conn, org["alice"], ready(conn, org, ms="build")["task_id"])["status"] == "IN_PROGRESS"
+
+
+def test_lowering_the_limit_below_what_someone_holds_then_refuses_claims(conn, org):
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"task_limit": 1})
+    t = ready(conn, org)
+    with pytest.raises(Conflict) as caught:
+        tasks.claim_task(conn, org["alice"], t["task_id"])
+    assert str(caught.value) == "You already hold 2 unfinished tasks, over your limit of 1." + LIMIT_TAIL
+
+
+def test_put_back_keeps_logged_time_and_stops_further_logging(conn, org):
+    t = ready(conn, org)
+    tasks.claim_task(conn, org["alice"], t["task_id"])
+    entry = log(conn, org["alice"], t, "2026-10-13", 1)
+    tasks.release_task(conn, org["alice"], t["task_id"])
+    owner = conn.execute("SELECT user_id FROM time_entries WHERE entry_id = %s",
+                         (entry["entry_id"],)).fetchone()["user_id"]
+    assert owner == org["alice"].user_id
+    with pytest.raises(Forbidden):
+        log(conn, org["alice"], t, "2026-10-13", 1)

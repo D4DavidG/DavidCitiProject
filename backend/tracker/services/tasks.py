@@ -1,14 +1,18 @@
-"""Tasks: the pieces of a deliverable that employees tick off (the Jira / GitHub Projects pattern).
+"""Tasks: the pieces of a deliverable that employees tick off (the Kanban pull pattern).
 
-The project's manager (or an admin) creates a task, estimates it and assigns it
-to someone booked on the project. Only the assignee moves its status, between
-TODO, IN_PROGRESS and DONE. Moving a task out of DONE, or adding one, under a
-signed-off deliverable clears that sign-off.
+The project's manager (or an admin) creates a task and estimates it. Left
+without an assignee, it is Ready: an employee booked on the project takes it
+("Take this", claim_task) up to their task limit, and can put it back
+(release_task). The manager can still assign it to anyone booked, even past
+their limit. Only the assignee moves its status, between TODO, IN_PROGRESS and
+DONE. Moving a task out of DONE, or adding one, under a signed-off deliverable
+clears that sign-off.
 """
 
 import datetime as dt
 
 import psycopg
+from psycopg import sql
 
 from domain import values
 from domain.errors import Conflict, Forbidden, NotFound, ValidationError
@@ -114,6 +118,71 @@ def move_task(conn: psycopg.Connection, actor: Actor, task_id: int, status: str)
                             f"{actor.name} moved task {row['title']} to {status.replace('_', ' ').lower()}")
         if status != "DONE" and _signed_off(conn, row["milestone_id"]):
             milestones.clear_sign_off(conn, actor, row["milestone_id"], f"task {row['title']} was reopened")
+    return row
+
+
+# The one definition of "held": unfinished, live tasks on live projects, across every project.
+# Correlated on the outer alias `u` (a users row), so it serves one person or a whole list.
+HELD = sql.SQL("(SELECT count(*) FROM tasks t JOIN projects p ON p.project_id = t.project_id"
+               " WHERE t.assignee_user_id = u.user_id AND t.status IN ('TODO', 'IN_PROGRESS')"
+               " AND NOT t.is_archived AND NOT p.is_archived)")
+
+
+def held_count(conn: psycopg.Connection, user_id: int) -> int:
+    """How many unfinished tasks this person holds right now."""
+    return conn.execute(sql.SQL("SELECT {} AS held FROM users u WHERE u.user_id = %s").format(HELD),
+                        (user_id,)).fetchone()["held"]
+
+
+def _limit_message(held: int, limit: int) -> str:
+    tail = " Finish one first, or ask your manager to raise it."
+    if held > limit:
+        return f"You already hold {held} unfinished tasks, over your limit of {limit}.{tail}"
+    noun = "task" if held == 1 else "tasks"
+    return f"You already hold {held} unfinished {noun}, your limit.{tail}"
+
+
+def claim_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
+    """Take this: an employee booked on the project takes a Ready task, up to their limit."""
+    if not actor.is_employee:
+        raise Forbidden("Only employees take tasks.")
+    with atomic(conn):
+        before, _ = _load(conn, actor, task_id, manage=False)  # locks the task row first
+        if before["is_archived"]:
+            raise Conflict("This task is archived.")
+        if before["status"] == "DONE":
+            raise Conflict("This task is already done.")
+        if before["assignee_user_id"] is not None:
+            raise Conflict("This task is already taken.")
+        # Then the person. Counting in a separate statement sees a claim that committed while we waited.
+        limit = conn.execute("SELECT task_limit FROM users WHERE user_id = %s FOR UPDATE",
+                             (actor.user_id,)).fetchone()["task_limit"]
+        held = held_count(conn, actor.user_id)
+        if held >= limit:
+            raise Conflict(_limit_message(held, limit))
+        row = conn.execute("UPDATE tasks SET assignee_user_id = %s, status = 'IN_PROGRESS', updated_at = now()"
+                           " WHERE task_id = %s RETURNING *", (actor.user_id, task_id)).fetchone()
+        audit.record_change(conn, actor, "CLAIM", "tasks", task_id, task_view(before), task_view(row),
+                            f"{actor.name} took task {row['title']}")
+    return row
+
+
+def release_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
+    """Put back: the holder returns an unfinished task to Ready."""
+    with atomic(conn):
+        before, _ = _load(conn, actor, task_id, manage=False)  # locks the task row first
+        if before["assignee_user_id"] != actor.user_id:
+            raise Forbidden("Only the task's assignee can put it back.")
+        if before["is_archived"]:
+            raise Conflict("This task is archived.")
+        if before["status"] == "DONE":
+            raise Conflict("This task is done. Move it back to In progress first.")
+        # Intentional: claim and release both lock task, then person (spec section 7), so they can't deadlock.
+        conn.execute("SELECT 1 FROM users WHERE user_id = %s FOR UPDATE", (actor.user_id,))
+        row = conn.execute("UPDATE tasks SET assignee_user_id = NULL, status = 'TODO', updated_at = now()"
+                           " WHERE task_id = %s RETURNING *", (task_id,)).fetchone()
+        audit.record_change(conn, actor, "RELEASE", "tasks", task_id, task_view(before), task_view(row),
+                            f"{actor.name} put back task {row['title']}")
     return row
 
 
