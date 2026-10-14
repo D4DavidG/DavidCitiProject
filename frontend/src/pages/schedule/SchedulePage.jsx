@@ -247,7 +247,7 @@ export default function SchedulePage() {
           onChange={(_, value) => value && show(() => setSpan(value))}
           aria-label="Weeks shown"
         >
-          {SPANS.map((n) => <ToggleButton key={n} value={n} aria-label={`${n} weeks`} sx={{ textTransform: 'none' }}>{`${n} wk`}</ToggleButton>)}
+          {SPANS.map((n) => <ToggleButton key={n} value={n} sx={{ textTransform: 'none' }}>{`${n} wk`}</ToggleButton>)}
         </ToggleButtonGroup>
         <FormControlLabel
           control={<Switch checked={overOnly} onChange={(e) => show(() => setOverOnly(e.target.checked))} />}

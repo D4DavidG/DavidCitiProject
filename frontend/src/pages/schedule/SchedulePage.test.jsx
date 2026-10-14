@@ -178,9 +178,9 @@ describe('SchedulePage', () => {
   it('shows 8, 13 or 26 weeks', async () => {
     const calls = renderSchedule()
     await bar(/Ben Okafor, Apollo, 25/)
-    await userEvent.click(screen.getByRole('button', { name: '13 weeks' }))
+    await userEvent.click(screen.getByRole('button', { name: '13 wk' }))
     await waitFor(() => expect(calls.at(-1).query.weeks).toBe('13'))
-    await userEvent.click(screen.getByRole('button', { name: '26 weeks' }))
+    await userEvent.click(screen.getByRole('button', { name: '26 wk' }))
     await waitFor(() => expect(calls.at(-1).query.weeks).toBe('26'))
   })
 
