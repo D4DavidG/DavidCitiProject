@@ -265,3 +265,6 @@ private/
 .agents/
 .claude/
 skills-lock.json
+
+
+notes.txt
