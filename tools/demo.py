@@ -80,7 +80,9 @@ def sign_in(username: str, password: str, new_password: str | None = None) -> Ap
     if payload["user"]["mustChangePassword"]:
         if not new_password:
             sys.exit(f"{username} must change their password first: set TRACKER_NEW_ADMIN_PASSWORD.")
-        api.ok("POST", "/auth/change-password", {"currentPassword": password, "newPassword": new_password})
+        # A password change ends every older session, so carry on with the one it returns.
+        result = api.ok("POST", "/auth/change-password", {"currentPassword": password, "newPassword": new_password})
+        api = Api(result["token"], username)
     return api
 
 

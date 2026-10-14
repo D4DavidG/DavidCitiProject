@@ -2,7 +2,8 @@
 # extension (humao.rest-client). Click "Send Request" above any request.
 #
 # 1. Run the "login" request first. It asks for the password (nothing secret is
-#    stored in this file). Every later request reuses its token for 8 hours.
+#    stored in this file). Every later request reuses its token, which lasts 15
+#    minutes: after that every request answers 401, so run "login" again.
 # 2. Pick the server on the @baseUrl line: {{aws}} (live, CloudFront -> Lambda ->
 #    Aurora) or {{local}} (needs ./bin/start-dev.sh running, proxy on :3001).
 #
