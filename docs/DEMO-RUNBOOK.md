@@ -171,7 +171,7 @@ Expect `{"error": "Change your generated password before continuing."}` and `403
 
 **If they ask about email:** the organisers' role has no email permission and the Lambda's
 network has no way out, so passwords are shown once instead. The full answer is
-[INTERVIEW-PREP.md, answer 22a](INTERVIEW-PREP.md#10-the-question-bank).
+[REPOINFO.md, answer 22a](REPOINFO.md#10-the-question-bank).
 
 ---
 

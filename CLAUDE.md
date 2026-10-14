@@ -24,7 +24,7 @@ outdated it.
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);
-  - `docs/INTERVIEW-PREP.md` (what to say, with every claim checked against the code,
+  - `docs/REPOINFO.md` (what to say, with every claim checked against the code,
     and a "say this, not that" table) and `docs/DEMO-RUNBOOK.md` (what to run and click
     live, the tests, Plan B); `tools/tracker.http` holds read-only API requests for VS
     Code's REST Client;

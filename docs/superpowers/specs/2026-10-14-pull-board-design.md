@@ -214,7 +214,7 @@ hang. Accepted; not worth a fix the night before the demo.
 | Database | 002 applies; default 2; 0 and 11 refused by the CHECK. `test_migrate.py:33` changes from `[1]` to `[1, 2]` |
 | API | The read and write walk tests (`test_api_read_walk.py:105`, `test_api_audit_walk.py:100-101`) fail until the 4 routes are called, so they must be added there |
 | Website (Vitest) | The Board tab's columns and buttons per role; Ready to take on My tasks; the Task limit box |
-| Browser (Playwright) | An employee takes a Ready task. This puts an employee in a browser test for the first time, but the named gap, "log time, then the manager approves", stays open (`docs/INTERVIEW-PREP.md`, answer 30 "What isn't tested?"; `docs/DEMO-RUNBOOK.md`, "What no browser test covers") |
+| Browser (Playwright) | An employee takes a Ready task. This puts an employee in a browser test for the first time, but the named gap, "log time, then the manager approves", stays open (`docs/REPOINFO.md`, answer 30 "What isn't tested?"; `docs/DEMO-RUNBOOK.md`, "What no browser test covers") |
 | Integrity check | No new query: the limit is soft for managers by design, so "nobody over the limit" is not an invariant |
 
 ## 10. Docs to update when it is built
@@ -223,14 +223,14 @@ hang. Accepted; not worth a fix the night before the demo.
 - `MVP.md`: the Tasks bullets (`:46-48`) and the permissions table (`:72-73`).
 - `CLAUDE.md`, "The stack", decision "Tasks": "The manager creates; employees pull Ready
   tasks; managers can still assign."
-- Route count 62 to 66: every "62" in `docs/GUIDE.md` and `docs/INTERVIEW-PREP.md`
-  (`grep -n '62' docs/GUIDE.md docs/INTERVIEW-PREP.md`; README has none).
+- Route count 62 to 66: every "62" in `docs/GUIDE.md` and `docs/REPOINFO.md`
+  (`grep -n '62' docs/GUIDE.md docs/REPOINFO.md`; README has none).
 - Migrations 1 to 2: lines that say the whole schema is in `001_init.sql` (README "Data
-  model", INTERVIEW-PREP "The ten tables", GUIDE's file map).
-- `docs/INTERVIEW-PREP.md`: "What isn't tested?" and the next-steps list both name
+  model", REPOINFO "The ten tables", GUIDE's file map).
+- `docs/REPOINFO.md`: "What isn't tested?" and the next-steps list both name
   concurrency as untested; the claim tests cover the two row locks in section 7, not the
   exclusion constraint or the advisory lock.
-- `docs/INTERVIEW-PREP.md` and `docs/DEMO-RUNBOOK.md`: a "push versus pull" answer and
+- `docs/REPOINFO.md` and `docs/DEMO-RUNBOOK.md`: a "push versus pull" answer and
   the demo steps.
 
 ## 11. Deploy
