@@ -260,6 +260,25 @@ def test_confirmed_overtime_tells_the_line_manager(conn, org):
     assert newest_summary(conn, org["bob"]).endswith("(1 h over capacity)")
 
 
+def test_editing_past_capacity_asks_first(conn, org):
+    week_of_16_hours(conn, org)
+    second = time_entries.my_entries(conn, org["alice"], {}, 1, 1)["items"][0]  # Tuesday's 8 h
+    with pytest.raises(OverCapacity, match="2 h over"):
+        time_entries.edit_entry(conn, org["alice"], second["entry_id"], {"minutes": 14 * 60})
+    assert week_minutes(conn, org) == 16 * 60
+
+
+def test_confirmed_edit_is_marked_and_an_edit_back_clears_it(conn, org):
+    week_of_16_hours(conn, org)
+    second = time_entries.my_entries(conn, org["alice"], {}, 1, 1)["items"][0]
+    row = time_entries.edit_entry(conn, org["alice"], second["entry_id"],
+                                  {"minutes": 14 * 60, "confirm_over_capacity": True})
+    assert row["over_capacity"] is True
+    assert newest_summary(conn, org["bob"]).endswith("(2 h over capacity)")
+    row = time_entries.edit_entry(conn, org["alice"], second["entry_id"], {"minutes": 4 * 60})
+    assert row["over_capacity"] is False
+
+
 def test_allowed_overtime_is_not_marked(conn, org):
     t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
     users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20, "overtime_allowed": True})

@@ -120,8 +120,9 @@ def log_time(conn: psycopg.Connection, actor: Actor, task_id: int, data: dict) -
 
 
 def edit_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, data: dict) -> dict:
-    """Change your own entry. It goes back to pending approval."""
+    """Change your own entry. It goes back to pending approval, and its over-capacity mark is recomputed."""
     values.only_allowed(data, _FIELDS)
+    confirmed = _confirmed(data)
     clean = _clean(data, partial=True)
     if not clean:
         raise ValidationError("Nothing to change.")
@@ -131,14 +132,14 @@ def edit_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, data: dict
         if before is None:
             raise NotFound(NOT_FOUND)
         merged = {**before, **clean}
-        _check_limits(conn, actor.user_id, before["project_id"], merged["work_date"], merged["minutes"], entry_id,
-                      False)
+        over = _check_limits(conn, actor.user_id, before["project_id"], merged["work_date"], merged["minutes"],
+                             entry_id, confirmed)
         # An edited entry goes back to pending: clear the old decision along with the change.
         row = update(conn, "time_entries", "entry_id", entry_id,
-                     {**clean, "status": "PENDING", "decided_by": None, "decided_at": None})
+                     {**clean, "over_capacity": over > 0, "status": "PENDING", "decided_by": None, "decided_at": None})
         audit.record_change(conn, actor, "UPDATE", "time_entries", entry_id, entry_view(before), entry_view(row),
                             f"{actor.name} edited a time entry ({hours_text(row['minutes'])}"
-                            f" on {row['work_date'].isoformat()})")
+                            f" on {row['work_date'].isoformat()}){_over_text(over)}")
     return row
 
 
