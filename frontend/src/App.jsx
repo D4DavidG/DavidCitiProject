@@ -20,6 +20,7 @@ import DependencyPage from './pages/projects/DependencyPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
 import ProjectsPage from './pages/projects/ProjectsPage'
 import RequestsPage from './pages/requests/RequestsPage'
+import SchedulePage from './pages/schedule/SchedulePage'
 import theme from './theme/theme'
 
 /** "/" sends you to your home screen, or to the login page. */
@@ -61,6 +62,7 @@ export function AppRoutes() {
       <Route element={<SignedIn />}>
         <Route path="/dashboard" element={<RequireRole roles={STAFF}><DashboardPage /></RequireRole>} />
         <Route path="/allocation" element={<RequireRole roles={STAFF}><AllocationPage /></RequireRole>} />
+        <Route path="/schedule" element={<RequireRole roles={STAFF}><SchedulePage /></RequireRole>} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/projects/:id/dependencies" element={<DependencyPage />} />

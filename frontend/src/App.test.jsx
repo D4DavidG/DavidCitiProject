@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { ThemeProvider } from '@mui/material/styles'
 import { AppRoutes } from './App'
@@ -36,6 +36,14 @@ describe('routes', () => {
 
   it('keeps an employee out of the allocation grid', async () => {
     renderApp('/allocation', session(USERS.employee))
+    expect(await screen.findByText(/not available for your role/i)).toBeInTheDocument()
+  })
+
+  it('opens the schedule for managers and keeps employees out, as for allocation', async () => {
+    renderApp('/schedule', session(USERS.manager))
+    expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeInTheDocument()
+    cleanup()
+    renderApp('/schedule', session(USERS.employee))
     expect(await screen.findByText(/not available for your role/i)).toBeInTheDocument()
   })
 
