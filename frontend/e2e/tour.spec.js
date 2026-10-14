@@ -55,7 +55,11 @@ for (const [role, { username, screens }] of Object.entries(ROLES)) {
         await page.goto(`/#${route}`)
         await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
         await expect(page.getByRole('progressbar', { name: /loading/i })).toHaveCount(0)
-        if (tab) await page.getByRole('tab', { name: tab }).click()
+        if (tab) {
+          await page.getByRole('tab', { name: tab }).click()
+          // A tab loads its own data: wait for that spinner too, or the shot and the overflow check see "Loading".
+          await expect(page.getByRole('progressbar', { name: /loading/i })).toHaveCount(0)
+        }
         await page.waitForLoadState('networkidle')
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
         if (overflow > 1) overflowing.push(`${screen} (${overflow}px)`)
