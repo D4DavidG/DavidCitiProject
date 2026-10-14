@@ -298,6 +298,8 @@ describe('ProjectDetailPage', () => {
       await userEvent.click(await screen.findByRole('option', { name: 'Ben Okafor' }))
       await userEvent.click(within(dialog).getByRole('button', { name: 'Assign' }))
       await waitFor(() => expect(calls.find((c) => c.method === 'PATCH' && c.path === '/tasks/30').body).toEqual({ assigneeUserId: 4 }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
     })
 
     it('shows "already taken" and reloads the board when someone got there first', async () => {
