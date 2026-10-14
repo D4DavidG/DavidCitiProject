@@ -16,7 +16,7 @@ export const NAV_ITEMS = [
   { to: '/projects', label: 'Projects', icon: FolderIcon, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
   { to: '/approvals', label: 'Approvals', icon: ApprovalIcon, roles: ['ADMIN', 'MANAGER'] },
   { to: '/people', label: 'People', icon: PeopleIcon, roles: ['ADMIN', 'MANAGER'] },
-  { to: '/requests', label: 'Requests', icon: RequestIcon, roles: ['ADMIN', 'MANAGER'] },
+  { to: '/requests', label: 'Requests', icon: RequestIcon, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
   { to: '/notifications', label: 'Notifications', icon: BellIcon, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
   { to: '/audit', label: 'Audit log', icon: HistoryIcon, roles: ['ADMIN'] },
 ]

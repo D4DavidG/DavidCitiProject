@@ -67,7 +67,7 @@ export function AppRoutes() {
         <Route path="/my-tasks" element={<RequireRole roles={['EMPLOYEE']}><MyTasksPage /></RequireRole>} />
         <Route path="/approvals" element={<RequireRole roles={STAFF}><ApprovalsPage /></RequireRole>} />
         <Route path="/people" element={<RequireRole roles={STAFF}><PeoplePage /></RequireRole>} />
-        <Route path="/requests" element={<RequireRole roles={STAFF}><RequestsPage /></RequireRole>} />
+        <Route path="/requests" element={<RequestsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/audit" element={<RequireRole roles={['ADMIN']}><AuditLogPage /></RequireRole>} />

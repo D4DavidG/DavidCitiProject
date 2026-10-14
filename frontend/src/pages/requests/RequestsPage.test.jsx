@@ -5,76 +5,143 @@ import RequestsPage from './RequestsPage'
 import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
 
 const IRIS = {
-  requestId: 3, requestedBy: 2, name: 'Iris', description: 'Mobile app', justification: 'Customers asked for it',
-  proposedStart: '2026-11-01', proposedEnd: '2027-02-28', status: 'PENDING', decidedBy: null, decidedAt: null,
+  requestId: 3, kind: 'NEW_PROJECT', requestedBy: 2, requesterName: 'Maria Lopez', name: 'Iris',
+  description: 'Mobile app', justification: 'Customers asked for it', proposedStart: '2026-11-01',
+  proposedEnd: '2027-02-28', projectId: null, taskLimit: null, status: 'PENDING', decidedBy: null, decidedAt: null,
   decisionNote: null, createdProjectId: null, createdAt: '2026-10-13T20:00:00+00:00',
 }
 const HERMES = { ...IRIS, requestId: 2, name: 'Hermes', status: 'APPROVED', createdProjectId: 3, decisionNote: 'Go ahead' }
-const MARIA = { userId: 2, firstName: 'Maria', lastName: 'Lopez', role: 'MANAGER' }
+const OVERTIME = {
+  ...IRIS, requestId: 7, kind: 'OVERTIME', requestedBy: 3, requesterName: 'Ben Okafor', name: 'Allow overtime',
+  description: null, justification: 'Launch week', proposedStart: null, proposedEnd: null,
+}
 
 function renderRequests(user = USERS.admin, answers = {}) {
   const calls = stubApi({
-    'GET /project-requests': [200, page([IRIS, HERMES])],
-    'GET /users': [200, page([MARIA])],
+    'GET /project-requests': [200, page([IRIS, HERMES, OVERTIME])],
+    'GET /projects': [200, page([{ projectId: 5, name: 'Apollo' }])],
     ...answers,
   })
   renderAt(<RequestsPage />, { path: '/requests', auth: session(user) })
   return calls
 }
 
+const table = () => screen.findByRole('table', { name: /requests/i })
+const posted = (calls) => calls.find((c) => c.method === 'POST')
+
+async function menuOf(user) {
+  renderRequests(user)
+  await table()
+  await userEvent.click(screen.getByRole('button', { name: /new request/i }))
+  return within(await screen.findByRole('menu')).getAllByRole('menuitem').map((item) => item.textContent)
+}
+
 describe('RequestsPage', () => {
-  it('lists requests with who asked, the proposed dates and the decision', async () => {
+  it('lists requests with their kind, who asked and the decision', async () => {
     renderRequests()
-    const table = await screen.findByRole('table', { name: /project requests/i })
-    expect(within(table).getByText('Iris')).toBeInTheDocument()
-    expect(within(table).getAllByText('Maria Lopez').length).toBeGreaterThan(0)
-    expect(within(table).getAllByText('Nov 1, 2026 – Feb 28, 2027')).toHaveLength(2)
-    expect(within(table).getByText('Pending')).toBeInTheDocument()
-    expect(within(table).getByRole('link', { name: /open project/i })).toHaveAttribute('href', '/projects/3')
+    const rows = await table()
+    expect(within(rows).getByText('Iris')).toBeInTheDocument()
+    expect(within(rows).getByText('Ben Okafor')).toBeInTheDocument()
+    expect(within(rows).getAllByText('New project')).toHaveLength(2)
+    expect(within(rows).getByRole('link', { name: /open project/i })).toHaveAttribute('href', '/projects/3')
   })
 
-  it('filters by status on the server', async () => {
+  it('filters by status and kind on the server', async () => {
     const calls = renderRequests()
-    await screen.findByRole('table', { name: /project requests/i })
+    await table()
     await userEvent.click(screen.getByLabelText(/^status/i))
     await userEvent.click(await screen.findByRole('option', { name: 'Pending' }))
-    await waitFor(() => expect(calls.at(-1).query.status).toBe('PENDING'))
+    await userEvent.click(screen.getByLabelText(/^kind/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Allow overtime' }))
+    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ status: 'PENDING', kind: 'OVERTIME' }))
   })
 
-  it('lets a manager file a request', async () => {
-    const calls = renderRequests(USERS.manager, { 'POST /project-requests': [201, IRIS] })
-    await screen.findByRole('table', { name: /project requests/i })
+  it("employee's New request menu offers task limit, overtime and free text only", async () => {
+    expect(await menuOf(USERS.employee)).toEqual(['Raise my task limit', 'Allow overtime', 'Something else'])
+  })
+
+  it("manager's menu offers new project, archive a project and free text", async () => {
+    expect(await menuOf(USERS.manager)).toEqual(['New project', 'Archive a project', 'Something else'])
+  })
+
+  it('admin has no New request button and decides from the To decide list', async () => {
+    const calls = renderRequests(USERS.admin)
+    await table()
+    expect(screen.queryByRole('button', { name: /new request/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    expect(calls[0].query.scope).toBe('TO_DECIDE')
+  })
+
+  it('manager sees Mine and To decide tabs; To decide asks for scope=TO_DECIDE', async () => {
+    const calls = renderRequests(USERS.manager)
+    await table()
+    expect(calls.at(-1).query.scope).toBe('MINE')
+    expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: /to decide/i }))
+    await waitFor(() => expect(calls.at(-1).query.scope).toBe('TO_DECIDE'))
+    expect(await screen.findByRole('button', { name: /approve allow overtime/i })).toBeInTheDocument()
+  })
+
+  it('employee sees no tabs and no Approve button', async () => {
+    const calls = renderRequests(USERS.employee)
+    await table()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument()
+    expect(calls[0].query.scope).toBe('MINE')
+  })
+
+  it('asking for a task limit sends kind and taskLimit', async () => {
+    const calls = renderRequests(USERS.employee, { 'POST /project-requests': [201, OVERTIME] })
+    await table()
     await userEvent.click(screen.getByRole('button', { name: /new request/i }))
-    await userEvent.type(screen.getByLabelText(/^name/i), 'Iris')
-    await userEvent.type(screen.getByLabelText(/why/i), 'Customers asked for it')
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Raise my task limit' }))
+    await userEvent.type(screen.getByLabelText(/new limit/i), '4')
+    await userEvent.type(screen.getByLabelText(/why/i), 'Two small tasks at once')
     await userEvent.click(screen.getByRole('button', { name: /send request/i }))
-    await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ name: 'Iris', justification: 'Customers asked for it' }))
+    await waitFor(() => expect(posted(calls).body).toEqual({ kind: 'TASK_LIMIT', taskLimit: 4, justification: 'Two small tasks at once' }))
+    expect(await screen.findByText(/your line manager will answer/i)).toBeInTheDocument()
   })
 
-  it('lets an admin approve, with the proposed dates filled in and a budget', async () => {
+  it('asking to archive a project offers your projects', async () => {
+    const calls = renderRequests(USERS.manager, { 'POST /project-requests': [201, IRIS] })
+    await table()
+    await userEvent.click(screen.getByRole('button', { name: /new request/i }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Archive a project' }))
+    await userEvent.click(await screen.findByLabelText(/^project/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Apollo' }))
+    await userEvent.type(screen.getByLabelText(/why/i), 'Finished')
+    await userEvent.click(screen.getByRole('button', { name: /send request/i }))
+    await waitFor(() => expect(posted(calls).body).toEqual({ kind: 'ARCHIVE_PROJECT', projectId: 5, justification: 'Finished' }))
+  })
+
+  it('approving an overtime request sends only the note and says what it does', async () => {
+    const calls = renderRequests(USERS.admin, { 'POST /project-requests/7/approve': [200, { request: { ...OVERTIME, status: 'APPROVED' }, project: null }] })
+    const rows = await table()
+    await userEvent.click(within(rows).getByRole('button', { name: /approve allow overtime/i }))
+    expect(screen.getByText('This turns overtime on for Ben Okafor.')).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText(/note/i), 'Fine for launch week')
+    await userEvent.click(screen.getByRole('button', { name: /^approve$/i }))
+    await waitFor(() => expect(posted(calls)).toMatchObject({ path: '/project-requests/7/approve', body: { decisionNote: 'Fine for launch week' } }))
+  })
+
+  it('approving a new project fills in the proposed dates and takes a budget', async () => {
     const calls = renderRequests(USERS.admin, { 'POST /project-requests/3/approve': [200, { request: { ...IRIS, status: 'APPROVED' }, project: { projectId: 9 } }] })
-    const table = await screen.findByRole('table', { name: /project requests/i })
-    await userEvent.click(within(table).getByRole('button', { name: /approve iris/i }))
+    const rows = await table()
+    await userEvent.click(within(rows).getByRole('button', { name: /approve iris/i }))
     expect(screen.getByLabelText(/start date/i)).toHaveValue('2026-11-01')
     await userEvent.type(screen.getByLabelText(/budget/i), '60,000')
     await userEvent.click(screen.getByRole('button', { name: /approve and create/i }))
-    await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({
+    await waitFor(() => expect(posted(calls).body).toEqual({
       startDate: '2026-11-01', predictedEndDate: '2027-02-28', budgetCents: 6_000_000,
     }))
   })
 
-  it('lets an admin reject, with a note', async () => {
+  it('rejecting sends the note', async () => {
     const calls = renderRequests(USERS.admin, { 'POST /project-requests/3/reject': [200, { ...IRIS, status: 'REJECTED' }] })
-    const table = await screen.findByRole('table', { name: /project requests/i })
-    await userEvent.click(within(table).getByRole('button', { name: /reject iris/i }))
+    const rows = await table()
+    await userEvent.click(within(rows).getByRole('button', { name: /reject iris/i }))
     await userEvent.type(screen.getByLabelText(/note/i), 'Not this quarter')
     await userEvent.click(screen.getByRole('button', { name: /^reject$/i }))
-    await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ decisionNote: 'Not this quarter' }))
-  })
-
-  it('gives managers no approve or reject buttons', async () => {
-    renderRequests(USERS.manager)
-    const table = await screen.findByRole('table', { name: /project requests/i })
-    expect(within(table).queryByRole('button', { name: /approve/i })).not.toBeInTheDocument()
+    await waitFor(() => expect(posted(calls).body).toEqual({ decisionNote: 'Not this quarter' }))
   })
 })

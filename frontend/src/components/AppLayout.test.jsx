@@ -34,7 +34,7 @@ describe('AppLayout', () => {
   it('gives employees their tasks and projects only', () => {
     renderLayout(USERS.employee)
     const labels = navLabels()
-    expect(labels).toEqual(expect.arrayContaining(['My tasks', 'Projects']))
+    expect(labels).toEqual(expect.arrayContaining(['My tasks', 'Projects', 'Requests']))
     expect(labels).not.toContain('Dashboard')
     expect(labels).not.toContain('Allocation')
     expect(labels).not.toContain('People')
