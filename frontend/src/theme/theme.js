@@ -27,6 +27,7 @@ const theme = createTheme({
     MuiCard: { defaultProps: { variant: 'outlined' } },
     MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: { root: { textTransform: 'none' } } },
     MuiAppBar: { defaultProps: { elevation: 0 } },
+    MuiTab: { styleOverrides: { root: { textTransform: 'none', fontWeight: 600 } } },
   },
 })
 

@@ -106,10 +106,10 @@ export default function DependencyPage() {
       {actionError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError(null)}>{actionError}</Alert>}
 
       <PageState loading={graph.loading} error={graph.error} onRetry={graph.reload} empty={graph.data && nodes.length === 0 ? 'No deliverables yet, so there is no chain to show.' : null}>
-        <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'stretch' }, overflowX: 'auto' }}>
+        <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, overflowX: 'auto' }}>
           {steps(nodes, edges).map((column, index) => (
-            <Box key={column[0].milestoneId} sx={{ display: 'flex', gap: 2, alignItems: 'center', flexDirection: { xs: 'column', md: 'row' } }}>
-              {index > 0 && <ArrowIcon color="action" sx={{ transform: { xs: 'rotate(90deg)', md: 'none' } }} aria-hidden />}
+            <Box key={column[0].milestoneId} sx={{ display: 'flex', gap: 2, alignItems: { xs: 'center', md: 'flex-start' }, flexDirection: { xs: 'column', md: 'row' } }}>
+              {index > 0 && <ArrowIcon color="action" sx={{ transform: { xs: 'rotate(90deg)', md: 'none' }, mt: { md: 7 } }} aria-hidden />}
               <Box component="section" aria-label={`Step ${index + 1}`} sx={{ display: 'grid', gap: 1.5, minWidth: 240, width: { xs: '100%', md: 260 } }}>
                 <Typography variant="overline" color="text.secondary">Step {index + 1}</Typography>
                 {column.map((node) => (

@@ -57,7 +57,7 @@ export default function AppLayout({ children }) {
             </IconButton>
           )}
           <Typography variant="h6" component="span" sx={{ fontWeight: 700, color: 'primary.main', flexGrow: 1 }} noWrap>
-            ACME Project Tracker
+            {isMobile ? 'ACME' : 'ACME Project Tracker'}
           </Typography>
           <NotificationBell />
           {!isMobile && (
@@ -66,7 +66,7 @@ export default function AppLayout({ children }) {
               <Chip size="small" label={ROLE_LABELS[user.role]} />
             </Box>
           )}
-          <Button onClick={logout} aria-label="Sign out">Sign out</Button>
+          <Button onClick={logout} aria-label="Sign out" sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Sign out</Button>
         </Toolbar>
       </AppBar>
 

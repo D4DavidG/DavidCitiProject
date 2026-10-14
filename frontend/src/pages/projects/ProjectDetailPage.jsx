@@ -89,7 +89,7 @@ export default function ProjectDetailPage() {
             actions={(
               <>
                 <Button component={Link} to={`/projects/${projectId}/dependencies`} variant="outlined">Dependency view</Button>
-                {canManage && <Button variant="outlined" onClick={() => setEditing(true)}>Edit</Button>}
+                {canManage && <Button variant="outlined" onClick={() => setEditing(true)}>Edit project</Button>}
                 {isAdmin && !p.isArchived && <Button color="inherit" onClick={() => setArchiving(true)}>Archive project</Button>}
                 {isAdmin && p.isArchived && (
                   <Button variant="contained" onClick={async () => { await request('POST', `/projects/${projectId}/reactivate`); project.reload() }}>Reactivate</Button>

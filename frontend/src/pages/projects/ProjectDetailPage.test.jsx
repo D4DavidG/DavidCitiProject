@@ -106,6 +106,79 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/projects/1/archive')).toBe(true))
   })
 
+  it('adds a task to a deliverable, assigned to someone booked on the project', async () => {
+    const calls = renderDetail(USERS.manager, { 'POST /milestones/11/tasks': [201, { ...BUILD_TASKS[0], taskId: 22, title: 'Docs' }] })
+    const build = await screen.findByRole('region', { name: 'Build' })
+    await userEvent.click(within(build).getByRole('button', { name: /show tasks/i }))
+    await userEvent.click(await within(build).findByRole('button', { name: /add task/i }))
+    await userEvent.type(screen.getByLabelText(/^title/i), 'Docs')
+    await userEvent.type(screen.getByLabelText(/estimate/i), '3')
+    await userEvent.click(screen.getByLabelText(/assignee/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Ana Ruiz' }))
+    await userEvent.click(screen.getByRole('button', { name: /create/i }))
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ title: 'Docs', estimateMinutes: 180, assigneeUserId: 3 }))
+  })
+
+  it("edits a task's estimate", async () => {
+    const calls = renderDetail(USERS.manager, { 'PATCH /tasks/20': [200, BUILD_TASKS[0]] })
+    const build = await screen.findByRole('region', { name: 'Build' })
+    await userEvent.click(within(build).getByRole('button', { name: /show tasks/i }))
+    await within(build).findByText('Portal UI')
+    await userEvent.click(within(build).getAllByRole('button', { name: /^edit$/i })[0])
+    const estimate = screen.getByLabelText(/estimate/i)
+    await userEvent.clear(estimate)
+    await userEvent.type(estimate, '12')
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ estimateMinutes: 720 }))
+  })
+
+  it('reopens a signed-off deliverable', async () => {
+    const calls = renderDetail(USERS.manager, { 'POST /milestones/10/reopen': [200, { ...DESIGN, completedAt: null }] })
+    const design = await screen.findByRole('region', { name: 'Design' })
+    expect(within(design).getByText('Signed off')).toBeInTheDocument()
+    await userEvent.click(within(design).getByRole('button', { name: /reopen/i }))
+    await waitFor(() => expect(calls.some((c) => c.path === '/milestones/10/reopen')).toBe(true))
+  })
+
+  it('archives a deliverable after confirming', async () => {
+    const calls = renderDetail(USERS.manager, { 'POST /milestones/11/archive': [200, BUILD] })
+    const build = await screen.findByRole('region', { name: 'Build' })
+    await userEvent.click(within(build).getByRole('button', { name: /^archive$/i }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive deliverable/i }))
+    await waitFor(() => expect(calls.some((c) => c.path === '/milestones/11/archive')).toBe(true))
+  })
+
+  it("changes a booking's hours, and archives a booking", async () => {
+    const calls = renderDetail(USERS.manager, {
+      'PATCH /assignments/7': [200, { ...BOOKINGS[0], hoursPerWeek: 35 }],
+      'POST /assignments/8/archive': [200, BOOKINGS[1]],
+    })
+    await screen.findByRole('heading', { name: 'Apollo' })
+    await userEvent.click(screen.getByRole('tab', { name: 'Resources' }))
+    const table = await screen.findByRole('table', { name: /people booked/i })
+    await userEvent.click(within(table).getAllByRole('button', { name: /^edit$/i })[0])
+    const hours = screen.getByLabelText(/hours per week/i)
+    await userEvent.clear(hours)
+    await userEvent.type(hours, '35')
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ hoursPerWeek: 35 }))
+    await userEvent.click(within(table).getAllByRole('button', { name: /^archive$/i })[1])
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive booking/i }))
+    await waitFor(() => expect(calls.some((c) => c.path === '/assignments/8/archive')).toBe(true))
+  })
+
+  it("lets the project's manager change the budget, sending only that", async () => {
+    const calls = renderDetail(USERS.manager, { 'PATCH /projects/1': [200, { ...APOLLO, budgetCents: 20_000_000 }] })
+    await screen.findByRole('heading', { name: 'Apollo' })
+    await userEvent.click(screen.getByRole('button', { name: /^edit project$/i }))
+    const budget = screen.getByLabelText(/budget/i)
+    expect(budget).toHaveValue('150000')
+    await userEvent.clear(budget)
+    await userEvent.type(budget, '200,000')
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ budgetCents: 20_000_000 }))
+  })
+
   it('gives employees a read-only view without the budget', async () => {
     renderDetail(USERS.employee)
     await screen.findByRole('heading', { name: 'Apollo' })
