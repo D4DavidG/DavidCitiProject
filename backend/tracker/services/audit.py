@@ -10,7 +10,8 @@ token or a stale session:
     Manager  -> every admin
     Admin    -> every other admin
 
-Archived users receive nothing. A lone admin's change notifies nobody but is
+A caller may name one more recipient (`also_notify`), used to tell an asker
+their request was decided. Archived users receive nothing. A lone admin's change notifies nobody but is
 still recorded. The notification text is the one-line summary, never the
 before/after state, so nobody sees a salary through a notification.
 """
@@ -26,7 +27,8 @@ from services.paging import paginate
 
 
 def record_change(conn: psycopg.Connection, actor: Actor | None, action: str, entity_type: str,
-                  entity_id: int | None, before: dict | None, after: dict | None, summary: str) -> int:
+                  entity_id: int | None, before: dict | None, after: dict | None, summary: str,
+                  also_notify: int | None = None) -> int:
     """Write one audit row plus its notifications; return the audit id."""
     role = None
     if actor is not None:
@@ -42,8 +44,10 @@ def record_change(conn: psycopg.Connection, actor: Actor | None, action: str, en
             "INSERT INTO notifications (recipient_user_id, audit_id)"
             " SELECT u.user_id, %(audit)s FROM users u, users me"
             " WHERE me.user_id = %(me)s AND u.user_id <> me.user_id AND NOT u.is_archived"
-            "   AND (u.role = 'ADMIN' OR (me.role = 'EMPLOYEE' AND u.user_id IN (me.manager_id, %(pm)s)))",
-            {"audit": audit_id, "me": actor.user_id, "pm": _project_manager(conn, entity_type, entity_id)},
+            "   AND (u.role = 'ADMIN' OR u.user_id = %(also)s"
+            "        OR (me.role = 'EMPLOYEE' AND u.user_id IN (me.manager_id, %(pm)s)))",
+            {"audit": audit_id, "me": actor.user_id, "also": also_notify,
+             "pm": _project_manager(conn, entity_type, entity_id)},
         )
     return audit_id
 

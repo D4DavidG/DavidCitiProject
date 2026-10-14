@@ -99,6 +99,25 @@ def test_archived_users_receive_nothing(conn, org):
     assert recipients_of_last_change(conn) == sorted([org["boss"].user_id, org["admin"].user_id])
 
 
+def manager_change(conn, org, also_notify):
+    """A manager's change (Bob edits himself) that also tells one more person."""
+    boss = org["boss"]
+    audit.record_change(conn, boss, "UPDATE", "users", boss.user_id, None, None, "Bob decided", also_notify=also_notify)
+
+
+def test_also_notify_adds_one_recipient(conn, org):
+    manager_change(conn, org, org["loner"].user_id)
+    assert recipients_of_last_change(conn) == sorted([org["admin"].user_id, org["admin2"].user_id, org["loner"].user_id])
+
+
+def test_also_notify_never_reaches_the_actor_or_an_archived_user(conn, org):
+    manager_change(conn, org, org["boss"].user_id)
+    assert recipients_of_last_change(conn) == sorted([org["admin"].user_id, org["admin2"].user_id])
+    users.archive_user(conn, org["admin"], org["loner"].user_id)
+    manager_change(conn, org, org["loner"].user_id)
+    assert recipients_of_last_change(conn) == sorted([org["admin"].user_id, org["admin2"].user_id])
+
+
 def test_audit_row_records_before_and_after_without_password_hash(conn, org):
     users.update_self(conn, org["alice"], {"first_name": "Alicia"})
     last = conn.execute("SELECT * FROM audit_log ORDER BY audit_id DESC LIMIT 1").fetchone()
