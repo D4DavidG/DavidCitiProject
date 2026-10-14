@@ -24,6 +24,12 @@ const ROLES = {
   },
 }
 
+// Charts that must be on screen, by screen key. The overflow check below then covers them at both widths.
+const FIGURES = {
+  '/dashboard': ['Workload this week · all projects', 'Budget by project'],
+  PROJECT: ['Deliverables timeline'],
+}
+
 test.skip(!DIR, 'Set E2E_TOUR_DIR (and the usernames) to run the screen tour.')
 
 async function signIn(page, username) {
@@ -59,6 +65,9 @@ for (const [role, { username, screens }] of Object.entries(ROLES)) {
           await page.getByRole('tab', { name: tab }).click()
           // A tab loads its own data: wait for that spinner too, or the shot and the overflow check see "Loading".
           await expect(page.getByRole('progressbar', { name: /loading/i })).toHaveCount(0)
+        }
+        for (const name of FIGURES[screen] ?? []) {
+          await expect(page.getByRole('figure', { name })).toBeVisible()
         }
         await page.waitForLoadState('networkidle')
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
