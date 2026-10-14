@@ -1,0 +1,103 @@
+import { describe, expect, it } from 'vitest'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import DashboardPage from './DashboardPage'
+import { page, renderAt, stubApi } from '../../test/utils'
+
+const APOLLO = {
+  projectId: 1, name: 'Apollo', status: 'ACTIVE', managerId: 2, managerName: 'Maria Lopez',
+  startDate: '2026-10-01', predictedEndDate: '2026-12-31', progressPercent: 12,
+  atRisk: true, riskReasons: [{ code: 'DELIVERABLE_BEHIND', message: 'Deliverable Build is 0% done with 25% of its time gone.' }],
+  budgetCents: 15_000_000, plannedCents: 3_197_600, consumedCents: 137_000, pendingCents: 153_800,
+  consumedPercent: 0, plannedOverBudget: false, remainingCents: 14_863_000, scheduleElapsedPercent: 14,
+}
+const HERMES = {
+  ...APOLLO, projectId: 3, name: 'Hermes', status: 'PLANNING', progressPercent: 0, atRisk: false, riskReasons: [],
+  budgetCents: 8_000_000, plannedCents: 0, consumedCents: 0, pendingCents: 0,
+}
+
+function renderDashboard(answers = { 'GET /dashboard/projects': [200, page([APOLLO, HERMES])] }) {
+  const calls = stubApi(answers)
+  renderAt(<DashboardPage />, { path: '/dashboard' })
+  return calls
+}
+
+describe('DashboardPage', () => {
+  it("tells a manager these are their own projects, not the company's", async () => {
+    renderDashboard()
+    expect(await screen.findByText(/the projects you manage/i)).toBeInTheDocument()
+  })
+
+  it('shows a card per project with its status and progress', async () => {
+    renderDashboard()
+    const card = await screen.findByRole('article', { name: 'Apollo' })
+    expect(within(card).getByText('Active')).toBeInTheDocument()
+    expect(within(card).getByText('12% of estimated hours done')).toBeInTheDocument()
+    expect(within(card).getByText('Maria Lopez')).toBeInTheDocument()
+  })
+
+  it('flags an at-risk project and lists every reason', async () => {
+    renderDashboard()
+    const card = await screen.findByRole('article', { name: 'Apollo' })
+    expect(within(card).getByText('At risk')).toBeInTheDocument()
+    expect(within(card).getByText('Deliverable Build is 0% done with 25% of its time gone.')).toBeInTheDocument()
+  })
+
+  it('marks a healthy project as on track', async () => {
+    renderDashboard()
+    const card = await screen.findByRole('article', { name: 'Hermes' })
+    expect(within(card).getByText('On track')).toBeInTheDocument()
+  })
+
+  it('shows the budget bar on each card', async () => {
+    renderDashboard()
+    const card = await screen.findByRole('article', { name: 'Apollo' })
+    expect(within(card).getByText('$1,370 spent of $150,000')).toBeInTheDocument()
+  })
+
+  it('counts projects and at-risk projects at the top', async () => {
+    renderDashboard()
+    await screen.findByRole('article', { name: 'Apollo' })
+    expect(screen.getByLabelText('Projects shown')).toHaveTextContent('2')
+    expect(screen.getByLabelText('At risk')).toHaveTextContent('1')
+  })
+
+  it('links each card to its project', async () => {
+    renderDashboard()
+    const card = await screen.findByRole('article', { name: 'Apollo' })
+    expect(within(card).getByRole('link', { name: /open project/i })).toHaveAttribute('href', '/projects/1')
+  })
+
+  it('searches and filters on the server', async () => {
+    const calls = renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO])] })
+    await screen.findByRole('article', { name: 'Apollo' })
+    await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
+    await waitFor(() => expect(calls.at(-1).query.search).toBe('apo'))
+    await userEvent.click(screen.getByLabelText(/status/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Active' }))
+    await waitFor(() => expect(calls.at(-1).query.status).toBe('ACTIVE'))
+    expect(calls.at(-1).query.search).toBe('apo')
+  })
+
+  it('says so when there are no projects', async () => {
+    renderDashboard({ 'GET /dashboard/projects': [200, page([])] })
+    expect(await screen.findByText(/no projects to show/i)).toBeInTheDocument()
+  })
+
+  it('shows the error and retries', async () => {
+    let attempts = 0
+    renderDashboard({
+      'GET /dashboard/projects': () => (++attempts === 1 ? [503, { error: 'The database is not ready. Please try again shortly.' }] : [200, page([APOLLO])]),
+    })
+    expect(await screen.findByText(/database is not ready/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /retry/i }))
+    expect(await screen.findByRole('article', { name: 'Apollo' })).toBeInTheDocument()
+  })
+
+  it('pages through long lists', async () => {
+    const calls = renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO], { total: 30, totalPages: 2 })] })
+    await screen.findByRole('article', { name: 'Apollo' })
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+  })
+})

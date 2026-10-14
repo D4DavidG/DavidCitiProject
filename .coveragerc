@@ -1,0 +1,8 @@
+# Measure our code only. bin/start-dev.sh vendors psycopg into backend/tracker for
+# LocalStack (CLAUDE.md trap 4); that's a library, not ours to cover.
+[run]
+source = backend/tracker
+omit =
+    backend/tracker/psycopg/*
+    backend/tracker/psycopg_binary/*
+    backend/tracker/psycopg_binary.libs/*

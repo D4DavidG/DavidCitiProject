@@ -1,0 +1,10 @@
+# bin/start-dev.sh pip-installs dependencies into this folder so LocalStack can
+# hot-reload it (CLAUDE.md trap 4). Ignore everything except our own code.
+/*
+!/.gitignore
+!/function.py
+!/requirements.txt
+!/api/
+!/domain/
+!/services/
+!/store/

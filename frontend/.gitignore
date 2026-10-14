@@ -1,0 +1,3 @@
+# Playwright output: traces and screenshots from failed end-to-end runs
+test-results/
+playwright-report/

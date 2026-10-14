@@ -1,0 +1,5 @@
+# Local development and tests. The Lambda's own dependencies are in
+# backend/tracker/requirements.txt.
+psycopg[binary]==3.3.6
+pytest==8.4.2
+pytest-cov==7.0.0

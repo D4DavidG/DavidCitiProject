@@ -45,3 +45,9 @@ output "jupyter_url" {
   description = "The URL of the JupyterHub instance"
   value       = data.aws_caller_identity.this.id == "000000000000" ? "http://localhost:8888" : try(one(aws_eks_cluster.this.*.endpoint), null)
 }
+
+output "bootstrap_admin_password" {
+  description = "Password of the first admin (AD000001); changed at first login"
+  value       = random_password.bootstrap_admin.result
+  sensitive   = true
+}
