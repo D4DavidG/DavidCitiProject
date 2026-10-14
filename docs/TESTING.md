@@ -253,8 +253,10 @@ Bandit          PASS   no issues
 Website tests   PASS   291 passed, lines 96.11%
 Lint            PASS   clean
 Build           PASS   frontend/dist
-Browser tests   PASS   20 passed, 1 skipped; screenshots in /tmp/tmp.JSLKxdWQec
+Browser tests   PASS   16 passed, 5 skipped; screenshots in /tmp/tmp.zY2xqChhek
 ```
+
+`tools/test-all.sh` does not set `E2E_ZEUS_MANAGER_USERNAME`, so the 4 timeline tests skip along with the screenshots test (5 skipped). The longer command in the table above, with Sam's username set, runs 20 and skips only the screenshots.
 
 **Automated on every push?** Not yet. GitHub CI today runs only the bandit scan
 (`.github/workflows/python.actions.yml:27`), `npm audit`
