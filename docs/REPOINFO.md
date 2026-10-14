@@ -12,7 +12,7 @@ below says when it was measured. Every claim points at a file and line you can o
 [3 Architecture](#3-architecture) · [4 Data and tables](#4-where-the-data-lives-and-the-10-tables) ·
 [5 Database](#5-database-design) · [6 Security](#6-security) · [7 Testing](#7-testing) ·
 [8 Performance](#8-performance) ·
-[9 Stories](#9-three-things-that-went-wrong) · [10 Question bank](#10-the-question-bank) ·
+[9 Stories](#9-three-things-that-went-wrong) · [10 Question bank](#10-the-question-bank) (14 Oct meeting questions and the security table are at its top) ·
 [11 Say this, not that](#11-say-this-not-that) · [12 Gaps and AI](#12-honest-gaps-what-id-do-next-and-ai-use) ·
 [13 Cheat card](#13-cheat-card)
 
@@ -523,6 +523,153 @@ on AWS, I found it by measuring, and it ends with a fix and a test.
 ## 10. The question bank
 
 Short answers. Paths are under `backend/tracker/` unless they say otherwise.
+
+### Questions from the 14 Oct meeting
+
+David's meeting notes asked for these answers in one place. Each says plainly whether it is
+**built** or **queued** (planned, not built). Counts measured 14 Oct 2026 on the VDI.
+
+1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
+   tests, business-rule tests, API tests (all pytest, against a real Postgres), website
+   tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
+   **428 backend, 291 website, 21 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
+2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
+   ran; it shows what ran, not what was checked. Backend **96% of statements** (94% with
+   branches), the API layer 100%. Website **93.6% statements, 95.2% lines, 89.9% branches,
+   89.3% functions** (`docs/TESTING.md` figures, measured earlier on 14 Oct). Browser tests
+   and load tests get no percentage, on purpose: their measure is journeys walked, and speed
+   and failures. *Point at: `docs/TESTING.md` section 2*
+3. **"Selenium or Playwright?"** Playwright. It waits by itself for a button to be clickable
+   (Selenium makes you write the waits, the usual cause of flaky tests), talks to the browser
+   directly, has a trace viewer for failures, and installs all browsers with one command.
+   *Point at: `docs/TESTING.md` section 5*
+4. **"k6 for performance testing?"** Not built. Today the load test is our own script,
+   `tools/loadtest.py`: on AWS, 25 users, 16,184 reads, 539 requests per second, p95 57 to
+   65 ms, 2 failures, measured 13 Oct. k6 is queued; it isn't installed on the VDI.
+   *Point at: `README.md` "Load test" section; `docs/TESTING.md` section 1, last row*
+5. **"Why Vite?"** David chose it: the dev server reloads on save and the production build
+   takes seconds. Vitest, the test runner made for Vite, reuses the same config, so tests
+   see the code exactly as the app does. Built. *Point at: `frontend/vite.config.js` (the `test:` block); `docs/TESTING.md` section 5*
+6. **"How fast are notifications, and why not WebSockets?"** Built 14 Oct, local until the
+   next deploy. The bell asks the server every 10 s while the tab is visible (about 6 tiny
+   reads a minute), straight away when you return to the tab, and after any change made in
+   that tab. When the count goes up, a pop-up shows the newest message. WebSockets are
+   blocked, not skipped: our AWS role has no API Gateway permission, and the Lambda sits in a
+   network with no route out to send a push. *Point at: `frontend/src/components/NotificationBell.jsx:7-9` and `:30-72`; `docs/superpowers/specs/2026-10-14-websockets-findings.md` section 1*
+7. **"If Chloe logs hours or finishes a task, is her manager told?"** Yes. For an employee,
+   `record_change` notifies her line manager and every admin. Chloe reports to Sam, not
+   Maria, so Sam's bell goes up. A project manager who isn't her line manager hears nothing:
+   that is how it was designed (decision (a) in CLAUDE.md). *Point at: `services/audit.py:39-46` (the recipient rule); `tools/demo.py:37`*
+8. **"Does every action make a notification?"** Every successful change writes one audit
+   row and notifies the people above the actor (employee: manager and admins; manager:
+   admins; admin: the other admins). Reads and refused requests are not logged. One test
+   calls every write route and checks it left an audit row. *Point at: CLAUDE.md section 2 table; `tests/backend/test_api_audit_walk.py`*
+9. **"What if someone steals the access token? A 15-minute timer?"** Today: the token lasts
+   8 hours, carries only the user id, and the role is re-read from the database on every
+   request, so archiving a user or demoting them takes effect at once. The gap: there is no
+   refresh token and no revoke, so a stolen token works until it expires, and a password
+   change doesn't end old sessions. **Queued, not built:** a 15-minute access token plus a
+   refresh token stored in Postgres. *Point at: `services/tokens.py:20, 47-59`; `api/app.py:22-33`*
+10. **"Total number of projects?"** Built. The dashboard's first counter, "Projects shown",
+    is the server's count for the current search and status filter (all of them when no
+    filter is set). "At risk" beside it counts only the cards on the current page. The budget
+    chart sits under the counters. *Point at: `frontend/src/pages/dashboard/DashboardPage.jsx:150-153`*
+11. **"How can you delete projects?"** You can't, by design: an admin archives (and can
+    reactivate), and a Postgres trigger refuses any DELETE on every application table. The
+    rubric's D in CRUD is met by archive; we haven't yet asked an evaluator whether that
+    counts. **Queued, not built:** managers asking an admin to archive a project. *Point at: `store/migrations/001_init.sql:239-255`; `api/routes.py:66`*
+12. **"History for employees?"** Today an admin can open the audit log and filter by person,
+    record type and date, with before and after state. **Queued, not built:** a History tab
+    per person that their line manager can read. *Point at: `frontend/src/pages/audit/AuditLogPage.jsx:99-103`*
+13. **"How are budgets calculated?"** Planned cost = booked hours per week, over the days of
+    the booking, times the person's hourly rate (salary divided by 2,080 hours), added up per
+    project. Spent = approved minutes times the hourly rate frozen on the entry when it was
+    logged, so a later raise changes nothing. All in whole cents, computed on the server;
+    the browser only formats. Pending time is shown separately and doesn't count as spent.
+    *Point at: `services/dashboard.py:48-60` (the money query); `domain/money.py:9, 28-40`*
+14. **"Fewer lines of code, faster?"** Honest numbers: about 3,600 lines of backend Python
+    (not counting the vendored database driver) and 88 website source files. The website
+    ships as one JavaScript file of 728 kB (`frontend/dist/assets`, built 14 Oct, after the
+    charts). The server avoids one-query-per-row loops and every list is paginated.
+    **Queued, not built:** splitting the bundle per page and a cleanup pass. *Point at: `frontend/dist/assets/index-*.js`; `services/paging.py`*
+15. **"Guardrails: how do you know the requirements are met?"** Three layers: Postgres
+    refuses bad rows (41 CHECK rules, 26 foreign keys, one exclusion constraint, 10
+    triggers); five integrity queries must return no rows and run after every database test
+    and at `GET /admin/integrity-check`; and the role table decides who may call what. The
+    requirements are traced to screens and tests. *Point at: `store/integrity.py`; `docs/superpowers/specs/2026-10-14-requirements-check.md`*
+16. **"How do I look inside the database?"** Local copy only (AWS Aurora is not reachable
+    from outside, by design). VS Code PostgreSQL extension: Server name `localhost` (not the
+    project name), port 5432, user `postgres`, password `postgres123`, database `postgres`.
+    Terminal: `PGPASSWORD=postgres123 psql -h localhost -U postgres -d postgres`.
+    *Point at: `docs/DEMO-RUNBOOK.md` section 5*
+17. **"Postman or SwaggerHub?"** Neither. We use `tools/tracker.http` (19 read-only
+    requests for VS Code's REST Client), `curl`, and `tools/demo.py`. There is **no
+    OpenAPI/Swagger file**. The one route table is the place to generate one from. Not built. *Point at: `tools/tracker.http`; `backend/tracker/api/routes.py`*
+18. **"How do you automate tests?"** Locally, one command: `./tools/test-all.sh` runs
+    backend tests with coverage, bandit, website tests with coverage, lint and the build,
+    then Playwright when ports 3000 and 3001 are up, and prints a PASS/FAIL table (about 2.5
+    minutes). On GitHub, `.github/workflows/` has three workflows, all triggered on every
+    push and pull request, and **none of them runs our pytest or Vitest**:
+    - `python.actions.yml`: `bandit -r ./backend` (security scan only);
+    - `react.actions.yml`: `npm install`, then `npm audit --audit-level=high`;
+    - `terraform.actions.yml`: Checkov on `./infra`, with `soft_fail: true`, so it reports
+      but never turns the check red.
+
+    All three came with the workshop repo (first commit 13cf7a6). Putting our tests in CI
+    needs a Postgres service in the workflow; not built. *Point at: `tools/test-all.sh`; `.github/workflows/`*
+19. **"Lighthouse or an accessibility scan?"** Not built. Today: the website tests find
+    things by role and label (so a missing label fails a test), fields are tied to their
+    errors with `aria-describedby`, and the tour test checks the phone layout. There is no
+    axe package in `frontend/package.json` and no scan in `frontend/e2e/`. An axe scan inside
+    Playwright is queued. *Point at: `frontend/e2e/tour.spec.js`; `frontend/package.json`*
+20. **"A schedule and project plan like Float?"** Partly built. The allocation grid is
+    Float-style (people by weeks, over-booked weeks flagged), and the deliverables timeline
+    shows each project's milestones against dates. Float has drag-to-schedule; we don't:
+    bookings are edited in a form. *Point at: `frontend/src/pages/allocation/AllocationPage.jsx`; `frontend/src/components/charts/TimelineChart.jsx`*
+21. **"If someone logs too many hours: warn them, let them go ahead, flag the manager?"**
+    Today it is stricter: logging past weekly capacity is refused (409) unless the person's
+    manager or an admin has turned on `overtime_allowed`; when allowed, the week is flagged.
+    The soft version (warn, allow, flag the manager) is proposed, **not built**.
+    *Point at: `services/time_entries.py:51-75` (`_check_limits`)*
+
+### Every security check, and where it came from
+
+"Came with the workshop repo" means the file was in the template by Eugene Istrati
+(`eistrati`, first commit `13cf7a6`, 9 Jan 2026), checked with `git log` on 14 Oct. "We
+added" means David's commits. Line numbers are in the working tree on 14 Oct.
+
+| Check | What it stops | Where | Origin |
+| --- | --- | --- | --- |
+| Bandit in CI | Known insecure Python patterns reaching `main` | `.github/workflows/python.actions.yml` | Came with the workshop repo; we keep the code clean for it |
+| `npm audit` in CI | Known-vulnerable website packages (high severity) | `.github/workflows/react.actions.yml` | Came with the workshop repo |
+| Checkov on Terraform | Risky infrastructure settings; reports only (`soft_fail: true`) | `.github/workflows/terraform.actions.yml` | Came with the workshop repo |
+| Website private behind CloudFront | Anyone reading the S3 bucket directly | `infra/cloudfront.tf:1-4, 19` (origin access control) | Came with the workshop repo |
+| HTTPS only | Plain-HTTP traffic: CloudFront redirects | `infra/cloudfront.tf:61, 96` | Came with the workshop repo |
+| Database encrypted, in the VPC | Reading data at rest; direct internet access (no `publicly_accessible` setting, so AWS's private default; not re-checked from outside on 14 Oct) | `infra/rds.tf:20-22` | Came with the workshop repo |
+| Secrets generated by Terraform | A guessable or committed signing key or admin password | `infra/secrets.tf:6, 14`; injected at `infra/locals.tf:115-116` | We added the token key and admin password. The template's database password is a `random_pet` name (`infra/rds.tf:15`) |
+| Passwords hashed: PBKDF2, 600,000 rounds, random salt | A stolen database revealing passwords | `services/passwords.py:18, 27-44` | We added |
+| Signed token (HS256), 8 h expiry | Forged or endless sessions | `services/tokens.py:20-22, 47-59` | We added |
+| Role re-read from the database on every request | A demoted or archived person keeping access | `api/app.py:22-33`; `services/actors.py:46-55` | We added |
+| Forced password change at first login | Using the admin-generated password for real work | `api/app.py:29-30`; `api/routes.py:49-50` | We added |
+| 404, never 403, with identical wording | Probing which ids exist | `services/access.py:17-27` | We added |
+| Unknown username costs the same hashing | Learning which usernames exist from reply time | `services/users.py:159-164` | We added (14 Oct; AWS after the next deploy) |
+| Parameterised SQL only | SQL injection | `store/postgres.py`; bandit B608 clean | We added |
+| No DELETE, append-only audit log | Erased records or history | `store/migrations/001_init.sql:239-255` | We added |
+| Five integrity queries | Silently inconsistent data | `store/integrity.py`; `GET /admin/integrity-check` | We added |
+| Field allow-lists | A caller changing fields their role may not | `domain/values.py:91` (`only_allowed`), used 17 times in `services/` | We added |
+| Proxy forwards only listed headers | Browser and cookie headers reaching the Lambda (local only) | `bin/proxy-server.js:100-110` | Template file; we added the `authorization` and `content-length` lines |
+| CORS | Which websites' scripts may call the API | Local proxy: `bin/proxy-server.js:39-43` (explicit header list, ours). AWS: Lambda URL allows every origin, `infra/lambda.tf:44-50` | Template. On AWS the site and API share one CloudFront address, so the browser never applies CORS to our calls |
+
+**Known gaps (each checked against the code on 14 Oct):**
+
+- Tokens survive a password change: they carry no issue time (`services/tokens.py:47-59`).
+- No refresh token and no way to revoke one token; a stolen token works up to 8 hours.
+- No rate limiting on login or anywhere else (no throttle in `backend/tracker/` or `infra/`).
+- Changing your own email needs no current password (`update_self` in `services/users.py`).
+- The Lambda URL itself has no authorisation (`authorization_type = "NONE"`, template); every
+  route except health and login checks the token in our code instead.
+- The database password is a `random_pet` name from the template, not a long random string.
 
 ### Product and scope
 

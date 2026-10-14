@@ -356,7 +356,8 @@ the tests: leave it alone.) On 14 Oct it held 8 users, 4 projects, 66 audit rows
 13 Oct 17:25) and 72 notifications.
 
 **1. VS Code, PostgreSQL extension (already installed, `ms-ossdata.vscode-pgsql`).**
-Click the elephant icon in the left bar, then **Add Connection**: Server `localhost`, Port
+Click the elephant icon in the left bar, then **Add Connection**. The Server name is
+`localhost`, not the project name. Server `localhost`, Port
 `5432`, Authentication Password, User `postgres`, Password `postgres123`, Database
 `postgres`, Name `tracker local`. Then open Tables, right-click `audit_log`, **Select Top
 1000**. (Not tried on 14 Oct: no connection is saved yet.)
