@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
 import { AuthContext } from './useAuth'
-import { request, setToken, setUnauthorizedHandler } from '../services/request'
+import { request, setTokens, setUnauthorizedHandler } from '../services/request'
 
 const TOKEN_KEY = 'acme.token'
 
@@ -37,7 +37,7 @@ export default function AuthProvider({ children }) {
   }))
 
   const signOut = useCallback((expired = false) => {
-    setToken(null)
+    setTokens(null, null)
     writeToken(null)
     setState({ user: null, status: 'signedOut', sessionExpired: expired })
   }, [])
@@ -48,7 +48,7 @@ export default function AuthProvider({ children }) {
     setUnauthorizedHandler(() => signOut(true))
     const stored = readToken()
     if (!stored) return () => setUnauthorizedHandler(null)
-    setToken(stored)
+    setTokens(stored, null)
     let current = true
     request('GET', '/auth/me')
       .then((user) => { if (current) setState({ user, status: 'signedIn', sessionExpired: false }) })
@@ -70,7 +70,7 @@ export default function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     const result = await request('POST', '/auth/login', { body: { username, password } })
-    setToken(result.token)
+    setTokens(result.token, null)
     writeToken(result.token)
     setState({ user: result.user, status: 'signedIn', sessionExpired: false })
     return result.user

@@ -3,9 +3,13 @@
  *
  * Every call goes through request(): it adds the base URL and the login token,
  * sends JSON, and turns any failure into an ApiError carrying the server's own
- * message ({ error, field, code }). A 401 (expired or invalid session) is handled in
- * one place, the handler AuthContext registers, except for the login call itself,
- * where 401 just means "wrong username or password".
+ * message ({ error, field, code }).
+ *
+ * The access token lasts 15 minutes. On a 401, request() swaps the refresh token
+ * for a new pair once (POST /auth/refresh), then retries the call once. Only if
+ * that fails does it call the handler AuthContext registers (sign out). The
+ * /auth/login, /auth/refresh and /auth/logout calls never refresh: there a 401
+ * means "wrong username or password" or "this session is over".
  */
 
 const NETWORK_MESSAGE = "Can't reach the server. Check your connection and try again."
@@ -28,7 +32,11 @@ export class ApiError extends Error {
 }
 
 let token = null
+let refreshToken = null
 let onUnauthorized = null
+let onRefreshed = null
+let refreshing = null // the refresh in flight, shared by every call that got a 401
+const NO_REFRESH = ['/auth/login', '/auth/refresh', '/auth/logout']
 const writeListeners = new Set()
 
 /**
@@ -58,14 +66,28 @@ export function announceUnreadChange() {
   unreadListeners.forEach((listener) => listener())
 }
 
-/** Remember (or forget, with null) the token sent as `Authorization: Bearer`. */
-export function setToken(value) {
-  token = value
+/**
+ * Remember (or forget, with nulls) both tokens.
+ * @param {string|null} access sent as `Authorization: Bearer` (15 minutes)
+ * @param {string|null} refresh swapped at /auth/refresh for a new pair (8 hours from login)
+ */
+export function setTokens(access, refresh) {
+  token = access
+  refreshToken = refresh
 }
 
-/** Register the function called when the server answers 401 (not for /auth/login). */
+/** Register the function called when the session is over: a 401 that a refresh couldn't fix. */
 export function setUnauthorizedHandler(handler) {
   onUnauthorized = handler
+}
+
+/**
+ * Register the function told about each new pair, so AuthContext stores it at once.
+ * (A reload with the old refresh token in storage would count as reuse and sign out everywhere.)
+ * @param {((tokens: { token: string, refreshToken: string }) => void)|null} handler
+ */
+export function setRefreshedHandler(handler) {
+  onRefreshed = handler
 }
 
 /** `${VITE_API_URL}/api/tracker`: the deploy script sets VITE_API_URL to the CloudFront URL. */
@@ -92,16 +114,51 @@ function parse(text) {
 }
 
 /**
+ * Swap the refresh token for a new pair. However many calls ask at once, one request
+ * is sent. Uses fetch directly, not request(), so it can never loop.
+ * @returns {Promise<boolean>} true when there is a new access token
+ */
+function refreshSession() {
+  if (!refreshing) {
+    refreshing = (async () => {
+      if (!refreshToken) return false
+      try {
+        const response = await fetch(`${apiBase()}/auth/refresh`, {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        })
+        const result = parse(await response.text())
+        if (!response.ok || !result?.token) return false
+        setTokens(result.token, result.refreshToken)
+        onRefreshed?.({ token: result.token, refreshToken: result.refreshToken })
+        return true
+      } catch {
+        return false
+      }
+    })().finally(() => {
+      refreshing = null
+    })
+  }
+  return refreshing
+}
+
+/**
  * Call the API.
  * @param {string} method GET, POST or PATCH
  * @param {string} path e.g. "/projects/7"
  * @param {{ body?: object, query?: object }} [options]
  * @returns {Promise<any>} the parsed JSON body, or null when there is none
  */
-export async function request(method, path, { body, query } = {}) {
+export function request(method, path, options = {}) {
+  return send(method, path, options, false)
+}
+
+async function send(method, path, { body, query }, retried) {
   const headers = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  if (token) headers.Authorization = `Bearer ${token}`
+  const sentToken = token
+  if (sentToken) headers.Authorization = `Bearer ${sentToken}`
 
   let response
   try {
@@ -120,7 +177,13 @@ export async function request(method, path, { body, query } = {}) {
     return payload ?? null
   }
 
-  if (response.status === 401 && path !== '/auth/login' && onUnauthorized) onUnauthorized()
+  if (response.status === 401 && !NO_REFRESH.includes(path)) {
+    // Another call may already have refreshed (the token changed): then just retry.
+    if (!retried && (token !== sentToken || await refreshSession())) {
+      return send(method, path, { body, query }, true)
+    }
+    onUnauthorized?.()
+  }
   const message = payload?.error ?? `Request failed (${response.status}).`
   throw new ApiError(response.status, message, payload?.field, payload?.code)
 }

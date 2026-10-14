@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, onWrite, request, setToken, setUnauthorizedHandler } from './request'
+import {
+  ApiError, onWrite, request, setRefreshedHandler, setTokens, setUnauthorizedHandler,
+} from './request'
 
 function answer(status, payload) {
   return Promise.resolve({
@@ -16,8 +18,9 @@ describe('request()', () => {
     vi.stubEnv('VITE_API_URL', 'https://api.example.test')
     fetchMock = vi.fn(() => answer(200, { ok: true }))
     vi.stubGlobal('fetch', fetchMock)
-    setToken(null)
+    setTokens(null, null)
     setUnauthorizedHandler(null)
+    setRefreshedHandler(null)
   })
 
   afterEach(() => {
@@ -30,7 +33,7 @@ describe('request()', () => {
   })
 
   it('sends the bearer token once one is set', async () => {
-    setToken('abc.def.ghi')
+    setTokens('abc.def.ghi', null)
     await request('GET', '/auth/me')
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer abc.def.ghi')
   })
@@ -120,5 +123,102 @@ describe('request()', () => {
   it('falls back to a generic message when the error body is not JSON', async () => {
     fetchMock.mockReturnValueOnce(Promise.resolve({ ok: false, status: 502, text: () => Promise.resolve('<html>') }))
     await expect(request('GET', '/projects')).rejects.toMatchObject({ status: 502, message: 'Request failed (502).' })
+  })
+})
+
+describe('request() after the 15-minute access token expires', () => {
+  let fetchMock
+  let calls
+
+  /** Answers by URL: each path gets its queue of [status, payload] answers, used in order. */
+  function serve(routes) {
+    calls = []
+    fetchMock = vi.fn((url, init) => {
+      const path = url.replace('https://api.example.test/api/tracker', '')
+      calls.push({ path, init })
+      const [status, payload] = routes[path].shift()
+      return answer(status, payload)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+  }
+  const pathsCalled = () => calls.map((c) => c.path)
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_API_URL', 'https://api.example.test')
+    setTokens('old', 'old-refresh')
+    setUnauthorizedHandler(null)
+    setRefreshedHandler(null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('refreshes once on a 401 and retries with the new token', async () => {
+    serve({
+      '/projects': [[401, { error: 'expired' }], [200, { items: [] }]],
+      '/auth/refresh': [[200, { token: 'new', refreshToken: 'new-refresh' }]],
+    })
+    await expect(request('GET', '/projects')).resolves.toEqual({ items: [] })
+    expect(pathsCalled()).toEqual(['/projects', '/auth/refresh', '/projects'])
+    expect(JSON.parse(calls[1].init.body)).toEqual({ refreshToken: 'old-refresh' })
+    expect(calls[2].init.headers.Authorization).toBe('Bearer new')
+  })
+
+  it('shares one refresh between concurrent 401s', async () => {
+    serve({
+      '/projects': [[401, {}], [200, { items: [] }]],
+      '/notifications/unread-count': [[401, {}], [200, { count: 0 }]],
+      '/auth/refresh': [[200, { token: 'new', refreshToken: 'new-refresh' }]],
+    })
+    await Promise.all([request('GET', '/projects'), request('GET', '/notifications/unread-count')])
+    expect(pathsCalled().filter((p) => p === '/auth/refresh')).toHaveLength(1)
+  })
+
+  it('signs out once when the refresh fails', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    serve({ '/projects': [[401, { error: 'expired' }]], '/auth/refresh': [[401, { error: 'no' }]] })
+    await expect(request('GET', '/projects')).rejects.toMatchObject({ status: 401 })
+    expect(handler).toHaveBeenCalledOnce()
+  })
+
+  it('does not refresh twice: a second 401 after the retry signs out', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    serve({
+      '/projects': [[401, {}], [401, { error: 'still no' }]],
+      '/auth/refresh': [[200, { token: 'new', refreshToken: 'new-refresh' }]],
+    })
+    await expect(request('GET', '/projects')).rejects.toMatchObject({ status: 401 })
+    expect(handler).toHaveBeenCalledOnce()
+    expect(pathsCalled().filter((p) => p === '/auth/refresh')).toHaveLength(1)
+  })
+
+  it.each(['/auth/login', '/auth/refresh', '/auth/logout'])('never refreshes for %s', async (path) => {
+    serve({ [path]: [[401, { error: 'no' }]] })
+    await expect(request('POST', path, { body: {} })).rejects.toMatchObject({ status: 401 })
+    expect(pathsCalled()).toEqual([path])
+  })
+
+  it('reports the rotated tokens', async () => {
+    const refreshed = vi.fn()
+    setRefreshedHandler(refreshed)
+    serve({
+      '/projects': [[401, {}], [200, { items: [] }]],
+      '/auth/refresh': [[200, { token: 'new', refreshToken: 'new-refresh' }]],
+    })
+    await request('GET', '/projects')
+    expect(refreshed).toHaveBeenCalledWith({ token: 'new', refreshToken: 'new-refresh' })
+  })
+
+  it('signs out without calling the server when there is no refresh token', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    setTokens('old', null)
+    serve({ '/projects': [[401, {}]] })
+    await expect(request('GET', '/projects')).rejects.toMatchObject({ status: 401 })
+    expect(pathsCalled()).toEqual(['/projects'])
+    expect(handler).toHaveBeenCalledOnce()
   })
 })
