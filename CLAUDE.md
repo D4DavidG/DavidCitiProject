@@ -38,7 +38,7 @@ outdated it.
   `docs/superpowers/specs/2026-10-14-tokens-design.md`): `POST /auth/refresh` rotates the
   refresh token (reuse of an old one ends every session of that user), `POST /auth/logout`
   revokes it, and a password change, reset or archive ends the user's older sessions.
-  Tests: 536 backend, 314 website, and 22 Playwright browser
+  Tests: 537 backend, 314 website, and 22 Playwright browser
   tests in 8 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
   `e2e/tour.spec.js` screenshots every screen at desktop and phone width;

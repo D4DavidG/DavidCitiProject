@@ -19,7 +19,7 @@ After this change:
 | Access token (the `Authorization: Bearer` one) | 8 h | **15 min**, still a JWT with `sub`, `iat`, `exp` |
 | Refresh token | none | 32 random bytes (`secrets.token_urlsafe(32)`), only its SHA-256 stored; good until **8 h after login** (absolute, never extended) |
 | `POST /auth/refresh` | none | swaps a live refresh token for a new access token **and** a new refresh token (rotation) |
-| Reusing an old or revoked refresh token | n/a | 401, and **every live refresh token of that user is revoked** (theft detection) |
+| Reusing a rotated refresh token | n/a | 401, and **every live refresh token of that user is revoked** (theft detection). A token revoked by sign out, password change, reset or archive is only refused |
 | `POST /auth/logout` | none (the website just forgot the token) | revokes the refresh token sent; 204 |
 | Password change, admin reset, archiving a user | archive ends access tokens; the others end nothing | all three revoke every refresh token of the user, and access tokens issued **before the last password change** are refused |
 
@@ -117,7 +117,8 @@ POST /users/{id}/reset-password, /users/{id}/archive -> also sets/revokes as abo
 | Access token older than 15 min | 401 "Your session is invalid or has expired..." (unchanged message); website refreshes and retries |
 | Access token issued before the user's last password change | same 401 |
 | Refresh token unknown, malformed, missing, expired, or user archived | 401, nothing revoked |
-| Refresh token already rotated or revoked | 401, all of the user's live refresh tokens revoked, warning logged |
+| Refresh token already rotated (`replaced_by` set) | 401, all of the user's live refresh tokens revoked, warning logged |
+| Refresh token revoked without rotation (sign out, password change, reset, archive) | 401, nothing else revoked, so a tab still holding a pre-change token can't sign out the tab that changed the password |
 | Logout with any token, or none | 204 |
 | Same tab, many calls 401 at once | one `/auth/refresh` request |
 | Duplicated browser tab (it copies `sessionStorage`) | whichever tab refreshes second is a reuse: both sign out. Rare; accepted, documented |

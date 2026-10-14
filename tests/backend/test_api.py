@@ -171,6 +171,9 @@ def test_change_password_returns_a_working_session(conn, org):
     assert payload["user"]["mustChangePassword"] is False
     assert c.call("GET", "/auth/me", token=payload["token"], now=LATER2)[0] == 200
     assert c.call("POST", "/auth/refresh", {"refreshToken": old_refresh}, token=None, now=LATER2)[0] == 401
+    # The old token was revoked, not rotated: presenting it must not end the new session.
+    assert c.call("POST", "/auth/refresh", {"refreshToken": payload["refreshToken"]}, token=None,
+                  now=LATER2)[0] == 200
 
 
 @pytest.mark.parametrize("action", ["reset-password", "archive"])

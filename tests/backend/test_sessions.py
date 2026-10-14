@@ -98,6 +98,15 @@ def test_end_revokes_and_is_safe_twice(conn, org):
         sessions.rotate(conn, raw, SECRET, NOW)
 
 
+def test_a_signed_out_token_is_not_reuse(conn, org):
+    signed_out = sessions.start(conn, org["alice"].user_id, SECRET, NOW)["refresh_token"]
+    other_tab = sessions.start(conn, org["alice"].user_id, SECRET, NOW)["refresh_token"]
+    sessions.end(conn, signed_out, NOW)
+    with pytest.raises(AuthenticationError):
+        sessions.rotate(conn, signed_out, SECRET, NOW)  # revoked, never rotated: a plain 401
+    assert row_of(conn, other_tab)["revoked_at"] is None  # the other tab is untouched
+
+
 def test_revoke_all_only_touches_that_user(conn, org):
     for _ in range(2):
         sessions.start(conn, org["alice"].user_id, SECRET, NOW)

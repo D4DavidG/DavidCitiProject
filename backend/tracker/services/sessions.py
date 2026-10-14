@@ -6,8 +6,10 @@ a database leak gives nobody a usable token.
 
 - Rotation: each refresh retires the token used and returns a new pair.
 - Fixed expiry: every token in the chain dies 8 hours after login.
-- Reuse detection: a retired token coming back means someone has a copy, so
+- Reuse detection: a rotated token coming back means someone has a copy, so
   every live refresh token of that user is revoked and both sides sign in again.
+  A token revoked any other way (sign out, password change, reset, archive) is
+  just refused: nobody copied it, so the user's other sessions stay.
 
 Sessions are not audited (see the design, section 2): a refresh every 15 minutes
 would flood the audit log and the admins' bells.
@@ -57,16 +59,18 @@ def rotate(conn: psycopg.Connection, raw: str | None, secret: str, now: dt.datet
     reused_by = None
     with atomic(conn):
         old = conn.execute(
-            "SELECT r.refresh_token_id, r.user_id, r.expires_at, r.revoked_at, u.is_archived"
+            "SELECT r.refresh_token_id, r.user_id, r.expires_at, r.revoked_at, r.replaced_by, u.is_archived"
             " FROM refresh_tokens r JOIN users u ON u.user_id = r.user_id"
             " WHERE r.token_hash = %s FOR UPDATE OF r",
             (_hash(raw),),
         ).fetchone()
         if old is None or old["expires_at"] <= now or old["is_archived"]:
             raise AuthenticationError(tokens.INVALID_MESSAGE)
-        if old["revoked_at"] is not None:
-            reused_by = old["user_id"]  # a retired token came back: someone has a copy
+        if old["replaced_by"] is not None:
+            reused_by = old["user_id"]  # a rotated token came back: someone has a copy
             revoke_all(conn, reused_by, now)
+        elif old["revoked_at"] is not None:
+            raise AuthenticationError(tokens.INVALID_MESSAGE)  # signed out or ended: refuse only
         else:
             pair, new_id = _new_pair(conn, old["user_id"], secret, now, old["expires_at"])
             conn.execute("UPDATE refresh_tokens SET revoked_at = %s, replaced_by = %s WHERE refresh_token_id = %s",

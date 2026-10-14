@@ -42,7 +42,7 @@ What's done and what isn't, honestly:
 | Database (10 tables, rules enforced by Postgres) | Done, tested, deployed to Aurora |
 | Backend API (66 routes, roles, audit log, notifications) | Done and tested. 62 of the routes are on Lambda; the 4 pull-board routes and migration `002_task_limit.sql` arrive with the next `./bin/deploy-backend.sh` |
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
-| Tests | Backend: 536 passing, 97% coverage, 100% for the API layer. Frontend: 314 passing, 94.93% of statements and 96.02% of lines covered, plus 22 browser (Playwright) tests in 8 files (14 Oct) |
+| Tests | Backend: 537 passing, 97% coverage, 100% for the API layer. Frontend: 314 passing, 94.93% of statements and 96.02% of lines covered, plus 22 browser (Playwright) tests in 8 files (14 Oct) |
 | AWS deployment | Verified 13 Oct: health, login, token, 404s, demo, load test |
 | Frontend (React, Material UI) | **Every screen built and tested**, live on AWS since 14 Oct (website deployed 11:35 UTC). The later 14 Oct changes (Hours and Minutes boxes, the Copy username and password button, the login-timing fix, the pull board, the bell's 10 s check with its pop-up, and the three charts: Workload and Budget on the Dashboard, the Deliverables timeline on each project) are local until the next `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
 
@@ -119,7 +119,7 @@ Maria: her username is printed by `python3 tools/demo.py demo`, and the password
 | 5 | Point at **4 and 6** | "Deliverables, with completion worked out from their tasks, and the dependency chain. Launch is blocked because Build isn't done." |
 | 6 | Point at **Trying to break the rules** | "Every one of these is a real request the server refused. Logging past 40 hours without confirming, a loop in the dependencies, someone else's project (404, not 403, so you can't tell it exists), deleting anything (there is no delete: records are archived)." |
 | 7 | Point at **5 integrity checks, 0 violations** | "Five database queries that must always return nothing: no dependency loops, no time logged outside a booking, and so on. They run after every database test, and here on live data." |
-| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "536 backend tests against a real Postgres database, not mocks. 314 website tests, which fake the API so they need no database. Plus a real browser test that walks this exact demo." |
+| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "537 backend tests against a real Postgres database, not mocks. 314 website tests, which fake the API so they need no database. Plus a real browser test that walks this exact demo." |
 | 9 | Optional: `(set -a; source ENVIRONMENT.config; python3 tools/console.py logs)` | "Here are those requests arriving in AWS's logs." |
 | 10 | Tell one story from section 8, "Things that went wrong" | Evaluators score curiosity and observation. These stories show both. |
 
@@ -276,7 +276,7 @@ backend/tracker/                     the whole backend: one Lambda
   domain/                            small shared pieces: errors, money (cents), clock (Eastern time), values
   store/                             the database: migrations/ (001_init.sql: all tables and rules; 002 to 004 add columns, 005 adds refresh_tokens),
                                      migrate.py, integrity.py (the 5 checks), postgres.py
-tests/backend/                       536 tests; conftest.py builds the test database
+tests/backend/                       537 tests; conftest.py builds the test database
 frontend/src/                        the website (React + Material UI):
   services/request.js                the one module that calls the API (token, JSON, errors; on a 401 refresh once, then retry)
   services/format.js                 the only code that turns cents, minutes and dates into text
@@ -411,7 +411,7 @@ counted as the next day.
 
 ### Testing
 
-**"How did you test it?"** 536 backend tests with pytest, against a real PostgreSQL database,
+**"How did you test it?"** 537 backend tests with pytest, against a real PostgreSQL database,
 not mocks. Each test runs inside a transaction that's rolled back, so tests can't
 affect each other, and the integrity check runs after each database test.
 
@@ -510,7 +510,7 @@ Run from `~/DavidCitiProject` on the VDI.
 
 ```sh
 # Tests
-.venv/bin/pytest -q                                   # backend tests (expect 536 passed)
+.venv/bin/pytest -q                                   # backend tests (expect 537 passed)
 (cd frontend && npm test)                             # website tests (expect 314 passed)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)   # real browser, needs ./bin/start-dev.sh running
 .venv/bin/pytest --cov --cov-report=term-missing      # with the coverage table

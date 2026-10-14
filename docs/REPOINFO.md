@@ -5,7 +5,7 @@ say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minu
 
 **Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
 final fix wave, the project-manager notifications and requests for everyone, the overtime warning, and 15-minute
-tokens with refresh: 536 backend tests, 314 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
+tokens with refresh: 537 backend tests, 314 website tests, 22 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
 pop-up, the three charts, the project manager being notified of an employee's project
@@ -33,7 +33,7 @@ points at a file and line you can open.
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 536 backend tests running against a real Postgres database,
+> with Terraform. There are 537 backend tests running against a real Postgres database,
 > and 314 website tests."
 
 ### 2 minutes
@@ -330,9 +330,12 @@ from the token."
   while people still stay signed in for a working day. The website refreshes on its own:
   on a 401 it calls `/auth/refresh` once (shared by every call waiting), retries once,
   and only then signs out (`frontend/src/services/request.js`).
-- *"What if the refresh token is stolen?"* Rotation: each use retires it. If a retired one
+- *"What if the refresh token is stolen?"* Rotation: each use retires it. If a rotated one
   comes back, someone has a copy, so every session of that user ends and a warning is
-  logged (`services/sessions.py:66-77`; test `test_reusing_a_rotated_token_revokes_everything`).
+  logged (`services/sessions.py:69-81`; test `test_reusing_a_rotated_token_revokes_everything`).
+  A token ended any other way (sign out, password change) is only refused: otherwise a
+  second tab still holding a pre-change token would sign out the tab that just changed
+  the password (test `test_a_signed_out_token_is_not_reuse`).
 - *"Why not an HttpOnly cookie?"* Stronger against script injection, but locally the page
   (:3000) and the proxy (:3001) are different origins and the proxy answers
   `Access-Control-Allow-Origin: *`, which browsers never combine with cookies. Rotation
@@ -361,7 +364,7 @@ from the token."
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "536 backend tests against a real Postgres database, at
+**Headline (fresh, 14 Oct 2026):** "537 backend tests against a real Postgres database, at
 97% coverage, with the API layer at 100%. Plus 314 website tests at 94.93% of
 statements, and 22 Playwright browser tests."
 
@@ -378,7 +381,7 @@ statements, and 22 Playwright browser tests."
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct (after the 15-minute tokens):** backend `536 passed in 21.69s`;
+- **Fresh numbers, 14 Oct (after the 15-minute tokens):** backend `537 passed in 18.85s` (after the refresh reuse fix);
   coverage `1990 statements, 68 missed, 97%`. By folder: `api/` 100%, `function.py` 100%,
   `domain/` 99%, `services/` 95.7%, `store/` 93.9%. Website: 31 files, `314 passed`, about
   a minute and a half. Website coverage: 94.93% of statements, 96.02% of lines, 91.34% of
@@ -548,7 +551,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **536 backend, 314 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **537 backend, 314 website, 22 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **97% of statements** (95% with
@@ -586,7 +589,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 9. **"What if someone steals the access token? A 15-minute timer?"** Built 14 Oct (not on
    AWS until the next deploy). The access token lasts 15 minutes; a refresh token (only its
    SHA-256 stored) gets a new pair at `POST /auth/refresh` and is retired on use; reusing a
-   retired one ends every session of that user; `POST /auth/logout` revokes it; a password
+   rotated one ends every session of that user; `POST /auth/logout` revokes it; a password
    change, reset or archive ends the user's older sessions. The role is still re-read on
    every request. *Point at: `services/tokens.py:21`; `services/sessions.py`;
    `services/actors.py:59-61`; `api/app.py:22-34`; `frontend/src/services/request.js` (refresh once, retry once)*
@@ -780,7 +783,7 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
     (`POST /auth/logout`). Every session of a user ends on a password change, an admin
     reset or archiving them: their refresh tokens are revoked and access tokens issued
     before the change are refused. One access token can't be revoked alone; it dies within
-    15 minutes. *`services/sessions.py:81-92`; `services/actors.py:59-61`; `api/app.py:28-29`*
+    15 minutes. *`services/sessions.py:85-96`; `services/actors.py:59-61`; `api/app.py:28-29`*
 21. **"Privilege escalation?"** Only admins create users or change roles. Nobody changes
     their own role or salary. *`services/users.py:233-239`; `api/routes.py:55-62`*
 22. **"Where are the secrets?"** Terraform generates them and passes them in as Lambda
@@ -918,7 +921,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 536 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 537 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -935,7 +938,7 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 536 / 97% | Backend tests / coverage (API layer 100%) | 14 Oct |
+| 537 / 97% | Backend tests / coverage (API layer 100%) | 14 Oct |
 | 314 / 94.93% | Website tests / statements (96.02% of lines) | 14 Oct |
 | 68 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
