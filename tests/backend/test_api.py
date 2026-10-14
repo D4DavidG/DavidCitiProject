@@ -197,7 +197,9 @@ def test_over_capacity_is_409(conn, org):
     alice = client_for(conn, org, "alice")
     status, payload = alice.call("POST", f"/tasks/{task['taskId']}/time-entries",
                                  {"workDate": "2026-10-13", "minutes": 180})
-    assert status == 409 and "capacity" in payload["error"]
+    assert status == 409
+    assert payload == {"error": "This puts you 1 h over your 2 h week. Log anyway? Your manager will be told.",
+                       "code": "OVER_CAPACITY"}
 
 
 def test_over_capacity_answer_carries_its_code():

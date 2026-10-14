@@ -4,8 +4,10 @@
 - The date can't be in the future and must fall inside one of their bookings on
   that project. At most 24 hours per person per day.
 - Capacity: logging that takes the person's Monday-to-Sunday week past their
-  weekly capacity is refused unless their manager allowed overtime. The user's
-  row is locked first, so two entries sent at once can't both slip under.
+  weekly capacity asks first (409, code OVER_CAPACITY) unless their manager
+  allowed overtime. Resent with confirm_over_capacity, it is saved, marked
+  over_capacity, and the notification says by how much. The user's row is
+  locked first, so an unconfirmed entry can never slip past.
 - The hourly rate is frozen on the entry when it's logged, so a later raise
   never rewrites past costs. Only approved time counts as consumed budget.
 - The line manager or any admin approves or rejects. Nobody approves their own.
@@ -26,7 +28,7 @@ from services.views import entry_view
 from store.postgres import atomic, insert, update
 
 NOT_FOUND = "Time entry not found."
-_FIELDS = {"work_date", "minutes", "note"}
+_FIELDS = {"work_date", "minutes", "note", "confirm_over_capacity"}
 
 
 def hours_text(minutes: int) -> str:
@@ -35,7 +37,17 @@ def hours_text(minutes: int) -> str:
     return " ".join(part for part in (f"{h} h" if h else "", f"{m} min" if m else "") if part) or "0 min"
 
 
+def _confirmed(data: dict) -> bool:
+    """Did the person say "Log anyway"? Read it, then drop it: it is not a column."""
+    return values.boolean(data, "confirm_over_capacity", required=False) or False
+
+
+def _over_text(over: int) -> str:
+    return f" ({hours_text(over)} over capacity)" if over else ""
+
+
 def _clean(data: dict, partial: bool) -> dict:
+    data = {k: v for k, v in data.items() if k != "confirm_over_capacity"}
     clean = {}
     if not partial or "work_date" in data:
         clean["work_date"] = values.date(data, "work_date")
@@ -49,8 +61,9 @@ def _clean(data: dict, partial: bool) -> dict:
 
 
 def _check_limits(conn: psycopg.Connection, user_id: int, project_id: int, work_date: dt.date,
-                  minutes: int, ignore_entry: int | None) -> None:
-    """Booked that day, at most 24 h that day, and within capacity unless overtime is allowed."""
+                  minutes: int, ignore_entry: int | None, confirmed: bool) -> int:
+    """Booked that day and at most 24 h that day (always refused). Past capacity without
+    overtime asks first; once confirmed, returns the minutes past capacity (else 0)."""
     person = conn.execute("SELECT weekly_capacity_hours, overtime_allowed FROM users WHERE user_id = %s FOR UPDATE",
                           (user_id,)).fetchone()
     booked = conn.execute("SELECT 1 FROM assignments WHERE user_id = %s AND project_id = %s AND NOT is_archived"
@@ -68,13 +81,18 @@ def _check_limits(conn: psycopg.Connection, user_id: int, project_id: int, work_
                         " AND work_date BETWEEN %(s)s AND %(e)s AND status <> 'REJECTED' AND entry_id <> %(ignore)s",
                         {**other, "s": start, "e": start + dt.timedelta(days=6)}).fetchone()["n"]
     capacity = person["weekly_capacity_hours"]
-    if week + minutes > capacity * 60 and not person["overtime_allowed"]:
-        raise OverCapacity(f"That would take you to {hours_text(week + minutes)} in the week of {start.isoformat()},"
-                           f" past your capacity of {capacity} h. Ask your manager to allow overtime.")
+    over = week + minutes - capacity * 60
+    if over <= 0 or person["overtime_allowed"]:
+        return 0
+    if not confirmed:
+        raise OverCapacity(f"This puts you {hours_text(over)} over your {capacity} h week."
+                           " Log anyway? Your manager will be told.")
+    return over
 
 
 def log_time(conn: psycopg.Connection, actor: Actor, task_id: int, data: dict) -> dict:
     values.only_allowed(data, _FIELDS)
+    confirmed = _confirmed(data)
     clean = _clean(data, partial=False)
     with atomic(conn):
         task = conn.execute("SELECT * FROM tasks WHERE task_id = %s", (task_id,)).fetchone()
@@ -88,15 +106,16 @@ def log_time(conn: psycopg.Connection, actor: Actor, task_id: int, data: dict) -
             raise Forbidden("Only the task's assignee logs time on it.")
         if task["is_archived"]:
             raise Conflict("This task is archived.")
-        _check_limits(conn, actor.user_id, task["project_id"], clean["work_date"], clean["minutes"], None)
+        over = _check_limits(conn, actor.user_id, task["project_id"], clean["work_date"], clean["minutes"], None,
+                             confirmed)
         salary = conn.execute("SELECT annual_salary_cents FROM users WHERE user_id = %s",
                               (actor.user_id,)).fetchone()["annual_salary_cents"]
         clean.update(task_id=task_id, project_id=task["project_id"], user_id=actor.user_id,
-                     hourly_rate_cents=money.hourly_rate_cents(salary))
+                     hourly_rate_cents=money.hourly_rate_cents(salary), over_capacity=over > 0)
         row = insert(conn, "time_entries", clean)
         audit.record_change(conn, actor, "CREATE", "time_entries", row["entry_id"], None, entry_view(row),
                             f"{actor.name} logged {hours_text(row['minutes'])} for {row['work_date'].isoformat()}"
-                            f" on task {task['title']}")
+                            f" on task {task['title']}{_over_text(over)}")
     return row
 
 
@@ -112,7 +131,8 @@ def edit_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, data: dict
         if before is None:
             raise NotFound(NOT_FOUND)
         merged = {**before, **clean}
-        _check_limits(conn, actor.user_id, before["project_id"], merged["work_date"], merged["minutes"], entry_id)
+        _check_limits(conn, actor.user_id, before["project_id"], merged["work_date"], merged["minutes"], entry_id,
+                      False)
         # An edited entry goes back to pending: clear the old decision along with the change.
         row = update(conn, "time_entries", "entry_id", entry_id,
                      {**clean, "status": "PENDING", "decided_by": None, "decided_at": None})

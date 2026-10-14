@@ -7,7 +7,7 @@ import pytest
 
 import factories as f
 from domain.errors import Conflict, DependencyCycle, Forbidden, NotFound, OverCapacity, ValidationError
-from services import assignments, milestones, projects, tasks, time_entries, users
+from services import assignments, milestones, notifications, projects, tasks, time_entries, users
 
 
 @pytest.fixture
@@ -221,13 +221,73 @@ def test_more_than_24_hours_in_a_day_is_refused(conn, org):
         log(conn, org["alice"], t, "2026-10-13", 5)
 
 
-def test_logging_past_capacity_is_refused_without_overtime(conn, org):
+def week_of_16_hours(conn, org, capacity=20):
+    """Alice at `capacity` h with overtime off, 8 h logged Mon and 8 h Tue; returns the task."""
     t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
-    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20})
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": capacity})
     log(conn, org["alice"], t, "2026-10-12", 8)
     log(conn, org["alice"], t, "2026-10-13", 8)
-    with pytest.raises(OverCapacity, match="20"):
+    return t
+
+
+def week_minutes(conn, org):
+    return conn.execute("SELECT sum(minutes) AS n FROM time_entries WHERE user_id = %s",
+                        (org["alice"].user_id,)).fetchone()["n"]
+
+
+def newest_summary(conn, person):
+    return notifications.list_notifications(conn, person, unread_only=False, page=1, page_size=1)["items"][0]["summary"]
+
+
+def test_logging_past_capacity_asks_first_without_overtime(conn, org):
+    t = week_of_16_hours(conn, org)
+    with pytest.raises(OverCapacity) as caught:
         log(conn, org["alice"], t, "2026-10-14", 5)
+    assert str(caught.value) == "This puts you 1 h over your 20 h week. Log anyway? Your manager will be told."
+    assert caught.value.code == "OVER_CAPACITY"
+    assert week_minutes(conn, org) == 16 * 60  # nothing saved
+
+
+def test_confirmed_overtime_is_saved_and_marked(conn, org):
+    t = week_of_16_hours(conn, org)
+    row = log(conn, org["alice"], t, "2026-10-14", 5, confirm_over_capacity=True)
+    assert (row["minutes"], row["over_capacity"]) == (300, True)
+
+
+def test_confirmed_overtime_tells_the_line_manager(conn, org):
+    t = week_of_16_hours(conn, org)
+    log(conn, org["alice"], t, "2026-10-14", 5, confirm_over_capacity=True)
+    assert newest_summary(conn, org["bob"]).endswith("(1 h over capacity)")
+
+
+def test_allowed_overtime_is_not_marked(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20, "overtime_allowed": True})
+    rows = [log(conn, org["alice"], t, "2026-10-12", 12), log(conn, org["alice"], t, "2026-10-13", 12)]
+    assert [r["over_capacity"] for r in rows] == [False, False]
+
+
+def test_confirm_within_capacity_is_ignored(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    row = log(conn, org["alice"], t, "2026-10-13", 2, confirm_over_capacity=True)
+    assert row["over_capacity"] is False
+    assert "over capacity" not in newest_summary(conn, org["bob"])
+
+
+def test_confirm_does_not_override_the_24_hour_day(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20})
+    log(conn, org["alice"], t, "2026-10-12", 20, confirm_over_capacity=True)
+    with pytest.raises(Conflict, match="24") as caught:
+        log(conn, org["alice"], t, "2026-10-12", 5, confirm_over_capacity=True)
+    assert not isinstance(caught.value, OverCapacity)
+
+
+def test_confirm_must_be_true_or_false(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    with pytest.raises(ValidationError) as caught:
+        log(conn, org["alice"], t, "2026-10-13", 1, confirm_over_capacity="yes")
+    assert caught.value.field == "confirm_over_capacity"
 
 
 def test_logging_past_capacity_is_allowed_when_overtime_is_on(conn, org):
