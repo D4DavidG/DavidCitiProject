@@ -256,6 +256,13 @@ describe('ProjectDetailPage', () => {
       expect(within(screen.getByRole('article', { name: 'Portal UI' })).getByText('Build · 40 h')).toBeInTheDocument()
     })
 
+    it('names the holder strip as a group so a screen reader announces it', async () => {
+      renderDetail(USERS.manager, { 'GET /projects/1/board': [200, BOARD] })
+      await openBoard()
+      const strip = await screen.findByRole('group', { name: 'Who holds what' })
+      expect(within(strip).getByText('Ana Ruiz 1 / 2')).toBeInTheDocument()
+    })
+
     it('flags anyone holding more than their limit', async () => {
       const people = [BOARD_PEOPLE[0], { userId: 4, name: 'Ben Okafor', held: 3, limit: 2 }]
       renderDetail(USERS.manager, { 'GET /projects/1/board': [200, page(BOARD_TASKS, { people })] })
@@ -326,6 +333,25 @@ describe('ProjectDetailPage', () => {
       await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
       expect(calls.filter((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toHaveLength(1)
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('keeps Take this disabled until the reload after the claim has finished', async () => {
+      const calls = renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [200, {}],
+      })
+      await openBoard()
+      const releaseClaim = holdOpen('/tasks/30/claim')
+      const button = within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' })
+      fireEvent.click(button)
+      const releaseReload = holdOpen('/projects/1/board')
+      releaseClaim()
+      await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toHaveLength(1))
+      expect(boardCalls(calls)).toHaveLength(1)
+      expect(button).toBeDisabled()
+      releaseReload()
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
+      await waitFor(() => expect(button).toBeEnabled())
     })
 
     it('shows "already taken" and reloads the board when someone got there first', async () => {

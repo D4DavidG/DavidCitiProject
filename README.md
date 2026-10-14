@@ -69,9 +69,9 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
 (deliverables), `milestone_dependencies`, `tasks`, `time_entries`, `project_requests`,
 `audit_log`, `notifications`: ten tables for the app, plus `schema_migrations`, which the
 migration runner keeps for itself. `002_task_limit.sql` adds one column, `users.task_limit`
-(1 to 10, default 2), because the first file never changes once it has run on Aurora. Money is integer cents. Nothing is deleted: a trigger
-refuses `DELETE` on every application table, and records are archived and reactivated
-instead.
+(1 to 10, default 2), because the first file never changes once it has run on Aurora.
+Money is integer cents. Nothing is deleted: a trigger refuses `DELETE` on every
+application table, and records are archived and reactivated instead.
 
 The database itself refuses whatever one row can prove wrong:
 
@@ -194,7 +194,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 423 passed
+.venv/bin/pytest -q                                                        # 425 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -221,7 +221,7 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 233 passed: Vitest + React Testing Library
+npm test                                  # 236 passed: Vitest + React Testing Library
 npm run test:coverage                     # 93% of statements, 95% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
@@ -239,6 +239,8 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
 
 **Known gaps (the uncovered 4% of the backend, 7% of the frontend):**
 
+- a manager cannot put a task back to Ready from the screen (the Assign dialog has no
+  empty choice); the API allows it (`PATCH /tasks/{id}` with `assigneeUserId: null`);
 - guard branches in the services for ids that don't exist or records already archived
   (for example, archiving an archived task); the same guards are tested on other records;
 - a handful of real rules with no test yet: reactivating a deliverable or task clears a

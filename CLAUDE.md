@@ -19,7 +19,7 @@ outdated it.
   not deployed (Hours and Minutes boxes, **Copy username and password**, the login-timing
   fix at `services/users.py:159-164`, and the pull board with migration
   `002_task_limit.sql`): on AWS after the next `./bin/deploy-backend.sh` and
-  `./bin/deploy-frontend.sh`. Tests: 423 backend, 233 website, and 9 Playwright browser
+  `./bin/deploy-frontend.sh`. Tests: 425 backend, 236 website, and 9 Playwright browser
   tests in 4 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/tour.spec.js` screenshots every screen at desktop and phone width).
 - **Read these first:**
@@ -220,8 +220,9 @@ the demo, so evaluators can tick items off without translating:
 **Every successful change writes one audit row, and that row notifies everyone above
 the actor.** That covers every create, edit, archive and reactivate: users (account
 created, role or title changed, password changed or reset), projects, deliverables,
-resources, budget, dependencies, tasks (created, assigned, status moved), time entries
-(logged, edited, approved, rejected), capacity and overtime settings, and project
+resources, budget, dependencies, tasks (created, assigned, claimed from the board, put
+back, status moved), time entries (logged, edited, approved, rejected), capacity,
+overtime and task-limit settings, and project
 requests and their decisions. Reads are not logged.
 Refused requests (403, 404, 409) changed nothing, so they are not logged either.
 

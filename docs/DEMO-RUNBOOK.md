@@ -252,12 +252,12 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 14 s (10.5 to 16.5 s) | `423 passed in 13.52s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  24 passed (24)` and `Tests  233 passed (233)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 14 s (10.5 to 16.5 s) | `425 passed in 12.84s` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute | `Test Files  24 passed (24)` and `Tests  236 passed (236)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 233 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 236 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
@@ -282,10 +282,10 @@ down mid-request (`postgres.py:121`) and turning a foreign-key violation into a 
 
 | Rule | Command | Result (14 Oct) |
 | --- | --- | --- |
-| 40-hour week | `.venv/bin/pytest -q -k capacity` | `11 passed, 364 deselected` (about 0.6 s) |
-| Not yours = 404, word for word | `.venv/bin/pytest -q -k byte_identical` | `2 passed, 373 deselected` (about 0.4 s) |
-| Nothing can be deleted | `.venv/bin/pytest -q -k delete` | `14 passed, 361 deselected` (about 0.5 s) |
-| Unknown usernames cost the same hashing as real ones | `.venv/bin/pytest -q -k unknown_username_costs` | `1 passed, 374 deselected` |
+| 40-hour week | `.venv/bin/pytest -q -k capacity` | `12 passed, 413 deselected` (about 0.7 s) |
+| Not yours = 404, word for word | `.venv/bin/pytest -q -k byte_identical` | `3 passed, 422 deselected` (about 0.4 s) |
+| Nothing can be deleted | `.venv/bin/pytest -q -k delete` | `14 passed, 411 deselected` (about 0.5 s) |
+| Unknown usernames cost the same hashing as real ones | `.venv/bin/pytest -q -k unknown_username_costs` | `1 passed, 424 deselected` |
 | The 5 integrity queries catch planted problems | `.venv/bin/pytest -q tests/backend/test_integrity.py` | `10 passed in 0.36s` |
 | Approvals screen | `cd frontend && npx vitest run src/pages/approvals` | `Tests  4 passed (4)`, 2.3 s |
 

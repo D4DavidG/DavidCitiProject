@@ -31,7 +31,7 @@ export default function BoardTab({ projectId, canManage }) {
   const [assigning, setAssigning] = useState(null)
   const [pendingId, setPendingId] = useState(null)
 
-  /** Take or put back one task. Its buttons stay disabled until the answer arrives. */
+  /** Take or put back one task. Its buttons stay disabled until the board has reloaded. */
   async function act(taskId, verb) {
     setFailure(null)
     setPendingId(taskId)
@@ -39,10 +39,11 @@ export default function BoardTab({ projectId, canManage }) {
       await request('POST', `/tasks/${taskId}/${verb}`)
     } catch (e) {
       setFailure(e.message)
-    } finally {
-      setPendingId(null)
     }
-    reload()
+    // The buttons come back only once the reloaded board has arrived, so a card that is
+    // about to move cannot be taken a second time in the gap.
+    await reload()
+    setPendingId(null)
   }
 
   const tasks = data?.items ?? []
@@ -53,7 +54,7 @@ export default function BoardTab({ projectId, canManage }) {
     <PageState loading={loading && !data} error={error} onRetry={reload}>
       <Box sx={{ display: 'grid', gap: 2 }}>
         {failure && <Alert severity="error" onClose={() => setFailure(null)}>{failure}</Alert>}
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }} aria-label="Who holds what">
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }} role="group" aria-label="Who holds what">
           {people.map((p) => {
             const over = p.held > p.limit
             return <Chip key={p.userId} variant="outlined" color={over ? 'error' : 'default'} label={`${p.name} ${p.held} / ${p.limit}${over ? ', over limit' : ''}`} />

@@ -133,11 +133,11 @@ export default function MyTasksPage() {
     } catch (failure) {
       // The server's sentence is the explanation (at the limit, already taken, ...).
       setMessage({ severity: 'error', text: failure.message })
-    } finally {
-      setTakingId(null)
     }
-    tasks.reload()
-    ready.reload()
+    // Take this comes back only once both reloaded lists have arrived, so a card that is
+    // about to move cannot be taken a second time in the gap.
+    await Promise.all([tasks.reload(), ready.reload()])
+    setTakingId(null)
   }
 
   const items = tasks.data?.items ?? []

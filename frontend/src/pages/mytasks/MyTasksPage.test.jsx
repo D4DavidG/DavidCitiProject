@@ -147,6 +147,24 @@ describe('MyTasksPage', () => {
     await waitFor(() => expect(button).toBeEnabled())
   })
 
+  it('keeps Take this disabled until the lists have reloaded after the claim', async () => {
+    const calls = renderPage({
+      'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 1, limit: 2 })],
+      'POST /tasks/30/claim': [200, { ...GO_LIVE, assigneeUserId: 3, status: 'IN_PROGRESS' }],
+    })
+    const releaseClaim = holdOpen('/tasks/30/claim')
+    const button = within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' })
+    fireEvent.click(button)
+    releaseClaim()
+    const releaseReload = holdOpen('/me/ready-tasks')
+    await screen.findByText('You took Go-live checklist.')
+    expect(calls.filter((c) => c.path === '/me/ready-tasks')).toHaveLength(1)
+    expect(button).toBeDisabled()
+    releaseReload()
+    await waitFor(() => expect(calls.filter((c) => c.path === '/me/ready-tasks')).toHaveLength(2))
+    await waitFor(() => expect(button).toBeEnabled())
+  })
+
   it("shows the server's refusal when I'm at my limit", async () => {
     const refusal = 'You already hold 2 unfinished tasks, your limit. Finish one first, or ask your manager to raise it.'
     renderPage({

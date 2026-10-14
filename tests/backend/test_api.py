@@ -263,6 +263,15 @@ def test_only_employees_take_tasks_from_the_board(conn, org):
     assert taken["status"] == "IN_PROGRESS" and taken["assigneeUserId"] == org["alice"].user_id
 
 
+@pytest.mark.parametrize("who", ["bob", "admin"])
+def test_managers_and_admins_have_no_ready_list_and_cannot_put_back(conn, org, who):
+    ms = f.deliverable(conn, org["bob"], org["apollo"])
+    mine = f.task(conn, org["bob"], ms, assignee=org["alice"])
+    c = client_for(conn, org, who)
+    assert c.call("GET", "/me/ready-tasks")[0] == 403
+    assert c.call("POST", f"/tasks/{mine['task_id']}/release")[0] == 403
+
+
 def test_the_limit_refusal_is_409_with_the_server_message(conn, org):
     ms = f.deliverable(conn, org["bob"], org["apollo"])
     f.task(conn, org["bob"], ms, assignee=org["alice"])

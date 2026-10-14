@@ -93,7 +93,7 @@ def test_two_people_take_one_task_and_the_second_is_refused(race_db):
     alice, eve = race_db["alice"], race_db["eve"]
     task = ready_task(race_db)["task_id"]
     future = race(alice, eve, task, task)
-    with pytest.raises(Conflict, match="^This task is already taken.$"):
+    with pytest.raises(Conflict, match=r"^This task is already taken\.$"):
         future.result(timeout=10)
     assert assignee_of(task) == alice.user_id
 
@@ -103,7 +103,7 @@ def test_one_person_at_1_of_2_takes_two_tasks_at_once_and_one_is_refused(race_db
     ready_task(race_db, assignee=alice)                       # Bob assigned her one: 1 of 2
     x, y = ready_task(race_db)["task_id"], ready_task(race_db)["task_id"]
     future = race(alice, alice, x, y)
-    with pytest.raises(Conflict, match="your limit"):
+    with pytest.raises(Conflict, match=r"^You already hold 2 unfinished tasks, your limit\. Finish one first, or ask your manager to raise it\.$"):
         future.result(timeout=10)
     with connect(settings(DB)) as conn:
         assert tasks.held_count(conn, alice.user_id) == 2

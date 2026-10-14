@@ -475,7 +475,7 @@ def test_put_back_keeps_logged_time_and_stops_further_logging(conn, org):
     owner = conn.execute("SELECT user_id FROM time_entries WHERE entry_id = %s",
                          (entry["entry_id"],)).fetchone()["user_id"]
     assert owner == org["alice"].user_id
-    with pytest.raises(Forbidden):
+    with pytest.raises(Forbidden, match=r"^Only the task's assignee logs time on it\.$"):
         log(conn, org["alice"], t, "2026-10-13", 1)
 
 
