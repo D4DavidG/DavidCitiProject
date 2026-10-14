@@ -534,3 +534,48 @@ def test_manager_clears_a_task_held_by_someone_no_longer_booked(conn, org):
     tasks.update_task(conn, org["bob"], t["task_id"], {"assignee_user_id": None})
     assert tasks.held_count(conn, org["alice"].user_id) == 0
     assert [x["task_id"] for x in tasks.ready_tasks(conn, org["eve"])["items"]] == [t["task_id"]]
+
+
+# --- findings on Task 5: archived projects, and the "one query" claims measured ---------
+
+class CountingConn:
+    """Wraps a connection and counts execute() calls, so 'one query' is measured, not read off the diff."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.count = 0
+
+    def execute(self, *args, **kwargs):
+        self.count += 1
+        return self.inner.execute(*args, **kwargs)
+
+
+def test_board_of_an_archived_project_is_hidden_from_everyone_but_admins(conn, org):
+    ready(conn, org)
+    projects.archive_project(conn, org["admin"], org["apollo"]["project_id"])
+    for who in ("bob", "alice"):
+        with pytest.raises(NotFound, match="^Project not found.$"):
+            tasks.board(conn, org[who], org["apollo"]["project_id"])
+
+
+def test_board_runs_one_query_for_tasks_and_one_for_people_however_many_there_are(conn, org):
+    def board_queries():
+        counter = CountingConn(conn)
+        tasks.board(counter, org["admin"], org["apollo"]["project_id"])
+        return counter.count
+    before = board_queries()
+    for n in range(5):
+        f.task(conn, org["bob"], org["design"], title=f"Extra {n}")
+    assert (before, board_queries()) == (3, 3)   # project lookup + tasks + people
+
+
+def test_ready_tasks_runs_one_query_for_tasks_and_one_for_held_and_limit(conn, org):
+    def ready_queries():
+        counter = CountingConn(conn)
+        tasks.ready_tasks(counter, org["alice"])
+        return counter.count
+    ready(conn, org)
+    before = ready_queries()
+    for n in range(5):
+        f.task(conn, org["bob"], org["design"], title=f"Extra {n}")
+    assert (before, ready_queries()) == (2, 2)

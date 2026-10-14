@@ -255,5 +255,6 @@ def ready_tasks(conn: psycopg.Connection, actor: Actor) -> dict:
                 " AND NOT p.is_archived AND EXISTS (SELECT 1 FROM assignments a"
                 " WHERE a.project_id = t.project_id AND a.user_id = %s AND NOT a.is_archived)"
                 " ORDER BY m.due_date, t.task_id").format(sql.SQL(_WITH_NAMES)), (actor.user_id,)).fetchall()
-    limit = conn.execute("SELECT task_limit FROM users WHERE user_id = %s", (actor.user_id,)).fetchone()["task_limit"]
-    return {"items": items, "held": held_count(conn, actor.user_id), "limit": limit}
+    me = conn.execute(sql.SQL("SELECT {} AS held, u.task_limit FROM users u WHERE u.user_id = %s").format(HELD),
+                      (actor.user_id,)).fetchone()
+    return {"items": items, "held": me["held"], "limit": me["task_limit"]}
