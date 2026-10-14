@@ -33,7 +33,7 @@ outdated it.
   (migration `004_over_capacity.sql`; spec `docs/superpowers/specs/2026-10-14-overtime-design.md`):
   logging past weekly capacity without overtime answers 409 with `code: "OVER_CAPACITY"`,
   the website asks **Log anyway**, and the resent entry is saved, marked "Over capacity"
-  and the manager is told. Tests: 502 backend, 302 website, and 22 Playwright browser
+  and the manager is told. Tests: 504 backend, 302 website, and 22 Playwright browser
   tests in 8 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
   `e2e/tour.spec.js` screenshots every screen at desktop and phone width;

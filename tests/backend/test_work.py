@@ -279,6 +279,33 @@ def test_confirmed_edit_is_marked_and_an_edit_back_clears_it(conn, org):
     assert row["over_capacity"] is False
 
 
+def over_week(conn, org):
+    """Mon 8 h and Tue 8 h inside a 20 h week, then Wed 5 h confirmed (1 h over); returns Mon and Wed."""
+    t = week_of_16_hours(conn, org)
+    wed = log(conn, org["alice"], t, "2026-10-14", 5, confirm_over_capacity=True)
+    mon = time_entries.my_entries(conn, org["alice"], {}, 1, 3)["items"][2]
+    return mon, wed
+
+
+def test_note_only_edit_in_an_over_week_does_not_ask_or_mark(conn, org):
+    mon, wed = over_week(conn, org)
+    row = time_entries.edit_entry(conn, org["alice"], mon["entry_id"], {"note": "typo fixed"})
+    assert (row["note"], row["over_capacity"]) == ("typo fixed", False)
+    assert "over capacity" not in newest_summary(conn, org["bob"])
+    row = time_entries.edit_entry(conn, org["alice"], wed["entry_id"], {"note": "late night"})
+    assert row["over_capacity"] is True  # its mark is kept
+
+
+def test_logging_less_never_asks(conn, org):
+    mon, wed = over_week(conn, org)
+    row = time_entries.edit_entry(conn, org["alice"], wed["entry_id"], {"minutes": 270})  # 4.5 h: still over
+    assert row["over_capacity"] is True
+    row = time_entries.edit_entry(conn, org["alice"], mon["entry_id"], {"minutes": 7 * 60 + 45})  # week still over
+    assert row["over_capacity"] is False  # Monday was inside capacity, and trimming it doesn't mark it
+    row = time_entries.edit_entry(conn, org["alice"], wed["entry_id"], {"minutes": 180})  # 3 h: back under
+    assert row["over_capacity"] is False
+
+
 def test_allowed_overtime_is_not_marked(conn, org):
     t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
     users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 20, "overtime_allowed": True})

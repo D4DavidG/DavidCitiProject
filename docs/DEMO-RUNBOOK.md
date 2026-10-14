@@ -275,7 +275,7 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `502 passed in 20.50s` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `504 passed in 20.14s` |
 | Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  31 passed (31)` and `Tests  302 passed (302)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
