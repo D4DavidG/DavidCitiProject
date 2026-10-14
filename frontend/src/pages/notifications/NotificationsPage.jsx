@@ -9,7 +9,8 @@ import { useApi } from '../../services/useApi'
 
 /**
  * Every change is recorded in the audit log, and that notifies the people above
- * whoever made it: an employee's line manager and the admins; a manager's admins.
+ * whoever made it: an employee's line manager, the admins and, for project work, the
+ * project's manager; a manager's admins.
  * This page is your own inbox of those one-line summaries.
  */
 /** Who notifies whom follows the org chart, so the explanation depends on your role. */

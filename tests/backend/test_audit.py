@@ -1,7 +1,8 @@
 """Every change writes an audit row, and that row notifies everyone above the actor.
 
 | Actor (stored role) | Notified                                  |
-| Employee            | their line manager and every admin        |
+| Employee            | their line manager and every admin, plus  |
+|                     | the project's manager for project work    |
 | Manager             | every admin                               |
 | Admin               | every other admin                         |
 Edge cases: no line manager -> admins only; a lone admin -> nobody; archived users
@@ -11,7 +12,7 @@ receive nothing.
 import pytest
 
 import factories as f
-from services import audit, notifications, users
+from services import audit, notifications, tasks, time_entries, users
 
 
 def recipients_of_last_change(conn):
@@ -56,6 +57,40 @@ def test_lone_admin_notifies_nobody_but_is_still_audited(conn):
     last = conn.execute("SELECT * FROM audit_log ORDER BY audit_id DESC LIMIT 1").fetchone()
     assert last["entity_type"] == "users" and last["actor_role"] == "ADMIN"
     assert recipients_of_last_change(conn) == []
+
+
+@pytest.fixture
+def work(conn, org):
+    """Alice (line manager Bob) booked on a project that Pam manages, with a task of hers."""
+    pam, _ = f.person(conn, org["admin"], role="MANAGER", first_name="Pam")
+    proj = f.project(conn, org["admin"], pam)
+    f.booking(conn, pam, proj, org["alice"])
+    task = f.task(conn, pam, f.deliverable(conn, pam, proj), assignee=org["alice"])
+    return {"pam": pam, "proj": proj, "task": task}
+
+
+def test_employee_project_change_also_notifies_the_project_manager(conn, org, work):
+    tasks.move_task(conn, org["alice"], work["task"]["task_id"], "IN_PROGRESS")
+    assert recipients_of_last_change(conn) == sorted(
+        [org["boss"].user_id, work["pam"].user_id, org["admin"].user_id, org["admin2"].user_id])
+
+
+def test_employee_logging_time_notifies_the_project_manager(conn, org, work):
+    time_entries.log_time(conn, org["alice"], work["task"]["task_id"], {"work_date": "2026-10-13", "minutes": 90})
+    assert work["pam"].user_id in recipients_of_last_change(conn)
+
+
+def test_project_manager_who_is_also_the_line_manager_is_notified_once(conn, org):
+    proj = f.project(conn, org["admin"], org["boss"])
+    f.booking(conn, org["boss"], proj, org["alice"])
+    task = f.task(conn, org["boss"], f.deliverable(conn, org["boss"], proj), assignee=org["alice"])
+    tasks.move_task(conn, org["alice"], task["task_id"], "IN_PROGRESS")
+    assert recipients_of_last_change(conn) == sorted([org["boss"].user_id, org["admin"].user_id, org["admin2"].user_id])
+
+
+def test_manager_project_change_notifies_admins_only(conn, org, work):
+    tasks.update_task(conn, work["pam"], work["task"]["task_id"], {"title": "Renamed"})
+    assert recipients_of_last_change(conn) == sorted([org["admin"].user_id, org["admin2"].user_id])
 
 
 def test_archived_users_receive_nothing(conn, org):

@@ -5,7 +5,8 @@ so the change, its audit row and its notifications commit together or not at
 all. Recipients come from the actor's role as stored right now, never from a
 token or a stale session:
 
-    Employee -> their line manager and every admin
+    Employee -> their line manager, every admin, and, when the change is to a
+                project's work (a task, logged time, ...), that project's manager
     Manager  -> every admin
     Admin    -> every other admin
 
@@ -41,10 +42,28 @@ def record_change(conn: psycopg.Connection, actor: Actor | None, action: str, en
             "INSERT INTO notifications (recipient_user_id, audit_id)"
             " SELECT u.user_id, %(audit)s FROM users u, users me"
             " WHERE me.user_id = %(me)s AND u.user_id <> me.user_id AND NOT u.is_archived"
-            "   AND (u.role = 'ADMIN' OR (me.role = 'EMPLOYEE' AND u.user_id = me.manager_id))",
-            {"audit": audit_id, "me": actor.user_id},
+            "   AND (u.role = 'ADMIN' OR (me.role = 'EMPLOYEE' AND u.user_id IN (me.manager_id, %(pm)s)))",
+            {"audit": audit_id, "me": actor.user_id, "pm": _project_manager(conn, entity_type, entity_id)},
         )
     return audit_id
+
+
+# Tables whose rows belong to one project, by their key column. Each has a project_id.
+_PROJECT_ROWS = {"projects": "project_id", "assignments": "assignment_id", "milestones": "milestone_id",
+                 "tasks": "task_id", "time_entries": "entry_id"}
+
+
+def _project_manager(conn: psycopg.Connection, entity_type: str, entity_id: int | None) -> int | None:
+    """The manager of the project a changed row belongs to, or None (users, requests, ...)."""
+    key = _PROJECT_ROWS.get(entity_type)
+    if key is None or entity_id is None:
+        return None
+    row = conn.execute(
+        sql.SQL("SELECT p.manager_id FROM {} t JOIN projects p ON p.project_id = t.project_id"
+                " WHERE t.{} = %s").format(sql.Identifier(entity_type), sql.Identifier(key)),
+        (entity_id,),
+    ).fetchone()
+    return row["manager_id"] if row else None
 
 
 def list_audit(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:

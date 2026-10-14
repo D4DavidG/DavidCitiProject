@@ -235,7 +235,7 @@ Refused requests (403, 404, 409) changed nothing, so they are not logged either.
 
 | Actor's role (stored in the DB at the time) | Who is notified |
 | --- | --- |
-| Employee | Their line manager (`users.manager_id`) and every admin |
+| Employee | Their line manager (`users.manager_id`), every admin and, when the change is to a project's work (task, logged time, booking, deliverable), that project's manager (`projects.manager_id`; added 14 Oct at David's request) |
 | Manager | Every admin |
 | Admin | Every *other* admin |
 

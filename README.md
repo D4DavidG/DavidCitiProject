@@ -122,7 +122,8 @@ They run after every database test.
 - **Deliverables:** their status is computed. Sign-off is refused until all tasks and
   dependencies are done, and reopening work clears the sign-off down the chain.
 - **Audit:** every change writes an audit row in the same transaction, and notifies
-  the people above the actor (in-app bell).
+  the people above the actor (in-app bell): for an employee, their line manager, the admins
+  and, for work on a project (a task, logged time), that project's manager.
 
 ## The website (`frontend/`)
 
