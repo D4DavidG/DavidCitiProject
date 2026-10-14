@@ -239,3 +239,12 @@ def test_no_service_has_a_delete_function():
         mod = importlib.import_module(f"services.{module.name}")
         names += [f"{module.name}.{n}" for n in dir(mod) if "delete" in n.lower()]
     assert names == []
+
+
+def test_capacity_takes_task_limit_and_names_the_field_when_out_of_range(conn, org):
+    b = client_for(conn, org, "bob")
+    uid = org["alice"].user_id
+    status, payload = b.call("PATCH", f"/users/{uid}/capacity", {"taskLimit": 11})
+    assert (status, payload) == (400, {"error": "Task limit must be between 1 and 10.", "field": "taskLimit"})
+    status, payload = b.call("PATCH", f"/users/{uid}/capacity", {"taskLimit": 3})
+    assert (status, payload["taskLimit"]) == (200, 3)

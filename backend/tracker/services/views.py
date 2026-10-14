@@ -21,7 +21,7 @@ def _pick(row: dict, fields: dict[str, str]) -> dict:
 _USER = {
     "userId": "user_id", "username": "username", "firstName": "first_name", "lastName": "last_name",
     "email": "email", "jobTitle": "job_title", "role": "role", "managerId": "manager_id",
-    "weeklyCapacityHours": "weekly_capacity_hours", "overtimeAllowed": "overtime_allowed",
+    "weeklyCapacityHours": "weekly_capacity_hours", "overtimeAllowed": "overtime_allowed", "taskLimit": "task_limit",
     "mustChangePassword": "must_change_password", "isArchived": "is_archived",
     "archivedAt": "archived_at", "createdAt": "created_at", "updatedAt": "updated_at",
 }

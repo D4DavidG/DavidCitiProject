@@ -218,6 +218,29 @@ def test_line_manager_sets_capacity_and_overtime(conn, org):
     assert (row["weekly_capacity_hours"], row["overtime_allowed"]) == (30, True)
 
 
+def test_line_manager_sets_the_task_limit(conn, org):
+    row = users.set_capacity(conn, org["boss"], org["alice"].user_id, {"task_limit": 3})
+    assert row["task_limit"] == 3
+
+
+@pytest.mark.parametrize("limit, message", [(0, "between 1 and 10"), (11, "between 1 and 10"),
+                                            ("3", "a whole number"), (2.5, "a whole number")])
+def test_task_limit_must_be_1_to_10(conn, org, limit, message):
+    # The message matters: before Task 2, only_allowed already raises a ValidationError on
+    # field task_limit ("Task limit can't be changed here."), so checking the field alone passes early.
+    with pytest.raises(ValidationError, match=f"^Task limit must be {message}.$") as caught:
+        users.set_capacity(conn, org["boss"], org["alice"].user_id, {"task_limit": limit})
+    assert caught.value.field == "task_limit"
+
+
+def test_a_new_persons_task_limit_is_2(conn, org):
+    assert users.get_user(conn, org["admin"], org["alice"].user_id)["task_limit"] == 2
+
+
+def test_an_admin_sets_the_task_limit_through_the_account_edit(conn, org):
+    assert users.admin_update(conn, org["admin"], org["alice"].user_id, {"task_limit": 4})["task_limit"] == 4
+
+
 def test_another_manager_cannot_set_capacity(conn, org):
     with pytest.raises(NotFound):
         users.set_capacity(conn, org["other_boss"], org["alice"].user_id, {"overtime_allowed": True})

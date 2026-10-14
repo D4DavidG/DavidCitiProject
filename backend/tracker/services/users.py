@@ -24,12 +24,12 @@ BAD_LOGIN = "Username or password is incorrect."
 ROLES = {ADMIN, MANAGER, EMPLOYEE}
 # Every column except password_hash, which never leaves the database layer.
 COLUMNS = columns(["user_id", "username", "first_name", "last_name", "email", "job_title", "role", "manager_id",
-                   "annual_salary_cents", "weekly_capacity_hours", "overtime_allowed", "must_change_password",
+                   "annual_salary_cents", "weekly_capacity_hours", "overtime_allowed", "task_limit", "must_change_password",
                    "is_archived", "archived_at", "archived_by", "created_at", "updated_at"])
 _PROFILE_FIELDS = {"first_name", "last_name", "email"}
 _ADMIN_FIELDS = _PROFILE_FIELDS | {"job_title", "role", "manager_id", "annual_salary_cents",
-                                   "weekly_capacity_hours", "overtime_allowed"}
-_CAPACITY_FIELDS = {"weekly_capacity_hours", "overtime_allowed"}
+                                   "weekly_capacity_hours", "overtime_allowed", "task_limit"}
+_CAPACITY_FIELDS = {"weekly_capacity_hours", "overtime_allowed", "task_limit"}
 
 
 def _row(conn: psycopg.Connection, user_id: int) -> dict | None:
@@ -65,6 +65,8 @@ def _validate_fields(data: dict) -> dict:
         clean["weekly_capacity_hours"] = values.integer(data, "weekly_capacity_hours", minimum=1, maximum=60)
     if "overtime_allowed" in data:
         clean["overtime_allowed"] = values.boolean(data, "overtime_allowed")
+    if "task_limit" in data:
+        clean["task_limit"] = values.integer(data, "task_limit", minimum=1, maximum=10)
     return clean
 
 
@@ -255,7 +257,7 @@ def set_capacity(conn: psycopg.Connection, actor: Actor, user_id: int, data: dic
             raise NotFound("User not found.")
         row = _update(conn, user_id, clean)
         audit.record_change(conn, actor, "UPDATE", "users", user_id, _snapshot(before), _snapshot(row),
-                            f"{actor.name} updated capacity and overtime settings for {_name(row)}")
+                            f"{actor.name} updated capacity, overtime and task limit settings for {_name(row)}")
     return row
 
 
