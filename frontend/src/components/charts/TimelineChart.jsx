@@ -4,7 +4,7 @@ import Typography from '@mui/material/Typography'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import { formatDate, formatDay, spentPercent, todayIso } from '../../services/format'
 import { useIsMobile } from '../../theme/responsive'
-import { GRID, INK, MARK, STATE_COLOURS } from '../../theme/chartColours'
+import { GRID, INK, MARK, STATE_COLOURS, SURFACE } from '../../theme/chartColours'
 import { ChartFigure, ChartLegend, ChartRow } from './ChartParts'
 import { isLate, monthTicks, offset, span, timelineAxis } from './timeline'
 
@@ -13,6 +13,13 @@ const WORDS = '10rem'
 const COLUMNS = { xs: '1fr', md: `1fr ${WORDS}` }
 /** An aria-hidden layer over the plot column of every row: gridlines under the bars, the Today line over them. */
 const LAYER = { position: 'absolute', top: 0, bottom: 0, left: 0, right: { xs: 0, md: WORDS }, pointerEvents: 'none' }
+
+/**
+ * Text that the Today line may cross: painted above it (the line's layer comes after the rows),
+ * on the card's white, and only as wide as the words, so the line breaks around them.
+ */
+const OVER_LINE = { position: 'relative', zIndex: 1, bgcolor: SURFACE, width: 'fit-content' }
+// Text colours go in sx: MUI 9's Typography `color` prop ignores dotted paths such as 'error.main'.
 
 const STATE_WORDS = { DONE: 'Done', IN_PROGRESS: 'In progress', NOT_STARTED: 'Not started', BLOCKED: 'Blocked' }
 
@@ -28,8 +35,7 @@ function AxisLabel({ left, bottom, children }) {
   return (
     <Typography
       variant="caption"
-      color="text.secondary"
-      sx={{ position: 'absolute', whiteSpace: 'nowrap', fontWeight: bottom ? 600 : 400 }}
+      sx={{ color: 'text.secondary', position: 'absolute', whiteSpace: 'nowrap', fontWeight: bottom ? 600 : 400 }}
       style={{ left: `${left}%`, transform: `translateX(-${left}%)`, [bottom ? 'bottom' : 'top']: 0 }}
     >
       {children}
@@ -77,7 +83,7 @@ export default function TimelineChart({ deliverables, edges, projectStart, proje
         </Box>
       )}
       legend={<ChartLegend items={LEGEND} />}
-      note={note && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{note}</Typography>}
+      note={note && <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>{note}</Typography>}
     >
       <Box component="li" aria-hidden="true" sx={LAYER}>
         {ticks.map((t) => (
@@ -102,8 +108,8 @@ export default function TimelineChart({ deliverables, edges, projectStart, proje
           <ChartRow key={d.milestoneId} tooltip={tooltip}>
             <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: COLUMNS, alignItems: 'center' }}>
               <Box sx={{ gridColumn: '1 / -1', overflowWrap: 'anywhere' }}>
-                <Typography variant="body2">{d.name}{afterText}</Typography>
-                {outside && <Typography variant="caption" color="text.secondary" component="p">Outside project dates</Typography>}
+                <Typography variant="body2" sx={OVER_LINE}>{d.name}{afterText}</Typography>
+                {outside && <Typography variant="caption" component="p" sx={{ ...OVER_LINE, color: 'text.secondary' }}>Outside project dates</Typography>}
               </Box>
               <Box sx={{ position: 'relative', height: MARK.bar }}>
                 <Box
@@ -118,8 +124,7 @@ export default function TimelineChart({ deliverables, edges, projectStart, proje
               </Box>
               <Typography
                 variant="body2"
-                color={lateNow ? 'error.main' : 'text.secondary'}
-                sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: { md: 1.5 } }}
+                sx={{ ...OVER_LINE, color: lateNow ? 'error.main' : 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5, pl: { md: 1.5 } }}
               >
                 {lateNow && <WarningAmberRoundedIcon aria-hidden="true" sx={{ fontSize: 16 }} />}
                 <span>{words}</span>

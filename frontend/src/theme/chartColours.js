@@ -5,6 +5,9 @@
  * the chart card's background. Under 3:1 is relieved by the legend, tooltip and the table on the page.
  */
 
+/** The chart card's background: what every contrast ratio below is measured against, and the backing behind text that a reference line crosses. */
+export const SURFACE = '#FFFFFF'
+
 /** Dark ink: reference lines (Today, Budget, Planned, Capacity). 14.7:1. */
 export const INK = '#1F2937'
 

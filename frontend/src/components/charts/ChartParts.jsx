@@ -5,7 +5,7 @@ import Card from '@mui/material/Card'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
-import { INK, MARK, STRIPE } from '../../theme/chartColours'
+import { INK, MARK, STRIPE, SURFACE } from '../../theme/chartColours'
 
 const STRIPES = `repeating-linear-gradient(45deg, ${STRIPE} 0 2px, transparent 2px 6px)`
 
@@ -24,7 +24,7 @@ export function ChartFigure({ title, summary, axis, legend, note, children }) {
       sx={{
         m: 0,
         p: 2,
-        bgcolor: '#FFFFFF',
+        bgcolor: SURFACE,
         '& [data-mark]': { forcedColorAdjust: 'none' },
         '@media print, (forced-colors: active)': {
           '& [data-state="late"], & [data-state="over"]': { backgroundImage: `${STRIPES} !important` },
@@ -32,7 +32,7 @@ export function ChartFigure({ title, summary, axis, legend, note, children }) {
       }}
     >
       <Typography id={headingId} variant="h3" component="h2">{title}</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{summary}</Typography>
+      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>{summary}</Typography>
       {axis}
       {/* Relative, so a reference line (Today, Budget) can be one absolute li spanning every row. */}
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, position: 'relative' }}>{children}</Box>

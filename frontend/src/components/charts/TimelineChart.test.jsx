@@ -67,6 +67,27 @@ describe('TimelineChart', () => {
     expect(screen.getByText('Today is before the start')).toBeInTheDocument()
   })
 
+  it('paints names and words over the Today line, on a white backing, so the line never strikes through text', () => {
+    draw()
+    const onTop = { position: 'relative', zIndex: '1', backgroundColor: '#FFFFFF', width: 'fit-content' }
+    expect(within(row('Build')).getByText('Build · after Design')).toHaveStyle(onTop)
+    expect(within(row('Migration')).getByText('Outside project dates')).toHaveStyle(onTop)
+    expect(within(row('Build')).getByText('In progress 0%').parentElement).toHaveStyle(onTop)
+    expect(within(row('Migration')).getByText('Late, 0%').parentElement).toHaveStyle(onTop)
+  })
+
+  it('writes Late in error red and the other words and captions in secondary text', () => {
+    // MUI 9 dropped dotted palette paths on Typography's color prop (color="error.main" painted
+    // nothing, so Late read in plain ink): the colours go through sx.
+    draw()
+    const secondary = { color: theme.palette.text.secondary }
+    expect(within(row('Migration')).getByText('Late, 0%').parentElement).toHaveStyle({ color: theme.palette.error.main })
+    expect(within(row('Build')).getByText('In progress 0%').parentElement).toHaveStyle(secondary)
+    expect(within(row('Migration')).getByText('Outside project dates')).toHaveStyle(secondary)
+    expect(screen.getByText('3 deliverables: 1 done, 1 late.')).toHaveStyle(secondary)
+    expect(screen.getByText('Today')).toHaveStyle(secondary)
+  })
+
   it('keeps a one-day deliverable at least 8 px wide', () => {
     draw({ deliverables: [{ ...BUILD, startDate: '2026-11-12' }] })
     expect(within(row('Build')).getByTestId('bar')).toHaveStyle({ minWidth: '8px' })
