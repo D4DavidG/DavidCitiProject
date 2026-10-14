@@ -265,7 +265,7 @@ API at `fetch`. Say it that way.
 | Command | Takes | Numbers (14 Oct) |
 | --- | --- | --- |
 | `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 13 s | `TOTAL 1847 73 96%`: api 100%, function.py 100%, domain 99%, services 94.9%, store 93.9% |
-| `cd frontend && npm run test:coverage` | about a minute | Statements 93.62%, Branches 89.94%, Functions 89.29%, Lines 95.18% |
+| `cd frontend && npm run test:coverage` | about a minute and a half (89 s) | Statements 93.66%, Branches 89.94%, Functions 89.37%, Lines 95.2% |
 
 The rubric asks for 80% overall and 90% on API and error paths. What the missing 4% is,
 honestly: mostly guards (already archived, not found, nothing to change), **plus five real
