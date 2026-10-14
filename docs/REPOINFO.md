@@ -652,8 +652,8 @@ Short answers. Paths are under `backend/tracker/` unless they say otherwise.
 
 ### Testing, performance, process
 
-30. **"What isn't tested?"** Concurrency; the employee journey end to end; the database
-    dropping mid-request; five real rules ([§7](#7-testing)); how it looks.
+30. **"What isn't tested?"** Concurrency outside the two claim row locks (the exclusion constraint and the advisory lock are not tested); the employee journey end to end; the
+    database dropping mid-request; five real rules ([§7](#7-testing)); how it looks.
 31. **"How do you know the tests test something?"** Each integrity query has a test that
     plants a violation. The cold-start fix shipped with a test that fails without it.
     *`tests/backend/test_integrity.py:35`*
