@@ -77,24 +77,37 @@ def milestone_view(row: dict) -> dict:
     return view
 
 
+def _with_names(view: dict, row: dict, names: dict[str, str]) -> dict:
+    """Add the display names a list query joined in (absent from plain rows and audit snapshots)."""
+    for out, src in names.items():
+        if src in row:
+            view[out] = row[src]
+    return view
+
+
 def task_view(row: dict) -> dict:
-    return _pick(row, {
+    """A task. Project, deliverable and assignee names are present when the service joined them."""
+    view = _pick(row, {
         "taskId": "task_id", "milestoneId": "milestone_id", "projectId": "project_id", "title": "title",
         "description": "description", "assigneeUserId": "assignee_user_id", "status": "status",
         "estimateMinutes": "estimate_minutes", "completedAt": "completed_at", "createdBy": "created_by",
         "isArchived": "is_archived", "archivedAt": "archived_at", "createdAt": "created_at",
         "updatedAt": "updated_at",
     })
+    return _with_names(view, row, {"projectName": "project_name", "milestoneName": "milestone_name",
+                                   "assigneeName": "assignee_name"})
 
 
 def entry_view(row: dict) -> dict:
     """Logged time. The frozen hourly rate is left out: it would reveal salary."""
-    return _pick(row, {
+    view = _pick(row, {
         "entryId": "entry_id", "taskId": "task_id", "projectId": "project_id", "userId": "user_id",
         "workDate": "work_date", "minutes": "minutes", "note": "note", "status": "status",
         "decidedBy": "decided_by", "decidedAt": "decided_at", "createdAt": "created_at",
         "updatedAt": "updated_at",
     })
+    return _with_names(view, row, {"taskTitle": "task_title", "projectName": "project_name",
+                                   "personName": "person_name"})
 
 
 def request_view(row: dict) -> dict:

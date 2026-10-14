@@ -107,6 +107,20 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert (reads | inbox_writes) - called == set(), "read routes not exercised by this walk"
 
 
+# --- names the screens need -------------------------------------------------------------------
+
+def test_my_tasks_name_their_project_and_deliverable(conn, world):
+    items = client_for(conn, world, "alice").call("GET", "/me/tasks")[1]["items"]
+    assert (items[0]["projectName"], items[0]["milestoneName"]) == ("Apollo", "Design")
+
+
+def test_logged_time_names_the_person_task_and_project(conn, world):
+    queue = client_for(conn, world, "bob").call("GET", "/approvals/time-entries")[1]["items"]
+    assert (queue[0]["personName"], queue[0]["taskTitle"], queue[0]["projectName"]) == ("Alice Tester", "Sketch", "Apollo")
+    mine = client_for(conn, world, "alice").call("GET", "/me/time-entries")[1]["items"]
+    assert (mine[0]["taskTitle"], mine[0]["projectName"]) == ("Sketch", "Apollo")
+
+
 # --- the audit log's filters ----------------------------------------------------------------
 
 def test_audit_log_filters_by_actor_entity_and_date(conn, world):
