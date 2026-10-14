@@ -59,6 +59,36 @@ TaskCard.propTypes = {
   onLog: PropTypes.func.isRequired,
 }
 
+/** A Ready task nobody holds yet, with the one button that takes it. */
+function ReadyCard({ task, onTake }) {
+  const titleId = `ready-${task.taskId}`
+  return (
+    <Card component="article" aria-labelledby={titleId}>
+      <CardContent sx={{ display: 'grid', gap: 1 }}>
+        <Typography id={titleId} variant="h3" component="h3">{task.title}</Typography>
+        <Typography variant="body2" color="text.secondary">{task.projectName} · {task.milestoneName}</Typography>
+        {task.description && <Typography variant="body2">{task.description}</Typography>}
+        <Typography variant="body2">Estimate {formatHours(task.estimateMinutes)}</Typography>
+      </CardContent>
+      <CardActions sx={{ px: 2, pb: 2 }}>
+        <Button variant="contained" onClick={() => onTake(task)}>Take this</Button>
+      </CardActions>
+    </Card>
+  )
+}
+
+ReadyCard.propTypes = {
+  task: PropTypes.shape({
+    taskId: PropTypes.number.isRequired,
+    title: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    projectName: PropTypes.string,
+    milestoneName: PropTypes.string,
+    estimateMinutes: PropTypes.number.isRequired,
+  }).isRequired,
+  onTake: PropTypes.func.isRequired,
+}
+
 /**
  * The employee's home: their open tasks (tick work off by moving status) and the
  * time they've logged. Logging past their weekly capacity is refused unless their
@@ -67,6 +97,8 @@ TaskCard.propTypes = {
 export default function MyTasksPage() {
   const loadTasks = useCallback(() => request('GET', '/me/tasks'), [])
   const tasks = useApi(loadTasks)
+  const loadReady = useCallback(() => request('GET', '/me/ready-tasks'), [])
+  const ready = useApi(loadReady)
   const [entriesPage, setEntriesPage] = useState(1)
   const loadEntries = useCallback(() => request('GET', '/me/time-entries', { query: { page: entriesPage, pageSize: 10 } }), [entriesPage])
   const entries = useApi(loadEntries)
@@ -84,7 +116,21 @@ export default function MyTasksPage() {
     }
   }
 
+  async function take(task) {
+    setMessage(null)
+    try {
+      await request('POST', `/tasks/${task.taskId}/claim`)
+      setMessage({ severity: 'success', text: `You took ${task.title}.` })
+    } catch (failure) {
+      // The server's sentence is the explanation (at the limit, already taken, ...).
+      setMessage({ severity: 'error', text: failure.message })
+    }
+    tasks.reload()
+    ready.reload()
+  }
+
   const items = tasks.data?.items ?? []
+  const readyItems = ready.data?.items ?? []
   const columns = [
     { key: 'workDate', label: 'Date', render: (e) => formatDate(e.workDate) },
     { key: 'taskTitle', label: 'Task' },
@@ -103,6 +149,21 @@ export default function MyTasksPage() {
       <PageState loading={tasks.loading} error={tasks.error} onRetry={tasks.reload} empty={tasks.data && items.length === 0 ? 'No open tasks. Nice work.' : null}>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
           {items.map((task) => <TaskCard key={task.taskId} task={task} onMove={move} onLog={setLogging} />)}
+        </Box>
+      </PageState>
+
+      <Typography variant="h2" sx={{ mt: 4, mb: 1 }}>Ready to take</Typography>
+      <PageState loading={ready.loading} error={ready.error} onRetry={ready.reload}>
+        {ready.data && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {`You hold ${ready.data.held} of ${ready.data.limit}`}
+          </Typography>
+        )}
+        {ready.data && readyItems.length === 0 && (
+          <Typography variant="body2">No Ready tasks on your projects right now.</Typography>
+        )}
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
+          {readyItems.map((task) => <ReadyCard key={task.taskId} task={task} onTake={take} />)}
         </Box>
       </PageState>
 

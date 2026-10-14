@@ -159,6 +159,15 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ title: 'Docs', estimateMinutes: 180, assigneeUserId: 3 }))
   })
 
+  it('tells the manager an empty assignee puts the task on the board as Ready', async () => {
+    renderDetail(USERS.manager)
+    const build = await screen.findByRole('region', { name: 'Build' })
+    await userEvent.click(within(build).getByRole('button', { name: /show tasks/i }))
+    await userEvent.click(await within(build).findByRole('button', { name: /add task/i }))
+    expect(screen.getByText('Leave empty to put it on the board as Ready')).toBeInTheDocument()
+    expect(screen.queryByText('Only people booked on this project can be assigned.')).not.toBeInTheDocument()
+  })
+
   it("edits a task's estimate", async () => {
     const calls = renderDetail(USERS.manager, { 'PATCH /tasks/20': [200, BUILD_TASKS[0]] })
     const build = await screen.findByRole('region', { name: 'Build' })

@@ -8,6 +8,10 @@ const PORTAL = {
   taskId: 20, milestoneId: 11, projectId: 1, title: 'Portal UI', description: 'Screens for the portal',
   assigneeUserId: 4, status: 'IN_PROGRESS', estimateMinutes: 600, projectName: 'Apollo', milestoneName: 'Build',
 }
+const GO_LIVE = {
+  taskId: 30, milestoneId: 12, projectId: 1, title: 'Go-live checklist', description: null,
+  assigneeUserId: null, status: 'TODO', estimateMinutes: 480, projectName: 'Apollo', milestoneName: 'Launch',
+}
 const ENTRY = {
   entryId: 30, taskId: 20, projectId: 1, userId: 4, workDate: '2026-10-12', minutes: 480, note: 'Layout',
   status: 'PENDING', taskTitle: 'Portal UI', projectName: 'Apollo',
@@ -17,6 +21,7 @@ function renderPage(answers = {}) {
   const calls = stubApi({
     'GET /me/tasks': [200, page([PORTAL])],
     'GET /me/time-entries': [200, page([ENTRY])],
+    'GET /me/ready-tasks': [200, page([], { held: 1, limit: 2 })],
     ...answers,
   })
   renderAt(<MyTasksPage />, { path: '/my-tasks', auth: session(USERS.employee) })
@@ -90,6 +95,39 @@ describe('MyTasksPage', () => {
     expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('That is more than 24 h.')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(calls.some((c) => c.method === 'POST')).toBe(false)
+  })
+
+  it('offers Ready tasks to take, and says how many I hold', async () => {
+    const calls = renderPage({
+      'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 1, limit: 2 })],
+      'POST /tasks/30/claim': [200, { ...GO_LIVE, assigneeUserId: 3, status: 'IN_PROGRESS' }],
+    })
+    expect(await screen.findByRole('heading', { name: 'Ready to take' })).toBeInTheDocument()
+    expect(screen.getByText('You hold 1 of 2')).toBeInTheDocument()
+    const card = screen.getByRole('article', { name: 'Go-live checklist' })
+    expect(within(card).getByText('Apollo · Launch')).toBeInTheDocument()
+    expect(within(card).getByText('Estimate 8 h')).toBeInTheDocument()
+    await userEvent.click(within(card).getByRole('button', { name: 'Take this' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toBe(true))
+    expect(await screen.findByText('You took Go-live checklist.')).toBeInTheDocument()
+    await waitFor(() => expect(calls.filter((c) => c.path === '/me/ready-tasks').length).toBe(2))
+    expect(calls.filter((c) => c.path === '/me/tasks').length).toBe(2)
+  })
+
+  it("shows the server's refusal when I'm at my limit", async () => {
+    const refusal = 'You already hold 2 unfinished tasks, your limit. Finish one first, or ask your manager to raise it.'
+    renderPage({
+      'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 2, limit: 2 })],
+      'POST /tasks/30/claim': [409, { error: refusal }],
+    })
+    const card = await screen.findByRole('article', { name: 'Go-live checklist' })
+    await userEvent.click(within(card).getByRole('button', { name: 'Take this' }))
+    expect(await screen.findByText(refusal)).toBeInTheDocument()
+  })
+
+  it('says so when no Ready tasks are waiting', async () => {
+    renderPage()
+    expect(await screen.findByText('No Ready tasks on your projects right now.')).toBeInTheDocument()
   })
 
   it('says so when there is nothing to do', async () => {

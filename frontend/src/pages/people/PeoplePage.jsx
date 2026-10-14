@@ -21,6 +21,7 @@ const ROLE_OPTIONS = [['EMPLOYEE', 'Employee'], ['MANAGER', 'Manager'], ['ADMIN'
 const CAPACITY_FIELDS = [
   { name: 'weeklyCapacityHours', label: 'Weekly capacity (hours)', type: 'number', helper: 'Logging past this in a week is refused unless overtime is allowed.' },
   { name: 'overtimeAllowed', label: 'Overtime allowed', type: 'boolean' },
+  { name: 'taskLimit', label: 'Task limit', type: 'number', helper: 'The most unfinished tasks they can take from the board themselves, 1 to 10. Managers can still assign past it.' },
 ]
 
 function accountFields(managers) {

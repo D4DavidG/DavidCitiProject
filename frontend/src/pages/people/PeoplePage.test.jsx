@@ -126,6 +126,20 @@ describe('PeoplePage', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ weeklyCapacityHours: 32, overtimeAllowed: true }))
   })
 
+  it('sets the task limit, and shows an out-of-range refusal on that box', async () => {
+    const calls = renderPeople(USERS.manager, {
+      'PATCH /users/4/capacity': [400, { error: 'Task limit must be between 1 and 10.', field: 'taskLimit' }],
+    })
+    const table = await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(within(table).getByRole('button', { name: /capacity for ben okafor/i }))
+    const limit = screen.getByLabelText(/task limit/i)
+    await userEvent.clear(limit)
+    await userEvent.type(limit, '11')
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    await waitFor(() => expect(limit).toHaveAccessibleDescription('Task limit must be between 1 and 10.'))
+    expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ taskLimit: 11 })
+  })
+
   it('resets a password and shows the new one once', async () => {
     renderPeople(USERS.admin, { 'POST /users/4/reset-password': [200, { temporaryPassword: 'N3wTempPass12' }] })
     const table = await screen.findByRole('table', { name: 'People' })

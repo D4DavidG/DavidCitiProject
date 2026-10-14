@@ -23,7 +23,7 @@ export default function TaskList({ milestoneId, canManage, people, onChanged }) 
     { name: 'title', label: 'Title', required: true },
     { name: 'description', label: 'Description', type: 'textarea' },
     { name: 'estimateMinutes', label: 'Estimate', type: 'duration', max: 60000, required: true },
-    { name: 'assigneeUserId', label: 'Assignee', type: 'select', numeric: true, options: people, helper: 'Only people booked on this project can be assigned.' },
+    { name: 'assigneeUserId', label: 'Assignee', type: 'select', numeric: true, options: people, helper: 'Leave empty to put it on the board as Ready' },
   ]
   const names = Object.fromEntries(people)
 
