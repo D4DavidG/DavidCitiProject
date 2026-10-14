@@ -111,12 +111,15 @@ def entry_view(row: dict) -> dict:
 
 
 def request_view(row: dict) -> dict:
-    return _pick(row, {
-        "requestId": "request_id", "requestedBy": "requested_by", "name": "name", "description": "description",
-        "justification": "justification", "proposedStart": "proposed_start", "proposedEnd": "proposed_end",
+    """A request of any kind. The asker's name is present when the service joined it."""
+    view = _pick(row, {
+        "requestId": "request_id", "kind": "kind", "requestedBy": "requested_by", "name": "name",
+        "description": "description", "justification": "justification", "proposedStart": "proposed_start",
+        "proposedEnd": "proposed_end", "projectId": "project_id", "taskLimit": "task_limit",
         "status": "status", "decidedBy": "decided_by", "decidedAt": "decided_at",
         "decisionNote": "decision_note", "createdProjectId": "created_project_id", "createdAt": "created_at",
     })
+    return _with_names(view, row, {"requesterName": "requester_name"})
 
 
 def notification_view(row: dict) -> dict:

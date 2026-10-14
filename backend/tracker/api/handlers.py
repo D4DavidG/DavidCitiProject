@@ -302,7 +302,8 @@ def get_request(ctx: Context) -> dict:
 
 def approve_request(ctx: Context) -> dict:
     result = requests.approve_request(ctx.conn, ctx.actor, ctx.id, ctx.body)
-    return {"request": request_view(result["request"]), "project": project_view(result["project"])}
+    project = result["project"]  # only a NEW_PROJECT request creates one
+    return {"request": request_view(result["request"]), "project": project_view(project) if project else None}
 
 
 def reject_request(ctx: Context) -> dict:

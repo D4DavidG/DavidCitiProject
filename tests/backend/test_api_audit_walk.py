@@ -93,9 +93,15 @@ def test_every_mutating_route_writes_an_audit_row(conn):
     req = hit(b, "POST", "/project-requests", "/project-requests",
               {"kind": "NEW_PROJECT", "name": "Hermes", "justification": "Growth", "proposedStart": "2026-11-01", "proposedEnd": "2027-01-31"})
     hit(a, "POST", "/project-requests/{id}/approve", f"/project-requests/{req['requestId']}/approve", {})
-    req2 = hit(b, "POST", "/project-requests", "/project-requests", {"kind": "NEW_PROJECT", "name": "Iris", "justification": "Maybe"})
+    req2 = hit(b, "POST", "/project-requests", "/project-requests",
+               {"kind": "NEW_PROJECT", "name": "Iris", "justification": "Maybe"})
     hit(a, "POST", "/project-requests/{id}/reject", f"/project-requests/{req2['requestId']}/reject",
         {"decisionNote": "Later"})
+    # An employee asks their line manager, who approves: overtime turns on (two audit rows).
+    req3 = hit(e, "POST", "/project-requests", "/project-requests", {"kind": "OVERTIME", "justification": "Launch week"})
+    hit(b, "POST", "/project-requests/{id}/approve", f"/project-requests/{req3['requestId']}/approve", {})
+    assert conn.execute("SELECT overtime_allowed FROM users WHERE user_id = %s",
+                        (alice.user_id,)).fetchone()["overtime_allowed"]
     hit(a, "POST", "/projects/{id}/archive", f"/projects/{pid}/archive")
     hit(a, "POST", "/projects/{id}/reactivate", f"/projects/{pid}/reactivate")
 

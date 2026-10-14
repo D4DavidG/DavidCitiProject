@@ -73,7 +73,9 @@ def test_every_read_route_answers_in_shape(conn, world):
 
     rid = world["request"]["request_id"]
     assert get(b, "/project-requests", "/project-requests", {"status": "PENDING"})["total"] == 1
-    assert get(b, "/project-requests/{id}", f"/project-requests/{rid}")["name"] == "Hermes"
+    one = get(b, "/project-requests/{id}", f"/project-requests/{rid}")
+    assert (one["name"], one["kind"], one["requesterName"]) == ("Hermes", "NEW_PROJECT", "Bob Tester")
+    assert get(e, "/project-requests", "/project-requests", {"scope": "MINE"})["total"] == 0
 
     assert PAGE_KEYS <= get(a, "/dashboard/at-risk", "/dashboard/at-risk").keys()
     board = get(b, "/dashboard/projects", "/dashboard/projects")
@@ -196,6 +198,21 @@ def test_another_managers_request_is_404_not_403(conn, world):
     mine = carol.call("GET", f"/project-requests/{rid}")
     missing = carol.call("GET", "/project-requests/999999")
     assert mine == missing and mine[0] == 404
+
+
+def test_another_managers_report_request_is_404_not_403(conn, world):
+    req = requests.create_request(conn, world["alice"], {"kind": "OVERTIME", "justification": "Launch week"})
+    bob, carol = client_for(conn, world, "bob"), client_for(conn, world, "carol")
+    assert bob.call("GET", f"/project-requests/{req['request_id']}")[1]["requesterName"] == "Alice Tester"
+    theirs = carol.call("GET", f"/project-requests/{req['request_id']}")
+    assert theirs == carol.call("GET", "/project-requests/999999") and theirs[0] == 404
+
+
+def test_employee_cannot_decide_requests(conn, world):
+    e = client_for(conn, world, "alice")
+    req = requests.create_request(conn, world["alice"], {"kind": "OTHER", "name": "A desk", "justification": "Back"})
+    assert e.call("POST", f"/project-requests/{req['request_id']}/approve", {})[0] == 403
+    assert e.call("POST", f"/project-requests/{req['request_id']}/reject", {})[0] == 403
 
 
 def test_someone_elses_notification_is_404_like_a_missing_one(conn, world):

@@ -103,11 +103,12 @@ ROUTES = [
     _r("POST", "/time-entries/{id}/reject", h.reject_time, STAFF),
     _r("GET", "/approvals/time-entries", h.pending_time, STAFF),
 
-    _r("GET", "/project-requests", h.list_requests, STAFF),
-    _r("POST", "/project-requests", h.create_request, {MANAGER}, status=201),
-    _r("GET", "/project-requests/{id}", h.get_request, STAFF),
-    _r("POST", "/project-requests/{id}/approve", h.approve_request, {ADMIN}),
-    _r("POST", "/project-requests/{id}/reject", h.reject_request, {ADMIN}),
+    # Requests of every kind; the service says which kinds a role sends and who decides.
+    _r("GET", "/project-requests", h.list_requests),
+    _r("POST", "/project-requests", h.create_request, status=201),
+    _r("GET", "/project-requests/{id}", h.get_request),
+    _r("POST", "/project-requests/{id}/approve", h.approve_request, STAFF),
+    _r("POST", "/project-requests/{id}/reject", h.reject_request, STAFF),
 
     _r("GET", "/dashboard/projects", h.project_cards, STAFF),
     _r("GET", "/dashboard/at-risk", h.at_risk, STAFF),
