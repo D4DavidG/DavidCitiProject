@@ -60,13 +60,49 @@ describe('MyTasksPage', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ workDate: '2026-10-13', minutes: 150, note: 'Forms' }))
   })
 
-  it("shows the server's capacity refusal in the dialog", async () => {
-    renderPage({ 'POST /tasks/20/time-entries': [409, { error: 'That would take you to 42 h in the week of 2026-10-12, past your capacity of 40 h. Ask your manager to allow overtime.' }] })
+  it('shows other refusals in the form as before', async () => {
+    renderPage({ 'POST /tasks/20/time-entries': [409, { error: "You weren't booked on this project on that date." }] })
     const task = await screen.findByRole('article', { name: 'Portal UI' })
     await userEvent.click(within(task).getByRole('button', { name: /log time/i }))
     await userEvent.type(screen.getByLabelText('Hours'), '2')
     await userEvent.click(screen.getByRole('button', { name: /^log$/i }))
-    expect(await within(screen.getByRole('dialog')).findByText(/past your capacity of 40 h/i)).toBeInTheDocument()
+    expect(await within(screen.getByRole('dialog')).findByText(/weren't booked/i)).toBeInTheDocument()
+  })
+
+  const OVER = "This puts you 2 h over your 40 h week. Log anyway? Your manager will be told."
+
+  /** Answers 409 OVER_CAPACITY until the body says confirmOverCapacity. */
+  function overUnlessConfirmed(call) {
+    return call.body.confirmOverCapacity ? [201, { ...ENTRY, minutes: 120, overCapacity: true }] : [409, { error: OVER, code: 'OVER_CAPACITY' }]
+  }
+
+  async function logTwoHours() {
+    const task = await screen.findByRole('article', { name: 'Portal UI' })
+    await userEvent.click(within(task).getByRole('button', { name: /log time/i }))
+    const date = screen.getByLabelText(/^date/i)
+    await userEvent.clear(date)
+    await userEvent.type(date, '2026-10-13')
+    await userEvent.type(screen.getByLabelText('Hours'), '2')
+    await userEvent.click(screen.getByRole('button', { name: /^log$/i }))
+    return screen.findByRole('dialog', { name: 'Over your weekly capacity' })
+  }
+
+  it('asks before logging past capacity, then logs with confirmOverCapacity', async () => {
+    const calls = renderPage({ 'POST /tasks/20/time-entries': overUnlessConfirmed })
+    const confirm = await logTwoHours()
+    expect(within(confirm).getByText(OVER)).toBeInTheDocument()
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Log anyway' }))
+    await waitFor(() => expect(calls.filter((c) => c.method === 'POST')).toHaveLength(2))
+    expect(calls.filter((c) => c.method === 'POST')[1].body).toEqual({ workDate: '2026-10-13', minutes: 120, confirmOverCapacity: true })
+    expect(await screen.findByText(/Logged 2 h on Portal UI/)).toBeInTheDocument()
+  })
+
+  it('sends nothing more when the person cancels', async () => {
+    const calls = renderPage({ 'POST /tasks/20/time-entries': overUnlessConfirmed })
+    const confirm = await logTwoHours()
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(1)
   })
 
   it('lists my logged time with its approval status, and edits it', async () => {

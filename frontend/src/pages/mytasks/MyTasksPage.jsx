@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Alert, Box, Button, Card, CardActions, CardContent, MenuItem, Pagination, TextField, Typography } from '@mui/material'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
 import PageHeader from '../../components/PageHeader'
@@ -96,8 +97,9 @@ ReadyCard.propTypes = {
 
 /**
  * The employee's home: their open tasks (tick work off by moving status) and the
- * time they've logged. Logging past their weekly capacity is refused unless their
- * manager allowed overtime; the server's message says exactly why.
+ * time they've logged. Logging past their weekly capacity (without overtime allowed)
+ * asks "Log anyway?" with the server's message; Log anyway resends with
+ * confirmOverCapacity and their manager is told. Other refusals show in the form.
  */
 export default function MyTasksPage() {
   const loadTasks = useCallback(() => request('GET', '/me/tasks'), [])
@@ -111,6 +113,35 @@ export default function MyTasksPage() {
   const [editing, setEditing] = useState(null)
   const [message, setMessage] = useState(null)
   const [takingId, setTakingId] = useState(null)
+  const [overCapacity, setOverCapacity] = useState(null)
+
+  /**
+   * Run send(body). If the server answers OVER_CAPACITY, keep a resend with
+   * confirmOverCapacity for the "Log anyway" button; the form then closes.
+   */
+  async function sendTime(send, body) {
+    try {
+      await send(body)
+    } catch (failure) {
+      if (failure.code !== 'OVER_CAPACITY') throw failure
+      setOverCapacity({ message: failure.message, send: () => send({ ...body, confirmOverCapacity: true }) })
+    }
+  }
+
+  function logTime(task, body) {
+    return sendTime(async (sent) => {
+      const entry = await request('POST', `/tasks/${task.taskId}/time-entries`, { body: sent })
+      setMessage({ severity: 'success', text: `Logged ${formatHours(entry.minutes)} on ${task.title}. It's waiting for approval.` })
+      entries.reload()
+    }, body)
+  }
+
+  function editTime(entry, body) {
+    return sendTime(async (sent) => {
+      await request('PATCH', `/time-entries/${entry.entryId}`, { body: sent })
+      entries.reload()
+    }, body)
+  }
 
   async function move(task, status) {
     setMessage(null)
@@ -198,11 +229,7 @@ export default function MyTasksPage() {
           submitLabel="Log"
           fields={TIME_FIELDS}
           defaults={{ workDate: todayIso() }}
-          onSubmit={async (body) => {
-            const entry = await request('POST', `/tasks/${logging.taskId}/time-entries`, { body })
-            setMessage({ severity: 'success', text: `Logged ${formatHours(entry.minutes)} on ${logging.title}. It's waiting for approval.` })
-            entries.reload()
-          }}
+          onSubmit={(body) => logTime(logging, body)}
           onClose={() => setLogging(null)}
         />
       )}
@@ -212,8 +239,18 @@ export default function MyTasksPage() {
           title="Edit logged time"
           fields={TIME_FIELDS}
           initial={editing}
-          onSubmit={async (body) => { await request('PATCH', `/time-entries/${editing.entryId}`, { body }); entries.reload() }}
+          onSubmit={(body) => editTime(editing, body)}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {overCapacity && (
+        <ConfirmDialog
+          open
+          title="Over your weekly capacity"
+          message={overCapacity.message}
+          confirmLabel="Log anyway"
+          onConfirm={overCapacity.send}
+          onClose={() => setOverCapacity(null)}
         />
       )}
     </>
