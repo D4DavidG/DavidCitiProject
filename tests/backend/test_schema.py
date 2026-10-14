@@ -80,6 +80,17 @@ def test_capacity_is_1_to_60_hours(conn, hours):
                    (hours, person["user_id"])) == "users_capacity_range"
 
 
+def test_task_limit_defaults_to_2(conn):
+    assert rows.user(conn)["task_limit"] == 2
+
+
+@pytest.mark.parametrize("limit", [0, 11])
+def test_task_limit_is_1_to_10(conn, limit):
+    person = rows.user(conn)
+    assert refused(conn, "UPDATE users SET task_limit = %s WHERE user_id = %s",
+                   (limit, person["user_id"])) == "users_task_limit_range"
+
+
 def test_new_users_default_to_40_hours_no_overtime_and_must_change_password(conn):
     person = rows.user(conn)
     assert (person["weekly_capacity_hours"], person["overtime_allowed"], person["must_change_password"]) == (40, False, True)
