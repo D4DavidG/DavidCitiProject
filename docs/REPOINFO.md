@@ -29,7 +29,7 @@ below says when it was measured. Every claim points at a file and line you can o
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
 > with Terraform. There are 423 backend tests running against a real Postgres database,
-> and 231 website tests."
+> and 233 website tests."
 
 ### 2 minutes
 
@@ -346,7 +346,7 @@ from the token."
 ## 7. Testing
 
 **Headline (fresh, 14 Oct 2026):** "423 backend tests against a real Postgres database, at
-96% coverage, with the API layer at 100%. Plus 231 website tests at about 93% of
+96% coverage, with the API layer at 100%. Plus 233 website tests at about 93% of
 statements, and Playwright browser tests."
 
 **What (three layers, plus the website):**
@@ -364,7 +364,7 @@ statements, and Playwright browser tests."
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
 - **Fresh numbers, 14 Oct (after the pull board):** backend `423 passed in 13.52s`; coverage
   `1847 statements, 73 missed, 96%`. By folder: `api/` 100%, `function.py` 100%, `domain/`
-  99%, `services/` 94.9%, `store/` 93.9%. Website: 24 files, `231 passed`, about a minute and
+  99%, `services/` 94.9%, `store/` 93.9%. Website: 24 files, `233 passed`, about a minute and
   a half. Website coverage: 93.58% of statements, 95.15% of lines, 89.94% of branches,
   89.29% of functions. Lint: clean.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
@@ -679,7 +679,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Every API route is tested over HTTP" | "Every route is called in-process with a Lambda-shaped event; real HTTP is covered by the demo script and Playwright" | `test_api.py` calls `app.dispatch()` |
 | "The uncovered 4% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:239` |
 | "The rule tests prove the layers are separate" | "The rule tests show services don't need HTTP; the import direction is what keeps them separate" | No test enforces imports |
-| "Real Postgres, not mocks" (right after "231 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
+| "Real Postgres, not mocks" (right after "233 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
 | "The staircase went up to 11 s" | "Up to about 10 s in the logs (9.8 s)" | 7 to 11 s was the load-test client's `max` column |
 | "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:276-277` |
@@ -743,7 +743,7 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 | Number | What | Measured |
 | --- | --- | --- |
 | 423 / 96% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 231 / 93% | Website tests / statements (95% of lines) | 14 Oct |
+| 233 / 93% | Website tests / statements (95% of lines) | 14 Oct |
 | 66 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 10 + 1 | Tables: ten for the app, plus `schema_migrations` | 14 Oct |

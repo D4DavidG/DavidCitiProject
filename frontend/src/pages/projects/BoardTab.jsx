@@ -29,13 +29,18 @@ export default function BoardTab({ projectId, canManage }) {
   const { data, error, loading, reload } = useApi(load)
   const [failure, setFailure] = useState(null)
   const [assigning, setAssigning] = useState(null)
+  const [pendingId, setPendingId] = useState(null)
 
-  async function act(path) {
+  /** Take or put back one task. Its buttons stay disabled until the answer arrives. */
+  async function act(taskId, verb) {
     setFailure(null)
+    setPendingId(taskId)
     try {
-      await request('POST', path)
+      await request('POST', `/tasks/${taskId}/${verb}`)
     } catch (e) {
       setFailure(e.message)
+    } finally {
+      setPendingId(null)
     }
     reload()
   }
@@ -67,10 +72,10 @@ export default function BoardTab({ projectId, canManage }) {
                     <Typography variant="body2">{t.assigneeName ?? 'Unassigned'}</Typography>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       {isEmployee && column === 'Ready' && (
-                        <Button size="small" variant="contained" onClick={() => act(`/tasks/${t.taskId}/claim`)}>Take this</Button>
+                        <Button size="small" variant="contained" disabled={pendingId === t.taskId} onClick={() => act(t.taskId, 'claim')}>Take this</Button>
                       )}
                       {isEmployee && column !== 'Done' && t.assigneeUserId === user.userId && (
-                        <Button size="small" onClick={() => act(`/tasks/${t.taskId}/release`)}>Put back</Button>
+                        <Button size="small" disabled={pendingId === t.taskId} onClick={() => act(t.taskId, 'release')}>Put back</Button>
                       )}
                       {canManage && column !== 'Done' && (
                         <Button size="small" onClick={() => setAssigning(t)}>Assign</Button>

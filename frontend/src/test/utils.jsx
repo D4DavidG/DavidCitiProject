@@ -62,6 +62,22 @@ export function stubApi(answers) {
   return calls
 }
 
+/**
+ * Hold every call to `path` open until the returned release() runs, so a test can
+ * act while that request is still in flight. Call it after stubApi; it wraps that stub.
+ */
+export function holdOpen(path) {
+  const stubbed = globalThis.fetch
+  let open
+  const gate = new Promise((resolve) => { open = resolve })
+  vi.stubGlobal('fetch', vi.fn((url, init) => {
+    const { pathname } = new URL(url, 'http://localhost')
+    if (pathname.replace(/^\/api\/tracker/, '') !== path) return stubbed(url, init)
+    return gate.then(() => stubbed(url, init))
+  }))
+  return () => open()
+}
+
 /** A list envelope, as every list endpoint returns. */
 export function page(items, extra = {}) {
   return { items, page: 1, pageSize: 20, total: items.length, totalPages: items.length ? 1 : 0, ...extra }

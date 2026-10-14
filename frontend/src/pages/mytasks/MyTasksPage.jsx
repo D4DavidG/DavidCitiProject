@@ -59,8 +59,11 @@ TaskCard.propTypes = {
   onLog: PropTypes.func.isRequired,
 }
 
-/** A Ready task nobody holds yet, with the one button that takes it. */
-function ReadyCard({ task, onTake }) {
+/**
+ * A Ready task nobody holds yet, with the one button that takes it. The button is
+ * disabled while that claim is running, so a double click sends one claim.
+ */
+function ReadyCard({ task, onTake, taking }) {
   const titleId = `ready-${task.taskId}`
   return (
     <Card component="article" aria-labelledby={titleId}>
@@ -71,7 +74,7 @@ function ReadyCard({ task, onTake }) {
         <Typography variant="body2">Estimate {formatHours(task.estimateMinutes)}</Typography>
       </CardContent>
       <CardActions sx={{ px: 2, pb: 2 }}>
-        <Button variant="contained" onClick={() => onTake(task)}>Take this</Button>
+        <Button variant="contained" disabled={taking} onClick={() => onTake(task)}>Take this</Button>
       </CardActions>
     </Card>
   )
@@ -87,6 +90,8 @@ ReadyCard.propTypes = {
     estimateMinutes: PropTypes.number.isRequired,
   }).isRequired,
   onTake: PropTypes.func.isRequired,
+  /** True while this card's claim request is running. */
+  taking: PropTypes.bool.isRequired,
 }
 
 /**
@@ -105,6 +110,7 @@ export default function MyTasksPage() {
   const [logging, setLogging] = useState(null)
   const [editing, setEditing] = useState(null)
   const [message, setMessage] = useState(null)
+  const [takingId, setTakingId] = useState(null)
 
   async function move(task, status) {
     setMessage(null)
@@ -118,12 +124,17 @@ export default function MyTasksPage() {
 
   async function take(task) {
     setMessage(null)
+    // Disables this card's button until the answer arrives: a second click would
+    // otherwise send a second claim, which the server refuses as "already taken".
+    setTakingId(task.taskId)
     try {
       await request('POST', `/tasks/${task.taskId}/claim`)
       setMessage({ severity: 'success', text: `You took ${task.title}.` })
     } catch (failure) {
       // The server's sentence is the explanation (at the limit, already taken, ...).
       setMessage({ severity: 'error', text: failure.message })
+    } finally {
+      setTakingId(null)
     }
     tasks.reload()
     ready.reload()
@@ -163,7 +174,7 @@ export default function MyTasksPage() {
           <Typography variant="body2">No Ready tasks on your projects right now.</Typography>
         )}
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
-          {readyItems.map((task) => <ReadyCard key={task.taskId} task={task} onTake={take} />)}
+          {readyItems.map((task) => <ReadyCard key={task.taskId} task={task} onTake={take} taking={takingId === task.taskId} />)}
         </Box>
       </PageState>
 

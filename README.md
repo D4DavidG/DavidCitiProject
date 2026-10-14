@@ -221,7 +221,7 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 231 passed: Vitest + React Testing Library
+npm test                                  # 233 passed: Vitest + React Testing Library
 npm run test:coverage                     # 93% of statements, 95% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app

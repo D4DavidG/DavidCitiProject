@@ -19,7 +19,7 @@ outdated it.
   not deployed (Hours and Minutes boxes, **Copy username and password**, the login-timing
   fix at `services/users.py:159-164`, and the pull board with migration
   `002_task_limit.sql`): on AWS after the next `./bin/deploy-backend.sh` and
-  `./bin/deploy-frontend.sh`. Tests: 423 backend, 231 website, and 9 Playwright browser
+  `./bin/deploy-frontend.sh`. Tests: 423 backend, 233 website, and 9 Playwright browser
   tests in 4 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/tour.spec.js` screenshots every screen at desktop and phone width).
 - **Read these first:**

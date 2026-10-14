@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MyTasksPage from './MyTasksPage'
-import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
+import { USERS, holdOpen, page, renderAt, session, stubApi } from '../../test/utils'
 
 const PORTAL = {
   taskId: 20, milestoneId: 11, projectId: 1, title: 'Portal UI', description: 'Screens for the portal',
@@ -129,6 +129,22 @@ describe('MyTasksPage', () => {
     await screen.findByText('You took Go-live checklist.')
     watch.disconnect()
     expect(unmounted).toBe(false)
+  })
+
+  it('sends one claim when Take this is pressed twice, and keeps the success message', async () => {
+    const calls = renderPage({
+      'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 1, limit: 2 })],
+      'POST /tasks/30/claim': [200, { ...GO_LIVE, assigneeUserId: 3, status: 'IN_PROGRESS' }],
+    })
+    const release = holdOpen('/tasks/30/claim')
+    const button = within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(button).toBeDisabled()
+    release()
+    expect(await screen.findByText('You took Go-live checklist.')).toBeInTheDocument()
+    expect(calls.filter((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toHaveLength(1)
+    await waitFor(() => expect(button).toBeEnabled())
   })
 
   it("shows the server's refusal when I'm at my limit", async () => {

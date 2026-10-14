@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProjectDetailPage from './ProjectDetailPage'
 import { APOLLO, BOARD_PEOPLE, BOARD_TASKS, BOOKINGS, BUDGET, BUILD, BUILD_TASKS, DESIGN, MARIA } from './fixtures'
-import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
+import { USERS, holdOpen, page, renderAt, session, stubApi } from '../../test/utils'
 
 const BOARD = page(BOARD_TASKS, { people: BOARD_PEOPLE })
 
@@ -309,6 +309,23 @@ describe('ProjectDetailPage', () => {
       await waitFor(() => expect(calls.find((c) => c.method === 'PATCH' && c.path === '/tasks/30').body).toEqual({ assigneeUserId: 4 }))
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
       await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
+    })
+
+    it('sends one claim when Take this is pressed twice, and shows no error', async () => {
+      const calls = renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [200, {}],
+      })
+      await openBoard()
+      const release = holdOpen('/tasks/30/claim')
+      const button = within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' })
+      fireEvent.click(button)
+      fireEvent.click(button)
+      expect(button).toBeDisabled()
+      release()
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
+      expect(calls.filter((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toHaveLength(1)
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
 
     it('shows "already taken" and reloads the board when someone got there first', async () => {
