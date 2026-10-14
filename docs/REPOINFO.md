@@ -633,7 +633,9 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 20. **"A schedule and project plan like Float?"** Mostly built. The **Schedule** screen is
     Float-style: people by weeks, a bar per booking in its project's colour ("Apollo · 25 h/wk"),
     over-booked weeks outlined in red with "+5 h over", a bar opens its project. It reads the
-    allocation route, nothing new on the server. The deliverables timeline shows each project's
+    allocation route, nothing new on the server. Colours are handed out once per visit, so past
+    five projects a later page can show several in grey (each bar still names its project; the
+    seed has fewer than six). The deliverables timeline shows each project's
     milestones against dates. Float has drag-to-schedule; we don't: bookings are edited in a
     form. *Point at: `frontend/src/pages/schedule/SchedulePage.jsx`; `frontend/src/components/charts/TimelineChart.jsx`*
 21. **"If someone logs too many hours: warn them, let them go ahead, flag the manager?"**
