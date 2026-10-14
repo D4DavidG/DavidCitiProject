@@ -99,6 +99,18 @@ describe('FormDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith({ workDate: '2026-10-14' })
   })
 
+  it('sends a yes/no field as true or false', async () => {
+    const onSubmit = vi.fn().mockResolvedValue({})
+    render(
+      <FormDialog open title="Capacity" fields={[{ name: 'overtimeAllowed', label: 'Overtime allowed', type: 'boolean' }]}
+        initial={{ overtimeAllowed: false }} onClose={vi.fn()} onSubmit={onSubmit} />,
+    )
+    await userEvent.click(screen.getByLabelText(/overtime allowed/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Yes' }))
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    expect(onSubmit).toHaveBeenCalledWith({ overtimeAllowed: true })
+  })
+
   it('closes after a successful save', async () => {
     const onClose = vi.fn()
     renderForm({ onClose })

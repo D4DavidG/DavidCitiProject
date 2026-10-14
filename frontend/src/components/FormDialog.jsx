@@ -17,13 +17,16 @@ function fromInput(field, text) {
   if (field.type === 'number' || (field.type === 'select' && field.numeric)) return Number(text)
   if (field.type === 'money') return parseDollars(text)
   if (field.type === 'hours') return Math.round(Number(text) * 60)
+  if (field.type === 'boolean') return text === 'true'
   return text
 }
+
+const YES_NO = [['true', 'Yes'], ['false', 'No']]
 
 /**
  * A create or edit form in a dialog. Fields: { name, label, type?, options?, required?, helper? }
  * where type is text (default), textarea, number, money (typed in dollars, sent as
- * cents), hours (typed in hours, sent as minutes), date or select. With `initial`, only the fields that changed are sent, so a
+ * cents), hours (typed in hours, sent as minutes), date, select or boolean (Yes/No). With `initial`, only the fields that changed are sent, so a
  * manager never sends an admin-only field they didn't touch. Server errors with a
  * `field` show on that field; others show above the form.
  */
@@ -79,7 +82,7 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
               label={field.label}
               required={field.required}
               type={field.type === 'date' ? 'date' : field.type === 'number' || field.type === 'hours' ? 'number' : 'text'}
-              select={field.type === 'select'}
+              select={field.type === 'select' || field.type === 'boolean'}
               multiline={field.type === 'textarea'}
               minRows={field.type === 'textarea' ? 3 : undefined}
               value={values[field.name]}
@@ -91,7 +94,8 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
                 htmlInput: field.type === 'money' ? { inputMode: 'decimal' } : field.type === 'hours' ? { step: 0.25, min: 0 } : undefined,
               }}
             >
-              {field.type === 'select' && (field.options ?? []).map(([value, label]) => <MenuItem key={value} value={String(value)}>{label}</MenuItem>)}
+              {(field.type === 'boolean' ? YES_NO : field.type === 'select' ? field.options ?? [] : [])
+                .map(([value, label]) => <MenuItem key={value} value={String(value)}>{label}</MenuItem>)}
             </TextField>
           ))}
         </DialogContent>
@@ -110,7 +114,7 @@ FormDialog.propTypes = {
   fields: PropTypes.arrayOf(PropTypes.shape({
     name: PropTypes.string.isRequired,
     label: PropTypes.string.isRequired,
-    type: PropTypes.oneOf(['text', 'textarea', 'number', 'money', 'hours', 'date', 'select']),
+    type: PropTypes.oneOf(['text', 'textarea', 'number', 'money', 'hours', 'date', 'select', 'boolean']),
     /** [value, label] pairs for a select. */
     options: PropTypes.arrayOf(PropTypes.array),
     /** A select whose values are ids: sent as numbers. */

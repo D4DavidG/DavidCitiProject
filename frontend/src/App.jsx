@@ -13,6 +13,7 @@ import DashboardPage from './pages/dashboard/DashboardPage'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
 import MyTasksPage from './pages/mytasks/MyTasksPage'
+import PeoplePage from './pages/people/PeoplePage'
 import DependencyPage from './pages/projects/DependencyPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
 import ProjectsPage from './pages/projects/ProjectsPage'
@@ -61,7 +62,7 @@ export function AppRoutes() {
         <Route path="/projects/:id/dependencies" element={<DependencyPage />} />
         <Route path="/my-tasks" element={<RequireRole roles={['EMPLOYEE']}><MyTasksPage /></RequireRole>} />
         <Route path="/approvals" element={<RequireRole roles={STAFF}><ApprovalsPage /></RequireRole>} />
-        <Route path="/people" element={<RequireRole roles={STAFF}><ComingSoon title="People" /></RequireRole>} />
+        <Route path="/people" element={<RequireRole roles={STAFF}><PeoplePage /></RequireRole>} />
         <Route path="/requests" element={<RequireRole roles={STAFF}><ComingSoon title="Project requests" /></RequireRole>} />
         <Route path="/notifications" element={<ComingSoon title="Notifications" />} />
         <Route path="/audit" element={<RequireRole roles={['ADMIN']}><ComingSoon title="Audit log" /></RequireRole>} />
