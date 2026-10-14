@@ -83,27 +83,35 @@ def _kind_fields(conn: psycopg.Connection, actor: Actor, kind: str, data: dict) 
     return {"name": values.text(data, "name")}  # OTHER: the subject
 
 
+# Who may decide a request: never its asker; an admin decides any; a line manager
+# decides their own reports' (an employee's request). One condition for list and get.
+_MAY_DECIDE = "(r.requested_by <> %(me)s AND (%(admin)s OR (u.role = 'EMPLOYEE' AND u.manager_id = %(me)s)))"
+_MAY_SEE = f"(r.requested_by = %(me)s OR {_MAY_DECIDE})"
+_SCOPES = {"MINE": "r.requested_by = %(me)s", "TO_DECIDE": _MAY_DECIDE}
+_SELECT = ("SELECT r.*, u.first_name || ' ' || u.last_name AS requester_name"
+           " FROM project_requests r JOIN users u ON u.user_id = r.requested_by")
+
+
 def list_requests(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
-    """Admins see every request; managers see their own."""
-    if actor.is_employee:
-        raise Forbidden("Only managers and admins see project requests.")
-    where, params = ["TRUE"], {"me": actor.user_id}
-    if actor.is_manager:
-        where.append("requested_by = %(me)s")
+    """Your own requests (scope MINE), the ones you may decide (TO_DECIDE), or both (no scope)."""
+    scope = values.choice(filters, "scope", set(_SCOPES), required=False)
+    where, params = [_SCOPES[scope] if scope else _MAY_SEE], {"me": actor.user_id, "admin": actor.is_admin}
     if status := values.choice(filters, "status", STATUSES, required=False):
-        where.append("status = %(status)s")
+        where.append("r.status = %(status)s")
         params["status"] = status
-    query = sql.SQL("SELECT * FROM project_requests WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
-    return paginate(conn, query, params, sql.SQL("request_id DESC"), page, page_size)
+    if kind := values.choice(filters, "kind", set(SENDERS), required=False):
+        where.append("r.kind = %(kind)s")
+        params["kind"] = kind
+    # The WHERE fragments are fixed strings from this module; every value is a parameter.
+    query = sql.SQL(_SELECT + " WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
+    return paginate(conn, query, params, sql.SQL("r.request_id DESC"), page, page_size)
 
 
 def get_request(conn: psycopg.Connection, actor: Actor, request_id: int, lock: bool = False) -> dict:
-    if actor.is_employee:
-        raise Forbidden("Only managers and admins see project requests.")
-    query = "SELECT * FROM project_requests WHERE request_id = %s FOR UPDATE" if lock else \
-        "SELECT * FROM project_requests WHERE request_id = %s"
-    row = conn.execute(query, (request_id,)).fetchone()
-    if row is None or (actor.is_manager and row["requested_by"] != actor.user_id):
+    """The request if you asked it or may decide it; otherwise 404."""
+    query = _SELECT + " WHERE r.request_id = %(id)s AND " + _MAY_SEE + (" FOR UPDATE OF r" if lock else "")
+    row = conn.execute(query, {"id": request_id, "me": actor.user_id, "admin": actor.is_admin}).fetchone()
+    if row is None:
         raise NotFound(NOT_FOUND)
     return row
 

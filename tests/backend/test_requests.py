@@ -154,3 +154,52 @@ def test_another_managers_request_is_not_found(conn, org):
     req = file(conn, org["bob"])
     with pytest.raises(NotFound):
         requests.get_request(conn, org["carol"], req["request_id"])
+
+
+# --- who sees what: Mine and To decide ------------------------------------------
+
+def names(conn, who, **filters):
+    return [r["name"] for r in requests.list_requests(conn, who, filters, 1, 50)["items"]]
+
+
+def test_employee_sees_only_their_own_requests(conn, org):
+    ask(conn, org["alice"], "OVERTIME")
+    dave, _ = f.person(conn, org["admin"], manager=org["bob"], first_name="Dave")
+    ask(conn, dave, "OTHER", name="A desk")
+    file(conn, org["bob"])
+    assert names(conn, org["alice"]) == ["Allow overtime"]
+
+
+def test_line_manager_sees_their_reports_requests_in_to_decide(conn, org):
+    ask(conn, org["alice"], "OVERTIME")
+    file(conn, org["bob"])
+    assert names(conn, org["bob"], scope="TO_DECIDE") == ["Allow overtime"]
+    assert names(conn, org["bob"], scope="MINE") == ["Hermes"]
+    assert names(conn, org["bob"]) == ["Hermes", "Allow overtime"]
+    assert names(conn, org["carol"], scope="TO_DECIDE") == []
+
+
+def test_admin_to_decide_has_every_request(conn, org):
+    ask(conn, org["alice"], "OVERTIME")
+    file(conn, org["bob"])
+    assert names(conn, org["admin"], scope="TO_DECIDE") == ["Hermes", "Allow overtime"]
+    assert names(conn, org["admin"], scope="MINE") == []
+
+
+def test_kind_filter(conn, org):
+    ask(conn, org["alice"], "OVERTIME")
+    ask(conn, org["alice"], "OTHER", name="A desk")
+    assert names(conn, org["alice"], kind="OTHER") == ["A desk"]
+
+
+def test_each_listed_request_names_its_asker(conn, org):
+    ask(conn, org["alice"], "OVERTIME")
+    [item] = requests.list_requests(conn, org["bob"], {"scope": "TO_DECIDE"}, 1, 50)["items"]
+    assert item["requester_name"] == "Alice Tester"
+
+
+def test_another_managers_report_request_is_not_found(conn, org):
+    req = ask(conn, org["alice"], "OVERTIME")
+    assert requests.get_request(conn, org["bob"], req["request_id"])["name"] == "Allow overtime"
+    with pytest.raises(NotFound):
+        requests.get_request(conn, org["carol"], req["request_id"])
