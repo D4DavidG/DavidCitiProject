@@ -119,6 +119,13 @@ describe('ProjectDetailPage', () => {
     expect(within(screen.getByRole('region', { name: 'Launch' })).getByRole('button', { name: /sign off/i })).toBeEnabled()
   })
 
+  it('gives both reasons when a deliverable has open tasks and is waiting on another', async () => {
+    const launch = { ...BUILD, milestoneId: 12, name: 'Launch', status: 'BLOCKED', taskCount: 1, doneTaskCount: 0 }
+    renderDetail(USERS.manager, { 'GET /projects/1/milestones': [200, page([DESIGN, BUILD, launch])] })
+    const card = await screen.findByRole('region', { name: 'Launch' })
+    expect(within(card).getByText(/1 task left to finish and waiting for what it depends on/i)).toBeInTheDocument()
+  })
+
   it('writes "1 task", not "1 tasks"', async () => {
     renderDetail()
     const design = await screen.findByRole('region', { name: 'Design' })

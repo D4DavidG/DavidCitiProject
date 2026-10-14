@@ -57,7 +57,7 @@ function ProjectCard({ project }) {
         )}
 
         <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: 2 }}>
             <Typography variant="body2">{project.progressPercent}% of estimated hours done</Typography>
             <Typography variant="body2" color="text.secondary">Ends {formatDate(project.predictedEndDate)}</Typography>
           </Box>

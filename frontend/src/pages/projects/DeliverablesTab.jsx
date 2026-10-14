@@ -26,9 +26,10 @@ const FIELDS = [
  */
 function signOffBlocker(d) {
   const left = d.taskCount - d.doneTaskCount
-  if (left > 0) return `${left} ${left === 1 ? 'task' : 'tasks'} left to finish`
-  if (d.status === 'BLOCKED') return 'waiting for what it depends on'
-  return null
+  const reasons = []
+  if (left > 0) reasons.push(`${left} ${left === 1 ? 'task' : 'tasks'} left to finish`)
+  if (d.status === 'BLOCKED') reasons.push('waiting for what it depends on')
+  return reasons.length ? reasons.join(' and ') : null
 }
 
 function Deliverable({ deliverable, canManage, people, onAction, onEdit, onArchive, onChanged }) {

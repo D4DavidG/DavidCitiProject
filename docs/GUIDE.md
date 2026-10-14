@@ -30,7 +30,7 @@ Numbers here were measured on 13 Oct 2026. Re-run the commands in section 9 befo
 > status, risk and budget, then an allocation grid that shows who is over capacity across
 > projects. It's a React website and a Python API on AWS Lambda with a PostgreSQL
 > database (Aurora). The business rules are enforced twice, in the code and in the
-> database itself, and about 560 automated tests check it, including a real browser
+> database itself, and about 570 automated tests check it, including a real browser
 > walking the demo. I deployed it to AWS, load-tested it there, and found and fixed two
 > real problems.
 
@@ -41,7 +41,7 @@ What's done and what isn't, honestly:
 | Database (10 tables, rules enforced by Postgres) | Done, tested, deployed to Aurora |
 | Backend API (62 routes, roles, audit log, notifications) | Done, tested, deployed to Lambda |
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
-| Tests | Backend: 373 passing, 96% coverage, 100% for the API layer. Frontend: 185 passing, 93% coverage, plus 2 browser (Playwright) tests |
+| Tests | Backend: 374 passing, 96% coverage, 100% for the API layer. Frontend: 199 passing, 93% coverage, plus 7 browser (Playwright) tests |
 | AWS deployment | Verified 13 Oct: health, login, token, 404s, demo, load test |
 | Frontend (React, Material UI) | **Demo screens built and tested** (14 Oct, overnight): login, dashboard, allocation grid, projects, deliverables, dependency view. Live on AWS after `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
 
@@ -56,7 +56,7 @@ and JSON. Things you can show:
 | --- | --- | --- |
 | Click through the app as a manager: dashboard, allocation grid, a project, its dependencies | The CloudFront URL (after `./bin/deploy-frontend.sh`), or `http://localhost:3000` locally | 3 |
 | Run the whole story: the seven answers, then every rule refusing bad input | `python3 tools/demo.py demo` | 3 |
-| Prove the code works | `.venv/bin/pytest -q` (373 backend tests, ~15 s) and `cd frontend && npm test` (185, ~30 s) | 3, 9 |
+| Prove the code works | `.venv/bin/pytest -q` (374 backend tests, ~15 s) and `cd frontend && npm test` (199, ~30 s) | 3, 9 |
 | Show it's live on AWS | `curl .../health`, the demo against AWS, the AWS console | 5 |
 | Show raw API answers (JSON) | `curl` with a login token | 4 |
 | Look inside the database | `psql` or DBeaver, on the local copy | 4 |
@@ -117,7 +117,7 @@ Maria: her username is printed by `python3 tools/demo.py demo`, and the password
 | 5 | Point at **4 and 6** | "Deliverables, with completion worked out from their tasks, and the dependency chain. Launch is blocked because Build isn't done." |
 | 6 | Point at **Trying to break the rules** | "Every one of these is a real request the server refused. Logging past 40 hours, a loop in the dependencies, someone else's project (404, not 403, so you can't tell it exists), deleting anything (there is no delete: records are archived)." |
 | 7 | Point at **5 integrity checks, 0 violations** | "Five database queries that must always return nothing: no dependency loops, no time logged outside a booking, and so on. They run after every test, and here on live data." |
-| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "373 backend tests against a real Postgres database, not mocks, and 185 for the website. Plus a real browser test that walks this exact demo." |
+| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "374 backend tests against a real Postgres database, not mocks, and 199 for the website. Plus a real browser test that walks this exact demo." |
 | 9 | Optional: `(set -a; source ENVIRONMENT.config; python3 tools/console.py logs)` | "Here are those requests arriving in AWS's logs." |
 | 10 | Tell one story from section 8, "Things that went wrong" | Evaluators score curiosity and observation. These stories show both. |
 
@@ -267,7 +267,7 @@ backend/tracker/                     the whole backend: one Lambda
   domain/                            small shared pieces: errors, money (cents), clock (Eastern time), values
   store/                             the database: migrations/001_init.sql (all tables and rules),
                                      migrate.py, integrity.py (the 5 checks), postgres.py
-tests/backend/                       373 tests; conftest.py builds the test database
+tests/backend/                       374 tests; conftest.py builds the test database
 frontend/src/                        the website (React + Material UI):
   services/request.js                the one module that calls the API (token, JSON, errors, 401)
   services/format.js                 the only code that turns cents, minutes and dates into text
@@ -391,7 +391,7 @@ counted as the next day.
 
 ### Testing
 
-**"How did you test it?"** 373 backend tests with pytest, against a real PostgreSQL database,
+**"How did you test it?"** 374 backend tests with pytest, against a real PostgreSQL database,
 not mocks. Each test runs inside a transaction that's rolled back, so tests can't
 affect each other, and the integrity check runs after each one.
 
@@ -411,7 +411,7 @@ database-down branch inside a request. The list is in the README under "Known ga
 broke the code (removed a sort, a filter, a check) and confirmed the right test failed.
 Most tests were written before the code and seen failing first.
 
-**"And the frontend?"** 185 tests with Vitest and React Testing Library (Jest's API),
+**"And the frontend?"** 199 tests with Vitest and React Testing Library (Jest's API),
 93% coverage. They render each screen with the API stubbed and check what a person would
 see and what gets sent (cents, minutes, only the changed fields). On top of that, Playwright
 drives a real browser against the real local API and database through the demo, and checks
@@ -478,8 +478,8 @@ Run from `~/DavidCitiProject` on the VDI.
 
 ```sh
 # Tests
-.venv/bin/pytest -q                                   # backend tests (expect 373 passed)
-(cd frontend && npm test)                             # website tests (expect 185 passed)
+.venv/bin/pytest -q                                   # backend tests (expect 374 passed)
+(cd frontend && npm test)                             # website tests (expect 199 passed)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)   # real browser, needs ./bin/start-dev.sh running
 .venv/bin/pytest --cov --cov-report=term-missing      # with the coverage table
 .venv/bin/pytest -q -k capacity                       # only tests with "capacity" in the name

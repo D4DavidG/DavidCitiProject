@@ -25,8 +25,8 @@ behalf so you can overrule it. The plan being followed is
 | 14 | Finish: coverage, screenshots, README, guide | Done |
 | Review | A fresh reviewer read all the night's work | Done: 5 fixes made (below) |
 
-**In one line:** every screen in `MVP.md` is built and tested. That's 185 website tests
-(93% coverage), 373 backend tests, and a real browser walking the demo. It's all committed
+**In one line:** every screen in `MVP.md` is built and tested. That's 199 website tests
+(93% coverage), 374 backend tests, and a real browser walking the demo. It's all committed
 on `David`, but not pushed or deployed.
 
 ## What you need to do this morning
@@ -311,7 +311,38 @@ first:
   old tokens working for up to 8 h. Both are existing backend behaviour, unchanged tonight.
 - **The demo password is in the public repo.** That was already true; the guide says so.
 - **Phone layout** was checked in a browser only for the dashboard. The other pages are
-  checked by code and component tests (see "Not verified").
+  checked by code and component tests (see "Not verified"). *Morning update: the tour
+  below now screenshots every page at phone width.*
+
+## Morning: screenshot review of the live site (14 Oct)
+
+`e2e/tour.spec.js` signs in as Maria and as Ana, visits every screen at 1440 px and 375 px
+(no sideways scrolling allowed), and saves a screenshot of each: 36 in all. Independent
+reviewers read those screenshots and reported 59 problems. Two skeptics then tried to
+disprove each one, and 24 survived.
+
+- **Fixed in `b880af9` and `64b3671`** (14 changes, each with a test):
+  - empty fields show "—";
+  - the project link uses the theme colour;
+  - spending under 1% reads "Under 1%", not 0%;
+  - "Sign off" is greyed out with the reason until it can succeed;
+  - tapping a week on the allocation grid shows its projects on a phone;
+  - wording now fits each role;
+  - new logged-time notifications say which day the time is for.
+- **Second review:** the tour ran again and a second set of reviewers compared before
+  and after. 20 of the 24 were confirmed fixed.
+  - Three of the four left open could not be judged: two screenshots caught a page still
+    loading, and the notification rows were seeded before the change.
+  - The fourth was real: the budget bar still drew nothing under 1%.
+- **Fixed after the second review**, along with three small problems the first fixes
+  caused:
+  - the bar now shows a sliver whenever money has been spent;
+  - the sign-off hint gives both reasons when both apply ("1 task left to finish and
+    waiting for what it depends on");
+  - dependency cards put the progress on its own line, worded like the project page;
+  - the phone dashboard lets the progress label and end date wrap.
+- **Tests:** 199 website tests and 374 backend tests pass, lint is clean, and the local
+  tour passes 5 of 5.
 
 ## Decisions made for you
 

@@ -37,6 +37,12 @@ describe('DependencyPage', () => {
     expect(within(build).getByText('Needs Design')).toBeInTheDocument()
   })
 
+  it('words progress the same way as the project page', async () => {
+    renderGraph()
+    const design = await screen.findByRole('article', { name: 'Design' })
+    expect(within(design).getByText('100% of estimated hours done')).toBeInTheDocument()
+  })
+
   it('says what a blocked deliverable is waiting for', async () => {
     renderGraph()
     const launch = await screen.findByRole('article', { name: 'Launch' })

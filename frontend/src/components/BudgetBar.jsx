@@ -24,7 +24,8 @@ export default function BudgetBar({
       {hasBudget && (
         <LinearProgress
           variant="determinate"
-          value={Math.min(consumedPercent ?? 0, 100)}
+          // The server's percentage rounds down, so a little spending would draw nothing: show a sliver.
+          value={consumedCents > 0 ? Math.max(Math.min(consumedPercent ?? 0, 100), 1) : 0}
           color={over ? 'error' : 'primary'}
           aria-label="Budget spent"
           // A neutral track, so an almost-empty bar can't be mistaken for a full one.

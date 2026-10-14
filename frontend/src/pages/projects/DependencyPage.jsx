@@ -25,7 +25,9 @@ function Node({ node, needs, canManage, onUnlink }) {
           <Typography id={titleId} variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>{node.name}</Typography>
           <StatusChip status={node.status} />
         </Box>
-        <Typography variant="body2" color="text.secondary">Due {formatDate(node.dueDate)} · {node.progressPercent}% of hours done</Typography>
+        {/* Two lines: the cards are narrow, and one long line wrapped mid-phrase. */}
+        <Typography variant="body2" color="text.secondary">Due {formatDate(node.dueDate)}</Typography>
+        <Typography variant="body2" color="text.secondary">{node.progressPercent}% of estimated hours done</Typography>
         {needs.length > 0 && <Typography variant="body2">Needs {needs.map((n) => n.name).join(', ')}</Typography>}
         {node.status === 'BLOCKED' && waiting.length > 0 && (
           <Typography variant="body2" color="error.main">Waiting for {waiting.map((n) => n.name).join(', ')} to be done.</Typography>

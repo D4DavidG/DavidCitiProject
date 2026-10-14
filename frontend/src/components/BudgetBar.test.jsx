@@ -18,6 +18,17 @@ describe('BudgetBar', () => {
     expect(screen.getByText(/under 1% of budget spent/i)).toBeInTheDocument()
   })
 
+  it('shows a sliver of fill when something has been spent, even under 1%', () => {
+    // $1,370 of $150,000 rounds down to 0%, which used to draw an empty bar.
+    render(<BudgetBar {...apollo} consumedPercent={0} />)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
+  })
+
+  it('leaves the bar empty when nothing has been spent', () => {
+    render(<BudgetBar {...apollo} consumedCents={0} consumedPercent={0} />)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
+  })
+
   it('fills the bar to the share spent, from the server', () => {
     render(<BudgetBar {...apollo} consumedPercent={42} />)
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '42')

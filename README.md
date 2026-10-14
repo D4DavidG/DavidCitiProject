@@ -168,7 +168,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 373 passed
+.venv/bin/pytest -q                                                        # 374 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 96% of our code
@@ -193,7 +193,7 @@ every route in the table called over HTTP by the two walk tests.
 
 ```sh
 cd frontend
-npm test                                  # 185 passed: Vitest + React Testing Library
+npm test                                  # 199 passed: Vitest + React Testing Library
 npm run test:coverage                     # 93% of statements, 94% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
