@@ -1,4 +1,4 @@
-import { useCallback, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import { Box, Button, Card, Link as MuiLink, Tooltip, Typography } from '@mui/material'
@@ -319,7 +319,7 @@ Legend.propTypes = { withBand: PropTypes.bool.isRequired }
  * pages of 10 projects come from GET /dashboard/timeline. Each row is one Tab stop; the arrow
  * keys move along its marks.
  */
-export default function ProjectTimelines({ title, today = todayIso(), headingVariant = 'h3' }) {
+export default function ProjectTimelines({ title, today = todayIso(), headingVariant = 'h3', version = 0 }) {
   const { user } = useAuth()
   const headingId = useId()
   const [pageNumber, setPageNumber] = useState(1)
@@ -328,6 +328,8 @@ export default function ProjectTimelines({ title, today = todayIso(), headingVar
   const load = useCallback(() => request('GET', '/dashboard/timeline', { query: { page: pageNumber, pageSize: PAGE_SIZE } }), [pageNumber])
   const { data, error, loading, reload } = useApi(load)
   const projects = data?.items ?? []
+  // A new version from the page loads this page of projects again (the first render doesn't).
+  useEffect(() => { if (version) reload() }, [version, reload])
 
   const axis = timelineWindow(today, moves)
   const thisWeek = mondayOf(today)
@@ -405,4 +407,6 @@ ProjectTimelines.propTypes = {
   today: PropTypes.string,
   /** The heading's size (it is always an h2): h3 beside the Dashboard's h3-sized cards, h2 among h2 sections. */
   headingVariant: PropTypes.oneOf(['h2', 'h3']),
+  /** Change it to load the projects again, e.g. after a task moves; the rows stay until they arrive. */
+  version: PropTypes.number,
 }

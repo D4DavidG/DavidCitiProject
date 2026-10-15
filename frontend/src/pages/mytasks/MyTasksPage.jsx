@@ -49,7 +49,7 @@ function TaskCard({ task, busy = false, onMove, onLog }) {
         >
           {TASK_STATUSES.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
         </TextField>
-        <Button variant="contained" onClick={() => onLog(task)} disabled={busy}>Log time</Button>
+        <Button variant="outlined" onClick={() => onLog(task)} disabled={busy}>Log time</Button>
       </CardActions>
     </Card>
   )
@@ -86,7 +86,7 @@ function ReadyCard({ task, onTake, taking }) {
         <Typography variant="body2">Estimate {formatHours(task.estimateMinutes)}</Typography>
       </CardContent>
       <CardActions sx={{ px: 2, pb: 2 }}>
-        <Button variant="contained" disabled={taking} onClick={() => onTake(task)}>Take this</Button>
+        <Button variant="outlined" disabled={taking} onClick={() => onTake(task)}>Take this</Button>
       </CardActions>
     </Card>
   )
@@ -129,6 +129,9 @@ export default function MyTasksPage() {
   const [takingId, setTakingId] = useState(null)
   const [movingId, setMovingId] = useState(null)
   const [overCapacity, setOverCapacity] = useState(null)
+  // Bumped after a task moves or is taken: the timeline loads again, as a deliverable's state
+  // (computed from its tasks) or the projects you work on may have changed.
+  const [timelineVersion, setTimelineVersion] = useState(0)
 
   /**
    * Run send(body). If the server answers OVER_CAPACITY, keep a resend with
@@ -164,6 +167,7 @@ export default function MyTasksPage() {
     try {
       await request('POST', `/tasks/${task.taskId}/status`, { body: { status } })
       tasks.reload()
+      setTimelineVersion((v) => v + 1)
     } catch (failure) {
       setMessage({ severity: 'error', text: failure.message })
     } finally {
@@ -179,6 +183,7 @@ export default function MyTasksPage() {
     try {
       await request('POST', `/tasks/${task.taskId}/claim`)
       setMessage({ severity: 'success', text: `You took ${task.title}.` })
+      setTimelineVersion((v) => v + 1)
     } catch (failure) {
       // The server's sentence is the explanation (at the limit, already taken, ...).
       setMessage({ severity: 'error', text: failure.message })
@@ -200,7 +205,7 @@ export default function MyTasksPage() {
     { key: 'minutes', label: 'Time', render: (e) => <>{formatHours(e.minutes)} {e.overCapacity && <OverCapacityMark />}</> },
     { key: 'status', label: 'Approval', render: (e) => <StatusChip status={e.status} /> },
     { key: 'note', label: 'Note' },
-    { key: 'actions', label: '', align: 'right', render: (e) => <Button size="small" onClick={() => setEditing(e)}>Edit</Button> },
+    { key: 'actions', label: '', align: 'right', render: (e) => <Button variant="outlined" size="small" onClick={() => setEditing(e)}>Edit</Button> },
   ]
 
   return (
@@ -208,7 +213,7 @@ export default function MyTasksPage() {
       <PageHeader title="Dashboard" subtitle="Your projects, your tasks and the time you've logged." />
       {message && <Alert severity={message.severity} sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
 
-      <ProjectTimelines title="My projects" />
+      <ProjectTimelines title="My projects" headingVariant="h2" version={timelineVersion} />
 
       <Typography variant="h2" sx={{ mb: 1 }}>My tasks</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -246,12 +251,13 @@ export default function MyTasksPage() {
         </Box>
       </PageState>
 
-      {/* Folded away by default: the count is in its title. The table mounts only when opened. */}
+      {/* Folded away by default: the count is in its title. The table mounts only when opened. MUI gives
+          the region the id named in aria-controls, so AccordionDetails must not repeat it (duplicate id). */}
       <Accordion variant="outlined" disableGutters sx={{ mt: 4 }} slotProps={{ heading: { component: 'h2' }, transition: { unmountOnExit: true } }}>
         <AccordionSummary expandIcon={<ExpandIcon />} id="logged-time-summary" aria-controls="logged-time-details">
           <Typography variant="h2" component="span">{loggedTitle}</Typography>
         </AccordionSummary>
-        <AccordionDetails id="logged-time-details">
+        <AccordionDetails>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Your line manager approves it. Editing an entry sends it back for approval.
           </Typography>

@@ -49,6 +49,16 @@ describe('MyTasksPage', () => {
       .toEqual(['My projects', 'My tasks', 'Ready to take', 'My logged time (1 entry)'])
   })
 
+  it('draws all four section titles at the same size', async () => {
+    renderPage()
+    await screen.findByRole('link', { name: 'Apollo' })
+    await screen.findByRole('button', { name: /^My logged time \(/ })
+    screen.getAllByRole('heading', { level: 2 }).forEach((h) => {
+      const title = h.classList.contains('MuiTypography-h2') ? h : h.querySelector('.MuiTypography-h2')
+      expect(title, h.textContent).not.toBeNull()
+    })
+  })
+
   it('shows my projects as a timeline, from GET /dashboard/timeline', async () => {
     const calls = renderPage()
     const section = await screen.findByRole('region', { name: 'My projects' })
@@ -86,6 +96,13 @@ describe('MyTasksPage', () => {
     expect(await screen.findByText('No Ready tasks match your search.')).toBeInTheDocument()
   })
 
+  it('gives the opened logged time one id, so the accordion region and its content never share it', async () => {
+    renderPage()
+    await openLoggedTime()
+    expect(document.querySelectorAll('[id="logged-time-details"]')).toHaveLength(1)
+    expect(screen.getByRole('region', { name: /^My logged time/ })).toHaveAttribute('id', 'logged-time-details')
+  })
+
   it('keeps my logged time folded away, with the count in its title, until I open it', async () => {
     renderPage({ 'GET /me/time-entries': [200, page([ENTRY], { total: 12, totalPages: 2 })] })
     const summary = await screen.findByRole('button', { name: 'My logged time (12 entries)' })
@@ -101,6 +118,36 @@ describe('MyTasksPage', () => {
     const task = await screen.findByRole('article', { name: 'Portal UI' })
     expect(within(task).getByText('Apollo · Build')).toBeInTheDocument()
     expect(within(task).getByText('Estimate 10 h')).toBeInTheDocument()
+  })
+
+  it('gives Log time, Take this and Edit the outlined look of every secondary button', async () => {
+    renderPage({ 'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 1, limit: 2 })] })
+    const task = await screen.findByRole('article', { name: 'Portal UI' })
+    expect(within(task).getByRole('button', { name: 'Log time' })).toHaveClass('MuiButton-outlined')
+    const ready = await screen.findByRole('article', { name: 'Go-live checklist' })
+    expect(within(ready).getByRole('button', { name: 'Take this' })).toHaveClass('MuiButton-outlined')
+    const table = await openLoggedTime()
+    expect(within(table).getByRole('button', { name: 'Edit' })).toHaveClass('MuiButton-outlined')
+  })
+
+  it('redraws my projects timeline after a task moves, since a deliverable may change state', async () => {
+    const calls = renderPage({ 'POST /tasks/20/status': [200, { ...PORTAL, status: 'DONE' }] })
+    const task = await screen.findByRole('article', { name: 'Portal UI' })
+    await screen.findByRole('link', { name: 'Apollo' })
+    expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(1)
+    await userEvent.click(within(task).getByLabelText(/status/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Done' }))
+    await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(2))
+  })
+
+  it('leaves the timeline alone when a move is refused', async () => {
+    const calls = renderPage({ 'POST /tasks/20/status': [409, { error: 'Only the assignee can move this task.' }] })
+    const task = await screen.findByRole('article', { name: 'Portal UI' })
+    await screen.findByRole('link', { name: 'Apollo' })
+    await userEvent.click(within(task).getByLabelText(/status/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Done' }))
+    await screen.findByText('Only the assignee can move this task.')
+    expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(1)
   })
 
   it('moves a task to done', async () => {
@@ -248,6 +295,8 @@ describe('MyTasksPage', () => {
     expect(await screen.findByText('You took Go-live checklist.')).toBeInTheDocument()
     await waitFor(() => expect(calls.filter((c) => c.path === '/me/ready-tasks').length).toBe(2))
     expect(calls.filter((c) => c.path === '/me/tasks').length).toBe(2)
+    // A task on a new project puts that project on my timeline.
+    await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(2))
   })
 
   it('keeps the other Ready cards on screen while the lists reload after Take this', async () => {
