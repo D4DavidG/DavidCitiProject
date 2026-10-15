@@ -40,6 +40,14 @@ describe('AppLayout', () => {
     expect(labels).not.toContain('People')
   })
 
+  it('puts each menu link in its own list item, so screen readers hear a list', () => {
+    renderLayout(USERS.manager)
+    const nav = screen.getByRole('navigation', { name: 'Main menu' })
+    const links = within(nav).getAllByRole('link')
+    expect(within(nav).getAllByRole('listitem')).toHaveLength(links.length)
+    links.forEach((link) => expect(link.closest('li')).not.toBeNull())
+  })
+
   it('shows who is signed in, and signs out', async () => {
     const auth = session(USERS.manager)
     renderLayout(USERS.manager, auth)

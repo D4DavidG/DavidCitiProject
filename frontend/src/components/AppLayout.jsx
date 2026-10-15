@@ -2,7 +2,7 @@ import { useState } from 'react'
 import PropTypes from 'prop-types'
 import { NavLink } from 'react-router'
 import {
-  AppBar, Box, Button, Chip, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography,
+  AppBar, Box, Button, Chip, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import { useAuth } from '../auth/useAuth'
@@ -17,16 +17,18 @@ function NavList({ role, onNavigate }) {
     <Box component="nav" aria-label="Main menu">
       <List>
         {NAV_ITEMS.filter((item) => item.roles.includes(role)).map(({ to, label, icon: Icon }) => (
-          <ListItemButton
-            key={to}
-            component={NavLink}
-            to={to}
-            onClick={onNavigate}
-            sx={{ mx: 1, borderRadius: 1, '&.active': { bgcolor: 'primary.main', color: 'primary.contrastText' }, '&.active .MuiListItemIcon-root': { color: 'inherit' } }}
-          >
-            <ListItemIcon sx={{ minWidth: 36 }}><Icon fontSize="small" /></ListItemIcon>
-            <ListItemText primary={label} />
-          </ListItemButton>
+          // Each link sits in its own <li>: a <ul> may hold only list items (axe rule 'list').
+          <ListItem key={to} disablePadding>
+            <ListItemButton
+              component={NavLink}
+              to={to}
+              onClick={onNavigate}
+              sx={{ mx: 1, borderRadius: 1, '&.active': { bgcolor: 'primary.main', color: 'primary.contrastText' }, '&.active .MuiListItemIcon-root': { color: 'inherit' } }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}><Icon fontSize="small" /></ListItemIcon>
+              <ListItemText primary={label} />
+            </ListItemButton>
+          </ListItem>
         ))}
       </List>
     </Box>
