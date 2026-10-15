@@ -303,11 +303,12 @@ describe('SchedulePage', () => {
     expect(await screen.findByText('No one is booked on the chosen projects in these weeks.')).toBeInTheDocument()
   })
 
-  it('says "Not booked on the chosen projects" for a row with none of their bookings', async () => {
-    renderSchedule(({ query }) => [200, { ...page(query.projectIds ? [DAN] : [CHLOE]), weeks: WEEKS }])
-    await bar(/Chloe Kim, Zeus/)
-    await choose('Apollo')
-    expect(await screen.findByText('Not booked on the chosen projects')).toBeInTheDocument()
+  it('says, with projects chosen, that the over-capacity count is from those projects alone (the server counts only them)', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    expect(screen.getByText('1 of 2 people shown are booked past capacity in at least one of these weeks.')).toBeInTheDocument()
+    await choose('Zeus')
+    expect(await screen.findByText('1 of 2 people shown are booked past capacity by the chosen projects alone in at least one of these weeks.')).toBeInTheDocument()
   })
 
   it('says so when there is no one to show', async () => {

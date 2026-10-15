@@ -103,10 +103,9 @@ BookingBar.propTypes = {
 
 /**
  * One person's row: their name, a lane per project with its bars, and a last line with the words
- * for any week booked past their capacity (that week also gets a red outline). `filtered` says
- * projects are chosen, so an empty row means "none of those", not "nothing at all".
+ * for any week booked past their capacity (that week also gets a red outline).
  */
-function PersonRow({ person, weeks, colours, filtered }) {
+function PersonRow({ person, weeks, colours }) {
   const c = useChartColours()
   const bars = scheduleBars(person.weeks)
   const lanes = [...new Set(bars.map((bar) => bar.projectId))].sort((x, y) => x - y)
@@ -146,7 +145,7 @@ function PersonRow({ person, weeks, colours, filtered }) {
       ))}
       {bars.length === 0 && (
         <Typography variant="caption" sx={{ gridColumn: '2 / -1', gridRow: 1, px: 1, py: 0.5, color: 'text.secondary' }}>
-          {filtered ? 'Not booked on the chosen projects' : 'Not booked'}
+          Not booked
         </Typography>
       )}
       {person.weeks.map((w, i) => w.overAllocated && (
@@ -181,7 +180,6 @@ PersonRow.propTypes = {
   }).isRequired,
   weeks: PropTypes.arrayOf(PropTypes.string).isRequired,
   colours: PropTypes.instanceOf(Map).isRequired,
-  filtered: PropTypes.bool.isRequired,
 }
 
 /** What to say when no one is left to show, given the switch and the project filter. */
@@ -193,8 +191,9 @@ function emptyText(overOnly, filtered) {
 /**
  * Questions 3 and 5 as a Float-style schedule: one row per person, weeks across, a bar per
  * booking in its project's colour, and a red outline plus words on any week past capacity.
- * It reads the same GET /dashboard/allocation as the Allocation grid; with projects chosen in
- * the picker it sends their ids (projectIds=1,2) so the server keeps only their bookings.
+ * It reads the same GET /dashboard/allocation as the Allocation grid. With projects chosen in
+ * the picker it sends their ids (projectIds=1,2): the server keeps only those bookings, counts
+ * hours and "over capacity" from them alone, and leaves out anyone with none of them.
  */
 export default function SchedulePage() {
   const [weekFrom, setWeekFrom] = useState('')
@@ -239,9 +238,10 @@ export default function SchedulePage() {
     ...(otherCount ? [{ label: `Other (${otherCount})`, colour: c.other, kind: 'swatch' }] : []),
     ...(overCount ? [{ label: 'Over capacity', colour: c.over, kind: 'problem' }] : []),
   ]
+  const by = filtered ? ' by the chosen projects alone' : ''
   const summary = overCount
-    ? `${overCount} of ${people.length} people shown are booked past capacity in at least one of these weeks.`
-    : 'No one shown is booked past capacity in these weeks.'
+    ? `${overCount} of ${people.length} people shown are booked past capacity${by} in at least one of these weeks.`
+    : `No one shown is booked past capacity${by} in these weeks.`
 
   return (
     <>
@@ -298,7 +298,7 @@ export default function SchedulePage() {
             </Box>
           )}
         >
-          {people.map((person) => <PersonRow key={person.userId} person={person} weeks={weeks} colours={colours} filtered={filtered} />)}
+          {people.map((person) => <PersonRow key={person.userId} person={person} weeks={weeks} colours={colours} />)}
         </ChartFigure>
         {data?.totalPages > 1 && (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
