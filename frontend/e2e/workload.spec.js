@@ -24,7 +24,7 @@ const NEAR = 1.5 // CSS pixels: sub-pixel rounding, never a visible misalignment
 async function openDashboard(page) {
   await page.goto('/')
   await page.getByLabel('Username').fill(USERNAME)
-  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/dashboard')
@@ -131,7 +131,7 @@ test('the over segment is striped only in print and forced colours, keeping its 
 
   const screen = await style()
   expect(screen.image, 'on screen: colour, word and icon only').toBe('none')
-  expect(screen.colour).toBe('rgb(198, 40, 40)') // OVER, #C62828
+  expect(screen.colour).toBe('rgb(194, 31, 31)') // the chart's over red, #C21F1F (chartColours.js, 15 Oct)
   expect(screen.adjust).toBe('none')
 
   await page.emulateMedia({ media: 'print' })
@@ -140,12 +140,13 @@ test('the over segment is striped only in print and forced colours, keeping its 
   await page.emulateMedia({ media: 'screen', forcedColors: 'active' })
   const forced = await style()
   expect(forced.image).toMatch(STRIPES)
-  expect(forced.colour).toBe('rgb(198, 40, 40)')
+  expect(forced.colour).toBe('rgb(194, 31, 31)')
   // Every other mark keeps its colour too: the project segments and the ink capacity line.
   const capacity = await ben(chart).getByTestId('capacity').evaluate((el) => getComputedStyle(el).backgroundColor)
-  expect(capacity).toBe('rgb(31, 41, 55)') // INK, #1F2937
+  expect(capacity).toBe('rgb(22, 26, 22)') // ink, #161A16
   const segments = await ben(chart).getByTestId('segment').evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor))
-  expect(segments).toEqual(['rgb(28, 92, 171)', 'rgb(25, 158, 112)']) // Apollo #1c5cab, Zeus #199e70
+  // Apollo #1c5cab, Zeus #eda100: project slots 1 and 2, never green since 15 Oct (spec 6.1)
+  expect(segments).toEqual(['rgb(28, 92, 171)', 'rgb(237, 161, 0)'])
 })
 
 test('words and the red and ink marks clear contrast against what is really behind them', async ({ page }) => {

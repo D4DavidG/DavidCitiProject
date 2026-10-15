@@ -25,7 +25,7 @@ async function signIn(browser, username) {
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
   await page.goto('/')
   await page.getByLabel('Username').fill(username)
-  await page.getByLabel('Password', { exact: true }).fill(DEMO_PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(DEMO_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   return page

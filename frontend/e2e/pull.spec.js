@@ -69,7 +69,7 @@ test.afterAll(async ({ request }) => {
 test('an employee takes a Ready task from the board and puts it back', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('Username').fill(ana)
-  await page.getByLabel('Password', { exact: true }).fill(DEMO_PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(DEMO_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
 
