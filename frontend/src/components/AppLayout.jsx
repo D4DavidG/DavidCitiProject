@@ -62,7 +62,7 @@ function NavList({ role, collapsed = false, onNavigate }) {
                 mx: 1,
                 justifyContent: collapsed ? 'center' : 'flex-start',
                 px: collapsed ? 0 : 2,
-                '&.active': { bgcolor: 'primary.main', color: 'primary.contrastText' },
+                '&.active': { bgcolor: 'fill.main', color: 'fill.contrastText' }, // the one fill, as primary buttons
                 '&.active .MuiListItemIcon-root': { color: 'inherit' },
               }}
             >

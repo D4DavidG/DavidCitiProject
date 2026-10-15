@@ -90,7 +90,7 @@ describe('AppLayout', () => {
     expect(within(bar).getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument()
   })
 
-  it.each([['light', '#184429', '#FFFFFF'], ['dark', '#D5DBD7', '#184429']])(
+  it.each([['light', '#1F7A3A', '#FFFFFF'], ['dark', '#D7D7D7', '#14602C']])(
     'paints the top bar dark green in light mode and light grey in dark mode (%s)',
     (mode, background, words) => {
       renderLayout(USERS.manager, session(USERS.manager), makeTheme(mode))

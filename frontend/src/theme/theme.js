@@ -1,57 +1,66 @@
 import { alpha, createTheme } from '@mui/material/styles'
 
 /*
- * Forest green and orange, calm and easy to read (redesign spec section 1). Square corners.
- * Orange only highlights (the logo's shine, the Today line, the focus ring), never a status.
+ * One design language (redesign spec 1 and 5c): David's site d4davidg.github.io and SimpleBank.
+ * Forest green with gold highlights, square corners, a faint graph-paper page, solid glowing panels.
+ * Gold only highlights (the logo's shine, the Today line), never a status and never text on light.
  * Every ratio is WCAG contrast against the surface the colour is drawn on; text needs 4.5:1,
  * UI parts 3:1. theme.test.jsx recomputes each one and fails below the line.
  */
 const TOKENS = {
   light: {
-    page: '#F2F4F1', // light grey page
-    gridLine: '#E6EAE5', // graph-paper line, 1.1:1 on the page: faint, and every text colour still passes on it
-    paper: '#FFFFFF', // cards stay solid white
-    divider: '#DCE2DD',
-    text: '#1C2620', // 15.6:1 on white, 12.8:1 on a grid line
-    textSecondary: '#4A564F', // 7.7:1 on white, 6.3:1 on a grid line
-    primary: '#184429', // dark forest green; 11.1:1 on white, 9.1:1 on a grid line; white text on it 11.1:1
-    onPrimary: '#FFFFFF',
-    orange: '#D9661F', // 3.6:1 on white, 3.2:1 on the page (UI parts); black text on it 5.9:1
-    onOrange: '#000000',
-    error: '#C62828', // late, over; 5.6:1 on white, 4.6:1 on a grid line; white text 5.6:1
-    warning: '#9A5800', // pending, on hold; 5.6:1 on white, 4.6:1 on a grid line; white text 5.6:1
-    success: '#2B7530', // done, approved; 5.7:1 on white, 4.7:1 on a grid line; white text 5.7:1; 16 apart from the primary
+    page: '#E4E9E4', // his site's page grey-green
+    gridLine: '#E0E5E0', // his rgba(0,0,0,.075) line at layer opacity .22, flattened on the page: 1.04:1
+    gridSize: 46,
+    paper: '#FFFFFF', // panels: solid white
+    divider: 'rgba(0, 0, 0, 0.14)', // his hairline
+    text: '#161A16', // 14.3:1 on the page
+    textSecondary: '#2C332E', // supporting lines; 10.5:1 on the page
+    textMuted: '#4C5450', // the least important text only; 6.1:1 on a grid line
+    ink: '#14602C', // green as text (links, outlined buttons, focus ring); 6.0:1 on a grid line, white on it 7.7:1
+    onInk: '#FFFFFF',
+    fill: '#1F7A3A', // the ONE green fill: top bar, primary buttons, selected menu item; white on it 5.4:1
+    onFill: '#FFFFFF',
+    fillHover: '#14602C', // white on it 7.7:1
+    glow: '#1F7A3A', // panels' and buttons' faint glow
+    gold: '#8A6100', // highlight lines (Today); 5.5:1 on white, 4.5:1 on the page; white on it 5.5:1
+    goldBright: '#FFD54A', // the logo's shine, edged in the deep gold on light
+    onGold: '#FFFFFF',
+    error: '#B3261E', // late, over, refused; 5.1:1 on a grid line; white on it 6.5:1
+    warning: '#9C4A00', // pending, on hold; 4.9:1 on a grid line; white on it 6.2:1
+    success: '#145DB2', // done, approved: blue, so it is never mistaken for the green brand; 5.1:1; white 6.5:1
     onStatus: '#FFFFFF',
-    header: '#184429', // the top bar: forest green, white text 11.1:1
+    header: '#1F7A3A', // the top bar: the fill green, white words 5.4:1
     onHeader: '#FFFFFF',
-    button: '#184429', // contained buttons: green, white text 11.1:1
-    onButton: '#FFFFFF',
-    buttonHover: '#10301D', // white text 14.4:1
   },
   dark: {
     page: '#0F1D15', // dark green page
-    gridLine: '#192B20', // 1.2:1 on the page
-    paper: '#17291E',
-    divider: '#2C3F33',
-    text: '#E9EEEA', // 13.0:1 on the card, 12.7:1 on a grid line
-    textSecondary: '#B4C2B9', // 8.3:1 on the card, 8.1:1 on a grid line
-    primary: '#D5DBD7', // neutral grey accent; 10.9:1 on the card; forest green text on it 7.9:1
-    onPrimary: '#184429',
-    orange: '#FF9F43', // 7.5:1 on the card; dark text on it 7.6:1
-    onOrange: '#1C2620',
-    error: '#F28B82', // 6.4:1 on the card, 6.2:1 on a grid line; dark text on it 6.5:1
-    warning: '#F2C230', // 9.4:1 on the card; dark text on it 9.3:1; 16 apart from the grey accent
-    success: '#6FCB8E', // 7.7:1 on the card; dark text on it 7.9:1; 17 apart from the grey accent
-    onStatus: '#1C2620',
-    header: '#D5DBD7', // the top bar: light grey, forest green text 7.9:1
-    onHeader: '#184429',
-    button: '#FFFFFF', // contained buttons: white, forest green text 11.1:1
-    onButton: '#184429',
-    buttonHover: '#E3E8E4', // forest green text 8.9:1
+    gridLine: '#1A2720', // his rgba(255,255,255,.045) line, flattened on the page: 1.12:1
+    gridSize: 46,
+    paper: '#0B0E0B', // his near-black panels
+    divider: 'rgba(255, 255, 255, 0.14)',
+    text: '#D7D7D7', // 13.5:1 on a panel, 10.8:1 on a grid line
+    textSecondary: '#C3C8C3', // 11.4:1 on a panel, 9.1:1 on a grid line
+    textMuted: '#A9B0AA', // 8.8:1 on a panel, 7.0:1 on a grid line
+    ink: '#7CC78F', // pale green links and outlined buttons; 9.6:1 on a panel; 16 apart from the grey
+    onInk: '#0B0E0B',
+    fill: '#FFFFFF', // primary buttons and the selected menu item: white, green words 7.7:1
+    onFill: '#14602C',
+    fillHover: '#E6E6E6', // green words 6.1:1
+    glow: '#D7D7D7', // the neutral grey accent
+    gold: '#FFD54A', // 13.7:1 on a panel; dark text on it 12.5:1
+    goldBright: '#FFD54A',
+    onGold: '#161A16',
+    error: '#F28B82', // 8.1:1 on a panel, 6.5:1 on a grid line; dark text on it 8.1:1
+    warning: '#FF9E57', // 9.5:1 on a panel; dark text on it 9.5:1
+    success: '#8AB4F8', // 9.2:1 on a panel; dark text on it 9.2:1; 18 apart from the green ink
+    onStatus: '#0B0E0B',
+    header: '#D7D7D7', // the top bar: light grey, green words 5.3:1
+    onHeader: '#14602C',
   },
 }
 
-/** The faint graph-paper grid behind the page (cards cover it): one line across and one down every 24 px. */
+/** The faint graph-paper grid behind the page (panels cover it): one line across and one down. */
 const graphPaper = (line) => `linear-gradient(${line} 1px, transparent 1px), linear-gradient(90deg, ${line} 1px, transparent 1px)`
 
 /**
@@ -61,47 +70,89 @@ const graphPaper = (line) => `linear-gradient(${line} 1px, transparent 1px), lin
 export function makeTheme(mode) {
   const t = TOKENS[mode]
   const status = (main) => ({ main, contrastText: t.onStatus })
+  const glow = (strength, blur = 12) => `0 0 ${blur}px ${alpha(t.glow, strength)}`
+  const calm = { '@media (prefers-reduced-motion: reduce)': { transition: 'none' } }
   return createTheme({
     palette: {
       mode,
-      primary: { main: t.primary, contrastText: t.onPrimary },
-      secondary: { main: t.orange, contrastText: t.onOrange },
+      primary: { main: t.ink, contrastText: t.onInk },
+      secondary: { main: t.gold, light: t.goldBright, contrastText: t.onGold },
       error: status(t.error),
       warning: status(t.warning),
       success: status(t.success),
       background: { default: t.page, paper: t.paper },
-      text: { primary: t.text, secondary: t.textSecondary },
+      text: { primary: t.text, secondary: t.textSecondary, muted: t.textMuted },
       divider: t.divider,
       gridLine: t.gridLine,
+      fill: { main: t.fill, contrastText: t.onFill, hover: t.fillHover },
       header: { main: t.header, contrastText: t.onHeader },
-      button: { main: t.button, contrastText: t.onButton, hover: t.buttonHover },
     },
     shape: { borderRadius: 0 },
     typography: {
-      fontFamily: '"Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-      h1: { fontSize: '1.75rem', fontWeight: 600 },
-      h2: { fontSize: '1.375rem', fontWeight: 600 },
-      h3: { fontSize: '1.125rem', fontWeight: 600 },
+      fontFamily: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      body1: { lineHeight: 1.6 },
+      body2: { lineHeight: 1.6 },
+      // Titles in capitals with a little tracking; h1 and h2 carry a faint glow of the accent.
+      h1: { fontSize: '1.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.012em', textShadow: glow(0.25, 10) },
+      h2: { fontSize: '1.375rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.012em', textShadow: glow(0.25, 10) },
+      h3: { fontSize: '1.125rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.012em' },
     },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
-          body: { backgroundColor: t.page, backgroundImage: graphPaper(t.gridLine), backgroundSize: '24px 24px' },
-          // The keyboard focus ring: orange, outside the control.
-          '.MuiButtonBase-root.Mui-focusVisible, a:focus-visible': { outline: `2px solid ${t.orange}`, outlineOffset: 2 },
+          body: {
+            backgroundColor: t.page,
+            backgroundImage: graphPaper(t.gridLine),
+            backgroundSize: `${t.gridSize}px ${t.gridSize}px`,
+          },
+          // The keyboard focus ring on every control: 2 px green ink, just outside it.
+          '.MuiButtonBase-root.Mui-focusVisible, a:focus-visible': { outline: `2px solid ${t.ink}`, outlineOffset: 2 },
         },
       },
-      MuiCard: { defaultProps: { variant: 'outlined' }, styleOverrides: { root: { borderRadius: 0 } } },
-      MuiButton: {
-        defaultProps: { disableElevation: true },
+      MuiCard: {
+        defaultProps: { variant: 'outlined' },
         styleOverrides: {
-          root: { textTransform: 'none', fontWeight: 600, borderRadius: 0 },
-          // Contained buttons: green with white words in light mode, white with green words in dark.
-          contained: ({ ownerState }) => (ownerState.color === 'primary'
-            ? { backgroundColor: t.button, color: t.onButton, '&:hover': { backgroundColor: t.buttonHover } }
-            : null),
+          // A panel: an accent hairline and a soft glow that brightens slowly on hover or focus.
+          // A card inside a card stays quiet: border only.
+          root: {
+            borderRadius: 0,
+            borderColor: alpha(t.glow, 0.34),
+            boxShadow: glow(0.12),
+            transition: 'box-shadow .9s ease',
+            ...calm,
+            '&:hover, &:focus-within': { boxShadow: glow(0.26, 18) },
+            '& .MuiCard-root, & .MuiCard-root:hover, & .MuiCard-root:focus-within': { boxShadow: 'none' },
+          },
         },
       },
+      MuiButton: {
+        // Three kinds only: primary (contained), secondary (outlined, the default) and danger (outlined, color="error").
+        defaultProps: { variant: 'outlined', disableElevation: true },
+        styleOverrides: {
+          root: { textTransform: 'none', fontWeight: 600, borderRadius: 0, ...calm },
+          contained: ({ ownerState }) => (ownerState.color === 'primary'
+            ? {
+              backgroundColor: t.fill,
+              color: t.onFill,
+              fontWeight: 700,
+              boxShadow: glow(0.3, 6),
+              '&:hover, &.Mui-focusVisible': { backgroundColor: t.fillHover, boxShadow: glow(0.45, 14) },
+              '&:active': { transform: 'scale(.97)' },
+            }
+            : null),
+          outlined: ({ ownerState }) => {
+            if (ownerState.color === 'inherit') return { borderColor: 'currentColor' }
+            const line = ownerState.color === 'error' ? t.error : t.ink
+            return {
+              borderWidth: 1.5,
+              borderColor: line,
+              backgroundColor: t.paper,
+              '&:hover': { borderColor: line, backgroundColor: t.paper, boxShadow: `0 0 10px ${alpha(line, 0.3)}` },
+            }
+          },
+        },
+      },
+      MuiLink: { defaultProps: { underline: 'hover' } },
       MuiOutlinedInput: {
         styleOverrides: {
           // A field in error glows red around a 2 px red border (spec 5a); its message stays under it.

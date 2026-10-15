@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>ACME</title>
-  <!-- The logo's A on forest green: white strokes, the tip shining orange. -->
-  <rect width="64" height="64" fill="#184429"/>
+  <!-- The logo's A on the fill green: white strokes, the tip shining bright gold with a deep gold edge. -->
+  <rect width="64" height="64" fill="#1F7A3A"/>
   <g transform="translate(12 3)">
     <path d="M0 56 L12.16 18 L27.84 18 L40 56 L31 56 L27.16 44 L12.84 44 L9 56 Z M15.4 36 L24.6 36 L20 21.6 Z" fill="#FFFFFF" fill-rule="evenodd"/>
-    <path d="M16 6 L24 6 L27.2 16 L12.8 16 Z" fill="#FF9F43"/>
+    <path d="M16 6 L24 6 L27.2 16 L12.8 16 Z" fill="#FFD54A" stroke="#8A6100" stroke-width="1"/>
   </g>
 </svg>

@@ -29,7 +29,7 @@ describe('AcmeLogo', () => {
     expect(top('a')).toBeLessThan(top('cme'))
   })
 
-  it.each([['light', 'rgb(24, 68, 41)'], ['dark', 'rgb(213, 219, 215)']])(
+  it.each([['light', 'rgb(20, 96, 44)'], ['dark', 'rgb(215, 215, 215)']])(
     'writes ACME in the brand colour for %s mode (forest green, or light grey on dark)',
     (mode, colour) => {
       const { logo } = draw({}, mode)
@@ -43,10 +43,11 @@ describe('AcmeLogo', () => {
     expect(screen.getByRole('img', { name: 'ACME' })).toHaveStyle({ color: 'rgb(1, 2, 3)' })
   })
 
-  it('shines orange at the tip of the A', () => {
-    const { theme, logo } = draw()
+  it('shines bright gold at the tip of the A, edged in deep gold', () => {
+    const { logo } = draw()
     for (const part of ['tip', 'spark']) {
-      expect(logo.querySelector(`[data-part="${part}"]`)).toHaveAttribute('fill', theme.palette.secondary.main)
+      expect(logo.querySelector(`[data-part="${part}"]`)).toHaveAttribute('fill', '#FFD54A')
+      expect(logo.querySelector(`[data-part="${part}"]`)).toHaveAttribute('stroke', '#8A6100')
     }
   })
 })
