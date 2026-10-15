@@ -606,20 +606,24 @@ By rules, not lines: the seven questions and ten refused requests, each once, pl
 invariant. It is a smoke test of the deployed system, not a replacement for the 88 database
 and 300-odd rule tests behind it. It needs the seeded demo data.
 
-### Import the API into Postman or SwaggerHub
+### Open the API in Swagger UI, Postman or SwaggerHub
 
 Not a test, but useful in a demo. `docs/openapi.json` is generated from the route table
 (`.venv/bin/python tools/openapi.py` after any route change; `test_openapi.py` fails if you
 forget).
 
+- **Swagger UI:** `./tools/swagger.sh`, then open `http://localhost:8090/swagger.html`.
+  Pick the server, run **POST /auth/login** with "Try it out" (on by default), and the
+  token is put into **Authorize** for you. Checked 15 Oct with Playwright, in Chromium and
+  Firefox, on both servers: log in gave 200, then `GET /auth/me` gave 200 with Maria's
+  account.
 - **Postman:** Import, Files, choose `docs/openapi.json`, import as a Postman Collection.
   Set the collection variable `baseUrl` to `http://localhost:3001/api/tracker` (local) or
   `https://d1gov8jpsxhwer.cloudfront.net/api/tracker` (AWS). Send "Log in", copy `token`
   from the answer into the collection's Authorization tab (Bearer Token). Tokens last 15
   minutes.
 - **SwaggerHub:** Create New, Import and Document API, upload `docs/openapi.json`. Browse
-  and share it there; "Try it out" may be blocked by CORS (a page on swaggerhub.com
-  calling our server). Not tried.
+  and share it there. Not tried.
 
 ## 2. What coverage means for each kind of test
 

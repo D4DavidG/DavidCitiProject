@@ -381,24 +381,34 @@ capacity, a future date, another manager's project, an employee creating a proje
 dependency loop, signing off unfinished work, DELETE, no token. It ends on the
 integrity check.
 
-### API file (Postman, SwaggerHub)
+### API file (Swagger UI, Postman, SwaggerHub)
 
-`docs/openapi.json` (OpenAPI 3.0.3) lists all 69 endpoints: method, path, who may call
+`docs/openapi.json` (OpenAPI 3.0.3) lists all 70 endpoints: method, path, who may call
 it, the body it takes and the status it answers. `tools/openapi.py` builds it from the
 route table (`backend/tracker/api/routes.py`); each summary is the handler's docstring.
 `tests/backend/test_openapi.py` fails when the saved file is stale, so after a route
 change run:
 
 ```sh
-.venv/bin/python tools/openapi.py   # Wrote docs/openapi.json: 69 operations
+.venv/bin/python tools/openapi.py   # Wrote docs/openapi.json: 70 operations
 ```
 
+- **Swagger UI (on this machine):** `./tools/swagger.sh`, then open
+  `http://localhost:8090/swagger.html` (`docs/swagger.html`). Pick Local or AWS in
+  **Servers**, open `auth`, **POST /auth/login**, fill in a username and password, and
+  **Execute**: the token goes into **Authorize** for you (15 minutes), so every other
+  call can be tried at once. Swagger UI itself comes from jsDelivr at a fixed version,
+  with integrity hashes.
 - **Postman:** Import, Files, choose `docs/openapi.json`, import as a Postman Collection.
   Set the collection's `baseUrl` to the local or AWS server, send "Log in", and paste
   `token` from the answer into the collection's Authorization tab (Bearer Token, 15 minutes).
 - **SwaggerHub:** Create New, Import and Document API, upload `docs/openapi.json`.
-  "Try it out" from swaggerhub.com may be blocked by CORS; Postman is not a browser, so
-  CORS does not apply there.
+
+Calls from Swagger's page are cross-origin, so CORS applies (Postman is not a browser,
+so it doesn't). The local proxy names `Authorization` in its allowed headers. The AWS
+function URL now names it too (`infra/lambda.tf`): before, it answered `*`, which the
+Fetch standard says doesn't cover `Authorization`. Chromium and Firefox still accepted
+that on 15 Oct, but Firefox warned it "will disallow" it soon.
 
 ## Deploying to AWS
 

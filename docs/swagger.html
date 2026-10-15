@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  Swagger UI for docs/openapi.json. Serve this folder with ./tools/swagger.sh, then open
+  http://localhost:8090/swagger.html (opening the file directly can't read openapi.json).
+  Swagger UI comes from jsDelivr at a fixed version, and the integrity hashes make the
+  browser refuse any other file.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACME API (Swagger)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0/swagger-ui.css"
+        integrity="sha384-Ov4/wv3j2bmct8cDc5X4ngJZohVPzEmc6uDPH8WeljUxO5vtoykvMEfbu9Vh6RaW" crossorigin="anonymous">
+  <style>
+    body { margin: 0; background: #fafafa; font-family: Inter, system-ui, sans-serif; }
+    header { background: #165E26; color: #fff; padding: 16px; }
+    header h1 { margin: 0 0 4px; font-size: 20px; }
+    header p { margin: 0; font-size: 14px; line-height: 1.5; }
+    header code { background: rgba(255, 255, 255, 0.15); padding: 1px 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ACME Project Tracker API</h1>
+    <p>Pick a server, then open <code>auth</code>, <b>POST /auth/login</b>, fill in a username and password and
+      press <b>Execute</b>. The token goes into <b>Authorize</b> for you and lasts 15 minutes.</p>
+  </header>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0/swagger-ui-bundle.js"
+          integrity="sha384-YDALVcy8kj8yltLBVi1vBiBAUqdxvus673gM8XKwiy6aDUJFXivF/KCufekjYbVf" crossorigin="anonymous"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: 'openapi.json',
+      dom_id: '#swagger-ui',
+      docExpansion: 'none', // 70 operations: start with the groups closed
+      filter: true, // a search box over the groups
+      tryItOutEnabled: true, // boxes ready to fill, one click fewer per call
+      displayRequestDuration: true,
+      persistAuthorization: true, // the token survives a page reload
+      validatorUrl: null, // don't send the file's address to swagger.io
+      // Login, refresh and change password answer a token: use it for the next calls.
+      responseInterceptor: (response) => {
+        const body = response.body || response.obj
+        if (response.ok && body && body.token && body.refreshToken) {
+          window.ui.preauthorizeApiKey('bearerAuth', body.token)
+        }
+        return response
+      },
+    })
+  </script>
+</body>
+</html>

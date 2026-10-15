@@ -91,7 +91,8 @@ outdated it.
   - `docs/REPOINFO.md` (what to say, with every claim checked against the code,
     and a "say this, not that" table) and `docs/DEMO-RUNBOOK.md` (what to run and click
     live, the tests, Plan B); `tools/tracker.http` holds read-only API requests for VS
-    Code's REST Client; `docs/openapi.json` is the OpenAPI file for Postman and
+    Code's REST Client; `docs/openapi.json` is the OpenAPI file for Swagger UI
+    (`./tools/swagger.sh`, then `http://localhost:8090/swagger.html`), Postman and
     SwaggerHub (regenerate with `.venv/bin/python tools/openapi.py` after any route
     change; `test_openapi.py` fails until you do);
   - `docs/OVERNIGHT-REPORT.md`: what was built on the night of 13 to 14 Oct, every
@@ -108,6 +109,10 @@ outdated it.
   without a prompt (a blanket `"Bash"` allow, added 14 Oct at David's request; delete
   that line to go back). Hand him the exact commands for the denied ones.
 - **Open items:**
+  - the Lambda URL's CORS headers now name `authorization` and `content-type` instead of
+    `*` (`infra/lambda.tf`, 15 Oct, for Swagger UI); on AWS after the next
+    `./bin/deploy-backend.sh`. Swagger already works there in Chromium and Firefox today;
+    Firefox warns that `*` will stop covering `Authorization`;
   - deploy everything committed since `a52da44` (see **Built**): `git push origin David`,
     `./bin/deploy-backend.sh` (migrations 002 to 005 on the first cold start),
     `./bin/deploy-frontend.sh`; deploy both together (the old website knows no refresh and

@@ -646,12 +646,15 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     project name), port 5432, user `postgres`, password `postgres123`, database `postgres`.
     Terminal: `PGPASSWORD=postgres123 psql -h localhost -U postgres -d postgres`.
     *Point at: `docs/DEMO-RUNBOOK.md` section 5*
-17. **"Postman or SwaggerHub?"** Both can import `docs/openapi.json`, an OpenAPI 3.0.3
-    file of all 69 endpoints (who may call each, its body, its status codes). It is
+17. **"Swagger, Postman or SwaggerHub?"** All three read `docs/openapi.json`, an OpenAPI
+    3.0.3 file of all 70 endpoints (who may call each, its body, its status codes). It is
     generated from the one route table by `tools/openapi.py`, and a test fails if the
-    saved file is stale, so it can't drift from the code. `tools/tracker.http` stays for
-    VS Code's REST Client (no sign-in needed). The imports themselves were not tried.
-    *Point at: `docs/openapi.json`; `tools/openapi.py`; `tests/backend/test_openapi.py`*
+    saved file is stale, so it can't drift from the code. Swagger UI runs on this machine
+    with `./tools/swagger.sh` (`http://localhost:8090/swagger.html`): log in once and the
+    token is used for every call. Checked 15 Oct on both servers. `tools/tracker.http` stays
+    for VS Code's REST Client (no sign-in needed). The Postman and SwaggerHub imports were
+    not tried.
+    *Point at: `docs/swagger.html`; `docs/openapi.json`; `tools/openapi.py`; `tests/backend/test_openapi.py`*
 18. **"How do you automate tests?"** Locally, one command: `./tools/test-all.sh` runs
     backend tests with coverage, bandit, website tests with coverage, lint and the build,
     then Playwright when ports 3000 and 3001 are up, and prints a PASS/FAIL table (about 2.5

@@ -85,11 +85,12 @@ DavidCitiProject/
 │   ├── demo.py        seed = make the demo data; demo = the 7 questions, then 10 refusals.
 │   ├── k6/load.js     The load test.
 │   ├── openapi.py     Rebuilds docs/openapi.json from the route table.
+│   ├── swagger.sh     Swagger UI for the API at http://localhost:8090/swagger.html.
 │   ├── tracker.http   Ready-made API requests for VS Code's REST Client.
 │   └── console.py     Opens the AWS console, signed in.
 │
 ├── infra/             Terraform: builds everything on AWS.                     [W, changed]
-│   ├── lambda.tf      The Lambda (we raised memory to 512 MB for faster logins). [W, changed]
+│   ├── lambda.tf      The Lambda (we raised memory to 512 MB for faster logins, and named Authorization in its CORS headers). [W, changed]
 │   ├── cloudfront.tf  The front door: website from S3, /api/tracker* to the Lambda. [W, changed]
 │   ├── rds.tf         The Aurora PostgreSQL database.                           [W]
 │   ├── s3.tf          The bucket that holds the website files.                  [W]
@@ -118,7 +119,8 @@ DavidCitiProject/
     ├── MAP.md         This page.
     ├── TESTING.md     Every kind of test, coverage, Playwright from scratch.
     ├── OVERNIGHT-REPORT.md   What was built on the night of 13 to 14 Oct.
-    ├── openapi.json   The API for Postman or SwaggerHub (70 operations).
+    ├── openapi.json   The API for Swagger UI, Postman or SwaggerHub (70 operations).
+    ├── swagger.html   The Swagger UI page that reads it (served by tools/swagger.sh).
     ├── screenshots/   The five pictures in the README.
     ├── superpowers/specs/   One design write-up per feature, with the reasons (17 files).
     ├── superpowers/plans/   The step-by-step build plans (12 files).

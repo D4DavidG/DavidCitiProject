@@ -524,8 +524,12 @@ REST Client wasn't installed, on 14 Oct.
 
 Postman (also installed in VS Code, but it wants a sign-in) can import every endpoint at
 once from `docs/openapi.json`: Import, Files, choose the file, import as a Postman
-Collection, then set `baseUrl`. Steps in `docs/TESTING.md` ("Import the API into Postman
-or SwaggerHub"). Not tried.
+Collection, then set `baseUrl`. Steps in `docs/TESTING.md` ("Open the API in Swagger UI,
+Postman or SwaggerHub"). Not tried.
+
+Swagger UI, in the browser, with nothing to install: `./tools/swagger.sh`, open
+`http://localhost:8090/swagger.html`, pick Local or AWS, run **POST /auth/login**, and
+every other call is signed in. Checked 15 Oct, local and AWS.
 
 ---
 
