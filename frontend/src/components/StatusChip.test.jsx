@@ -41,11 +41,11 @@ describe('StatusChip', () => {
     }
   })
 
-  it('has no border, only a faint wash of its colour, so it never looks like a button (spec 5c)', () => {
+  it('has no border, only a faint wash of its colour, so it never looks like a button', () => {
     draw('REJECTED')
     const shown = chip('Rejected')
     expect(getComputedStyle(shown).borderColor).toMatch(/^(transparent|rgba\(0, 0, 0, 0\))$/)
-    expect(getComputedStyle(shown).backgroundColor).toMatch(/^rgba\(179, 38, 30, 0\.1\)$/) // the error red, faint
+    expect(getComputedStyle(shown).backgroundColor).toMatch(/^rgba\(194, 31, 31, 0\.1\)$/) // the error red, faint
   })
 
   it.each(['light', 'dark'])('reads at 4.5:1, its icon at 3:1, on a panel and on the page (%s)', (mode) => {
