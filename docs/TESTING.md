@@ -17,18 +17,18 @@ checks one layer, from the database up to a real browser.
 | **API tests** | Routing (both path shapes), every route needs a token, the role is read from the database, 404 not 403, error and list shapes, no DELETE route; every read route and every write route called once; the Lambda entry point; `docs/openapi.json` matches the route table | Proves the wiring between the web request and the rules, using real Lambda-shaped events | `tests/backend/test_api.py`, `test_api_read_walk.py`, `test_api_audit_walk.py`, `test_function.py`, `test_openapi.py` | `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py tests/backend/test_openapi.py` | 4 s | 156 |
 | **"Writes really commit" test** | A change is actually saved, not left in a transaction that is never committed | Every other test rolls back on purpose, so only a test on its own database can catch "nothing is ever saved" | `tests/backend/test_store_commits.py` | `.venv/bin/pytest -q tests/backend/test_store_commits.py` | under 1 s | 2 |
 | **Race (concurrency) tests** | Two people pressing "Take this" at the same moment: only one wins, and nobody goes over their task limit | A race only shows up with two real database connections at once; the test waits until Postgres reports the second one blocked | `tests/backend/test_claim_race.py` | `.venv/bin/pytest -q tests/backend/test_claim_race.py` | under 1 s | 2 |
-| **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (33 files, beside the code they test) | `cd frontend && npm test` | 109 s | 330 |
-| **Browser tests** (Playwright) | A real Chrome against the real running app: the demo walk (the seven questions, plus the phone menu), the pull board (Ana takes a task and puts it back), requests (Ana asks, Maria rejects with a note, Ana reads it on a phone), the screen tour (every screen for a manager and an employee, desktop and phone, no sideways scrolling, an axe accessibility scan of each, a deep-link refresh), history (a manager reads a report's history without the before/after state; an employee sees My history), the three charts (timeline: Late words and icon, tooltips on hover, tap and focus, print stripes; budget: the Budget line's position, tooltips; workload: gridlines and bars line up, Tab opens the tooltip, print stripes, contrast), README screenshots (only when asked) | The only test that sees what David sees: real login, real API, real database, real layout | `frontend/e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `history.spec.js`, `tour.spec.js`, `timeline.spec.js`, `budget.spec.js`, `workload.spec.js`, `screenshots.spec.js` | `cd frontend && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_ZEUS_MANAGER_USERNAME=SP345715 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test` | 2.3 min | 24 tests in 9 files: 23 passed, 1 skipped (screenshots, on purpose), 14 Oct evening |
+| **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (36 files, beside the code they test) | `cd frontend && npm test` | 118 s | 404 |
+| **Browser tests** (Playwright) | A real Chrome against the real running app: the demo walk (the seven questions, plus the phone menu), the pull board (Ana takes a task and puts it back), requests (Ana asks, Maria rejects with a note, Ana reads it on a phone), the screen tour (every screen for a manager and an employee, desktop and phone, no sideways scrolling, an axe accessibility scan of each, a deep-link refresh), history (a manager reads a report's history without the before/after state; an employee sees My history), the three charts (timeline: Late words and icon, tooltips on hover, tap and focus, print stripes; budget: the Budget line's position, tooltips; workload: gridlines and bars line up, Tab opens the tooltip, print stripes, contrast), the Schedule screen (a bar per booking, the over week outlined, keyboard tooltip and Enter), log time then approve (Ben logs, Maria approves, spent goes up), an admin's project life cycle (create, edit, archive, reactivate), README screenshots (only when asked) | The only test that sees what David sees: real login, real API, real database, real layout | `frontend/e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `history.spec.js`, `tour.spec.js`, `timeline.spec.js`, `budget.spec.js`, `workload.spec.js`, `schedule.spec.js`, `timelog.spec.js`, `project-lifecycle.spec.js`, `screenshots.spec.js` | `cd frontend && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_ZEUS_MANAGER_USERNAME=SP345715 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test` | about 2.5 min | 30 tests in 12 files: 29 passed, 1 skipped (screenshots, on purpose), 14 Oct night |
 | **k6 load test** | Managers reading the dashboard at once, then a burst of logins: every request answers, reads within 1 s and logins within 3 s for 95 in 100 | k6 is the industry's load-test tool (named in the meeting notes, "sk8", `notes.txt:6`); pass or fail comes from thresholds written in the script | `tools/k6/load.js` | `K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js` (section 7; AWS command there too) | 107 s | 4,038 requests, 0 failed, all 4 thresholds passed (local, 14 Oct) |
 
 Plus two checks that are not tests but run with them: **lint** (ESLint reads the website
 code for mistakes: `cd frontend && npm run lint`, clean, 5 s) and **bandit** (a security
 scanner for the Python, the same one CI runs: no issues, under 1 s).
 
-Backend total: `.venv/bin/pytest -q` printed `565 passed in 35.19s`.
-Website total: `npm test` printed `Test Files  33 passed (33)`, `Tests  330 passed (330)`, `Duration  108.81s`.
-Browser total: 24 tests in 9 files; `tools/test-all.sh` printed `23 passed, 1 skipped` (the skip is the README screenshots).
-(14 Oct, evening.)
+Backend total: `.venv/bin/pytest -q` printed `565 passed in 27.19s`.
+Website total: `npm test` printed `Test Files  36 passed (36)`, `Tests  404 passed (404)`, `Duration  117.60s`.
+Browser total: 30 tests in 12 files; Playwright printed 29 passed, 1 skipped (the skip is the README screenshots).
+(14 Oct, night. Steps 1 to 5 from `tools/test-all.sh`; the browser tests were run by hand against this branch's own site, see below.)
 
 The backend tests need local Postgres running. They build their own `tracker_test`
 database (`tests/backend/pg.py:13`) and never touch the app's data.
@@ -51,7 +51,7 @@ after any route change; `test_openapi.py` fails if you forget).
 
 The screen tour (`frontend/e2e/tour.spec.js`, the `scan` helper) runs **axe**
 (`@axe-core/playwright` 4.13.0, the rule engine behind Lighthouse's accessibility score)
-on the sign-in page, on every screen it opens, and at phone width on the open menu: 48
+on the sign-in page, on every screen it opens, and at phone width on the open menu: 50
 scans over the four role-by-width tests.
 
 - **What it checks:** the WCAG 2.0 to 2.2 A and AA rules a machine can decide: colour
@@ -97,7 +97,7 @@ coverage misses.
 
 ```
 TOTAL                                        2011     64    97%
-565 passed in 38.12s
+565 passed in 27.19s
 ```
 
 97% means: of the 2,011 statements in our backend, the tests ran all but 64. It
@@ -117,10 +117,10 @@ To see which lines were missed: `.venv/bin/pytest --cov=backend/tracker --cov-re
 `cd frontend && npm run test:coverage` printed:
 
 ```
-Statements   : 94.58% ( 1345/1422 )
-Branches     : 92.07% ( 964/1047 )
-Functions    : 90.11% ( 474/526 )
-Lines        : 96.47% ( 1151/1193 )
+Statements   : 95.5% ( 1510/1581 )
+Branches     : 93.72% ( 1075/1147 )
+Functions    : 91.4% ( 532/582 )
+Lines        : 97.04% ( 1280/1319 )
 ```
 
 V8 is the JavaScript engine inside Chrome and Node; it counts what ran while the
@@ -145,7 +145,7 @@ branches.
 | Rubric target | Goal | Today | Met? |
 | --- | --- | --- | --- |
 | Backend code coverage | 80% | 97% of statements (95% with branches) | Yes |
-| Frontend code coverage | 80% | 94.58% statements, 96.47% lines, 92.07% branches, 90.11% functions | Yes |
+| Frontend code coverage | 80% | 95.5% statements, 97.04% lines, 93.72% branches, 91.4% functions | Yes |
 | API endpoints (all CRUD) | 90% | `api/` 100%; every route called by the two walk tests | Yes |
 | Error handling | 90% | `api/errors.py` 100%; `test_api_read_walk.py` covers malformed input and a crash returning 500 | Yes |
 | Critical user paths end to end | 100% | Manager's demo walk, pull board, an employee's request and its answer, every screen for manager and employee | Partly. Not end to end yet: an employee logs time and the manager approves it (component tests only, `README.md:253-254`); an admin creates, edits, archives and reactivates a project; the forced password change at first sign-in |
@@ -179,6 +179,9 @@ Before running: start the stack (`./bin/start-dev.sh`) and seed it once (`tools/
 | --- | --- | --- |
 | `demo.spec.js` | `E2E_MANAGER_USERNAME` (or `E2E_ADMIN_PASSWORD` to look it up) | No |
 | `pull.spec.js` | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` (or `E2E_ADMIN_PASSWORD`); Ana must hold at most 1 unfinished task | **Yes**: a task, audit rows, bell notifications (it archives the task afterwards) |
+| `schedule.spec.js` | `E2E_MANAGER_USERNAME` (defaults to local Maria) | No |
+| `timelog.spec.js` | `E2E_MANAGER_USERNAME` | **Yes**: one approved 15-minute entry, audit rows, bell notifications (local only) |
+| `project-lifecycle.spec.js` | `E2E_ADMIN_PASSWORD` | **Yes**: one archived project, audit rows, notifications (local only) |
 | `tour.spec.js` | `E2E_TOUR_DIR` (a folder for screenshots) and both usernames | No |
 | `screenshots.spec.js` | `E2E_SCREENSHOTS=1` and `E2E_ADMIN_PASSWORD`; overwrites `docs/screenshots/` | No (but changes repo files) |
 
@@ -302,26 +305,25 @@ tests pass, FAIL if any fails, SKIP when the tour did not run). It
 finds the local Maria and Ana usernames in the local database by itself (or uses
 `E2E_MANAGER_USERNAME` / `E2E_EMPLOYEE_USERNAME` if set). The browser tests always go
 to the local stack, even if `E2E_BASE_URL` is still set from an AWS run, because
-`pull.spec.js` and `requests.spec.js` write data. Each run therefore adds one archived
+`pull.spec.js`, `requests.spec.js`, `timelog.spec.js` and `project-lifecycle.spec.js` write data. Each run therefore adds one archived
 task, one rejected request from Ana, audit rows and bell notifications (for Ana, Maria and
 every admin) to the local database. It ends with a table
-and exits with an error code if any step failed. Last results, 14 Oct, evening (after
-pages loaded on first visit; one real `bash tools/test-all.sh` run, every row PASS):
+and exits with an error code if any step failed. Last results, 14 Oct, night (one real `bash tools/test-all.sh` run on the merged branch; its browser and accessibility rows were SKIP because the script's site on port 3000 served another folder's code, so those two steps were run by hand against this branch's own site on port 3002, and passed):
 
 ```
 Step            Result Detail
 Backend tests   PASS   565 passed, coverage 97%
 Bandit          PASS   no issues
-Website tests   PASS   330 passed, lines 96.47%
+Website tests   PASS   404 passed, lines 97.04%
 Lint            PASS   clean
 Build           PASS   frontend/dist
-Browser tests   PASS   23 passed, 1 skipped; screenshots in /tmp/tmp.ZorRKCN2S1
-Accessibility   PASS   axe on every tour screen, 4 tests, 48 scans, WCAG A/AA
+Browser tests   SKIP   local stack not running   (run by hand: 29 passed, 1 skipped)
+Accessibility   SKIP   local stack not running   (run by hand: 4 tour tests, 50 scans, WCAG A/AA, all passed)
 ```
 
-`demo.spec.js` and `timeline.spec.js`, which failed at the previous checkpoint, pass again
-with no code change: they read the seeded data, and at 21:36 Ana moved Apollo's Portal API
-and Go-live checklist back out of Done in the local app (audit rows 175 to 177).
+The one failure on the first browser run was a wrong test, not the app: `project-lifecycle.spec.js` clicked
+**Save** in the New project dialog, whose button has said **Create** since 13 Oct. The spec had always been
+skipped (it needs the admin password), so this was its first real run. Fixed to click **Create**; it then passed in 6.2 s.
 
 `tools/test-all.sh` looks up Maria's, Ana's and Sam's usernames in the local database, so every browser test runs except the README screenshots one (it only runs with `E2E_SCREENSHOTS=1`).
 

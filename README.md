@@ -85,7 +85,7 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
   holds the salary, so for everyone else `views.audit_view` leaves both state keys out,
   and the one-line summary never contains it (`test_history_never_shows_salary_to_a_manager`).
 
-### Data model (`backend/tracker/store/migrations/001_init.sql` to `004_over_capacity.sql`)
+### Data model (`backend/tracker/store/migrations/001_init.sql` to `005_sessions.sql`)
 
 `users`, `projects`, `assignments` (bookings, "Resources" on screen), `milestones`
 (deliverables), `milestone_dependencies`, `tasks`, `time_entries`, `project_requests`,
@@ -96,6 +96,8 @@ for the app, plus `schema_migrations`, which the migration runner keeps for itse
 task limit, overtime, other), with a check per kind; old rows default to new project.
 `004_over_capacity.sql` adds `time_entries.over_capacity` (default false): the entry was
 logged past capacity without overtime, after the person confirmed.
+`005_sessions.sql` adds the `refresh_tokens` table (only each token's SHA-256 is stored) and
+`users.password_changed_at`, so a password change, reset or archive ends older sessions.
 Money is integer cents. Nothing is deleted: a trigger refuses `DELETE` on every
 application table, and records are archived and reactivated instead.
 
@@ -203,8 +205,8 @@ frontend/src/
   rule: the Hours and Minutes boxes check whole numbers and the server's own limits (24 h
   of logged time, 1,000 h of estimate) so the dialog can say which box is wrong; the server
   still enforces both.
-- **Each signed-in page is its own file**, downloaded on its first visit (`lazyPage` in
-  `App.jsx`): the first download is 560 kB (177 kB gzip) instead of 739 kB. The sign-in
+- **Each signed-in page is its own file**, downloaded on its first visit (`lazyPage`, defined in
+  `frontend/src/components/lazyPage.js` and used in `App.jsx`): the first download is 560 kB (177 kB gzip) instead of 739 kB. The sign-in
   page stays in it. If a page's file can't be downloaded (offline, or a deploy replaced
   it), the page says so and offers **Reload** instead of going blank.
 - **Hash URLs** (`/#/projects/7`): the server only ever serves `index.html`, so CloudFront
@@ -266,8 +268,8 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 330 passed: Vitest + React Testing Library
-npm run test:coverage                     # 94.58% of statements, 96.47% of lines
+npm test                                  # 404 passed in 36 files: Vitest + React Testing Library
+npm run test:coverage                     # 95.5% of statements, 97.04% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
 ```
@@ -281,8 +283,12 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
   dependencies), and the dashboard at phone width has no sideways scrolling.
   `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
   `requests.spec.js`: an employee asks her line manager, he rejects it with a note from
-  To decide, and she reads the answer at phone width.
-- Against the rubric's goals: frontend 94.58% of statements (goal 80%); the demo journey end to end.
+  To decide, and she reads the answer at phone width. `timelog.spec.js`: Ben logs time,
+  Maria approves it, and the project's spent figure goes up. `project-lifecycle.spec.js`: an
+  admin creates, edits, archives and reactivates a project. `schedule.spec.js`: the Schedule
+  bars, the over week and the keyboard. 30 tests in 12 files; 29 passed and 1 (README
+  screenshots, only on request) skipped on 14 Oct; the screen tour runs axe on 50 scans.
+- Against the rubric's goals: frontend 95.5% of statements (goal 80%); the demo journey end to end.
 
 **Known gaps (the uncovered 3% of the backend, 5% of the frontend):**
 
@@ -299,8 +305,8 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
 - in the frontend, mostly the People screen's less-used paths: an
   admin editing a person, "Show archived" and paging; plus the Reactivate buttons for an
   archived project or person;
-- end to end covers the manager's demo journey and the phone layout; the employee
-  journey (log time, then a manager approves) is covered by screen tests, not end to end;
+- end to end covers the demo journeys, log time then approve, and an admin's project life
+  cycle; the forced password change at first sign-in has no browser test;
 - 2 of 16,184 requests at 25 users on AWS got no HTTP response (status 0) and are unexplained;
   the Lambda logged no error for them (below).
 
@@ -437,6 +443,10 @@ The first request after a deploy migrates Aurora and creates `AD000001`.
   endpoint, and our role can't create either. So a new or reset password is shown once to
   the admin and must be changed at first sign-in
   ([findings](./docs/superpowers/specs/2026-10-14-email-and-sms-findings.md)).
+- **Deliberately out of scope:** an installable or offline app (PWA), AI features and background
+  jobs. The brief's feature list names none of them, and nothing here is slow enough to need a
+  queue: every write finishes in one transaction in about 6 ms
+  ([requirements check](./docs/superpowers/specs/2026-10-14-requirements-check.md), gap 1).
 - **Known security gap.** Changing your own email needs no current password
   (`update_self`, `services/users.py`), which would matter once an emailed reset exists.
 

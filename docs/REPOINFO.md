@@ -3,14 +3,12 @@
 What to say to the Citi evaluators (15 Oct) and in later job interviews. It covers what to
 say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minute-demo).
 
-**Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
-final fix wave, the project-manager notifications and requests for everyone, the overtime warning, and 15-minute
-tokens with refresh, employee history, the dashboard's total counts, the OpenAPI file, the accessibility scan and pages loaded on first visit: 565 backend tests, 330 website tests, 24 Playwright tests (full `tools/test-all.sh` run, every row PASS). AWS was last checked at `a52da44`. Everything built since is committed
+**Last checked:** 14 Oct 2026, night, against branch `merge-prep` (David plus David2, merged) after the Schedule screen, k6, forms locked while saving, the "Saved" message, a refresh that survives a network blip, and the two critical-path browser tests: 565 backend tests, 404 website tests, 30 Playwright tests (29 passed, 1 skipped) and 50 axe scans. `tools/test-all.sh` steps 1 to 5 passed; its browser steps were run by hand against this branch's own site (see `docs/TESTING.md` section 6). AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
 pop-up, the three charts, the project manager being notified of an employee's project
 work, requests for everyone (migration 003), the overtime warning (migration 004), and
-15-minute access tokens with refresh tokens (migration 005), employee history, the dashboard's total counts, the axe fixes and pages loaded on first visit. Everything since `5e994e6` (this evening's work) is in that list too. Every number below says when it was measured. Every claim
+15-minute access tokens with refresh tokens (migration 005), employee history, the dashboard's total counts, the axe fixes and pages loaded on first visit. Everything since `5e994e6` (this evening's work and tonight's merge: Schedule, k6, forms locked while saving, "Saved", the refresh fix) is in that list too. Every number below says when it was measured. Every claim
 points at a file and line you can open.
 
 **Contents:** [1 Pitch](#1-the-pitch) · [2 Seven questions](#2-the-seven-questions) ·
@@ -34,7 +32,7 @@ points at a file and line you can open.
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
 > with Terraform. There are 565 backend tests running against a real Postgres database,
-> and 330 website tests."
+> and 404 website tests."
 
 ### 2 minutes
 
@@ -123,8 +121,8 @@ browser -> CloudFront (/api/tracker*) -> Lambda Function URL
   `function.py`, then `api/`, `services/`, `store/`, Postgres underneath, and `domain/`
   shared by every layer.
 
-**Point at:** `backend/tracker/function.py:58-71`, `api/app.py:37-50` (`dispatch`),
-`api/routes.py:128` (`match`), `api/errors.py:17-41`.
+**Point at:** `backend/tracker/function.py:58-71`, `api/app.py:41-54` (`dispatch`),
+`api/routes.py:129` (`match`), `api/errors.py:17-41`.
 
 ---
 
@@ -307,18 +305,18 @@ from the token."
   isn't flaky. Before the fix, the dummy hash had only 1,000 rounds and answered much faster.
 - **Tokens:** login returns two. The access token is a signed HS256 JWT (standard library
   only) that lasts **15 minutes** and carries only the user id and its issue time
-  (`services/tokens.py:21, 47-66`). Its secret is a Terraform `random_password`
+  (`services/tokens.py:20, 46-66`). Its secret is a Terraform `random_password`
   (`infra/secrets.tf:6`). The refresh token is 32 random bytes; only its SHA-256 is stored
   (`refresh_tokens`, migration 005). `POST /auth/refresh` swaps it for a new pair and
   retires the old one; every refresh token dies 8 hours after login
-  (`services/sessions.py:28, 55-78`).
+  (`services/sessions.py:30, 57-82`).
 - **Gate 1, the route table:** a role that may never do something gets a 403
-  (`api/routes.py`, checked at `api/app.py:32-33`).
+  (`api/routes.py`, checked at `api/app.py:36-37`).
 - **Gate 2, the services:** they check ownership. A project you can't see answers 404 with
   wording byte-identical to a missing one, so nobody can probe ids
   (`services/access.py:17-27`; test `test_api.py:163-167`).
 - **The role is re-read on every authenticated request** with one primary-key lookup, so a
-  demotion or an archive takes effect on the next request (`api/app.py:22-34`;
+  demotion or an archive takes effect on the next request (`api/app.py:22-38`;
   `services/actors.py:46-62`; test `test_api.py:145-152`).
 
 **If they push:**
@@ -358,7 +356,7 @@ from the token."
 - *"Can a manager see salaries?"* No. A manager who books someone could work out their rate
   from the planned cost, and the README says so (`README.md:356-357`).
 
-**Point at:** `backend/tracker/api/app.py:22-34`, `services/access.py`,
+**Point at:** `backend/tracker/api/app.py:22-38`, `services/access.py`,
 `services/passwords.py`, `services/tokens.py`, `services/sessions.py`.
 
 ---
@@ -366,8 +364,8 @@ from the token."
 ## 7. Testing
 
 **Headline (fresh, 14 Oct 2026):** "565 backend tests against a real Postgres database, at
-97% coverage, with the API layer at 100%. Plus 330 website tests at 94.58% of
-statements, and 24 Playwright browser tests."
+97% coverage, with the API layer at 100%. Plus 404 website tests at 95.5% of
+statements, and 30 Playwright browser tests."
 
 **What (three layers, plus the website):**
 
@@ -377,17 +375,17 @@ statements, and 24 Playwright browser tests."
 | 2. Rules | Each business rule behaves as specified | Calls the services directly; never imports `api` | e.g. `tests/backend/test_work.py` |
 | 3. API | All 69 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route is missed (the audit walk exempts only login, refresh, logout and marking notifications read) | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
 | Website | Screens behave correctly | Vitest + React Testing Library, with `fetch` stubbed (no database) | `frontend/src/**/*.test.jsx` |
-| Browser | The demo works in a real browser | Playwright: 24 tests in 9 files (one only takes README screenshots) | `frontend/e2e/` |
+| Browser | The demo works in a real browser | Playwright: 30 tests in 12 files (one only takes README screenshots) | `frontend/e2e/` |
 
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
 - **Fresh numbers, 14 Oct evening (full `tools/test-all.sh` run, after pages loaded on
-  first visit):** backend `565 passed in 35.19s`; coverage `2011 statements, 64 missed,
+  first visit):** backend `565 passed in 27.19s`; coverage `2011 statements, 64 missed,
   97%`. By folder: `api/` 100%, `function.py` 100%, `domain/` 99%, `services/` 96.0%,
-  `store/` 93.9%. Website: 33 files, `330 passed`. Website coverage: 94.58% of statements,
-  96.47% of lines, 92.07% of branches, 90.11% of functions. Lint, bandit and build: clean.
-  Playwright: 23 passed, 1 skipped (README screenshots), axe clean on 48 scans.
+  `store/` 93.9%. Website: 36 files, `404 passed`. Website coverage: 95.5% of statements,
+  97.04% of lines, 93.72% of branches, 91.4% of functions. Lint, bandit and build: clean.
+  Playwright: 29 passed, 1 skipped (README screenshots), axe clean on 50 scans.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
   `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
   later 14 Oct changes; none of its tests log time, type an estimate or click Copy.
@@ -553,12 +551,12 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **565 backend, 330 website, 24 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **565 backend, 404 website, 30 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **97% of statements** (95% with
-   branches), the API layer 100%. Website **94.58% statements, 96.47% lines, 92.07% branches,
-   90.11% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct evening in the full `tools/test-all.sh` run). Browser tests
+   branches), the API layer 100%. Website **95.5% statements, 97.04% lines, 93.72% branches,
+   91.4% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct evening in the full `tools/test-all.sh` run). Browser tests
    and load tests get no percentage, on purpose: their measure is journeys walked, and speed
    and failures. *Point at: `docs/TESTING.md` section 2*
 3. **"Selenium or Playwright?"** Playwright. It waits by itself for a button to be clickable
@@ -598,8 +596,8 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    SHA-256 stored) gets a new pair at `POST /auth/refresh` and is retired on use; reusing a
    rotated one ends every session of that user; `POST /auth/logout` revokes it; a password
    change, reset or archive ends the user's older sessions. The role is still re-read on
-   every request. *Point at: `services/tokens.py:21`; `services/sessions.py`;
-   `services/actors.py:59-61`; `api/app.py:22-34`; `frontend/src/services/request.js` (refresh once, retry once)*
+   every request. *Point at: `services/tokens.py:20`; `services/sessions.py`;
+   `services/actors.py:59-61`; `api/app.py:22-38`; `frontend/src/services/request.js` (refresh once, retry once)*
 10. **"Total number of projects?"** Built. The dashboard's two counters, **Total projects**
     and **Total at risk**, both come from the server and count every page, not just the 12
     cards shown: `GET /dashboard/projects` returns `total` and `atRiskTotal`, worked out from
@@ -612,9 +610,11 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     reactivate), and a Postgres trigger refuses any DELETE on every application table. The
     rubric's D in CRUD is met by archive; we haven't yet asked an evaluator whether that
     counts. **Built 14 Oct (not on AWS until the next deploy):** a manager asks an admin to archive a project from the Requests page; approving runs the same `archive_project`. *Point at: `store/migrations/001_init.sql:239-255`; `api/routes.py:68`; `services/requests.py` (`_apply`)*
-12. **"History for employees?"** Today an admin can open the audit log and filter by person,
-    record type and date, with before and after state. **Queued, not built:** a History tab
-    per person that their line manager can read. *Point at: `frontend/src/pages/audit/AuditLogPage.jsx:99-103`*
+12. **"History for employees?"** Built 14 Oct (not on AWS until the next deploy). **History** on
+    People and **My history** on Account show one person's trail from the audit log:
+    `GET /users/{id}/history` (admins, the person's line manager and the person; anyone else
+    gets 404). Only admins see the before/after state, so a salary never reaches a manager.
+    No migration. *Point at: `tests/backend/test_api.py` (`test_history_never_shows_salary_to_a_manager`); `frontend/e2e/history.spec.js`; `api/routes.py:58`*
 13. **"How are budgets calculated?"** Planned cost = booked hours per week, over the days of
     the booking, times the person's hourly rate (salary divided by 2,080 hours), added up per
     project. Spent = approved minutes times the hourly rate frozen on the entry when it was
@@ -625,7 +625,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     out): 3,982 lines of backend Python in 34 files (not counting the vendored database
     driver) and 5,030 lines of website code in 54 files. **Built 14 Oct (not on AWS until the
     next deploy):** each signed-in page is its own file, downloaded on its first visit
-    (`lazyPage` in `App.jsx`). The first download fell from one 739 kB file (227 kB gzip) to
+    (`lazyPage`, defined in `components/lazyPage.js` and used in `App.jsx`). The first download fell from one 739 kB file (227 kB gzip) to
     560 kB (177 kB gzip); the largest page file is the project page, 22 kB. A failed page
     download (offline, or a deploy replaced the file) shows a Reload message, not a blank
     screen. Vite still warns that the first file is over 500 kB: it holds react-dom (209 kB)
@@ -637,7 +637,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     *Point at: `frontend/src/App.jsx` (the `lazyPage` lines); `frontend/src/components/lazyPage.js`;
     `backend/tracker/domain/values.py` (`require`); `services/paging.py`*
 15. **"Guardrails: how do you know the requirements are met?"** Three layers: Postgres
-    refuses bad rows (47 CHECK rules, 27 foreign keys, one exclusion constraint, 10
+    refuses bad rows (50 CHECK rules, 29 foreign keys, one exclusion constraint, 11
     triggers); five integrity queries must return no rows and run after every database test
     and at `GET /admin/integrity-check`; and the role table decides who may call what. The
     requirements are traced to screens and tests. *Point at: `store/integrity.py`; `docs/superpowers/specs/2026-10-14-requirements-check.md`*
@@ -667,7 +667,7 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 19. **"Lighthouse or an accessibility scan?"** An axe scan, built 14 Oct (the two fixes
     not yet deployed). axe is the rule engine behind Lighthouse's accessibility score; the
     screen tour runs it on the sign-in page, every screen a manager and an employee open,
-    and the open phone menu, at desktop and phone width (48 scans), against every WCAG 2.0
+    and the open phone menu, at desktop and phone width (50 scans), against every WCAG 2.0
     to 2.2 A and AA rule axe has. A serious or critical problem fails the test. Its first
     run found two, both fixed: the side menu's `<ul>` held links with no `<li>` (a screen
     reader could not say "list, 9 items"), and empty weeks on the allocation grid were grey
@@ -677,14 +677,14 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     axe rules again. Besides the scan, the website tests find things by role and label,
     and fields are tied to their errors with `aria-describedby`.
     *Point at: `frontend/e2e/tour.spec.js` (the `scan` helper); `frontend/src/components/AppLayout.jsx` (`ListItem`); `frontend/src/pages/allocation/AllocationPage.jsx` (the colour)*
-20. **"A schedule and project plan like Float?"** Mostly built. The **Schedule** screen is
+20. **"A schedule and project plan like Float?"** Built (drag-to-schedule excepted). The **Schedule** screen is
     Float-style: people by weeks, a bar per booking in its project's colour ("Apollo · 25 h/wk"),
     over-booked weeks outlined in red with "+5 h over", a bar opens its project. It reads the
     allocation route, nothing new on the server. Colours are handed out once per visit, so past
     five projects a later page can show several in grey (each bar still names its project; the
     seed has fewer than six). The deliverables timeline shows each project's
     milestones against dates. Float has drag-to-schedule; we don't: bookings are edited in a
-    form. *Point at: `frontend/src/pages/schedule/SchedulePage.jsx`; `frontend/src/components/charts/TimelineChart.jsx`*
+    form. *Point at: `frontend/src/pages/schedule/SchedulePage.jsx`; `frontend/src/components/charts/TimelineChart.jsx`; `frontend/e2e/schedule.spec.js`*
 21. **"If someone logs too many hours: warn them, let them go ahead, flag the manager?"**
     Yes, built 14 Oct (not yet deployed). Without overtime allowed, the first answer is a
     409 with `code: "OVER_CAPACITY"` ("This puts you 2 h over your 40 h week. Log anyway?
@@ -710,11 +710,11 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
 | Database encrypted, in the VPC | Reading data at rest; direct internet access (no `publicly_accessible` setting, so AWS's private default; not re-checked from outside on 14 Oct) | `infra/rds.tf:20-22` | Came with the workshop repo |
 | Secrets generated by Terraform | A guessable or committed signing key or admin password | `infra/secrets.tf:6, 14`; injected at `infra/locals.tf:115-116` | We added the token key and admin password. The template's database password is a `random_pet` name (`infra/rds.tf:15`) |
 | Passwords hashed: PBKDF2, 600,000 rounds, random salt | A stolen database revealing passwords | `services/passwords.py:18, 27-44` | We added |
-| Signed access token (HS256), 15 min expiry | Forged or endless sessions | `services/tokens.py:21, 47-66` | We added |
+| Signed access token (HS256), 15 min expiry | Forged or endless sessions | `services/tokens.py:20, 46-66` | We added |
 | Refresh tokens: hashed, rotated, reuse ends every session, 8 h from login | A stolen token used for long; a copied refresh token | `services/sessions.py`; `store/migrations/005_sessions.sql` | We added (14 Oct; AWS after the next deploy) |
 | Password change, reset or archive ends older sessions | A thief keeping access after the password changes | `services/actors.py:59-61` (`password_changed_at`); `services/users.py:195, 213, 327` | We added (14 Oct; AWS after the next deploy) |
-| Role re-read from the database on every request | A demoted or archived person keeping access | `api/app.py:22-34`; `services/actors.py:46-62` | We added |
-| Forced password change at first login | Using the admin-generated password for real work | `api/app.py:30-31`; `api/routes.py:51-52` | We added |
+| Role re-read from the database on every request | A demoted or archived person keeping access | `api/app.py:22-38`; `services/actors.py:46-62` | We added |
+| Forced password change at first login | Using the admin-generated password for real work | `api/app.py:34-35`; `api/routes.py:51-52` | We added |
 | 404, never 403, with identical wording | Probing which ids exist | `services/access.py:17-27` | We added |
 | Unknown username costs the same hashing | Learning which usernames exist from reply time | `services/users.py:159-164` | We added (14 Oct; AWS after the next deploy) |
 | Parameterised SQL only | SQL injection | `store/postgres.py`; bandit B608 clean | We added |
@@ -769,7 +769,7 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
 ### Architecture
 
 6. **"Walk me through one request."** See [§3](#3-architecture). *`function.py:58-71`;
-   `api/app.py:37-50`*
+   `api/app.py:41-54`*
 7. **"Why one Lambda?"** One database, one rule set: one connection, one deploy, no
    duplicated code. *`infra/locals.tf` finds services by `backend/*/requirements.txt`*
 8. **"How are the layers separated?"** By import direction: nothing below `api` imports
@@ -814,12 +814,12 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
 
 19. **"Why JWT, not sessions?"** Lambda instances share no memory. The access token holds
     only the user id and issue time, and the role is re-read per request. The refresh
-    tokens are rows in Postgres, so any instance can check them. *`services/tokens.py:47-66`; `services/sessions.py`*
+    tokens are rows in Postgres, so any instance can check them. *`services/tokens.py:46-66`; `services/sessions.py`*
 20. **"Can you revoke a token?"** A refresh token, yes: Sign out revokes it
     (`POST /auth/logout`). Every session of a user ends on a password change, an admin
     reset or archiving them: their refresh tokens are revoked and access tokens issued
     before the change are refused. One access token can't be revoked alone; it dies within
-    15 minutes. *`services/sessions.py:85-96`; `services/actors.py:59-61`; `api/app.py:28-29`*
+    15 minutes. *`services/sessions.py:85-96`; `services/actors.py:59-61`; `api/app.py:29-33`*
 21. **"Privilege escalation?"** Only admins create users or change roles. Nobody changes
     their own role or salary. *`services/users.py:233-239`; `api/routes.py:55-62`*
 22. **"Where are the secrets?"** Terraform generates them and passes them in as Lambda
@@ -907,7 +907,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Every API route is tested over HTTP" | "Every route is called in-process with a Lambda-shaped event; real HTTP is covered by the demo script and Playwright" | `test_api.py` calls `app.dispatch()` |
 | "The uncovered 3% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:248` |
 | "The rule tests prove the layers are separate" | "The rule tests show services don't need HTTP; the import direction is what keeps them separate" | No test enforces imports |
-| "Real Postgres, not mocks" (right after "330 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
+| "Real Postgres, not mocks" (right after "404 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
 | "The staircase went up to 11 s" | "Up to about 10 s in the logs (9.8 s)" | 7 to 11 s was the load-test client's `max` column |
 | "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:278-279` |
@@ -929,30 +929,32 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 **Gaps and next steps, in order:**
 
-1. A browser test of the employee journey: log time, then a manager approves it.
-2. Concurrency tests for the exclusion constraint and the advisory lock (the two claim
+1. Concurrency tests for the exclusion constraint and the advisory lock (the two claim
    row locks are done).
-3. Tests for the five untested rules, and for the database dropping mid-request.
-4. RDS Proxy, and risk sorting in SQL so the dashboard pages in the database.
-5. Security: the current password before an email change; the refresh token in an
+2. Tests for the five untested rules, and for the database dropping mid-request.
+3. RDS Proxy, and risk sorting in SQL so the dashboard pages in the database.
+4. Security: the current password before an email change; the refresh token in an
    HttpOnly cookie instead of `sessionStorage` (needs a proxy change locally). (Built 14 Oct:
    15-minute tokens, refresh tokens, and a password change ending old sessions. Login timing for unknown
    usernames was fixed on 14 Oct in the working tree, on AWS after the next backend
    deploy; see [§6](#6-security).)
-6. Email: a private endpoint to SES and a single-use, expiring set-password link
+5. Email: a private endpoint to SES and a single-use, expiring set-password link
    ([findings](superpowers/specs/2026-10-14-email-and-sms-findings.md)).
-7. The pull board (**Take this**, a per-person task limit) is **built**
-   ([spec](superpowers/specs/2026-10-14-pull-board-design.md)); still to do: deploy it
-   to AWS and check it there. Known gap: a manager cannot put a task back to Ready from
+6. Deploy everything built since `a52da44` (the pull board, tokens with refresh, requests,
+   Schedule, k6 and the rest) to AWS and check it there; then run k6 on AWS. The pull board
+   ([spec](superpowers/specs/2026-10-14-pull-board-design.md)) is built. Known gap: a manager cannot put a task back to Ready from
    the screen (the Assign dialog has no empty choice); the API allows it
    (`PATCH /tasks/{id}` with `assigneeUserId: null`).
-8. Small website bugs:
+7. Small website bugs:
    - "Mark all as read" is enabled based only on the current page; the server marks all;
-   - approving an already-decided entry again is allowed (`services/time_entries.py:146-166`).
-9. Unexplained: 2 of 16,184 load-test requests got no response.
-10. Ask the evaluators whether archive counts as the D in CRUD.
-11. (d) History charts: a burn-up chart (work done over time) and budget spent over time.
+   - approving an already-decided entry again is allowed (`services/time_entries.py:165-185`).
+8. Unexplained: 2 of 16,184 load-test requests got no response.
+9. Ask the evaluators whether archive counts as the D in CRUD.
+10. (d) History charts: a burn-up chart (work done over time) and budget spent over time.
     Both need history the API doesn't keep (no snapshots per day or week).
+11. Deliberately not built: an installable or offline app (PWA), AI features and background
+    jobs. Nothing in the app is slow enough to need a queue; the reasons are in
+    [the requirements check](superpowers/specs/2026-10-14-requirements-check.md).
 
 **The AI-use answer:**
 
@@ -976,8 +978,8 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 | Number | What | Measured |
 | --- | --- | --- |
 | 565 / 97% | Backend tests / coverage (API layer 100%) | 14 Oct, evening |
-| 330 / 94.58% | Website tests / statements (96.47% of lines) | 14 Oct, evening |
-| 24 / 48 | Playwright tests in 9 files (23 run, 1 README-screenshot test skipped) / axe scans, all clean | 14 Oct, evening |
+| 404 / 95.5% | Website tests / statements (97.04% of lines) | 14 Oct, evening |
+| 30 / 50 | Playwright tests in 12 files (29 run, 1 README-screenshot test skipped) / axe scans, all clean | 14 Oct, evening |
 | 69 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 11 + 1 | Tables: eleven for the app (with `refresh_tokens`), plus `schema_migrations` | 14 Oct, after migration 005 |
@@ -1008,7 +1010,7 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 | File | Why |
 | --- | --- |
 | `api/routes.py` | The one route table: method, path, roles |
-| `api/app.py` | `dispatch` and `authorise`; role re-read at `:22-33` |
+| `api/app.py` | `dispatch` and `authorise`; role re-read at `:22-38` |
 | `api/errors.py` | The one error-to-status table |
 | `services/access.py` | 404, not 403, for what isn't yours |
 | `services/audit.py` | `record_change`: audit row plus notifications |

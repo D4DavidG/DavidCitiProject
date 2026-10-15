@@ -1,4 +1,6 @@
-# Requirements check (14 Oct 2026, afternoon)
+# Requirements check (14 Oct 2026, afternoon; statuses updated that night)
+
+**Status update, 14 Oct night (merged branch `merge-prep`).** The rows below were written in the afternoon. Rows that changed since are marked **(night)** and carry the new evidence; the afternoon wording is kept where it explains the history. What changed: bell polling 30 s to 10 s; 15-minute tokens with refresh (**MET**); employee history built; Schedule screen built; forms locked while saving; a "Saved" message after every change; log-time-then-approve and project life cycle browser tests; k6; axe scan in the tour; pages load on first visit; the README's out-of-scope line for PWA, AI features and background jobs. Line-number citations to README.md and test files are the afternoon's and may have drifted; the new ones were checked tonight. Counts tonight: 565 backend, 404 website in 36 files, 30 browser tests in 12 files (29 passed, 1 skipped), 50 axe scans.
 
 What this is: every line of the workshop rubric and of `MVP.md`, checked against the code
 as it stands on branch `David` (written against commit `88a052d` plus the pull board work
@@ -10,21 +12,21 @@ with the evidence, and for PARTLY or MISSING the smallest thing that would close
 - **`oldmvp.md` is the rubric, unchanged.** `diff oldmvp.md docs/full-stack.md` prints
   one difference: `oldmvp.md` has no newline after the final `</nav>` (line 395). Every
   word is the same, so checking `docs/full-stack.md` checks both.
-- **Everything in `MVP.md` is built.** Two items are thinner than their wording: no
-  deliverable *timeline* drawing (question 4 shows due dates in a list), and "search and
-  filter on every list" holds for the main lists only.
+- **Everything in `MVP.md` is built.** Two items were thinner than their wording in the
+  afternoon: no deliverable *timeline* drawing (built since: night), and "search and
+  filter on every list" holds for the main lists only (still true).
 - **Against the rubric:** the core is met and tested: CRUD, validation, error shape,
   roles, persistence, responsive layout, deploy scripts, load test. The gaps are of three
   kinds:
-  1. **Departures we chose:** archive instead of DELETE/204, PATCH instead of PUT, no
-     refresh token.
+  1. **Departures we chose:** archive instead of DELETE/204, PATCH instead of PUT. (Night:
+     the refresh token is built, so it is no longer a departure.)
   2. **Rubric extras we haven't built:** offline install (PWA), AI features, background
-     (async) jobs.
-  3. **End-to-end tests:** the browser tests cover the manager's read journey and the
-     pull board, not yet the other write journeys (log time then approve; create then
-     archive).
-- **Coverage, measured today:** backend 96%, API layer 100%, frontend 93.6% statements
-  and 95.2% lines. Every number-based goal is met. "100% of critical paths end to end" is
+     (async) jobs. (Night: the README now says so under "Trade-offs and assumptions".)
+  3. **End-to-end tests:** (night) now built: `timelog.spec.js` (log time then approve) and
+     `project-lifecycle.spec.js` (create, edit, archive, reactivate). Only the forced
+     password change at first sign-in has no browser test.
+- **Coverage, measured tonight:** backend 97%, API layer 100%, frontend 95.5% statements
+  and 97.04% lines (afternoon: 96%, 100%, 93.6%, 95.2%). Every number-based goal is met. "100% of critical paths end to end" is
   only partly met (see Testing).
 - **README test count:** `README.md:224` said 231 website tests when this was written; by
   14:48 the other workflow had changed it to 233, which matches today's run.
@@ -33,11 +35,11 @@ with the evidence, and for PARTLY or MISSING the smallest thing that would close
 
 | Goal (rubric `docs/full-stack.md:105-111`) | Target | Measured | Command and output |
 | --- | --- | --- | --- |
-| Backend components | 80% | **96%** (1,847 statements, 73 missed) | `.venv/bin/pytest --cov=backend/tracker -q`: `TOTAL 1847 73 96%`, `423 passed in 27.53s` |
-| Frontend components | 80% | **93.62% statements, 95.18% lines** (branches 89.94%, functions 89.29%) | `npx vitest run --coverage`: `Tests 233 passed (233)` |
+| Backend components | 80% | **97%** (2,011 statements, 64 missed) (night; afternoon: 96%, 1,847 statements) | `bash tools/test-all.sh`: `TOTAL 2011 64 97%`, `565 passed in 27.19s` |
+| Frontend components | 80% | **95.5% statements, 97.04% lines** (branches 93.72%, functions 91.4%) (night; afternoon: 93.62% and 95.18%) | `npm run test:coverage`: `Tests 404 passed (404)`, 36 files |
 | API endpoints, all CRUD | 90% | **100%** of `api/` plus `domain/errors.py` (335 statements, 0 missed; `api/` alone 321): routing, handlers, error map | `.venv/bin/coverage report --include='backend/tracker/api/*,backend/tracker/domain/errors.py'`: `TOTAL 335 0 100%` |
 | Error handling (validation and error cases) | 90% | **100%** of the error map (`api/errors.py`, `domain/errors.py`). Most of the 73 missed backend lines are guard branches for ids that don't exist (`README.md:240-256`) | same command as the row above |
-| Critical user paths, end to end | 100% | **PARTLY**: see the Testing table | `frontend/e2e/*.spec.js` |
+| Critical user paths, end to end | 100% | **MET except one** (night): see the Testing table (T9) | `frontend/e2e/*.spec.js` |
 
 Note: the first frontend coverage run today showed `1 failed | 231 passed (232)`. That
 run overlapped the other workflow's own vitest run and file edits. The rerun straight
@@ -62,13 +64,13 @@ failing test.
 | 3.2 | Errors, validation and edge cases in both layers | MET | Server: `api/errors.py:17-29`; browser: `components/FormDialog.jsx:94-132` | |
 | 3.3 | Naming, formatting, lint | MET | `npm run lint` clean (CLAUDE.md trap 5); CI runs bandit (`.github/workflows/python.actions.yml:27`) | |
 | 3.4 | Reuse over copy-paste | MET | `DataTable` (table on desktop, cards on phone), `FormDialog`, `services/format.js`, `services/paging.py` | |
-| 4.1 | Unit and integration tests for business logic and API | MET | 423 backend tests: `tests/backend/test_work.py`, `test_api.py`, both walk tests | |
-| 4.2 | Frontend core journeys and error states | MET | 233 Vitest + RTL tests; refusals shown as written (`README.md:230-233`) | |
+| 4.1 | Unit and integration tests for business logic and API | MET | 565 backend tests (night; 423 in the afternoon): `tests/backend/test_work.py`, `test_api.py`, both walk tests | |
+| 4.2 | Frontend core journeys and error states | MET | 404 Vitest + RTL tests (night; 233 in the afternoon); refusals shown as written (`README.md:230-233`) | |
 | 4.3 | Manual validation, UI through to the database | MET | `docs/superpowers/plans/2026-10-13-manual-verification.md`; `tools/demo.py demo` ends on the integrity check | |
 | 4.4 | Test commands, results and gaps documented | MET | `README.md:190-256`; `docs/TESTING.md` | |
 | 5.1 | Set up locally with documented commands | MET | `README.md:172-188`; CLAUDE.md §4 | |
 | 5.2 | README covers architecture, trade-offs, assumptions | MET | `README.md:35-170`, `336-367` | |
-| 5.3 | Clear loading, success and failure feedback | PARTLY | Loading and failure: `components/PageState.jsx:9` (spinner, error with Retry, empty). Success: mostly implied (the dialog closes and the list refreshes); an explicit message only on Requests (`RequestsPage.jsx:87`) | Show an MUI `Snackbar` saying "Saved" when `FormDialog` succeeds |
+| 5.3 | Clear loading, success and failure feedback | **MET (night)** | Loading and failure: `components/PageState.jsx:9` (spinner, error with Retry, empty). Success: after every successful change the layout shows "Saved" for 3 seconds (`components/AppLayout.jsx:53-118`, fed by `onWrite` in `services/request.js`). Afternoon status: PARTLY, only Requests said anything | |
 | 5.4 | Ownership, communication, pragmatic decisions | MET | `docs/OVERNIGHT-REPORT.md`, `docs/GUIDE.md`, the decision table in CLAUDE.md | |
 
 ### Testing expectations (`full-stack.md:86-111`)
@@ -80,10 +82,10 @@ failing test.
 | T3 | Error tests for CRUD | MET | `test_api.py:177` (bad JSON is 400), `test_api_read_walk.py:206` (bad query is 400 naming the field), `:226` (a crash is a bare 500) | |
 | T4 | Component tests (Jest + RTL) | MET | Vitest + RTL, Jest-compatible (CLAUDE.md §8); `*.test.jsx` beside each screen | |
 | T5 | API service tests with mocked responses | MET | `services/request.test.js` (fetch stubbed) | |
-| T6 | End-to-end tests (Cypress or Selenium) | MET (Playwright) | `e2e/demo.spec.js:37`, `pull.spec.js:69`, `tour.spec.js:47,74`. Playwright fills the same role as Selenium | |
-| T7 | Load test (Artillery or JMeter) | MET (k6) | `tools/k6/load.js` (`docs/TESTING.md` section 7); the earlier `tools/loadtest.py` was removed on 14 Oct because k6 covers the same reads and logins; on AWS 13 Oct, 25 users, 16,184 reads, 539 req/s, 2 failed (`README.md:269-275`) | Run k6 on AWS |
+| T6 | End-to-end tests (Cypress or Selenium) | MET (Playwright) | 30 tests in 12 files (night): `e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `history.spec.js`, `tour.spec.js`, `schedule.spec.js`, `timelog.spec.js`, `project-lifecycle.spec.js` and the chart specs. Playwright fills the same role as Selenium | |
+| T7 | Load test (Artillery or JMeter) | MET (k6) | `tools/k6/load.js` (`docs/TESTING.md` section 7); the earlier `tools/loadtest.py` was removed on 14 Oct because k6 covers the same reads and logins; on AWS 13 Oct (measured with the removed script), 25 users, 16,184 reads, 539 req/s, 2 failed (README, "Load test") | Run k6 on AWS |
 | T8 | Performance monitoring | PARTLY | CloudWatch `REPORT` lines, 6 ms p50 inside Lambda (`README.md:276-277`); `tools/console.py logs`; no dashboard or alarm | Name the CloudWatch log command in the README (one line) |
-| T9 | Critical user paths 100% end to end | PARTLY | Covered: sign-in, the seven questions (`demo.spec.js:37`), phone layout (`:67`), pull board (`pull.spec.js:69`), every screen for every role (`tour.spec.js:47`), deep-link refresh (`:74`). **Not covered:** an employee logs time and the manager approves it (`README.md:253-254`); an admin creates, edits, archives and reactivates a project; the forced password change at first sign-in | One Playwright spec per missing journey (gaps 4 and 5 below) |
+| T9 | Critical user paths 100% end to end | **MET except one (night)** | Covered: sign-in, the seven questions (`demo.spec.js`), phone layout, pull board (`pull.spec.js`), every screen for every role with an axe scan (`tour.spec.js`), deep-link refresh, **an employee logs time and the manager approves it** (`timelog.spec.js`), **an admin creates, edits, archives and reactivates a project** (`project-lifecycle.spec.js`). **Still not covered:** the forced password change at first sign-in. Afternoon status: PARTLY | A spec for the forced change |
 
 ### Implementation expectations (`full-stack.md:164-381`)
 
@@ -93,9 +95,9 @@ failing test.
 | --- | --- | --- | --- |
 | Store and manage data | MET | 11 tables plus `schema_migrations`, `store/migrations/001_init.sql`, `005_sessions.sql` | |
 | Authenticate and authorise | MET | See section 6 below | |
-| API endpoints | MET | 66 routes, `api/routes.py:46-122` | |
+| API endpoints | MET | 69 routes (night; 66 in the afternoon), `api/routes.py` | |
 | Business logic | MET | `services/`; rules listed in `MVP.md:86-105` | |
-| Real-time | PARTLY | The bell polls every 30 s, and at once after a write made in the same tab (`components/NotificationBell.jsx:7`, `:24`); no push. David saw the delay in practice (notes.txt:5) | WebSockets researched: not possible on the workshop account (`2026-10-14-websockets-findings.md`). Recommended instead: poll every 10 s while the tab is visible, check on return to the tab, and show a Snackbar (`2026-10-14-notification-delay-findings.md`, section 6) |
+| Real-time | PARTLY (night: poll is now 10 s) | The bell asks every 10 s while the tab is visible (`POLL_MS`, `components/NotificationBell.jsx:8`), at once on returning to the tab, and after a write made in the same tab, and shows a pop-up when the count rises; no push. Afternoon status: 30 s | WebSockets researched: not possible on the workshop account (`2026-10-14-websockets-findings.md`), so polling stays |
 | Async tasks where sync isn't feasible | DELIBERATELY DIFFERENT | Nothing needs it: every write finishes inside one transaction in about 6 ms. The Lambda has a dead-letter queue (`infra/lambda.tf:42`), but nothing runs in the background | One README sentence: no work in the app is slow enough to need a queue |
 | Reliability, high availability | MET | Lambda + Aurora Serverless v2; advisory-lock migrations; 503 when the database is down (`api/errors.py:27`) | |
 | Security, performance | MET | PBKDF2 at 600k rounds; role re-read from the database; load test | |
@@ -144,17 +146,17 @@ failing test.
 | Expectation | Status | Evidence | Smallest fix |
 | --- | --- | --- | --- |
 | Responsive and adaptive | MET | `theme/responsive.js:1-8` (react-responsive); `tour.spec.js:47` at phone width | |
-| High performance | PARTLY | One 703 KB JavaScript file (`frontend/dist/assets/index-*.js`, built 14 Oct 14:22) | **Queued:** split the code per screen (`React.lazy`) |
-| Real-time data | PARTLY | 30 s polling (as above) | As above: 10 s visible polling plus a Snackbar |
-| Accessibility | MET (not re-checked with a screen reader) | Contrast notes (`theme.js:6-14`); `aria-describedby` on fields (`FormDialog.jsx:52`); tests find elements by role and name; no axe scan | Optional: add `@axe-core/playwright` to the tour |
-| State and feedback | PARTLY | as 5.3 | Snackbar |
+| High performance | **MET (night)** | Each signed-in page is its own file (`lazyPage`, defined in `components/lazyPage.js`): first download 739 kB to 560 kB. Afternoon status: one 703 KB file | |
+| Real-time data | PARTLY (night: 10 s) | 10 s polling plus a pop-up (as above) | |
+| Accessibility | MET (night: not tried with a screen reader) | Contrast notes (`theme.js:6-14`); `aria-describedby` on fields; tests find elements by role and name; **an axe scan in the tour: 50 scans, no serious or critical problems** (`e2e/tour.spec.js:51,68`) | |
+| State and feedback | **MET (night)** | as 5.3 | |
 | PWA | MISSING | No manifest or service worker (`frontend/public` holds only two SVGs) | Say it's out of scope in the README; a manifest alone would make it installable, but not offline |
 | AI features | MISSING | None | Say it's out of scope in the README; "intelligent features" aren't in the brief's feature list |
 | Required fields marked | MET | `required` on fields (`FormDialog.jsx:50,154`), which shows MUI's asterisk | |
 | Validate before submit | MET | Native `required` plus checks on money and duration (`FormDialog.jsx:97-114`) | |
 | Error next to its field | MET | `helperText` (`FormDialog.jsx:42,162`) | |
 | No submit until valid | MET | `if (Object.keys(problems).length) return` (`FormDialog.jsx:118`) | |
-| Loading disables the form | PARTLY | Only the submit button is disabled while saving (`FormDialog.jsx:175`); the fields stay editable | Wrap the fields in `<fieldset disabled={busy}>` (gap 3) |
+| Loading disables the form | **MET (night)** | While saving, every field and both buttons are disabled (`FormDialog.jsx:158,175,187-188`); confirm dialogs, sign-in, change-password, sign-off and My tasks cards do the same. Afternoon status: PARTLY | |
 
 **6. Authentication, authorisation and roles (`:302-333`)**
 
@@ -166,7 +168,7 @@ failing test.
 | Secure login (JWT) | MET | `services/tokens.py` | |
 | Password hashing | MET | PBKDF2-SHA256, 600k rounds (`README.md:104-106`) | |
 | A token on every endpoint | MET | `test_api.py:111` (every non-public route needs one); today, no token gave `401` | |
-| Token expiry **and refresh** | PARTLY | Expiry: 8 h (`tokens.py:20`; `test_security.py:68`). Refresh: none, by decision (`MVP.md:127`, `README.md:348-349`) | **Queued:** 15-minute token plus refresh (notes.txt:15) |
+| Token expiry **and refresh** | **MET (night)** | Access token 15 minutes (`tokens.py:20`); refresh token rotated on each use, 8 hours from login, reuse ends every session (`services/sessions.py:30, 57-82`); `POST /auth/refresh` and `/auth/logout`; the website refreshes once on a 401 and keeps the session through a network blip (`services/request.js`). Afternoon status: PARTLY, 8 h token and no refresh | |
 | Middleware before CRUD | MET | `api/app.py` runs before every handler | |
 | Clear error for a bad or expired token | MET | "Your session is invalid or has expired. Please sign in again." (`tokens.py:21`) | |
 | Roles defined | MET (named differently) | Admin, Manager, Employee (`routes.py:21`), not the rubric's example of Admin, Manager, Contributor, Viewer | |
@@ -186,7 +188,7 @@ PATCH for PUT and `POST /{id}/archive` for DELETE (see API design above).
 | 14 | Q1 status of each project | MET | `GET /dashboard/projects`, `/projects`; `DashboardPage.jsx`, `ProjectsPage.jsx`; `demo.spec.js:37` |
 | 15 | Q2 at risk, with the reason | MET | `GET /dashboard/at-risk`; `test_dashboard.py:59` |
 | 16 | Q3 allocation grid | MET | `GET /dashboard/allocation`; `AllocationPage.jsx` |
-| 17 | Q4 deliverables: progress, **timeline**, sign-off | PARTLY | Progress and sign-off: MET (`DeliverablesTab.jsx`, `test_work.py:68-87`). Timeline: a list ordered by position, then due date (`milestones.py:77`), with no drawn timeline. **Queued:** the dashboard graphs (`docs/superpowers/plans/2026-10-14-dashboard-graphs.md`). Smallest fix: change the MVP wording to "due dates" |
+| 17 | Q4 deliverables: progress, **timeline**, sign-off | **MET (night)** | Progress and sign-off: `DeliverablesTab.jsx`, `test_work.py:68-87`. Timeline: the drawn deliverables timeline on each project (`components/charts/`, `e2e/timeline.spec.js`). Afternoon status: PARTLY, a list with no drawn timeline |
 | 18 | Q5 over-allocated, flagged | MET | `?overOnly=true`; `demo.spec.js` (Ben "Over-allocated", Apollo 25 h, Zeus 20 h) |
 | 19 | Q6 dependency view | MET | `GET /projects/{id}/dependency-graph`; `DependencyPage.jsx`; `demo.spec.js` (Launch blocked) |
 | 20 | Q7 budget bar | MET | `GET /projects/{id}/budget`; `BudgetBar.jsx`; `BudgetTab.jsx`. Demo gap: no seeded project is over budget (set Zeus's budget to $2,000 live) |
@@ -215,7 +217,9 @@ PATCH for PUT and `POST /{id}/archive` for DELETE (see API design above).
 | 103-105 | Rule 9: integrity check | MET | `GET /admin/integrity-check`; `test_integrity.py` |
 | 109-116 | Money and risk formulas | MET | `services/dashboard.py`; `domain/money.py` |
 | 120-123 | Screens list | MET | `frontend/src/pages/*`: all 12 listed screens, plus My account |
-| 127-130 | Out of the MVP | MET (as scoped) | Dark mode, refresh tokens, email: absent, as listed |
+| 127-130 | Out of the MVP | MET (as scoped; night: refresh tokens have since been built) | Dark mode and email: absent, as listed |
+| (night) | Schedule: people by weeks, a bar per booking | MET, new | `pages/schedule/SchedulePage.jsx`; `e2e/schedule.spec.js`; managers and admins only. Not in the afternoon list |
+| (night) | Employee history | MET, new | `GET /users/{id}/history`; `e2e/history.spec.js` |
 
 ## 3. CLAUDE.md, "The brief's feature list"
 
@@ -228,11 +232,13 @@ Each row matches a row above, so this is only a cross-reference.
 | CRUD: projects, deliverables, resources, budget | MET (D = archive) | MVP lines 28-31 |
 | Search and filter | PARTLY | MVP line 32 |
 | Responsive design | MET | MVP line 33 |
-| "Real-time visibility" | PARTLY (polling, as decided) | Rubric section 1, real-time |
+| "Real-time visibility" | PARTLY (polling every 10 s, as decided) | Rubric section 1, real-time |
 | Git, Terraform, shell scripts, AWS serverless | MET | `bin/*.sh`, `infra/`; rubric 1.4 |
 | Deliverables labelled "Deliverables", resources labelled "Resources" | MET | `DeliverablesTab.jsx`, `ResourcesTab.jsx` |
 
 ## Already queued (not counted as gaps here)
+
+Night update: every item in this table is now built and committed (none is on AWS yet).
 
 | Item | Closes | Source |
 | --- | --- | --- |
@@ -245,6 +251,8 @@ Each row matches a row above, so this is only a cross-reference.
 | Faster bell: 10 s visible polling, check on return, Snackbar (WebSockets ruled out, research done) | Real-time | notes.txt:5,38; `2026-10-14-websockets-findings.md`; `2026-10-14-notification-delay-findings.md` |
 
 ## Gaps worth closing before the demo (smallest first)
+
+Night update: gaps 1, 3, 4 and 5 are closed (1: README, "Trade-offs and assumptions"; 3: forms locked while saving; 4: `frontend/e2e/timelog.spec.js`; 5: `frontend/e2e/project-lifecycle.spec.js`). Gap 2 (ask an evaluator about archive) is still open. The text below is the afternoon's.
 
 1. **Say "not built, on purpose" for PWA, AI features and background jobs.** Add three
    lines under "Trade-offs" in `README.md`. Evaluators tick these off the rubric's list,

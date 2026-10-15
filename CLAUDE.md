@@ -12,7 +12,7 @@ David.
 **Rule:** if something here goes out of date, fix it in the same commit as the code that
 outdated it.
 
-### Where things stand (updated 14 Oct, evening)
+### Where things stand (updated 14 Oct, night)
 
 - **Built:** backend, database and every website screen in `MVP.md`, plus everything
   below. **AWS was last checked at `a52da44`** (14 Oct, about 09:30). Everything
@@ -27,7 +27,7 @@ outdated it.
     timeline on each project, a budget chart and this week's workload on the dashboard,
     `components/charts/`), and an employee's project work notifying the project's manager
     too (`services/audit.py`).
-  - **14 Oct, evening (everything since `5e994e6`):**
+  - **14 Oct, evening (everything since `5e994e6`, on branch `David`):**
     - **requests for everyone** (migration `003_request_kinds.sql`; spec
       `docs/superpowers/specs/2026-10-14-requests-design.md`): employees ask their line
       manager for a higher task limit, overtime or anything else; managers ask the admins
@@ -58,15 +58,33 @@ outdated it.
       each signed-in page is its own file (`components/lazyPage.js`), first download
       739 kB to 560 kB, with a Reload message if a page's file can't be fetched; one
       `Pager` (in `PageState.jsx`) and `values.require` replace copied code.
-- **Tests (full run of `bash tools/test-all.sh`, 14 Oct evening, every row PASS):**
-  565 backend (97% of statements, 95% with branches; `api/` 100%), 330 website in 33
-  files (94.58% of statements, 96.47% of lines), lint, bandit and the production build
-  clean, and 24 Playwright browser tests in 9 files (23 passed, 1 skipped: the README
+  - **14 Oct, night (branch David2, merged in; none of it on AWS yet):**
+    - the **Schedule** screen (managers and admins; people by weeks, a bar per booking in
+      its project's colour, over weeks outlined; `pages/schedule/`);
+    - **forms locked while saving**: every field and button is disabled while a form,
+      confirm dialog, sign-in or change-password request is in flight, so one press sends one
+      request (`components/FormDialog.jsx`);
+    - a **"Saved"** message after every successful change (`components/AppLayout.jsx`);
+    - **refresh no longer signs you out on a network blip**: only an answer from
+      `/auth/refresh` that says the token is dead ends the session (`services/request.js`);
+    - the **k6 load test** `tools/k6/load.js`, replacing `tools/loadtest.py` (deleted);
+    - **template cleanup**: the Vite template's unused files and the workshop's other-track
+      guides and examples (`data/`, the Java and Node examples) removed;
+    - the browser specs `schedule.spec.js`, `timelog.spec.js` (log time, approve, spent
+      goes up) and `project-lifecycle.spec.js` (create, edit, archive, reactivate); the last
+      two write data, so local only;
+    - a **backend comments pass** (shorter docstrings, no code change).
+- **Tests (merged branch, 14 Oct night: `bash tools/test-all.sh` steps 1 to 5 PASS; the browser steps were run by hand against this branch's own site on port 3002, because the script's site on port 3000 served another folder's code):**
+  565 backend (97% of statements, 95% with branches; `api/` 100%), 404 website in 36
+  files (95.5% of statements, 97.04% of lines), lint, bandit and the production build
+  clean, and 30 Playwright browser tests in 12 files (29 passed, 1 skipped: the README
   screenshots run only on request). `e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js`
   takes and puts back a task; `e2e/requests.spec.js` asks and answers a request;
   `e2e/history.spec.js` reads a person's history; `e2e/tour.spec.js` screenshots every
-  screen at desktop and phone width and runs axe on it (48 scans; serious or critical
-  WCAG A/AA problems fail); `timeline`, `budget` and `workload` specs check the charts.
+  screen at desktop and phone width and runs axe on it (50 scans; serious or critical
+  WCAG A/AA problems fail); `timeline`, `budget` and `workload` specs check the charts; `schedule.spec.js` checks the
+  Schedule bars; `timelog.spec.js` and `project-lifecycle.spec.js` walk log-time-then-approve
+  and an admin's project life cycle.
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);
@@ -83,8 +101,7 @@ outdated it.
   - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
     email or texts (role and network), and the design for any future reset flow;
   - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
-    a per-person task limit), built 14 Oct (69 routes now; five migration files, the latest
-    `005_sessions.sql`).
+    a per-person task limit), built 14 Oct (69 routes; five migration files, 001 to 005).
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
   and cleanup scripts, and `terraform apply`/`destroy`. Every other shell command runs
@@ -92,8 +109,8 @@ outdated it.
   that line to go back). Hand him the exact commands for the denied ones.
 - **Open items:**
   - deploy everything committed since `a52da44` (see **Built**): `git push origin David`,
-    then `./bin/deploy-backend.sh` (migrations 002 to 005 on the first cold start) and
-    `./bin/deploy-frontend.sh`, both together (the old website knows no refresh and
+    `./bin/deploy-backend.sh` (migrations 002 to 005 on the first cold start),
+    `./bin/deploy-frontend.sh`; deploy both together (the old website knows no refresh and
     would sign out after 15 min);
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
@@ -655,8 +672,7 @@ terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first 
 
 ## 12. Safe to ignore
 
-- `data/`, `infra/eks.tf`, `infra/helm/`, and `infra/documentdb.tf` (off by default).
-- `backend/_examples/java-service` and `backend/_examples/nodejs-service`.
+- `infra/eks.tf`, `infra/helm/`, and `infra/documentdb.tf` (off by default).
 - Every guide in `docs/` except `full-stack.md` and `validation.md`.
 - Jupyter, Spark, Trino, kubectl and Helm, which `setup-environment.sh` installs for
   other tracks. Their install failures don't matter to us.
