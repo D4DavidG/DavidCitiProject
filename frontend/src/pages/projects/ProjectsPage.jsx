@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link, useNavigate } from 'react-router'
-import { Box, Button, Chip, FormControlLabel, MenuItem, Link as MuiLink, Pagination, Switch, TextField } from '@mui/material'
+import { Box, Button, Chip, FormControlLabel, MenuItem, Link as MuiLink, Switch, TextField } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
 import { useAuth } from '../../auth/useAuth'
 import { formatCents, formatDate } from '../../services/format'
@@ -111,11 +111,7 @@ export default function ProjectsPage() {
 
       <PageState loading={loading} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={data?.items ?? []} rowKey="projectId" label="Projects" empty="No projects match." />
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
 
       {creating && (

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Pagination,
+  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem,
   Switch, TextField, Typography,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/PersonAddAlt'
@@ -10,7 +10,7 @@ import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
 import HistoryPanel from '../../components/HistoryPanel'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import { useAuth } from '../../auth/useAuth'
 import { ROLE_LABELS } from '../../components/navigation'
 import { formatCents } from '../../services/format'
@@ -177,11 +177,7 @@ export default function PeoplePage() {
 
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={rows} rowKey="userId" label="People" empty="Nobody matches." />
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
 
       {dialog?.kind === 'create' && (

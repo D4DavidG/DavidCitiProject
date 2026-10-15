@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Alert, Box, Button, Card, CardActions, CardContent, MenuItem, Pagination, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardActions, CardContent, MenuItem, TextField, Typography } from '@mui/material'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
 import OverCapacityMark from '../../components/OverCapacityMark'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
 import { formatDate, formatHours, todayIso } from '../../services/format'
 import { request } from '../../services/request'
@@ -216,11 +216,7 @@ export default function MyTasksPage() {
       </Typography>
       <PageState loading={entries.loading} error={entries.error} onRetry={entries.reload}>
         <DataTable columns={columns} rows={entries.data?.items ?? []} rowKey="entryId" label="My logged time" empty="You haven't logged any time yet." />
-        {entries.data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={entries.data.totalPages} page={entriesPage} onChange={(_, value) => setEntriesPage(value)} />
-          </Box>
-        )}
+        <Pager page={entriesPage} totalPages={entries.data?.totalPages} onChange={setEntriesPage} />
       </PageState>
 
       {logging && (

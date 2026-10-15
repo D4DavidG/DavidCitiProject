@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import {
-  Box, Button, Card, CardActions, CardContent, Chip, LinearProgress, Link as MuiLink, MenuItem, Pagination, TextField, Typography,
+  Box, Button, Card, CardActions, CardContent, Chip, LinearProgress, Link as MuiLink, MenuItem, TextField, Typography,
 } from '@mui/material'
 import WarningIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckIcon from '@mui/icons-material/CheckCircleOutlined'
@@ -10,7 +10,7 @@ import BudgetBar from '../../components/BudgetBar'
 import BudgetChart from '../../components/charts/BudgetChart'
 import WorkloadChart from '../../components/charts/WorkloadChart'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
 import { useAuth } from '../../auth/useAuth'
 import { formatDate } from '../../services/format'
@@ -158,11 +158,7 @@ export default function DashboardPage() {
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' } }}>
           {items.map((project) => <ProjectCard key={project.projectId} project={project} />)}
         </Box>
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>
   )

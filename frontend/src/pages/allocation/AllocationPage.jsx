@@ -1,13 +1,13 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Box, Button, Chip, FormControlLabel, IconButton, Pagination, Paper, Switch, Table, TableBody, TableCell,
+  Box, Button, Chip, FormControlLabel, IconButton, Paper, Switch, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Tooltip, Typography,
 } from '@mui/material'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import { addDays, formatDay, formatHours } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -153,11 +153,7 @@ export default function AllocationPage() {
             </TableBody>
           </Table>
         </TableContainer>
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>
   )

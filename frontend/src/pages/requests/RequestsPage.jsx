@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
-import { Alert, Box, Button, Menu, MenuItem, Pagination, Tab, Tabs, TextField } from '@mui/material'
+import { Alert, Box, Button, Menu, MenuItem, Tab, Tabs, TextField } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
 import { useAuth } from '../../auth/useAuth'
 import { request } from '../../services/request'
@@ -171,11 +171,7 @@ export default function RequestsPage() {
 
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={data?.items ?? []} rowKey="requestId" label="Requests" empty="No requests." />
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
 
       {dialog?.action === 'send' && (

@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react'
-import { Alert, Box, Button, Pagination } from '@mui/material'
+import { Alert, Box, Button } from '@mui/material'
 import DataTable from '../../components/DataTable'
 import OverCapacityMark from '../../components/OverCapacityMark'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import { formatDate, formatHours } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -65,11 +65,7 @@ export default function ApprovalsPage() {
       {message && <Alert severity={message.severity} sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={data?.items ?? []} rowKey="entryId" label="Time waiting for approval" empty="Nothing waiting for approval." />
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>
   )

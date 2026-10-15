@@ -1,12 +1,12 @@
 import { Fragment, useCallback, useState } from 'react'
 import {
-  Box, Button, Chip, Collapse, MenuItem, Pagination, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
+  Box, Button, Chip, Collapse, MenuItem, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, TextField, Typography,
 } from '@mui/material'
 import AuditChanges from '../../components/AuditChanges'
 import { ENTITY_LABELS, actionLabel } from '../../components/auditText'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import { ROLE_LABELS } from '../../components/navigation'
 import { formatDateTime } from '../../services/format'
 import { usePeopleOptions } from '../../services/people'
@@ -102,11 +102,7 @@ export default function AuditLogPage() {
             </TableBody>
           </Table>
         </TableContainer>
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>
   )

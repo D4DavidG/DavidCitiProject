@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Pagination, TextField,
+  Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, TextField,
 } from '@mui/material'
 import AuditChanges from './AuditChanges'
 import DataTable from './DataTable'
-import PageState from './PageState'
+import PageState, { Pager } from './PageState'
 import { ENTITY_LABELS, actionLabel } from './auditText'
 import { formatDateTime } from '../services/format'
 import { request } from '../services/request'
@@ -66,11 +66,7 @@ export default function HistoryPanel({ userId }) {
 
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={items} rowKey="auditId" label="History" empty="No history matches." />
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
 
       <Dialog open={open !== null} onClose={() => setOpen(null)} maxWidth="sm" fullWidth>

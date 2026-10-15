@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, Pagination, Switch, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, Switch, Typography } from '@mui/material'
 import PageHeader from '../../components/PageHeader'
 import { useAuth } from '../../auth/useAuth'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import { formatDateTime } from '../../services/format'
 import { onUnreadChange, request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -81,11 +81,7 @@ export default function NotificationsPage() {
             </Card>
           ))}
         </Box>
-        {notifications.data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={notifications.data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={notifications.data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>
   )
