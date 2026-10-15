@@ -40,18 +40,6 @@ The backend is organized into Lambda functions, one for each CRUD service:
 coding-workshop-participant/
 ├── backend/                             # Backend services
 │   ├── _examples/                         # Hello world examples
-│   │   ├── java-service/                    # Backend service example for Java developers
-│   │   │   ├── src/main/java/com/example/     # Path to Java package
-│   │   │   │   ├── Handler.java               # Business logic using Java
-│   │   │   │   ├── MongoService.java          # MongoDB connectivity service
-│   │   │   │   └── PostgresService.java       # PostgreSQL connectivity service
-│   │   │   └── pom.xml                        # Java configuration and dependencies
-│   │   ├── nodejs-service/                  # Backend service example for NodeJS developers
-│   │   │   ├── eslint.config.js               # ESLint JS tool configuration
-│   │   │   ├── index.js                       # Business logic using NodeJS
-│   │   │   ├── mongo-service.js               # MongoDB connectivity service
-│   │   │   ├── package.json                   # NodeJS configuration and dependencies
-│   │   │   └── postgres-service.js            # PostgreSQL connectivity service
 │   │   └── python-service/                  # Backend service example for Python developers
 │   │       ├── function.py                    # Business logic using Python
 │   │       ├── mongo_service.py               # MongoDB connectivity service
