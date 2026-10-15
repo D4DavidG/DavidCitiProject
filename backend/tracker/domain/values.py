@@ -1,7 +1,7 @@
-"""Read and validate one field from a request body (already converted to snake_case).
+"""Read and validate one field of a request body (already snake_case).
 
-Every helper raises ValidationError naming the field, so the API can tie the
-message to the right form input. They refuse rather than guess: "3" is not an
+Each helper raises ValidationError naming the field, so the form can show the
+message on the right input. They refuse rather than guess: "3" is not an
 integer and "false" is not a boolean.
 """
 
