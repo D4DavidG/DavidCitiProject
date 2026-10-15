@@ -38,7 +38,10 @@ local stack (section 7), but reaches AWS only after `./bin/deploy-backend.sh` an
   that counts only the cards on the current page.
 - pages load on first visit: each signed-in screen downloads its own file the first time
   you open it (first download 560 kB instead of 739 kB); a brief spinner under the app bar
-  is normal. AWS today: one file, every screen at once.
+  is normal. AWS today: one file, every screen at once;
+- two fixes from the axe accessibility scan: each side-menu link sits in its own list
+  item (screen readers hear a list), and empty weeks on the allocation grid are a readable
+  grey (7.6:1). AWS today: the pale 2.7:1 grey, and the tour's axe checks fail there.
 
 Until you deploy, Path A on AWS has no charts in steps 1 and 5, no Board (so no "The
 pull-board moment"), and a slower bell with no pop-up in "The audit-log moment". Demo
@@ -284,26 +287,26 @@ check's name to its offending rows, so healthy means no keys (`services/dashboar
 
 ## 4. Running the tests live
 
-All counts and times measured on the VDI on 14 Oct 2026.
+All counts and times measured on the VDI on 14 Oct 2026, evening (full `bash tools/test-all.sh` run, every row PASS).
 
 ### The suites
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `559 passed in 22.58s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  32 passed (32)` and `Tests  325 passed (325)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | 20 to 40 s, depending on what else the VDI is doing (21 s and 35 s on 14 Oct, evening) | `565 passed in 35.19s` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about two minutes (109 s) | `Test Files  33 passed (33)` and `Tests  330 passed (330)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 325 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 330 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
 
-| Command | Takes | Numbers (14 Oct) |
+| Command | Takes | Numbers (14 Oct, evening) |
 | --- | --- | --- |
-| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 20 s | `TOTAL 2015 68 97%`: api 100%, function.py 100%, domain 99%, services 95.7%, store 93.9% |
-| `cd frontend && npm run test:coverage` | about a minute and a half (115 s) | Statements 94.7%, Branches 91.45%, Functions 90.52%, Lines 95.86% |
+| `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing -q` | about 40 s (38 s) | `TOTAL 2011 64 97%`: api 100%, function.py 100%, domain 99%, services 96.0%, store 93.9% |
+| `cd frontend && npm run test:coverage` | about two to three minutes (196 s, with another test run sharing the VDI) | Statements 94.58%, Branches 92.07%, Functions 90.11%, Lines 96.47% |
 
 The rubric asks for 80% overall and 90% on API and error paths. What the missing 4% is,
 honestly: mostly guards (already archived, not found, nothing to change), **plus five real
@@ -336,10 +339,15 @@ and `test_role_comes_from_the_database_not_the_token` (`tests/backend/test_api.p
 Every spec signs in with `Demo-pass-2026`. Without the right variables, a spec skips itself
 instead of failing.
 
+24 tests in 9 files. Last full local run (14 Oct, evening, `bash tools/test-all.sh`): 23 passed,
+1 skipped (`screenshots.spec.js`), axe clean on all 48 tour scans.
+
 | Spec | Checks | Needs |
 | --- | --- | --- |
 | `demo.spec.js` (2 tests) | Manager walks the seven questions: Apollo "At risk", Ben "Over-allocated" with "Apollo 25 h, Zeus 20 h", the Build deliverable, Launch "Blocked". Then at 375x812: no sideways scroll, **Open menu** shows Allocation | `E2E_MANAGER_USERNAME`, or `E2E_ADMIN_PASSWORD` to look Maria up |
 | `pull.spec.js` (1 test) | An employee takes a Ready task from the Board and puts it back. **Writes data** (makes and archives its own Ready task, plus audit rows and bell notifications), so **run it locally only, never against AWS**. "Go-live checklist" stays free for the live demo | `E2E_ADMIN_PASSWORD`, or `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME`. Ana must hold at most 1 task |
+| `requests.spec.js` (1 test) | An employee asks her line manager, he rejects it with a note from **To decide**, and she reads the answer at phone width. **Writes data**, so local only | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` |
+| `history.spec.js` (2 tests) | A manager reads a report's **History** without the before/after state; an employee sees **My history** on Account. Read-only. Local only until the next deploy | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` |
 | `tour.spec.js` (5 tests) | Every screen for manager and employee, desktop and phone, fails on sideways scroll or a serious axe accessibility problem, saves a screenshot of each. Plus: refreshing a deep link keeps the page. Read-only, safe on AWS | `E2E_TOUR_DIR`, `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME` |
 | `timeline.spec.js` (4 tests) | Zeus's late Migration says **Late** with the icon; its tooltip opens on hover and on a phone tap with no sideways scroll; stripes only in print and forced colours; Apollo reads Design **Done**, Build **In progress 0%**, Launch **Blocked**. Read-only. Local only until the charts are deployed | `E2E_ZEUS_MANAGER_USERNAME` (Sam, `SP345715` locally), or `E2E_ADMIN_PASSWORD` |
 | `budget.spec.js` (3 tests) | The Budget line sits at 100 of 125 of the bar column, desktop and phone; a row's tooltip opens on hover and on Tab. Read-only. Local only until the charts are deployed | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
