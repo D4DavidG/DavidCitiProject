@@ -58,12 +58,12 @@ Postgres                constraints, triggers, the 5 integrity queries
 | [Business-rule tests](#22-business-rule-tests-pytest) | `tests/backend/` (9 files) | The rules in `services/`, on a real Postgres | 383 tests |
 | [API tests](#23-api-tests-pytest) | `tests/backend/` (5 files) | Routes, sign-in checks, error answers, the OpenAPI file | 173 tests |
 | [Commit and race tests](#24-commit-and-race-tests-pytest) | `tests/backend/` (2 files) | Writes really save; two people can't win the same task | 4 tests |
-| Backend, all four kinds | `tests/backend/` (20 test files) | | **648 passed, 97% of statements** (15 Oct) |
+| Backend, all four kinds | `tests/backend/` (20 test files) | | **683 passed, 97% of statements** (15 Oct) |
 | [Bandit](#25-bandit-the-python-security-scan) | reads `backend/tracker` | Security mistakes in the Python | no issues |
-| [Website unit tests](#26-website-unit-tests-vitest-and-react-testing-library) | `frontend/src/**/*.test.js(x)`, beside the code | Each screen and component, with the API faked | **846 passed in 51 files, 98.04% of lines** (15 Oct) |
+| [Website unit tests](#26-website-unit-tests-vitest-and-react-testing-library) | `frontend/src/**/*.test.js(x)`, beside the code | Each screen and component, with the API faked | **889 passed in 54 files, 98.11% of lines** (15 Oct) |
 | [Lint](#27-lint-eslint) | reads `frontend/` | JavaScript and React mistakes | clean |
 | [Production build](#28-the-production-build) | `frontend/` to `frontend/dist` | The website builds the way the deploy builds it | builds |
-| [Browser tests](#29-browser-tests-playwright) | `frontend/e2e/*.spec.js` (12 files) | The whole app in a real browser | **34 tests: 33 passed, 1 skipped on purpose** (local, 15 Oct); 17 of 17 on AWS |
+| [Browser tests](#29-browser-tests-playwright) | `frontend/e2e/*.spec.js` (14 files) | The whole app in a real browser | **38 tests: 37 passed, 1 skipped on purpose** (local, 15 Oct, after the post-demo changes); 17 of 17 on AWS before them |
 | [Accessibility scans](#210-accessibility-scans-axe) | inside `frontend/e2e/tour.spec.js` | WCAG A and AA problems on every screen | 8 tests, 100 scans, all passed |
 | [k6 load test](#211-k6-load-test) | `tests/load/load.js` | Speed and failures with many users at once | 4,038 requests, 0 failed, 4 of 4 thresholds (local, 14 Oct) |
 | [npm audit](#212-npm-audit) | reads the website's package list | Known security holes in the website's packages | 0 high (14 Oct) |
@@ -263,7 +263,7 @@ two exist, both B105 in `backend/tracker/services/users.py` (a column named
 
 ### 2.6 Website unit tests (Vitest and React Testing Library)
 
-Files: 51 files named `*.test.jsx` or `*.test.js`, each beside the code it tests in
+Files: 54 files named `*.test.jsx` or `*.test.js`, each beside the code it tests in
 `frontend/src/` (for example `frontend/src/pages/approvals/`). Setup in
 [`frontend/src/test/setup.js`](../frontend/src/test/setup.js); config in the `test:` block
 of [`frontend/vite.config.js`](../frontend/vite.config.js). About 3 to 4 minutes.
@@ -284,12 +284,12 @@ is faked.
 browser, so layout and colour are not tested here.
 
 **What the results mean.** Passing prints `Test Files  51 passed (51)` and
-`Tests  846 passed (846)`. A failure prints `FAIL`, the file and test name, and a diff of what
+`Tests  889 passed (889)`. A failure prints `FAIL`, the file and test name, and a diff of what
 the screen showed against what was expected. Rerun one folder to see it quickly:
 `(cd frontend && npx vitest run src/pages/approvals)`. If you changed a label on purpose,
 update the test.
 
-**Coverage.** Line, statement, branch and function coverage, measured by V8: **98.04% of
+**Coverage.** Line, statement, branch and function coverage, measured by V8: **98.11% of
 lines** on 15 Oct (section 3). It can't catch what jsdom can't lay out (sideways scrolling,
 overlap, colour contrast), or a faked API drifting from the real one. The browser tests
 cover both.
@@ -333,7 +333,7 @@ failure prints the file and line that would not compile.
 
 ### 2.9 Browser tests (Playwright)
 
-Files: 12 in [`frontend/e2e/`](../frontend/e2e/), 34 tests. Config:
+Files: 14 in [`frontend/e2e/`](../frontend/e2e/), 38 tests. Config:
 [`frontend/playwright.config.js`](../frontend/playwright.config.js). Run them with
 [`tools/e2e.sh`](../tools/e2e.sh) (section 7). About 5 minutes for all of them locally.
 
@@ -353,6 +353,8 @@ phone, a menu that can't be reached.
 | `timeline.spec.js` | 4 | The deliverables timeline: Late words and icon, tooltips on hover, tap and focus, print stripes | No |
 | `budget.spec.js` | 3 | The budget chart: where the Budget line sits, tooltips | No |
 | `workload.spec.js` | 5 | The workload chart: gridlines and bars line up, Tab opens the tooltip, contrast | No |
+| `search.spec.js` | 2 | The top-bar search: "/" jumps in, a page and a project open from it, and the phone search button | No |
+| `archive-warning.spec.js` | 1 | An admin opens Archive for an employee on a live project, sees the red warning and **Archive anyway**, then cancels | No |
 | `pull.spec.js` | 1 | An employee takes a Ready task (**Take this**) and puts it back | **Yes**: a task, audit rows, bell notifications |
 | `requests.spec.js` | 1 | An employee asks, the manager rejects with a note, the employee reads it on a phone | **Yes**: a request, audit rows, notifications |
 | `timelog.spec.js` | 1 | An employee logs 15 minutes, the manager approves, the project's Spent goes up | **Yes**: an approved time entry |
@@ -564,12 +566,12 @@ was *checked*: it finds code no test touches, but can't prove the tested code is
 | **Function** | How many functions were called at least once |
 
 **Backend** (pytest-cov, configured by [`.coveragerc`](../.coveragerc) to measure our code only,
-not the psycopg copy): **97% of statements** with 648 tests (15 Oct). The API layer (`api/`)
+not the psycopg copy): **97% of statements** with 683 tests (15 Oct). The API layer (`api/`)
 is 100% of lines and branches. With branches counted the total was 95% on 14 Oct. To see the
 lines no test ran: `.venv/bin/pytest --cov=backend/tracker --cov-report=term-missing`.
 
 **Website** (Vitest with V8 coverage, the JavaScript engine inside Chrome and Node):
-**98.04% of lines** with 846 tests (15 Oct). `npm run test:coverage` prints four lines,
+**98.11% of lines** with 889 tests (15 Oct). `npm run test:coverage` prints four lines,
 Statements, Branches, Functions and Lines, each as a percentage and a count. The one module
 that talks to the API, `services/request.js`, was at 100% of lines on 14 Oct.
 
@@ -582,7 +584,7 @@ are pass or fail.
 | Target | Goal | Today | Met? |
 | --- | --- | --- | --- |
 | Backend code coverage | 80% | 97% of statements | Yes |
-| Website code coverage | 80% | 98.04% of lines | Yes |
+| Website code coverage | 80% | 98.11% of lines | Yes |
 | API endpoints | 90% | `api/` 100%; every route called by the two walks | Yes |
 | Error handling | 90% | `api/errors.py` 100%; malformed input and a crash returning 500 are tested | Yes |
 | Critical user paths end to end | 100% | Every journey in 2.9, in a real browser | Almost: the forced password change at first sign-in is covered by backend and unit tests, not walked in a browser |
@@ -621,7 +623,7 @@ up in the local database by email.
 ## 5. Run each suite
 
 ```sh
-# Backend: all four kinds (648 tests, about 30 seconds), then with coverage
+# Backend: all four kinds (683 tests, about 30 seconds), then with coverage
 .venv/bin/pytest -q
 .venv/bin/pytest --cov=backend/tracker --cov-report=term-missing
 
@@ -634,7 +636,7 @@ up in the local database by email.
 # Bandit
 .venv/bin/bandit -r backend/tracker -x backend/tracker/psycopg,backend/tracker/psycopg_binary,backend/tracker/psycopg_binary.libs
 
-# Website unit tests (846 tests, 3 to 4 minutes), with coverage, one folder
+# Website unit tests (889 tests, 3 to 4 minutes), with coverage, one folder
 (cd frontend && npm test)
 (cd frontend && npm run test:coverage)
 (cd frontend && npx vitest run src/pages/approvals)
@@ -689,12 +691,12 @@ from 15 Oct):
 ```
 === Summary ===
 Step            Result Detail
-Backend tests   PASS   648 passed, coverage 97%
+Backend tests   PASS   683 passed, coverage 97%
 Bandit          PASS   no issues
-Website tests   PASS   846 passed, lines 98.04%
+Website tests   PASS   889 passed, lines 98.11%
 Lint            PASS   clean
 Build           PASS   frontend/dist
-Browser tests   PASS   33 passed, 1 skipped; screenshots in /tmp/tmp.XXXXXXXXXX
+Browser tests   PASS   37 passed, 1 skipped; screenshots in /tmp/tmp.XXXXXXXXXX
 Accessibility   PASS   axe on every tour screen, light and dark, 8 tests, 100 scans, WCAG A/AA
 Full logs: /tmp/tmp.XXXXXXXXXX
 ```
@@ -738,7 +740,7 @@ warm database, a folder for screenshots), runs Playwright, and ends with the pla
   `tour` about 3 minutes even headless (run it beforehand and look at the pictures it saves in
   `~/tour-shots`, or the folder in `E2E_TOUR_DIR`).
 - **Which files only read, and which add data.** `demo`, `tour`, `history`, `schedule`,
-  `timeline`, `budget` and `workload` only read. `pull`, `requests`, `timelog` and
+  `timeline`, `budget`, `workload`, `search` and `archive-warning` only read. `pull`, `requests`, `timelog` and
   `project-lifecycle` add data, and nothing is ever deleted, so each run leaves rows behind
   and rings bells (Maria's count goes up). `screenshots` rewrites `docs/screenshots/` and runs
   only when named with `E2E_SCREENSHOTS=1`.
@@ -777,8 +779,11 @@ warm database, a folder for screenshots), runs Playwright, and ends with the pla
 | `--show needs a screen` | The shell has no display | Use a terminal on the machine's desktop |
 | `Playwright is not installed here` | The website's packages or the browser are missing | Run the command it prints |
 
-**Latest results:** the full local run on 15 Oct: 33 passed, 1 skipped on purpose (the
-screenshots). `--aws` after the 15 Oct deploy: 17 of 17 passed.
+**Latest results:** the full local run on 15 Oct after the post-demo changes: 37 passed, 1
+skipped on purpose (the screenshots). `--aws` after the 15 Oct deploy (before those changes):
+17 of 17 passed. Until the next deploy, `demo`, `tour`, `timeline`, `search` and
+`archive-warning` fail on the live site because it still runs the old screens; the script
+says so when you run them.
 
 ## 8. Why these tools
 

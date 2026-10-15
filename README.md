@@ -194,10 +194,10 @@ are the organisation's coding rules for AI assistants, one per language:
 
 ## Tests
 
-About 1,500 automated tests, in four kinds. **Backend** (pytest, 648 tests, 97% of statements)
+About 1,600 automated tests, in four kinds. **Backend** (pytest, 683 tests, 97% of statements)
 checks every business rule, every route and that Postgres itself refuses bad rows. **Website**
-(Vitest and React Testing Library, 846 tests in 51 files, 98.04% of lines) checks what each
-screen shows and sends. **Browser** (Playwright, 33 passed and 1 skipped on request) clicks
+(Vitest and React Testing Library, 889 tests in 54 files, 98.11% of lines) checks what each
+screen shows and sends. **Browser** (Playwright, 37 passed and 1 skipped on request) clicks
 through the real app, takes screenshots of every screen and runs 100 accessibility scans in
 light and dark; 17 of them are safe to run against the live AWS site, and all 17 passed there
 after the 15 Oct deploy. A **load test** (k6) measures speed under many users. Numbers are from

@@ -42,10 +42,10 @@ outdated it.
   `docs/validation.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `DCO.md`, `SECURITY.md`) and
   our demo-day notes (`docs/GUIDE.md`, `REPOINFO.md`, `DEMO-RUNBOOK.md`, `DEMO-TESTS.md`,
   `MAP.md`, `OVERNIGHT-REPORT.md`, and the design specs and plans in `docs/superpowers/`).
-- **Tests (15 Oct, before the post-demo changes):** 648 backend (97% of statements), 846
-  website in 51 files (98.04% of lines), 33 browser tests passed and 1 skipped on request
-  (the README screenshots), 100 axe scans (light and dark), 70 API operations (71 since
-  `GET /users/{id}/projects`). `./tools/test-all.sh` runs every local check. Where each suite lives: `tests/README.md`;
+- **Tests (15 Oct, after the post-demo changes):** 683 backend (97% of statements), 889
+  website in 54 files (98.11% of lines), 37 browser tests passed and 1 skipped on request
+  (the README screenshots; 38 tests in 14 files), 100 axe scans (light and dark), 71 API
+  operations. `./tools/test-all.sh` runs every local check. Where each suite lives: `tests/README.md`;
   what each proves: `docs/TESTING.md`.
 - **Read these first:**
   - `README.md` (the front door: logins, the repo tree, Swagger) and `docs/README.md` (the
