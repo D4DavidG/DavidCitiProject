@@ -4,7 +4,8 @@
 #   ./tools/e2e.sh                 # every browser test, on the local stack
 #   ./tools/e2e.sh demo            # one file (any part of a spec file name)
 #   ./tools/e2e.sh --show demo     # a real browser window, slowed down so people can watch
-#   ./tools/e2e.sh --aws demo tour # against the live AWS site; read-only files only
+#   ./tools/e2e.sh --aws           # the live AWS site: the four read-only files seen passing there
+#   ./tools/e2e.sh --aws demo tour # the live AWS site, just those; read-only files only
 #   ./tools/e2e.sh --report demo   # then open Playwright's HTML report
 #   ./tools/e2e.sh --list          # list the tests without running them (needs no server)
 #
