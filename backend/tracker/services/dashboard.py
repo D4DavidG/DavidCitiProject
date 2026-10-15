@@ -188,24 +188,25 @@ def at_risk(conn: psycopg.Connection, actor: Actor) -> list[dict]:
 
 # One row per active employee per shown week: hours booked, projects, minutes logged.
 # %(q)s (a name pattern) and %(projects)s (a list of project ids) are NULL when not asked
-# for; a booking counts when no projects were chosen or it is on one of them.
+# for. booked_hours is every live booking, so "over capacity" is always the person's real
+# total; shown_hours and project_count count only the chosen projects (all when none chosen).
 _CELLS = (
     "WITH w AS (SELECT generate_series(%(from)s::date, %(from)s::date + 7 * (%(n)s - 1), '7 days')::date AS week),"
     " people AS (SELECT user_id, first_name || ' ' || last_name AS name, job_title, weekly_capacity_hours,"
     "            overtime_allowed FROM users WHERE role = 'EMPLOYEE' AND NOT is_archived"
     "            AND (%(q)s::text IS NULL OR first_name || ' ' || last_name ILIKE %(q)s)),"
-    " cells AS (SELECT pe.user_id, w.week,"
-    "  COALESCE((SELECT sum(a.hours_per_week) FROM assignments a JOIN projects p ON p.project_id = a.project_id"
-    "    WHERE a.user_id = pe.user_id AND NOT a.is_archived AND NOT p.is_archived"
-    "      AND (%(projects)s::bigint[] IS NULL OR a.project_id = ANY(%(projects)s::bigint[]))"
-    "      AND a.start_date <= w.week + 6 AND a.end_date >= w.week), 0) AS booked_hours,"
-    "  (SELECT count(DISTINCT a.project_id) FROM assignments a JOIN projects p ON p.project_id = a.project_id"
-    "    WHERE a.user_id = pe.user_id AND NOT a.is_archived AND NOT p.is_archived"
-    "      AND (%(projects)s::bigint[] IS NULL OR a.project_id = ANY(%(projects)s::bigint[]))"
-    "      AND a.start_date <= w.week + 6 AND a.end_date >= w.week) AS project_count,"
+    " cells AS (SELECT pe.user_id, w.week, b.booked_hours, b.shown_hours, b.project_count,"
     "  COALESCE((SELECT sum(e.minutes) FROM time_entries e WHERE e.user_id = pe.user_id"
     "    AND e.status <> 'REJECTED' AND e.work_date BETWEEN w.week AND w.week + 6), 0) AS logged_minutes"
-    "  FROM people pe CROSS JOIN w)"
+    "  FROM people pe CROSS JOIN w CROSS JOIN LATERAL ("
+    "   SELECT COALESCE(sum(a.hours_per_week), 0) AS booked_hours,"
+    "    COALESCE(sum(a.hours_per_week) FILTER (WHERE %(projects)s::bigint[] IS NULL"
+    "      OR a.project_id = ANY(%(projects)s::bigint[])), 0) AS shown_hours,"
+    "    count(DISTINCT a.project_id) FILTER (WHERE %(projects)s::bigint[] IS NULL"
+    "      OR a.project_id = ANY(%(projects)s::bigint[])) AS project_count"
+    "   FROM assignments a JOIN projects p ON p.project_id = a.project_id"
+    "   WHERE a.user_id = pe.user_id AND NOT a.is_archived AND NOT p.is_archived"
+    "     AND a.start_date <= w.week + 6 AND a.end_date >= w.week) b)"
 )
 
 
@@ -214,9 +215,10 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
 
     A person's peak is their largest "over by" in any shown week. The list is
     sorted by it, and over_only keeps people whose peak is above zero. Weeks start on Monday.
-    q searches people's names. project_ids keeps only bookings on those projects (hours,
-    projects, over flags and peak), and drops anyone with none of them in the shown weeks.
-    Logged time stays the person's whole week.
+    q searches people's names. project_ids narrows what is shown (shown_hours, project_count
+    and each week's projects) and drops anyone with none of them in the shown weeks; over
+    capacity, over by, the peak and over_only still count every booking, so filtering never
+    hides someone who is over. Logged time stays the person's whole week.
     """
     _staff_only(actor, "the allocation grid")
     week_from = clock.week_start(values.date(filters, "week_from", required=False) or clock.today())
@@ -269,6 +271,7 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
         rows[c["user_id"]]["weeks"].append({
             "week": c["week"].isoformat(),
             "booked_hours": booked,
+            "shown_hours": int(c["shown_hours"]),
             "project_count": c["project_count"],
             "over_allocated": booked > capacity,
             "over_by_hours": max(booked - capacity, 0),
