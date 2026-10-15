@@ -48,6 +48,15 @@ PageState.propTypes = {
   children: PropTypes.node,
 }
 
+/** Shown instead of a page whose code couldn't be downloaded; lazyPage uses it. */
+export function PageLoadFailed() {
+  return (
+    <Alert severity="warning" action={<Button color="inherit" onClick={() => window.location.reload()}>Reload</Button>}>
+      This page couldn&apos;t load. The website may have been updated since you opened it.
+    </Alert>
+  )
+}
+
 /** Page numbers under a list; nothing when there is one page or none. onChange gets the new page number. */
 export function Pager({ page, totalPages, onChange }) {
   if (!(totalPages > 1)) return null

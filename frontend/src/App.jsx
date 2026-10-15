@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { HashRouter, Link, Navigate, Outlet, Route, Routes } from 'react-router'
 import { Alert, Button, CssBaseline } from '@mui/material'
 import { ThemeProvider } from '@mui/material/styles'
@@ -5,22 +6,24 @@ import AuthProvider from './auth/AuthContext'
 import RequireRole from './auth/RequireRole'
 import { STAFF, homePath, useAuth } from './auth/useAuth'
 import AppLayout from './components/AppLayout'
+import lazyPage from './components/lazyPage'
 import PageState from './components/PageState'
-import AccountPage from './pages/account/AccountPage'
-import AllocationPage from './pages/allocation/AllocationPage'
-import ApprovalsPage from './pages/approvals/ApprovalsPage'
-import AuditLogPage from './pages/audit/AuditLogPage'
-import DashboardPage from './pages/dashboard/DashboardPage'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
-import MyTasksPage from './pages/mytasks/MyTasksPage'
-import NotificationsPage from './pages/notifications/NotificationsPage'
-import PeoplePage from './pages/people/PeoplePage'
-import DependencyPage from './pages/projects/DependencyPage'
-import ProjectDetailPage from './pages/projects/ProjectDetailPage'
-import ProjectsPage from './pages/projects/ProjectsPage'
-import RequestsPage from './pages/requests/RequestsPage'
 import theme from './theme/theme'
+
+const AccountPage = lazyPage(() => import('./pages/account/AccountPage'))
+const AllocationPage = lazyPage(() => import('./pages/allocation/AllocationPage'))
+const ApprovalsPage = lazyPage(() => import('./pages/approvals/ApprovalsPage'))
+const AuditLogPage = lazyPage(() => import('./pages/audit/AuditLogPage'))
+const DashboardPage = lazyPage(() => import('./pages/dashboard/DashboardPage'))
+const MyTasksPage = lazyPage(() => import('./pages/mytasks/MyTasksPage'))
+const NotificationsPage = lazyPage(() => import('./pages/notifications/NotificationsPage'))
+const PeoplePage = lazyPage(() => import('./pages/people/PeoplePage'))
+const DependencyPage = lazyPage(() => import('./pages/projects/DependencyPage'))
+const ProjectDetailPage = lazyPage(() => import('./pages/projects/ProjectDetailPage'))
+const ProjectsPage = lazyPage(() => import('./pages/projects/ProjectsPage'))
+const RequestsPage = lazyPage(() => import('./pages/requests/RequestsPage'))
 
 /** "/" sends you to your home screen, or to the login page. */
 function Home() {
@@ -38,11 +41,14 @@ function NotFound() {
   )
 }
 
-/** Every signed-in page shares the layout; RequireRole keeps signed-out visitors out. */
+/**
+ * Every signed-in page shares the layout; RequireRole keeps signed-out visitors out.
+ * Suspense sits inside the layout, so the menu stays while a page's file arrives.
+ */
 function SignedIn() {
   return (
     <RequireRole>
-      <AppLayout><Outlet /></AppLayout>
+      <AppLayout><Suspense fallback={<PageState loading />}><Outlet /></Suspense></AppLayout>
     </RequireRole>
   )
 }
@@ -50,7 +56,8 @@ function SignedIn() {
 /**
  * The route table. Hash URLs (#/projects/7) mean the server only ever serves
  * index.html, so CloudFront needs no rewrite rule (it was removed on 13 Oct because
- * it also swallowed the API's 404s).
+ * it also swallowed the API's 404s). Each signed-in page is its own file, downloaded
+ * on its first visit.
  */
 export function AppRoutes() {
   return (

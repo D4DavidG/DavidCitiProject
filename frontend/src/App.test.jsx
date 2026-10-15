@@ -1,9 +1,12 @@
+import { Suspense } from 'react'
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { ThemeProvider } from '@mui/material/styles'
 import { AppRoutes } from './App'
+import appSource from './App.jsx?raw'
 import { AuthContext } from './auth/useAuth'
+import lazyPage from './components/lazyPage'
 import theme from './theme/theme'
 import { USERS, session, stubApi } from './test/utils'
 
@@ -48,5 +51,31 @@ describe('routes', () => {
   it('answers an unknown address with a not-found page', async () => {
     renderApp('/nowhere', session(USERS.manager))
     expect(await screen.findByText(/page not found/i)).toBeInTheDocument()
+  })
+})
+
+describe('page loading', () => {
+  function renderLazy(load) {
+    const Page = lazyPage(load)
+    return render(
+      <ThemeProvider theme={theme}>
+        <Suspense fallback={<p>wait</p>}><Page /></Suspense>
+      </ThemeProvider>,
+    )
+  }
+
+  it("loads a page's code on first visit and shows it", async () => {
+    renderLazy(() => Promise.resolve({ default: () => <h1>Loaded</h1> }))
+    expect(await screen.findByRole('heading', { name: 'Loaded' })).toBeInTheDocument()
+  })
+
+  it("shows Reload when a page's code can't be downloaded", async () => {
+    renderLazy(() => Promise.reject(new Error('Failed to fetch dynamically imported module')))
+    expect(await screen.findByText(/couldn't load/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument()
+  })
+
+  it('imports no signed-in page eagerly', () => {
+    expect(appSource).not.toMatch(/^import \w+ from '\.\/pages\/(?!login\/)/m)
   })
 })
