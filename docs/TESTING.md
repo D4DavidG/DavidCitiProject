@@ -20,7 +20,7 @@ checks one layer, from the database up to a real browser.
 | **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (32 files, beside the code they test) | `cd frontend && npm test` | 115 s | 325 |
 | **Browser tests** (Playwright) | A real Chrome against the real running app: the demo walk (the seven questions, plus the phone menu), the pull board (Ana takes a task and puts it back), requests (Ana asks, Maria rejects with a note, Ana reads it on a phone), the screen tour (every screen for a manager and an employee, desktop and phone, no sideways scrolling, an axe accessibility scan of each, a deep-link refresh), history (a manager reads a report's history without the before/after state; an employee sees My history), the three charts (timeline: Late words and icon, tooltips on hover, tap and focus, print stripes; budget: the Budget line's position, tooltips; workload: gridlines and bars line up, Tab opens the tooltip, print stripes, contrast), README screenshots (only when asked) | The only test that sees what David sees: real login, real API, real database, real layout | `frontend/e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `history.spec.js`, `tour.spec.js`, `timeline.spec.js`, `budget.spec.js`, `workload.spec.js`, `screenshots.spec.js` | `cd frontend && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_ZEUS_MANAGER_USERNAME=SP345715 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test` | 66 s | 24 tests in 9 files: 23 pass on freshly seeded data, 1 skipped (screenshots, on purpose); 2 fail after hand edits to Apollo (see "Last results" below) |
 | **Load test** | How fast the API answers with many users at once, and whether anything fails | Speed and failures under load can't be seen one request at a time | `tools/loadtest.py` | AWS (asks for the AWS admin password, then runs): `read -rsp 'Admin password: ' TRACKER_ADMIN_PASSWORD && export TRACKER_ADMIN_PASSWORD && TRACKER_API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker python3 tools/loadtest.py --users 25 --seconds 60`. Locally, leave out `TRACKER_API` and keep to 10 users or fewer: LocalStack itself fails past about 15 (`README.md:296-303`) | 20 to 60 s | Last run on AWS, 13 Oct: 16,184 reads at 539 per second, 2 failed (`README.md:269-275`). Not rerun today |
-| **k6 load test (planned)** | The same as the load test, with the industry tool named in the meeting notes ("sk8", `notes.txt:6`) | Evaluators may expect a named tool; k6 also gives standard reports | not built yet | none yet; k6 is not installed on the VDI (`which k6` prints nothing) | | 0 |
+| **k6 load test** | Managers reading the dashboard at once, then a burst of logins: every request answers, reads within 1 s and logins within 3 s for 95 in 100 | k6 is the industry's load-test tool (named in the meeting notes, "sk8", `notes.txt:6`); pass or fail comes from thresholds written in the script | `tools/k6/load.js` | `K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js` (section 7; AWS command there too) | 107 s | 4,038 requests, 0 failed, all 4 thresholds passed (local, 14 Oct) |
 
 Plus two checks that are not tests but run with them: **lint** (ESLint reads the website
 code for mistakes: `cd frontend && npm run lint`, clean, 5 s) and **bandit** (a security
@@ -332,3 +332,71 @@ back (not run: the local database is never reseeded without David).
 (`.github/workflows/react.actions.yml:27`) and a Terraform check. The tests run on the VDI,
 by hand or through `tools/test-all.sh`. Running them in CI would need a Postgres service
 in the workflow; that is a possible next step, not built.
+
+## 7. Load test with k6
+
+**What it measures.** `tools/k6/load.js` plays managers using the site at the same time.
+Each virtual user logs in once, then repeats one round of the reads a manager's screens make
+(dashboard cards, the at-risk panel, the projects list, the allocation grid, the unread
+count, and one project's detail, budget and deliverables), with 1 s between rounds. After
+that, a second part sends 20 logins, 10 at a time. It only reads: nothing is written.
+
+**Pass or fail is in the script** (k6 calls these thresholds): under 1% of requests fail;
+95 in 100 reads answer within 1 s; 95 in 100 logins answer within 3 s. Login gets its own,
+looser limit because it is slow on purpose: the password hash (PBKDF2, 600,000 rounds) is
+built to cost about a second of CPU, so guessing passwords is expensive, and a person logs in
+once per session. Mixing logins into the read figures would hide a slow read behind them.
+
+**Install** (no sudo; done on the VDI on 14 Oct): the official release v2.2.0 from
+github.com/grafana/k6/releases, checksum checked, unpacked into `~/.local/bin/k6`.
+`k6 version` prints `k6 v2.2.0`.
+
+**Run it locally** (through the proxy on 3001; 10 users at most, because LocalStack itself
+fails past about 15). Don't run it while browser tests run against the same API, or they may
+turn flaky:
+
+```sh
+K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
+```
+
+**Run it on AWS** (David runs this; 25 users, as `tools/loadtest.py` did on 13 Oct; the
+thresholds are the same; about 4 minutes):
+
+```sh
+K6_PROFILE=aws K6_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net/api/tracker \
+K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
+```
+
+On AWS, use the username Maria has there if it differs, and her password there. Warm the
+app up first (section 7 of `CLAUDE.md`: Aurora pauses itself). `K6_VUS=50` raises the
+number of users.
+
+**Last local run, 14 Oct** (ramp to 10 users over 1 minute, hold 30 s, then the login
+burst; 107 s in all). k6 exited 0:
+
+| Measure | Result | Threshold |
+| --- | --- | --- |
+| Requests | 4,038 (4,008 reads, 30 logins), 37.7 per second | |
+| Failed | 0 (0.00%) | under 1% |
+| Checks (status 200, a token on login) | 4,038 of 4,038 | over 99% |
+| Reads | median 24 ms, p95 67 ms, max 1.8 s | p95 under 1,000 ms |
+| Logins | median 599 ms, p95 1.3 s, max 2.1 s | p95 under 3,000 ms |
+
+One read took 1.8 s while users were still being added; that is most likely LocalStack
+starting another Lambda container, but it was not checked in the logs.
+
+**How it differs from `tools/loadtest.py`.**
+
+| | `tools/loadtest.py` | `tools/k6/load.js` |
+| --- | --- | --- |
+| Tool | Python standard library, nothing to install | k6, the industry tool |
+| Signs in as | the admin (needs the admin password) | a manager (Maria) |
+| Reads | 6 endpoints, as fast as possible, no pause | the same 6 plus the projects list and one project's detail, 1 s between rounds |
+| Logins | a burst of 20, 10 at a time | the same burst, plus one login per virtual user |
+| Pass or fail | exit code 1 if any request failed | thresholds on failures, read time and login time |
+| Report | a table with p50, p95 and max per endpoint | totals per kind (read, login), checks per endpoint |
+
+So k6 covers everything the Python script does except its per-endpoint timing table
+(k6 can produce one with `--out json`, but not in its default summary). The Python script
+also hammers the API with no pause, so it measures peak throughput; k6's 1 s pause is
+closer to people clicking.

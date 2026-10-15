@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AppLayout from './AppLayout'
 import { USERS, renderAt, session, stubApi } from '../test/utils'
@@ -26,6 +26,15 @@ describe('AppLayout', () => {
     expect(labels).not.toContain('My tasks')
   })
 
+  it('puts Schedule right after Allocation for managers and admins', () => {
+    for (const user of [USERS.manager, USERS.admin]) {
+      renderLayout(user)
+      const labels = navLabels()
+      expect(labels.indexOf('Schedule')).toBe(labels.indexOf('Allocation') + 1)
+      cleanup()
+    }
+  })
+
   it('gives admins the audit log as well', () => {
     renderLayout(USERS.admin)
     expect(navLabels()).toContain('Audit log')
@@ -37,6 +46,7 @@ describe('AppLayout', () => {
     expect(labels).toEqual(expect.arrayContaining(['My tasks', 'Projects', 'Requests']))
     expect(labels).not.toContain('Dashboard')
     expect(labels).not.toContain('Allocation')
+    expect(labels).not.toContain('Schedule')
     expect(labels).not.toContain('People')
   })
 

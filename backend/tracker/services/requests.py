@@ -6,9 +6,9 @@ Five kinds (the `kind` column of project_requests, migration 003):
     TASK_LIMIT, OVERTIME          sent by employees, decided by their line manager or an admin
     OTHER                         free text from either; deciding it changes nothing else
 
-Who decides is who `record_change` notifies when the request is sent. Approving
-applies the change through the existing service in the same transaction, so the
-same rules and audit rows apply as if the decider had done it by hand.
+Whoever may decide is whoever is notified when it is sent. Approving applies the
+change through the existing service in the same transaction, so the same rules
+and audit rows apply as if the decider had done it by hand.
 """
 
 import psycopg
@@ -83,8 +83,9 @@ def _kind_fields(conn: psycopg.Connection, actor: Actor, kind: str, data: dict) 
     return {"name": values.text(data, "name")}  # OTHER: the subject
 
 
-# Who may decide a request: never its asker; an admin decides any; a line manager
-# decides their own reports' (an employee's request). One condition for list and get.
+# Who may decide: never the asker; an admin decides any; a line manager decides
+# requests from employees who report to them (a manager's go to the admins only).
+# One condition shared by list and get.
 _MAY_DECIDE = "(r.requested_by <> %(me)s AND (%(admin)s OR (u.role = 'EMPLOYEE' AND u.manager_id = %(me)s)))"
 _MAY_SEE = f"(r.requested_by = %(me)s OR {_MAY_DECIDE})"
 _SCOPES = {"MINE": "r.requested_by = %(me)s", "TO_DECIDE": _MAY_DECIDE}
@@ -102,7 +103,7 @@ def list_requests(conn: psycopg.Connection, actor: Actor, filters: dict, page: i
     if kind := values.choice(filters, "kind", set(SENDERS), required=False):
         where.append("r.kind = %(kind)s")
         params["kind"] = kind
-    # The WHERE fragments are fixed strings from this module; every value is a parameter.
+    # WHERE fragments are fixed strings from this module; every value is a parameter.
     query = sql.SQL(_SELECT + " WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
     return paginate(conn, query, params, sql.SQL("r.request_id DESC"), page, page_size)
 
@@ -157,7 +158,7 @@ def _apply(conn: psycopg.Connection, actor: Actor, req: dict, data: dict) -> dic
         projects.archive_project(conn, actor, req["project_id"])
     elif kind == "TASK_LIMIT":
         current = conn.execute("SELECT task_limit FROM users WHERE user_id = %s", (asker,)).fetchone()["task_limit"]
-        if current >= req["task_limit"]:  # raised meanwhile: approving must never lower it
+        if current >= req["task_limit"]:  # limit was raised since; approving must never lower it
             raise Conflict(f"{req['requester_name']}'s task limit is already {current}.")
         users.set_capacity(conn, actor, asker, {"task_limit": req["task_limit"]})
     elif kind == "OVERTIME":
@@ -182,7 +183,7 @@ def _create_project(conn: psycopg.Connection, actor: Actor, req: dict, data: dic
 
 def _decide(conn: psycopg.Connection, actor: Actor, before: dict, status: str, data: dict,
             project_id: int | None = None) -> dict:
-    """Record the decision and its audit row; the asker is notified too."""
+    """Record the decision and its audit row; `also_notify` tells the asker."""
     row = conn.execute("UPDATE project_requests SET status = %s, decided_by = %s, decided_at = now(),"
                        " decision_note = %s, created_project_id = %s WHERE request_id = %s RETURNING *",
                        (status, actor.user_id, values.text(data, "decision_note", required=False, max_length=2000),

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { Alert, Box, Button, TextField } from '@mui/material'
 import { homePath, useAuth } from '../../auth/useAuth'
@@ -7,6 +7,7 @@ import AuthCard from './AuthCard'
 /**
  * Sign in with the generated username (initials + 6 digits) and password. A
  * first-time user is sent to change the generated password before anything else.
+ * While signing in, both fields and the button are disabled and a second submit is ignored.
  */
 export default function LoginPage() {
   const { status, user, login, sessionExpired } = useAuth()
@@ -16,11 +17,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const sending = useRef(false) // set at once, so two submits in the same moment send one login
 
   if (status === 'signedIn') return <Navigate to={homePath(user)} replace />
 
   async function submit(event) {
     event.preventDefault()
+    if (sending.current) return
+    sending.current = true
     setBusy(true)
     setError(null)
     try {
@@ -30,6 +34,7 @@ export default function LoginPage() {
       navigate(next, { replace: true })
     } catch (failure) {
       setError(failure.message)
+      sending.current = false
       setBusy(false)
     }
   }
@@ -49,6 +54,7 @@ export default function LoginPage() {
           autoComplete="username"
           autoFocus
           required
+          disabled={busy}
           placeholder="e.g. ML662930"
         />
         <TextField
@@ -59,6 +65,7 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
           required
+          disabled={busy}
         />
         <Button type="submit" variant="contained" size="large" disabled={busy || !username || !password}>
           {busy ? 'Signing in…' : 'Sign in'}

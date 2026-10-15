@@ -1,5 +1,6 @@
 import DashboardIcon from '@mui/icons-material/SpaceDashboardOutlined'
 import GridIcon from '@mui/icons-material/GridViewOutlined'
+import ScheduleIcon from '@mui/icons-material/ViewTimelineOutlined'
 import FolderIcon from '@mui/icons-material/FolderOutlined'
 import TaskIcon from '@mui/icons-material/TaskAltOutlined'
 import ApprovalIcon from '@mui/icons-material/FactCheckOutlined'
@@ -12,6 +13,7 @@ import HistoryIcon from '@mui/icons-material/HistoryOutlined'
 export const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon, roles: ['ADMIN', 'MANAGER'] },
   { to: '/allocation', label: 'Allocation', icon: GridIcon, roles: ['ADMIN', 'MANAGER'] },
+  { to: '/schedule', label: 'Schedule', icon: ScheduleIcon, roles: ['ADMIN', 'MANAGER'] },
   { to: '/my-tasks', label: 'My tasks', icon: TaskIcon, roles: ['EMPLOYEE'] },
   { to: '/projects', label: 'Projects', icon: FolderIcon, roles: ['ADMIN', 'MANAGER', 'EMPLOYEE'] },
   { to: '/approvals', label: 'Approvals', icon: ApprovalIcon, roles: ['ADMIN', 'MANAGER'] },

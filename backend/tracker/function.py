@@ -1,14 +1,14 @@
 """AWS Lambda entry point for the ACME Project Tracker API.
 
 Terraform finds this service by backend/tracker/requirements.txt and calls
-function.handler. On a cold start it connects to Postgres, applies any new
+function.handler. On a cold start it connects to Postgres, applies new
 migrations (Aurora isn't publicly reachable, so the schema can only be applied
-from in here), and creates the first admin if BOOTSTRAP_ADMIN_PASSWORD is set.
-A warm instance reuses its connection. Everything else is api.app.dispatch().
+from inside the Lambda) and creates the first admin if BOOTSTRAP_ADMIN_PASSWORD
+is set. A warm instance reuses its connection. The rest is api.app.dispatch().
 
-Lambda is not a server: instances don't share memory and are recycled at
-will, so nothing here may be "generated on first run". The JWT secret comes
-from the environment, the same for every instance.
+Lambda instances don't share memory and are recycled at will, so nothing may be
+"generated on first run". The JWT secret comes from the environment, so every
+instance signs and checks tokens with the same key.
 """
 
 import logging

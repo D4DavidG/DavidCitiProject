@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import LoginPage from './LoginPage'
@@ -71,5 +71,46 @@ describe('LoginPage', () => {
   it('skips the form when already signed in', () => {
     renderLogin(session(USERS.manager))
     expect(screen.getByText('dashboard page')).toBeInTheDocument()
+  })
+
+  describe('while signing in', () => {
+    /** A login the test finishes by hand, like a request held open. */
+    function heldLogin() {
+      let fail
+      const login = vi.fn(() => new Promise((_, reject) => { fail = reject }))
+      return { login, fail: (error) => fail(error) }
+    }
+    const controls = () => [
+      screen.getByLabelText(/username/i), screen.getByLabelText(/^password/i), screen.getByRole('button', { name: /sign(ing)? in/i }),
+    ]
+
+    it('disables both fields and the button, which says it is signing in', async () => {
+      renderLogin(session(null, { login: heldLogin().login }))
+      await signIn()
+      expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled()
+      controls().forEach((control) => expect(control).toBeDisabled())
+    })
+
+    it('enables them again after a refusal, so the password can be retyped', async () => {
+      const held = heldLogin()
+      renderLogin(session(null, { login: held.login }))
+      await signIn('ML662930', 'nope')
+      held.fail(new ApiError(401, 'Wrong username or password.'))
+      expect(await screen.findByText('Wrong username or password.')).toBeInTheDocument()
+      controls().forEach((control) => expect(control).toBeEnabled())
+    })
+
+    it('sends one login, however many times the form is submitted', async () => {
+      const held = heldLogin()
+      renderLogin(session(null, { login: held.login }))
+      await userEvent.type(screen.getByLabelText(/username/i), 'ML662930')
+      await userEvent.type(screen.getByLabelText(/^password/i), 'Demo-pass-2026')
+      const form = screen.getByLabelText(/username/i).closest('form')
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+      expect(held.login).toHaveBeenCalledTimes(1)
+      held.fail(new ApiError(401, 'Wrong username or password.'))
+      await waitFor(() => expect(screen.getByLabelText(/username/i)).toBeEnabled())
+    })
   })
 })

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Alert, Box, Button, TextField } from '@mui/material'
 import { homePath, useAuth } from '../../auth/useAuth'
@@ -14,6 +14,7 @@ const FIELDS = [
 /**
  * Change your password. Required on first sign-in: until then the server answers
  * every other request with 403, and RequireRole keeps sending you back here.
+ * While saving, every field and the button are disabled and a second submit is ignored.
  */
 export default function ChangePasswordPage() {
   const { user, startSession } = useAuth()
@@ -22,15 +23,18 @@ export default function ChangePasswordPage() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const sending = useRef(false) // set at once, so two submits in the same moment send once
 
   async function submit(event) {
     event.preventDefault()
+    if (sending.current) return
     setError(null)
     if (values.newPassword !== values.confirm) {
       setFieldErrors({ confirm: "Passwords don't match." })
       return
     }
     setFieldErrors({})
+    sending.current = true
     setBusy(true)
     try {
       // The change ends every older session, this one included, and answers with a new one.
@@ -42,6 +46,7 @@ export default function ChangePasswordPage() {
     } catch (failure) {
       if (failure.field && failure.field in values) setFieldErrors({ [failure.field]: failure.message })
       else setError(failure.message)
+      sending.current = false
       setBusy(false)
     }
   }
@@ -65,6 +70,7 @@ export default function ChangePasswordPage() {
             onChange={(e) => setValues({ ...values, [name]: e.target.value })}
             autoComplete={autoComplete}
             required
+            disabled={busy}
             error={Boolean(fieldErrors[name])}
             helperText={fieldErrors[name] ?? helper}
           />

@@ -1,7 +1,7 @@
 """A person's in-app notifications (the bell).
 
-Marking one read changes only the reader's own inbox, not business data, so it
-is not audited; auditing it would notify people about notifications.
+Marking one read touches only the reader's own inbox, not business data, so it
+is not audited (that would notify people about notifications).
 """
 
 import psycopg

@@ -7,13 +7,15 @@ A deliverable's status is computed, never typed in:
     NOT_STARTED  otherwise
 Progress is the share of its live tasks' estimated minutes that are done.
 
-Sign-off is refused while a task or a dependency is unfinished. Reopening work
-under a signed-off deliverable clears its sign-off, and the sign-offs of
-everything that depends on it (integrity check 5 guards this).
+Sign-off is refused while a task or dependency is unfinished. If that later
+stops being true (a task added, reopened or reactivated; a new unfinished
+dependency; the deliverable reactivated), the sign-off is cleared, and so are the
+sign-offs of everything depending on it (integrity check 5 guards this). The
+manager can also reopen a sign-off by hand.
 
 Dependencies stay inside one project (the database enforces it too) and may
-never loop (checked here, under a lock on the project row, and re-checked by
-integrity check 1).
+never loop: checked here under a lock on the project row, and again by
+integrity check 1.
 """
 
 import datetime as dt
@@ -100,7 +102,7 @@ def _check_dates(merged: dict) -> None:
 
 
 def _load(conn: psycopg.Connection, actor: Actor, milestone_id: int, manage: bool) -> tuple[dict, dict]:
-    """The deliverable and its project, if visible (or manageable); otherwise 404/403."""
+    """The deliverable and its project if visible (manage=True: manageable, project row locked); else 404, 403 or 409 (archived project)."""
     row = conn.execute("SELECT * FROM milestones WHERE milestone_id = %s", (milestone_id,)).fetchone()
     if row is None:
         raise NotFound(NOT_FOUND)
@@ -112,7 +114,7 @@ def _load(conn: psycopg.Connection, actor: Actor, milestone_id: int, manage: boo
     return row, project
 
 
-# --- create, read, update, archive ---------------------------------------------------
+# --- create, read, update, archive ---
 
 def create_milestone(conn: psycopg.Connection, actor: Actor, project_id: int, data: dict) -> dict:
     values.only_allowed(data, _FIELDS)
@@ -196,7 +198,7 @@ def reactivate_milestone(conn: psycopg.Connection, actor: Actor, milestone_id: i
     return row
 
 
-# --- sign-off -----------------------------------------------------------------------
+# --- sign-off ---
 
 def sign_off(conn: psycopg.Connection, actor: Actor, milestone_id: int) -> dict:
     """The project's manager (or an admin) marks a deliverable done, once all its work is done."""
@@ -248,7 +250,7 @@ def clear_sign_off(conn: psycopg.Connection, actor: Actor, milestone_id: int, re
                             f"Sign-off of deliverable {m['name']} was cleared because {reason}")
 
 
-# --- dependencies ---------------------------------------------------------------------
+# --- dependencies ---
 
 def add_dependency(conn: psycopg.Connection, actor: Actor, milestone_id: int, depends_on_id: int) -> dict:
     """Record that `milestone_id` can't finish before `depends_on_id`. Same project, no loops."""

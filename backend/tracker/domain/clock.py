@@ -1,6 +1,6 @@
-"""Whose "today". Lambda and Aurora run in UTC; ACME's day is Eastern time.
+"""ACME's "today": Lambda and Aurora run in UTC, but the business day is Eastern time.
 
-Services call clock.today() through the module, so tests can replace it.
+Services call clock.today() through the module so tests can replace it.
 """
 
 import datetime as dt

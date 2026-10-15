@@ -24,6 +24,7 @@ const DependencyPage = lazyPage(() => import('./pages/projects/DependencyPage'))
 const ProjectDetailPage = lazyPage(() => import('./pages/projects/ProjectDetailPage'))
 const ProjectsPage = lazyPage(() => import('./pages/projects/ProjectsPage'))
 const RequestsPage = lazyPage(() => import('./pages/requests/RequestsPage'))
+const SchedulePage = lazyPage(() => import('./pages/schedule/SchedulePage'))
 
 /** "/" sends you to your home screen, or to the login page. */
 function Home() {
@@ -68,6 +69,7 @@ export function AppRoutes() {
       <Route element={<SignedIn />}>
         <Route path="/dashboard" element={<RequireRole roles={STAFF}><DashboardPage /></RequireRole>} />
         <Route path="/allocation" element={<RequireRole roles={STAFF}><AllocationPage /></RequireRole>} />
+        <Route path="/schedule" element={<RequireRole roles={STAFF}><SchedulePage /></RequireRole>} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/projects/:id/dependencies" element={<DependencyPage />} />

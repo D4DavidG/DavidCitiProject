@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import ChangePasswordPage from './ChangePasswordPage'
-import { USERS, renderAt, session, stubApi } from '../../test/utils'
+import { USERS, holdOpen, renderAt, session, stubApi } from '../../test/utils'
 
 const landing = [<Route key="dash" path="/dashboard" element={<p>dashboard page</p>} />]
 
@@ -59,5 +59,47 @@ describe('ChangePasswordPage', () => {
     renderPage()
     await fill('wrong', 'my-new-password', 'my-new-password')
     expect(await screen.findByText('Your current password is wrong.')).toBeInTheDocument()
+  })
+
+  describe('while saving', () => {
+    const controls = () => [
+      screen.getByLabelText(/current password/i), screen.getByLabelText(/^new password/i), screen.getByLabelText(/confirm/i),
+      screen.getByRole('button', { name: /^(change password|saving…)$/i }),
+    ]
+
+    it('disables every field and the button, which says it is saving', async () => {
+      stubApi({ 'POST /auth/change-password': [200, USERS.manager] })
+      holdOpen('/auth/change-password')
+      renderPage()
+      await fill('Generated-123', 'my-new-password', 'my-new-password')
+      expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+      controls().forEach((control) => expect(control).toBeDisabled())
+    })
+
+    it('enables them again after a refusal', async () => {
+      stubApi({ 'POST /auth/change-password': [400, { error: 'That password is too common.' }] })
+      const release = holdOpen('/auth/change-password')
+      renderPage()
+      await fill('Generated-123', 'password1', 'password1')
+      expect(screen.getByLabelText(/current password/i)).toBeDisabled()
+      release()
+      expect(await screen.findByText('That password is too common.')).toBeInTheDocument()
+      controls().forEach((control) => expect(control).toBeEnabled())
+    })
+
+    it('sends once, however many times the form is submitted', async () => {
+      const calls = stubApi({ 'POST /auth/change-password': [400, { error: 'That password is too common.' }] })
+      const release = holdOpen('/auth/change-password')
+      renderPage()
+      await userEvent.type(screen.getByLabelText(/current password/i), 'Generated-123')
+      await userEvent.type(screen.getByLabelText(/^new password/i), 'password1')
+      await userEvent.type(screen.getByLabelText(/confirm/i), 'password1')
+      const form = screen.getByLabelText(/current password/i).closest('form')
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+      release()
+      await waitFor(() => expect(screen.getByLabelText(/current password/i)).toBeEnabled())
+      expect(calls.filter((c) => c.path === '/auth/change-password')).toHaveLength(1)
+    })
   })
 })

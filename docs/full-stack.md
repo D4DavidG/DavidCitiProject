@@ -1,6 +1,6 @@
 # Coding Workshop - Full Stack Guide
 
-> [Main Guide](./README.md) | [Validation Guide](./validation.md) | [AI FDE Guide](./ai-fde.md) | [Data Engineer Guide](./data-engineer.md) | **Full Stack Guide** | [System Engineer Guide](./system-engineer.md) | [UI/UX Engineer Guide](./ui-ux-engineer.md)
+> [Main Guide](./README.md) | [Validation Guide](./validation.md) | **Full Stack Guide**
 
 ## Overview
 
@@ -386,10 +386,6 @@ Secure access is essential to protect data and ensure users only perform permitt
   <ol>
     <li><a href="./README.md">Main Guide</a></li>
     <li><a href="./validation.md">Validation Guide</a></li>
-    <li><a href="./ai-stack.md">AI FDE Guide</a></li>
-    <li><a href="./data-engineer.md">Data Engineer Guide</a></li>
     <li><a href="./full-stack.md">Full Stack Guide</a></li>
-    <li><a href="./system-engineer.md">System Engineer Guide</a></li>
-    <li><a href="./ui-ux-engineer.md">UI/UX Engineer Guide</a></li>
   </ol>
 </nav>

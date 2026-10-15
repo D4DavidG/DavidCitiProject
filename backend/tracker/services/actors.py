@@ -1,8 +1,8 @@
 """Who is making the request, read from the database.
 
 The token only says which user id signed in. Role, manager and the
-password-change flag come from Postgres on every request, so a demoted user's
-old token can't keep powers they no longer have.
+password-change flag are re-read from Postgres on every request, so a demoted
+user's old token loses its powers at once.
 """
 
 from dataclasses import dataclass

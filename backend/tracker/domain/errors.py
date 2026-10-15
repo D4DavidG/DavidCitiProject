@@ -1,15 +1,13 @@
-"""Domain exceptions.
+"""Domain exceptions. Services raise these and never know about HTTP.
 
-Services raise these; they never know about HTTP. The API maps each class to a
-status code in one table (api/errors.py). Subclasses come before their parents
-there, so a specific error is never answered with its parent's status.
+api/errors.py maps each class to a status code in one table.
 """
 
 
 class DomainError(Exception):
     """Base class for every error the app reports to a caller."""
 
-    code: str | None = None  # a machine-readable tag the website can act on; most errors have none
+    code: str | None = None  # optional tag the website can act on (see OverCapacity)
 
 
 class ValidationError(DomainError):

@@ -1,19 +1,18 @@
 """The audit log and who it notifies.
 
-record_change() is called inside the same transaction as the change it records,
-so the change, its audit row and its notifications commit together or not at
-all. Recipients come from the actor's role as stored right now, never from a
-token or a stale session:
+record_change() runs inside the same transaction as the change it records, so
+the change, its audit row and its notifications commit together or not at all.
+Recipients come from the actor's role stored in the database now, never the token:
 
     Employee -> their line manager, every admin, and, when the change is to a
                 project's work (a task, logged time, ...), that project's manager
     Manager  -> every admin
     Admin    -> every other admin
 
-A caller may name one more recipient (`also_notify`), used to tell an asker
-their request was decided. Archived users receive nothing. A lone admin's change notifies nobody but is
-still recorded. The notification text is the one-line summary, never the
-before/after state, so nobody sees a salary through a notification.
+A caller may name one more recipient (`also_notify`): the asker, when their
+request is decided. Archived users receive nothing. A lone admin's change
+notifies nobody but is still recorded. Notification text is the one-line
+summary, never the before/after state, so no salary leaks through it.
 
 person_history() reads one person's trail back: admins, the person's line
 manager and the person themself may read it; only admins get the state.
@@ -33,7 +32,7 @@ def record_change(conn: psycopg.Connection, actor: Actor | None, action: str, en
                   entity_id: int | None, before: dict | None, after: dict | None, summary: str,
                   also_notify: int | None = None) -> int:
     """Write one audit row plus its notifications; return the audit id."""
-    role = None
+    role = None  # system actions (actor None) have no role
     if actor is not None:
         role = conn.execute("SELECT role FROM users WHERE user_id = %s", (actor.user_id,)).fetchone()["role"]
     audit_id = conn.execute(
@@ -55,7 +54,7 @@ def record_change(conn: psycopg.Connection, actor: Actor | None, action: str, en
     return audit_id
 
 
-# Tables whose rows belong to one project, by their key column. Each has a project_id.
+# Tables whose rows belong to one project (entity_type -> key column); each has a project_id.
 _PROJECT_ROWS = {"projects": "project_id", "assignments": "assignment_id", "milestones": "milestone_id",
                  "tasks": "task_id", "time_entries": "entry_id"}
 

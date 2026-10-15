@@ -1,9 +1,9 @@
 """The one table mapping domain exceptions to HTTP status codes.
 
-Order matters: subclasses come before their parents, or a 409 OverCapacity
-would be answered as its parent's status. Every error body is { "error": "..." },
-plus "field" (camelCase) when a specific input is at fault, and "code" when the
-error has a machine-readable tag (OVER_CAPACITY: the website asks to confirm).
+Order matters: the first match wins, so a subclass must come before its parent
+(OverCapacity before Conflict). Every body is { "error": "..." }, plus "field"
+(camelCase) when one input is at fault, and "code" when the error has a tag
+(OVER_CAPACITY: the website asks to confirm).
 """
 
 from api.http import to_camel
@@ -33,6 +33,7 @@ UNEXPECTED = "Something went wrong on our side. Nothing was changed."
 
 
 def to_response(exc: DomainError) -> tuple[int, dict]:
+    """Status code and JSON body for a domain error; anything unlisted is a 500 with a generic message."""
     for error_class, status in STATUS:
         if isinstance(exc, error_class):
             body = {"error": str(exc)}

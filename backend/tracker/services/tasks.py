@@ -1,12 +1,11 @@
 """Tasks: the pieces of a deliverable that employees tick off (the Kanban pull pattern).
 
-The project's manager (or an admin) creates a task and estimates it. Left
-without an assignee, it is Ready: an employee booked on the project takes it
-("Take this", claim_task) up to their task limit, and can put it back
-(release_task). The manager can still assign it to anyone booked, even past
-their limit. Only the assignee moves its status, between TODO, IN_PROGRESS and
-DONE. Moving a task out of DONE, or adding one, under a signed-off deliverable
-clears that sign-off.
+The project's manager (or an admin) creates and estimates a task. With no
+assignee it is Ready: an employee booked on the project takes it ("Take this",
+claim_task) up to their task limit, and can put it back (release_task). The
+manager can still assign it to anyone booked, even past their limit. Only the
+assignee moves its status (TODO, IN_PROGRESS, DONE). Adding a task, or moving
+one out of DONE, under a signed-off deliverable clears that sign-off.
 """
 
 import datetime as dt
@@ -119,8 +118,8 @@ def move_task(conn: psycopg.Connection, actor: Actor, task_id: int, status: str)
     return row
 
 
-# The one definition of "held": unfinished, live tasks on live projects, across every project.
-# Correlated on the outer alias `u` (a users row), so it serves one person or a whole list.
+# The one definition of "held": unfinished, live tasks on live projects, across all projects.
+# A correlated subquery on the outer alias `u` (a users row), so it works for one person or a list.
 HELD = sql.SQL("(SELECT count(*) FROM tasks t JOIN projects p ON p.project_id = t.project_id"
                " WHERE t.assignee_user_id = u.user_id AND t.status IN ('TODO', 'IN_PROGRESS')"
                " AND NOT t.is_archived AND NOT p.is_archived)")
@@ -152,7 +151,8 @@ def claim_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
             raise Conflict("This task is already done.")
         if before["assignee_user_id"] is not None:
             raise Conflict("This task is already taken.")
-        # Then the person. Counting in a separate statement sees a claim that committed while we waited.
+        # Lock order is task, then person. The count runs after the lock so it sees any
+        # claim that committed while we waited (two concurrent claims can't both fit).
         limit = conn.execute("SELECT task_limit FROM users WHERE user_id = %s FOR UPDATE",
                              (actor.user_id,)).fetchone()["task_limit"]
         held = held_count(conn, actor.user_id)
@@ -175,7 +175,7 @@ def release_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
             raise Conflict("This task is archived.")
         if before["status"] == "DONE":
             raise Conflict("This task is done. Move it back to In progress first.")
-        # Intentional: claim and release both lock task, then person (spec section 7), so they can't deadlock.
+        # Same lock order as claim_task (task, then person), so the two can't deadlock (pull-board spec, section 7).
         conn.execute("SELECT 1 FROM users WHERE user_id = %s FOR UPDATE", (actor.user_id,))
         row = conn.execute("UPDATE tasks SET assignee_user_id = NULL, status = 'TODO', updated_at = now()"
                            " WHERE task_id = %s RETURNING *", (task_id,)).fetchone()
@@ -237,7 +237,7 @@ def board(conn: psycopg.Connection, actor: Actor, project_id: int) -> dict:
     visible_project(conn, actor, project_id)  # 404 if it isn't yours
     items = conn.execute(f"{_WITH_NAMES} WHERE t.project_id = %s AND NOT t.is_archived"
                          " ORDER BY m.due_date, t.task_id", (project_id,)).fetchall()
-    # EXISTS, not a join: a person with two live bookings on the project is listed once.
+    # EXISTS, not a join, so someone with two live bookings on the project is listed once.
     people = conn.execute(
         sql.SQL("SELECT u.user_id, u.first_name || ' ' || u.last_name AS name, {} AS held, u.task_limit"
                 " FROM users u WHERE NOT u.is_archived AND EXISTS (SELECT 1 FROM assignments a"

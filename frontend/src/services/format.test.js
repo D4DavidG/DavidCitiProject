@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, centsToDollarsInput, daysBetween, formatCents, formatDate, formatDateTime, formatDay, formatHours, parseDollars, parseDuration, splitMinutes, todayIso,
+  addDays, centsToDollarsInput, daysBetween, formatCents, formatDate, formatDateTime, formatDay, formatHours, formatPerWeek, parseDollars, parseDuration, splitMinutes, todayIso,
 } from './format'
 
 describe('formatCents', () => {
@@ -136,5 +136,13 @@ describe('todayIso', () => {
 describe('formatDateTime', () => {
   it('formats a timestamp in Eastern time, like the server', () => {
     expect(formatDateTime('2026-10-14T01:03:25+00:00')).toBe('Oct 13, 2026, 9:03 PM')
+  })
+})
+
+describe('formatPerWeek', () => {
+  it('shows booked hours a week short on screen, and in words for screen readers', () => {
+    expect(formatPerWeek(25)).toBe('25 h/wk')
+    expect(formatPerWeek(25, { spoken: true })).toBe('25 hours a week')
+    expect(formatPerWeek(1, { spoken: true })).toBe('1 hour a week')
   })
 })

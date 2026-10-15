@@ -19,7 +19,7 @@ const TIME_FIELDS = [
   { name: 'note', label: 'Note', type: 'textarea' },
 ]
 
-function TaskCard({ task, onMove, onLog }) {
+function TaskCard({ task, busy = false, onMove, onLog }) {
   const titleId = `task-${task.taskId}`
   return (
     <Card component="article" aria-labelledby={titleId}>
@@ -37,11 +37,12 @@ function TaskCard({ task, onMove, onLog }) {
           label="Status"
           value={task.status}
           onChange={(e) => onMove(task, e.target.value)}
+          disabled={busy}
           sx={{ minWidth: 160 }}
         >
           {TASK_STATUSES.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
         </TextField>
-        <Button variant="contained" onClick={() => onLog(task)}>Log time</Button>
+        <Button variant="contained" onClick={() => onLog(task)} disabled={busy}>Log time</Button>
       </CardActions>
     </Card>
   )
@@ -57,6 +58,8 @@ TaskCard.propTypes = {
     status: PropTypes.string.isRequired,
     estimateMinutes: PropTypes.number.isRequired,
   }).isRequired,
+  /** True while this task's status change is saving: the card's controls are disabled. */
+  busy: PropTypes.bool,
   onMove: PropTypes.func.isRequired,
   onLog: PropTypes.func.isRequired,
 }
@@ -114,6 +117,7 @@ export default function MyTasksPage() {
   const [editing, setEditing] = useState(null)
   const [message, setMessage] = useState(null)
   const [takingId, setTakingId] = useState(null)
+  const [movingId, setMovingId] = useState(null)
   const [overCapacity, setOverCapacity] = useState(null)
 
   /**
@@ -146,11 +150,14 @@ export default function MyTasksPage() {
 
   async function move(task, status) {
     setMessage(null)
+    setMovingId(task.taskId) // the card's status and Log time are disabled until the answer arrives
     try {
       await request('POST', `/tasks/${task.taskId}/status`, { body: { status } })
       tasks.reload()
     } catch (failure) {
       setMessage({ severity: 'error', text: failure.message })
+    } finally {
+      setMovingId(null)
     }
   }
 
@@ -191,7 +198,7 @@ export default function MyTasksPage() {
 
       <PageState loading={tasks.loading && !tasks.data} error={tasks.error} onRetry={tasks.reload} empty={tasks.data && items.length === 0 ? 'No open tasks. Nice work.' : null}>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
-          {items.map((task) => <TaskCard key={task.taskId} task={task} onMove={move} onLog={setLogging} />)}
+          {items.map((task) => <TaskCard key={task.taskId} task={task} busy={movingId === task.taskId} onMove={move} onLog={setLogging} />)}
         </Box>
       </PageState>
 

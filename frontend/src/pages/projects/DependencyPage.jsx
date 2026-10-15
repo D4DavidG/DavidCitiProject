@@ -15,7 +15,7 @@ import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
 import { steps } from './graph'
 
-function Node({ node, needs, canManage, onUnlink }) {
+function Node({ node, needs, canManage, unlinking, onUnlink }) {
   const titleId = `node-${node.milestoneId}`
   const waiting = needs.filter((n) => n.status !== 'DONE')
   return (
@@ -35,7 +35,7 @@ function Node({ node, needs, canManage, onUnlink }) {
         {canManage && needs.map((dep) => (
           // Words, not just an icon: a phone has no hover to reveal a tooltip.
           <Button key={dep.milestoneId} size="small" color="inherit" startIcon={<LinkOffIcon fontSize="small" />}
-            onClick={() => onUnlink(node, dep)} sx={{ justifySelf: 'start', color: 'text.secondary' }}>
+            onClick={() => onUnlink(node, dep)} disabled={unlinking === dep.milestoneId} sx={{ justifySelf: 'start', color: 'text.secondary' }}>
             Remove link to {dep.name}
           </Button>
         ))}
@@ -54,6 +54,8 @@ Node.propTypes = {
   }).isRequired,
   needs: PropTypes.arrayOf(PropTypes.object).isRequired,
   canManage: PropTypes.bool.isRequired,
+  /** The deliverable whose link from this one is being removed right now: its button waits for the answer. */
+  unlinking: PropTypes.number,
   onUnlink: PropTypes.func.isRequired,
 }
 
@@ -71,6 +73,7 @@ export default function DependencyPage() {
   const graph = useApi(loadGraph)
   const [adding, setAdding] = useState(false)
   const [actionError, setActionError] = useState(null)
+  const [unlinking, setUnlinking] = useState(null) // { from, to } while a link is being removed
 
   const p = project.data
   const canManage = Boolean(p) && !p.isArchived && (user.role === 'ADMIN' || (user.role === 'MANAGER' && p.managerId === user.userId))
@@ -82,11 +85,14 @@ export default function DependencyPage() {
 
   async function unlink(node, dep) {
     setActionError(null)
+    setUnlinking({ from: node.milestoneId, to: dep.milestoneId })
     try {
       await request('POST', `/milestones/${node.milestoneId}/dependencies/${dep.milestoneId}/archive`)
       graph.reload()
     } catch (failure) {
       setActionError(failure.message)
+    } finally {
+      setUnlinking(null)
     }
   }
 
@@ -112,7 +118,7 @@ export default function DependencyPage() {
               <Box component="section" aria-label={`Step ${index + 1}`} sx={{ display: 'grid', gap: 1.5, minWidth: 240, width: { xs: '100%', md: 260 } }}>
                 <Typography variant="overline" color="text.secondary">Step {index + 1}</Typography>
                 {column.map((node) => (
-                  <Node key={node.milestoneId} node={node} needs={needsOf(node.milestoneId)} canManage={canManage} onUnlink={unlink} />
+                  <Node key={node.milestoneId} node={node} needs={needsOf(node.milestoneId)} canManage={canManage} unlinking={unlinking?.from === node.milestoneId ? unlinking.to : undefined} onUnlink={unlink} />
                 ))}
               </Box>
             </Box>

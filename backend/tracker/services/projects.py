@@ -1,9 +1,9 @@
 """Projects: created by admins, run by one manager each, archived rather than deleted.
 
-A project's manager may change its description, dates, budget and status. Its
-name and its manager are admin-only. Archiving a project archives its bookings,
-deliverables and tasks with the same timestamp, and reactivating restores
-exactly those.
+A project's manager may change its description, dates, budget and status; its
+name and manager are admin-only. Archiving also archives its bookings,
+deliverables and tasks with the same timestamp, and reactivating restores only
+the rows carrying that timestamp (ones archived earlier stay archived).
 """
 
 import datetime as dt
@@ -25,7 +25,7 @@ _ADMIN_FIELDS = {"name", "description", "manager_id", "start_date", "predicted_e
 _ADMIN_ONLY = {"name", "manager_id"}
 CHILDREN = ("assignments", "milestones", "tasks")
 
-# Question 1: a project's progress is the share of its live tasks' estimated minutes that are done.
+# Q1: progress = share of the project's live tasks' estimated minutes that are done (0 with no tasks).
 _WITH_PROGRESS = (
     "SELECT p.*, COALESCE(pr.progress_percent, 0) AS progress_percent FROM projects p"
     " LEFT JOIN (SELECT project_id, (COALESCE(sum(estimate_minutes) FILTER (WHERE status = 'DONE'), 0) * 100"
@@ -64,7 +64,7 @@ def _check(conn: psycopg.Connection, merged: dict) -> None:
 
 
 def create_project(conn: psycopg.Connection, actor: Actor, data: dict) -> dict:
-    """Admin only."""
+    """Create a project. Admin only; managers file a project request instead."""
     if not actor.is_admin:
         raise Forbidden("Only admins create projects. Managers can file a project request.")
     values.only_allowed(data, _ADMIN_FIELDS)
@@ -106,7 +106,7 @@ def list_projects(conn: psycopg.Connection, actor: Actor, filters: dict, page: i
     if status := values.choice(filters, "status", STATUSES, required=False):
         where.append("p.status = %(status)s")
         params["status"] = status
-    # The WHERE fragments are fixed strings from this function; every value is a parameter.
+    # WHERE fragments are fixed strings written above; every value is a parameter.
     query = sql.SQL("{} WHERE {}").format(sql.SQL(_WITH_PROGRESS), sql.SQL(" AND ").join(map(sql.SQL, where)))
     return paginate(conn, query, params, sql.SQL("p.name, p.project_id"), page, page_size)
 

@@ -13,9 +13,15 @@ const STRIPES = `repeating-linear-gradient(45deg, ${STRIPE} 0 2px, transparent 2
  * A chart's frame: a figure named by its heading, a one-line summary, then axis, rows, legend and note.
  * Marks carry data-mark; problem marks carry data-state="late" or "over" and get stripes only in
  * print and high-contrast mode, so colour is never the only signal.
- * @param {object} props title, summary, optional axis, legend, note; children are the rows (li)
+ * `scroll` (the box's name) puts the axis and rows in a box that scrolls sideways (the Schedule's
+ * 26 weeks), so the page itself never does. The box is always one Tab stop, so the keyboard can
+ * scroll it even when nothing inside takes focus; `scrollPaddingLeft` keeps a sticky first column
+ * from covering whatever focus scrolls into view. `legendFirst` puts the legend above the rows.
+ * @param {object} props title, summary, optional axis, legend, note, scroll, scrollPaddingLeft, legendFirst; children are the rows (li)
  */
-export function ChartFigure({ title, summary, axis, legend, note, children }) {
+export function ChartFigure({
+  title, summary, axis, legend, note, scroll, scrollPaddingLeft, legendFirst = false, children,
+}) {
   const headingId = useId()
   return (
     <Card
@@ -33,10 +39,16 @@ export function ChartFigure({ title, summary, axis, legend, note, children }) {
     >
       <Typography id={headingId} variant="h3" component="h2">{title}</Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>{summary}</Typography>
-      {axis}
-      {/* Relative, so a reference line (Today, Budget) can be one absolute li spanning every row. */}
-      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, position: 'relative' }}>{children}</Box>
-      {legend}
+      {legendFirst && legend}
+      <Box
+        {...(scroll && { role: 'region', 'aria-label': scroll, tabIndex: 0 })}
+        sx={scroll ? { overflowX: 'auto', scrollPaddingLeft } : undefined}
+      >
+        {axis}
+        {/* Relative, so a reference line (Today, Budget) can be one absolute li spanning every row. */}
+        <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, position: 'relative' }}>{children}</Box>
+      </Box>
+      {!legendFirst && legend}
       {note}
     </Card>
   )
@@ -48,6 +60,12 @@ ChartFigure.propTypes = {
   axis: PropTypes.node,
   legend: PropTypes.node,
   note: PropTypes.node,
+  /** When set, rows wider than the card scroll sideways inside it, with the axis; it names that box. */
+  scroll: PropTypes.string,
+  /** Width of a sticky first column (a CSS length, or a breakpoint object) for the scroll box to keep clear. */
+  scrollPaddingLeft: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+  /** Show the legend above the rows rather than below. */
+  legendFirst: PropTypes.bool,
   children: PropTypes.node,
 }
 

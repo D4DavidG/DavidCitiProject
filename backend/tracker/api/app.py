@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 
 def authorise(conn: psycopg.Connection, request: http.Request, route: routes.Route, secret: str,
               now: dt.datetime) -> Actor:
-    """Who is calling, read fresh from the database, and may their stored role use this route?"""
+    """Return the caller, read fresh from the database; refuse if their stored role can't use this route.
+
+    The token only proves who signed in. Role and the must-change-password flag
+    come from Postgres, never from the token, so a demoted user loses access at once.
+    """
     header = request.headers.get("authorization", "")
     if not header.startswith("Bearer "):
         raise AuthenticationError(tokens.INVALID_MESSAGE)
@@ -45,6 +49,6 @@ def dispatch(event: dict, conn: psycopg.Connection, secret: str, now: dt.datetim
         return http.respond(route.status, payload)
     except DomainError as exc:
         return http.respond(*errors.to_response(exc))
-    except Exception:  # an unexpected bug: log it, tell the caller nothing internal
+    except Exception:  # a bug: log the details, tell the caller nothing internal
         logger.exception("Unhandled error for %s", event.get("rawPath"))
         return http.respond(500, {"error": errors.UNEXPECTED})

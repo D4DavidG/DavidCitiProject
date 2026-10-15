@@ -1,8 +1,8 @@
 """The outside shape of every record: camelCase, every field named explicitly.
 
-Used for API responses and for audit snapshots, so both always agree. Naming
-each field (never dumping a row) is what guarantees password_hash can't leak
-when someone adds a column later.
+Used for API responses and audit snapshots, so the two always agree. Each field
+is named (a row is never dumped whole), so password_hash, or any column added
+later, can't leak.
 """
 
 import datetime as dt
@@ -28,7 +28,7 @@ _USER = {
 
 
 def user_view(row: dict, include_salary: bool) -> dict:
-    """A person. Salary only for admins and the person themselves."""
+    """A person. The caller decides `include_salary` (admins and the person themselves only)."""
     view = _pick(row, _USER)
     if include_salary:
         view["annualSalaryCents"] = row.get("annual_salary_cents")

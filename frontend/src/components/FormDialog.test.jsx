@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FormDialog from './FormDialog'
 import { ApiError } from '../services/request'
@@ -205,5 +205,77 @@ describe('FormDialog', () => {
     await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  describe('while saving', () => {
+    /** A save the test finishes by hand, like a request held open. */
+    function heldSave() {
+      let finish
+      let fail
+      const onSubmit = vi.fn(() => new Promise((resolve, reject) => { finish = resolve; fail = reject }))
+      return { onSubmit, finish: () => finish({}), fail: (error) => fail(error) }
+    }
+    const withTime = [...fields, { name: 'minutes', label: 'Time', type: 'duration', max: 1440 }]
+
+    /** Every input, the dropdown and both buttons, as a person would find them. */
+    function controls() {
+      return [
+        screen.getByLabelText(/^name/i), screen.getByLabelText(/hours per week/i), screen.getByLabelText(/budget/i),
+        screen.getByLabelText(/start date/i), screen.getByLabelText('Hours'), screen.getByLabelText('Minutes'),
+        screen.getByRole('button', { name: /cancel/i }), screen.getByRole('button', { name: /^(save|saving…)$/i }),
+      ]
+    }
+    const statusDisabled = () => screen.getByRole('combobox', { name: /status/i }).getAttribute('aria-disabled') === 'true'
+
+    it('disables every field and button, and says it is saving, until the save succeeds', async () => {
+      const save = heldSave()
+      renderForm({ fields: withTime, onSubmit: save.onSubmit })
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+      controls().forEach((control) => expect(control).toBeDisabled())
+      expect(statusDisabled()).toBe(true)
+      save.finish()
+      await waitFor(() => expect(screen.getByLabelText(/^name/i)).toBeEnabled())
+      controls().forEach((control) => expect(control).toBeEnabled())
+      expect(statusDisabled()).toBe(false)
+    })
+
+    it('enables everything again after an error, so it can be fixed and sent again', async () => {
+      const save = heldSave()
+      renderForm({ fields: withTime, onSubmit: save.onSubmit })
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/^name/i)).toBeDisabled()
+      save.fail(new ApiError(409, 'A project with that name already exists.'))
+      expect(await screen.findByText('A project with that name already exists.')).toBeInTheDocument()
+      controls().forEach((control) => expect(control).toBeEnabled())
+      expect(statusDisabled()).toBe(false)
+    })
+
+    it('sends once, however many times the form is submitted while saving', async () => {
+      const save = heldSave()
+      renderForm({ onSubmit: save.onSubmit })
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      const form = screen.getByLabelText(/^name/i).closest('form')
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+      expect(save.onSubmit).toHaveBeenCalledTimes(1)
+      save.finish()
+      await waitFor(() => expect(screen.getByLabelText(/^name/i)).toBeEnabled())
+    })
+
+    it('cannot be closed with Escape while saving', async () => {
+      const save = heldSave()
+      const onClose = vi.fn()
+      renderForm({ onSubmit: save.onSubmit, onClose })
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+      expect(onClose).not.toHaveBeenCalled()
+      save.finish()
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1)) // the successful save closes it
+    })
   })
 })

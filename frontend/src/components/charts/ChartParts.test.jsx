@@ -47,6 +47,33 @@ describe('chart parts', () => {
     expect(css).toMatch(/background-image:\s*repeating-linear-gradient[^;]*!important/)
   })
 
+  it('can scroll wide rows sideways inside the card, axis included, so the page never does', () => {
+    inTheme(<ChartFigure title="Wide" summary="S" scroll="Weeks" axis={<p>axis</p>}><li>row</li></ChartFigure>)
+    const box = screen.getByRole('region', { name: 'Weeks' })
+    expect(box).toHaveStyle({ overflowX: 'auto' })
+    expect(box).toContainElement(screen.getByText('axis'))
+    expect(box).toContainElement(within(screen.getByRole('figure', { name: 'Wide' })).getByRole('list'))
+  })
+
+  it('lets the keyboard reach the scroll box, even when nothing in it can take focus', () => {
+    inTheme(<ChartFigure title="Empty" summary="S" scroll="Weeks"><li>Not booked</li></ChartFigure>)
+    expect(screen.getByRole('region', { name: 'Weeks' })).toHaveAttribute('tabindex', '0')
+  })
+
+  it('keeps a sticky column clear when the scroll box brings something into view', () => {
+    inTheme(<ChartFigure title="Sticky" summary="S" scroll="Weeks" scrollPaddingLeft="7rem"><li>row</li></ChartFigure>)
+    screen.getByRole('region', { name: 'Weeks' })
+    // jsdom has no scroll-padding in computed styles, so read the generated CSS (as the stripes tests do).
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent).join('')
+    expect(css).toMatch(/scroll-padding-left:\s*7rem/)
+  })
+
+  it('can put the legend above the rows', () => {
+    inTheme(<ChartFigure title="Key first" summary="S" legendFirst legend={<p>key</p>}><li>row</li></ChartFigure>)
+    const rows = within(screen.getByRole('figure', { name: 'Key first' })).getByRole('list')
+    expect(screen.getByText('key').compareDocumentPosition(rows) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('gives two figures with the same title different heading ids', () => {
     inTheme(<><ChartFigure title="Same" summary="a" /><ChartFigure title="Same" summary="b" /></>)
     const [a, b] = screen.getAllByRole('figure', { name: 'Same' })
