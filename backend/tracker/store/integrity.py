@@ -1,8 +1,7 @@
 """The integrity check: five queries that must always return no rows.
 
-Each checks something the schema can't enforce row by row (a check the schema
-already guarantees could never fail, so it would prove nothing). They run after
-every test and back GET /admin/integrity-check.
+Each covers a rule the schema can't enforce row by row. They run after every
+database test and back GET /admin/integrity-check.
 """
 
 import psycopg
@@ -36,8 +35,7 @@ QUERIES = {
         FROM tasks t JOIN projects p ON p.project_id = t.project_id
         WHERE p.is_archived AND NOT t.is_archived
     """,
-    # Every record has its creation audit row: a write path that forgets
-    # record_change() fails whichever test used it.
+    # Every record has a CREATE audit row, so a write path that forgets record_change() fails.
     "audit": """
         SELECT t.entity_type, t.entity_id FROM (
                       SELECT 'users' AS entity_type, user_id AS entity_id FROM users
@@ -53,8 +51,8 @@ QUERIES = {
             WHERE a.action = 'CREATE' AND a.entity_type = t.entity_type AND a.entity_id = t.entity_id
         )
     """,
-    # Live time is only logged on days its author was booked on that project.
-    # Archived bookings count: archiving later doesn't make history wrong.
+    # Non-rejected time sits on a day its author was booked on that project.
+    # Archived bookings still count: archiving later doesn't make history wrong.
     "time_outside_booking": """
         SELECT e.entry_id
         FROM time_entries e

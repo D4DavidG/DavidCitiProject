@@ -1,9 +1,9 @@
 """Apply numbered migration files once each, in order, all or nothing.
 
-Run on every Lambda cold start (function.py) and by the test suite. An advisory
-lock makes two cold starts queue instead of both migrating. Each applied file's
-sha256 is recorded, and an applied file that later changes is refused: fix
-forward with a new file instead of editing one that has already run on Aurora.
+Runs on every Lambda cold start (function.py) and in the tests. An advisory lock
+makes two cold starts queue instead of both migrating. Each applied file's sha256
+is recorded; an applied file that later changes is refused, so fix forward with a
+new file instead of editing one that has already run on Aurora.
 """
 
 import hashlib
@@ -16,12 +16,12 @@ import psycopg
 from domain.errors import MigrationError
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
-LOCK_KEY = 74_131_015  # any fixed number; shared by every instance of this app
+LOCK_KEY = 74_131_015  # any fixed number, the same in every instance
 FILE_NAME = re.compile(r"^(\d{3})_[a-z0-9_]+\.sql$")
 
 
 def _read_files(directory: Path) -> list[tuple[int, str, str]]:
-    """Return (version, name, text) for every migration file, sorted by version."""
+    """Read every migration file as (version, name, text), sorted by version; refuse bad or duplicate numbers."""
     found: dict[int, str] = {}
     files = []
     for path in sorted(directory.glob("*.sql")):
@@ -66,7 +66,7 @@ def run(
                 if recorded[version] != digest:
                     raise MigrationError(f"{name} changed after it was applied. Add a new migration instead.")
                 continue
-            conn.execute(text)  # no parameters, so a file may hold several statements
+            conn.execute(text)  # no parameters, so one file can hold several statements
             conn.execute(
                 "INSERT INTO schema_migrations (version, name, sha256) VALUES (%s, %s, %s)",
                 (version, name, digest),
