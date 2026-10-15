@@ -33,8 +33,8 @@ const LEGEND = [['DONE', 'Done'], ['IN_PROGRESS', 'In progress'], ['NOT_STARTED'
 /** This week's column: a light wash of the highlight colour (palette.secondary, so dark mode follows). */
 const THIS_WEEK = (theme) => alpha(theme.palette.secondary.main, 0.12)
 /**
- * Every project's bar is the theme's one green (dark mode: its grey accent), at least 3:1 on the card
- * in both modes. Each row names its project, so a colour per project would add nothing, and it
+ * Every project's bar is the theme's green ink (#14602C, 7.7:1 on the white panel; dark mode #7CC78F,
+ * 9.6:1 on its panel). Each row names its project, so a colour per project would add nothing, and it
  * could clash with the workload chart's project colours on the same Dashboard.
  */
 const BAR_COLOUR = 'primary.main'
