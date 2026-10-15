@@ -26,7 +26,25 @@ const TIME_FIELDS = [
   { name: 'note', label: 'Note', type: 'textarea' },
 ]
 
-function TaskCard({ task, busy = false, onMove, onLog }) {
+/**
+ * A line right under what you pressed: a refusal, or news (time waiting for approval). A plain
+ * "done" needs none: the one Saved pop-up says it. News is polite (status); a refusal is an alert.
+ */
+function Notice({ notice, onClose }) {
+  if (!notice) return null
+  return (
+    <Alert severity={notice.severity} role={notice.severity === 'error' ? 'alert' : 'status'} onClose={onClose} sx={{ mx: 2, mb: 2 }}>
+      {notice.text}
+    </Alert>
+  )
+}
+
+Notice.propTypes = {
+  notice: PropTypes.shape({ severity: PropTypes.oneOf(['success', 'error']).isRequired, text: PropTypes.string.isRequired }),
+  onClose: PropTypes.func.isRequired,
+}
+
+function TaskCard({ task, busy = false, notice = null, onMove, onLog, onCloseNotice }) {
   const titleId = `task-${task.taskId}`
   return (
     <Card component="article" aria-labelledby={titleId}>
@@ -51,6 +69,7 @@ function TaskCard({ task, busy = false, onMove, onLog }) {
         </TextField>
         <Button variant="outlined" onClick={() => onLog(task)} disabled={busy}>Log time</Button>
       </CardActions>
+      <Notice notice={notice} onClose={onCloseNotice} />
     </Card>
   )
 }
@@ -67,8 +86,11 @@ TaskCard.propTypes = {
   }).isRequired,
   /** True while this task's status change is saving: the card's controls are disabled. */
   busy: PropTypes.bool,
+  /** A line for this card: a refused move, or time logged and waiting for approval. */
+  notice: PropTypes.object,
   onMove: PropTypes.func.isRequired,
   onLog: PropTypes.func.isRequired,
+  onCloseNotice: PropTypes.func.isRequired,
 }
 
 /**
@@ -112,6 +134,8 @@ ReadyCard.propTypes = {
  * folded away. Both task lists search on the server as you type. Logging past their weekly
  * capacity (without overtime allowed) asks "Log anyway?" with the server's message; Log anyway
  * resends with confirmOverCapacity and their manager is told. Other refusals show in the form.
+ * Messages sit by what you pressed (spec 5c): a refused move on its card, a refused take in
+ * Ready to take; a success only when it says something new.
  */
 export default function MyTasksPage() {
   const [taskSearch, setTaskSearch] = useState('')
@@ -125,7 +149,8 @@ export default function MyTasksPage() {
   const entries = useApi(loadEntries)
   const [logging, setLogging] = useState(null)
   const [editing, setEditing] = useState(null)
-  const [message, setMessage] = useState(null)
+  // { where: 'task-<id>' or 'ready', severity, text }: one message at a time, by what was pressed.
+  const [notice, setNotice] = useState(null)
   const [takingId, setTakingId] = useState(null)
   const [movingId, setMovingId] = useState(null)
   const [overCapacity, setOverCapacity] = useState(null)
@@ -149,7 +174,7 @@ export default function MyTasksPage() {
   function logTime(task, body) {
     return sendTime(async (sent) => {
       const entry = await request('POST', `/tasks/${task.taskId}/time-entries`, { body: sent })
-      setMessage({ severity: 'success', text: `Logged ${formatHours(entry.minutes)} on ${task.title}. It's waiting for approval.` })
+      setNotice({ where: `task-${task.taskId}`, severity: 'success', text: `Logged ${formatHours(entry.minutes)} on ${task.title}. It's waiting for approval.` })
       entries.reload()
     }, body)
   }
@@ -162,31 +187,31 @@ export default function MyTasksPage() {
   }
 
   async function move(task, status) {
-    setMessage(null)
+    setNotice(null)
     setMovingId(task.taskId) // the card's status and Log time are disabled until the answer arrives
     try {
       await request('POST', `/tasks/${task.taskId}/status`, { body: { status } })
       tasks.reload()
       setTimelineVersion((v) => v + 1)
     } catch (failure) {
-      setMessage({ severity: 'error', text: failure.message })
+      setNotice({ where: `task-${task.taskId}`, severity: 'error', text: failure.message })
     } finally {
       setMovingId(null)
     }
   }
 
   async function take(task) {
-    setMessage(null)
+    setNotice(null)
     // Disables this card's button until the answer arrives: a second click would
     // otherwise send a second claim, which the server refuses as "already taken".
     setTakingId(task.taskId)
     try {
-      await request('POST', `/tasks/${task.taskId}/claim`)
-      setMessage({ severity: 'success', text: `You took ${task.title}.` })
+      await request('POST', `/tasks/${task.taskId}/claim`) // the Saved pop-up confirms it
       setTimelineVersion((v) => v + 1)
     } catch (failure) {
-      // The server's sentence is the explanation (at the limit, already taken, ...).
-      setMessage({ severity: 'error', text: failure.message })
+      // The server's sentence is the explanation (at the limit, already taken, ...). It goes in the
+      // section, not on the card: an "already taken" card leaves the list when it reloads.
+      setNotice({ where: 'ready', severity: 'error', text: failure.message })
     }
     // Take this comes back only once both reloaded lists have arrived, so a card that is
     // about to move cannot be taken a second time in the gap.
@@ -211,7 +236,6 @@ export default function MyTasksPage() {
   return (
     <>
       <PageHeader title="Dashboard" subtitle="Your projects, your tasks and the time you've logged." />
-      {message && <Alert severity={message.severity} sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
 
       <ProjectTimelines title="My projects" headingVariant="h2" version={timelineVersion} />
 
@@ -229,27 +253,42 @@ export default function MyTasksPage() {
         empty={tasks.data && items.length === 0 ? (taskSearch ? 'No tasks match your search.' : 'No open tasks. Nice work.') : null}
       >
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
-          {items.map((task) => <TaskCard key={task.taskId} task={task} busy={movingId === task.taskId} onMove={move} onLog={setLogging} />)}
+          {items.map((task) => (
+            <TaskCard
+              key={task.taskId}
+              task={task}
+              busy={movingId === task.taskId}
+              notice={notice?.where === `task-${task.taskId}` ? notice : null}
+              onMove={move}
+              onLog={setLogging}
+              onCloseNotice={() => setNotice(null)}
+            />
+          ))}
         </Box>
       </PageState>
 
-      <Typography variant="h2" sx={{ mt: 4, mb: 1 }}>Ready to take</Typography>
-      <Box sx={{ mb: 2 }}>
-        <SearchField id="ready-search" label="Search ready tasks" placeholder={TASK_SEARCH_HINT} onSearch={setReadySearch} />
-      </Box>
-      <PageState loading={ready.loading && !ready.data} error={ready.error} onRetry={ready.reload}>
-        {ready.data && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {`You hold ${ready.data.held} of ${ready.data.limit}`}
-          </Typography>
-        )}
-        {ready.data && readyItems.length === 0 && (
-          <Typography variant="body2">{readySearch ? 'No Ready tasks match your search.' : 'No Ready tasks on your projects right now.'}</Typography>
-        )}
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
-          {readyItems.map((task) => <ReadyCard key={task.taskId} task={task} onTake={take} taking={takingId === task.taskId} />)}
+      <Box component="section" aria-labelledby="ready-heading">
+        <Typography id="ready-heading" variant="h2" sx={{ mt: 4, mb: 1 }}>Ready to take</Typography>
+        <Box sx={{ mb: 2 }}>
+          <SearchField id="ready-search" label="Search ready tasks" placeholder={TASK_SEARCH_HINT} onSearch={setReadySearch} />
         </Box>
-      </PageState>
+        <PageState loading={ready.loading && !ready.data} error={ready.error} onRetry={ready.reload}>
+          {ready.data && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {`You hold ${ready.data.held} of ${ready.data.limit}`}
+            </Typography>
+          )}
+          {notice?.where === 'ready' && (
+            <Alert severity="error" onClose={() => setNotice(null)} sx={{ mb: 2 }}>{notice.text}</Alert>
+          )}
+          {ready.data && readyItems.length === 0 && (
+            <Typography variant="body2">{readySearch ? 'No Ready tasks match your search.' : 'No Ready tasks on your projects right now.'}</Typography>
+          )}
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
+            {readyItems.map((task) => <ReadyCard key={task.taskId} task={task} onTake={take} taking={takingId === task.taskId} />)}
+          </Box>
+        </PageState>
+      </Box>
 
       {/* Folded away by default: the count is in its title. The table mounts only when opened. MUI gives
           the region the id named in aria-controls, so AccordionDetails must not repeat it (duplicate id). */}

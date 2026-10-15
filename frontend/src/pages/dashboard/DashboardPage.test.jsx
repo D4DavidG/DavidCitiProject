@@ -134,13 +134,12 @@ describe('DashboardPage', () => {
     expect(chart.compareDocumentPosition(screen.getByRole('article', { name: 'Apollo' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('links each card to its project with a text link, since it goes somewhere rather than doing something', async () => {
+  it('opens each card\'s project with a secondary (outlined) button', async () => {
     renderDashboard()
     const card = await screen.findByRole('article', { name: 'Apollo' })
-    const link = within(card).getByRole('link', { name: /open project/i })
-    expect(link).toHaveAttribute('href', '/projects/1')
-    expect(link).toHaveClass('MuiLink-root')
-    expect(link).not.toHaveClass('MuiButton-root')
+    const open = within(card).getByRole('link', { name: /open project/i })
+    expect(open).toHaveAttribute('href', '/projects/1')
+    expect(open).toHaveClass('MuiButton-outlined')
   })
 
   it('searches and filters on the server', async () => {
@@ -177,7 +176,9 @@ describe('DashboardPage', () => {
     expect(chart.compareDocumentPosition(screen.getByLabelText(/search projects/i)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(calls.find((c) => c.path === '/dashboard/allocation').query).toMatchObject({ weeks: '1', pageSize: '8' })
     expect(within(chart).getByText('Showing 1 of 12 people, most over first.')).toBeInTheDocument() // the panel passes the server's total
-    expect(screen.getByRole('link', { name: 'All people and weeks in Allocation' })).toHaveAttribute('href', '/allocation')
+    const allocation = screen.getByRole('link', { name: 'All people and weeks in Allocation' })
+    expect(allocation).toHaveAttribute('href', '/allocation')
+    expect(allocation).toHaveClass('MuiButton-outlined') // not in a sentence, so a button, not a text link
   })
 
   it('leaves the workload chart alone when searching projects', async () => {

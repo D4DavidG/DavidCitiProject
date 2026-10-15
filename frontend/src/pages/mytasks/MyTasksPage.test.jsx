@@ -146,7 +146,7 @@ describe('MyTasksPage', () => {
     await screen.findByRole('link', { name: 'Apollo' })
     await userEvent.click(within(task).getByLabelText(/status/i))
     await userEvent.click(await screen.findByRole('option', { name: 'Done' }))
-    await screen.findByText('Only the assignee can move this task.')
+    await within(task).findByText('Only the assignee can move this task.')
     expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(1)
   })
 
@@ -180,7 +180,7 @@ describe('MyTasksPage', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Done' }))
     await waitFor(() => expect(within(task).getByRole('button', { name: /log time/i })).toBeDisabled())
     release()
-    expect(await screen.findByText('Only the assignee can move this task.')).toBeInTheDocument()
+    expect(await within(task).findByText('Only the assignee can move this task.')).toBeInTheDocument() // on the card I used
     expect(within(task).getByRole('combobox', { name: /status/i })).not.toHaveAttribute('aria-disabled')
     expect(within(task).getByRole('button', { name: /log time/i })).toBeEnabled()
   })
@@ -235,7 +235,9 @@ describe('MyTasksPage', () => {
     await userEvent.click(within(confirm).getByRole('button', { name: 'Log anyway' }))
     await waitFor(() => expect(calls.filter((c) => c.method === 'POST')).toHaveLength(2))
     expect(calls.filter((c) => c.method === 'POST')[1].body).toEqual({ workDate: '2026-10-13', minutes: 120, confirmOverCapacity: true })
-    expect(await screen.findByText(/Logged 2 h on Portal UI/)).toBeInTheDocument()
+    // News (it waits for approval), so it gets a line, on the card I logged from, not at the top of the page.
+    const task = screen.getByRole('article', { name: 'Portal UI' })
+    expect(await within(task).findByRole('status')).toHaveTextContent("Logged 2 h on Portal UI. It's waiting for approval.")
   })
 
   it('sends nothing more when the person cancels', async () => {
@@ -292,11 +294,21 @@ describe('MyTasksPage', () => {
     expect(within(card).getByText('Estimate 8 h')).toBeInTheDocument()
     await userEvent.click(within(card).getByRole('button', { name: 'Take this' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toBe(true))
-    expect(await screen.findByText('You took Go-live checklist.')).toBeInTheDocument()
     await waitFor(() => expect(calls.filter((c) => c.path === '/me/ready-tasks').length).toBe(2))
     expect(calls.filter((c) => c.path === '/me/tasks').length).toBe(2)
     // A task on a new project puts that project on my timeline.
     await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(2))
+  })
+
+  it('confirms a take with the one Saved pop-up, so the page adds no success line of its own', async () => {
+    const calls = renderPage({
+      'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 1, limit: 2 })],
+      'POST /tasks/30/claim': [200, { ...GO_LIVE, assigneeUserId: 3, status: 'IN_PROGRESS' }],
+    })
+    await userEvent.click(within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' }))
+    await waitFor(() => expect(calls.filter((c) => c.path === '/me/ready-tasks').length).toBe(2))
+    expect(screen.queryByText(/You took/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('keeps the other Ready cards on screen while the lists reload after Take this', async () => {
@@ -311,12 +323,12 @@ describe('MyTasksPage', () => {
     watch.observe(document.body, { childList: true, subtree: true })
     await userEvent.click(within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' }))
     await waitFor(() => expect(calls.filter((c) => c.path === '/me/ready-tasks').length).toBe(2))
-    await screen.findByText('You took Go-live checklist.')
+    await waitFor(() => expect(calls.filter((c) => c.path === '/me/tasks').length).toBe(2))
     watch.disconnect()
     expect(unmounted).toBe(false)
   })
 
-  it('sends one claim when Take this is pressed twice, and keeps the success message', async () => {
+  it('sends one claim when Take this is pressed twice', async () => {
     const calls = renderPage({
       'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 1, limit: 2 })],
       'POST /tasks/30/claim': [200, { ...GO_LIVE, assigneeUserId: 3, status: 'IN_PROGRESS' }],
@@ -327,9 +339,8 @@ describe('MyTasksPage', () => {
     fireEvent.click(button)
     expect(button).toBeDisabled()
     release()
-    expect(await screen.findByText('You took Go-live checklist.')).toBeInTheDocument()
-    expect(calls.filter((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toHaveLength(1)
     await waitFor(() => expect(button).toBeEnabled())
+    expect(calls.filter((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toHaveLength(1)
   })
 
   it('keeps Take this disabled until the lists have reloaded after the claim', async () => {
@@ -342,7 +353,8 @@ describe('MyTasksPage', () => {
     fireEvent.click(button)
     releaseClaim()
     const releaseReload = holdOpen('/me/ready-tasks')
-    await screen.findByText('You took Go-live checklist.')
+    // My tasks reloads alongside Ready to take, so once it has asked, the claim has answered.
+    await waitFor(() => expect(calls.filter((c) => c.path === '/me/tasks')).toHaveLength(2))
     expect(calls.filter((c) => c.path === '/me/ready-tasks')).toHaveLength(1)
     expect(button).toBeDisabled()
     releaseReload()
@@ -358,7 +370,9 @@ describe('MyTasksPage', () => {
     })
     const card = await screen.findByRole('article', { name: 'Go-live checklist' })
     await userEvent.click(within(card).getByRole('button', { name: 'Take this' }))
-    expect(await screen.findByText(refusal)).toBeInTheDocument()
+    // In the Ready to take section, by the cards, so it stays even if the reload removes the card.
+    const section = screen.getByRole('region', { name: 'Ready to take' })
+    expect(await within(section).findByRole('alert')).toHaveTextContent(refusal)
   })
 
   it('says so when no Ready tasks are waiting', async () => {

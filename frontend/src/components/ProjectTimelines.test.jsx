@@ -58,10 +58,12 @@ describe('ProjectTimelines', () => {
     expect(calls[0]).toMatchObject({ path: '/dashboard/timeline', query: { page: '1', pageSize: '10' } })
   })
 
-  it('has a heading and one row per project, its name a link to the project', async () => {
+  it('has a heading and one row per project, its name a secondary button that opens the project', async () => {
     renderTimelines()
     const section = await screen.findByRole('region', { name: 'My projects this week' })
-    expect(within(section).getByRole('link', { name: 'Apollo' })).toHaveAttribute('href', '/projects/1')
+    const apollo = within(section).getByRole('link', { name: 'Apollo' })
+    expect(apollo).toHaveAttribute('href', '/projects/1')
+    expect(apollo).toHaveClass('MuiButton-outlined')
     expect(within(section).getByRole('link', { name: 'Zeus' })).toHaveAttribute('href', '/projects/2')
   })
 

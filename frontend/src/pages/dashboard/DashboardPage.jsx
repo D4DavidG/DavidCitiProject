@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import {
-  Box, Card, CardActions, CardContent, Chip, LinearProgress, Link as MuiLink, MenuItem, TextField, Typography,
+  Box, Button, Card, CardActions, CardContent, Chip, LinearProgress, MenuItem, TextField, Typography,
 } from '@mui/material'
 import WarningIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckIcon from '@mui/icons-material/CheckCircleOutlined'
@@ -72,9 +72,8 @@ function ProjectCard({ project }) {
 
         <BudgetBar {...project} />
       </CardContent>
-      {/* It goes somewhere, so it is a link (green ink), not a button (spec 5c). */}
       <CardActions sx={{ px: 2, pb: 2 }}>
-        <MuiLink component={Link} to={`/projects/${project.projectId}`} sx={{ fontWeight: 600 }}>Open project</MuiLink>
+        <Button component={Link} to={`/projects/${project.projectId}`} variant="outlined">Open project</Button>
       </CardActions>
     </Card>
   )
@@ -106,9 +105,10 @@ function WorkloadPanel() {
       <PageState loading={loading} error={error} onRetry={reload} empty={data && data.items.length === 0 ? 'No employees to show.' : null}>
         {data && <WorkloadChart people={data.items} total={data.total} />}
       </PageState>
-      <MuiLink component={Link} to="/allocation" sx={{ display: 'inline-block', mt: 1, fontWeight: 600 }}>
+      {/* Not inside a sentence, so a secondary button rather than a text link (spec 5c). */}
+      <Button component={Link} to="/allocation" variant="outlined" sx={{ mt: 1 }}>
         All people and weeks in Allocation
-      </MuiLink>
+      </Button>
     </Box>
   )
 }

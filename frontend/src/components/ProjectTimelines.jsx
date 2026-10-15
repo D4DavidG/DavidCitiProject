@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
-import { Box, Button, Card, Link as MuiLink, Tooltip, Typography } from '@mui/material'
+import { Box, Button, Card, Tooltip, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
@@ -224,7 +224,16 @@ function ProjectRow({ project, axis, today, thisWeek, userId }) {
   return (
     <Box component="li" sx={{ ...ROW, borderTop: 1, borderColor: 'divider' }}>
       <Box sx={NAME_CELL}>
-        <MuiLink component={Link} to={`/projects/${project.projectId}`} sx={{ fontWeight: 600 }}>{project.name}</MuiLink>
+        {/* A project's name in a list is a secondary button that opens it (spec 5c), left aligned. */}
+        <Button
+          component={Link}
+          to={`/projects/${project.projectId}`}
+          variant="outlined"
+          size="small"
+          sx={{ justifyContent: 'flex-start', textAlign: 'left', maxWidth: '100%' }}
+        >
+          {project.name}
+        </Button>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
           <StatusChip status={project.status} />
           {project.atRisk && (
