@@ -330,6 +330,7 @@ def test_allocation_takes_a_name_search_and_a_project_list(conn, org):
     apollo, zeus = org["apollo"]["project_id"], org["zeus"]["project_id"]
     status, grid = bob.call("GET", "/dashboard/allocation", query={"q": "ALICE", "projectIds": f"{zeus},{apollo}"})
     assert status == 200 and [p["name"] for p in grid["items"]] == ["Alice Tester"]
+    assert grid["items"][0]["managerId"] == org["bob"].user_id
     assert grid["items"][0]["weeks"][0]["projects"] == [{"projectId": apollo, "name": "Apollo", "hours": 20}]
     assert (grid["items"][0]["weeks"][0]["shownHours"], grid["items"][0]["weeks"][0]["bookedHours"]) == (20, 20)
     assert bob.call("GET", "/dashboard/allocation", query={"projectIds": str(zeus)})[1]["total"] == 0

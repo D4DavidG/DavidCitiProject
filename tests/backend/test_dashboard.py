@@ -227,6 +227,13 @@ def test_allocation_names_each_persons_job_title(conn, org):
     assert row_for(dashboard.allocation(conn, org["bob"], {"weeks": 1}), dan)["job_title"] == "Analyst"
 
 
+def test_allocation_names_each_persons_line_manager_so_the_page_knows_who_may_act(conn, org):
+    dan, _ = f.person(conn, org["admin"], first_name="Dan")  # no line manager
+    grid = dashboard.allocation(conn, org["carol"], {"weeks": 1})
+    assert row_for(grid, org["alice"])["manager_id"] == org["bob"].user_id
+    assert row_for(grid, dan)["manager_id"] is None
+
+
 @pytest.fixture
 def crowd(conn, org):
     """Dan over by 10 (week 1), Alice over by 5 (week 2 only), Eve within capacity."""

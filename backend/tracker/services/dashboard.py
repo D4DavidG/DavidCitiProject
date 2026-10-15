@@ -192,8 +192,8 @@ def at_risk(conn: psycopg.Connection, actor: Actor) -> list[dict]:
 # total; shown_hours and project_count count only the chosen projects (all when none chosen).
 _CELLS = (
     "WITH w AS (SELECT generate_series(%(from)s::date, %(from)s::date + 7 * (%(n)s - 1), '7 days')::date AS week),"
-    " people AS (SELECT user_id, first_name || ' ' || last_name AS name, job_title, weekly_capacity_hours,"
-    "            overtime_allowed FROM users WHERE role = 'EMPLOYEE' AND NOT is_archived"
+    " people AS (SELECT user_id, first_name || ' ' || last_name AS name, job_title, manager_id,"
+    "            weekly_capacity_hours, overtime_allowed FROM users WHERE role = 'EMPLOYEE' AND NOT is_archived"
     "            AND (%(q)s::text IS NULL OR first_name || ' ' || last_name ILIKE %(q)s)),"
     " cells AS (SELECT pe.user_id, w.week, b.booked_hours, b.shown_hours, b.project_count,"
     "  COALESCE((SELECT sum(e.minutes) FROM time_entries e WHERE e.user_id = pe.user_id"
@@ -218,7 +218,8 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
     q searches people's names. project_ids narrows what is shown (shown_hours, project_count
     and each week's projects) and drops anyone with none of them in the shown weeks; over
     capacity, over by, the peak and over_only still count every booking, so filtering never
-    hides someone who is over. Logged time stays the person's whole week.
+    hides someone who is over. Logged time stays the person's whole week. manager_id (the
+    line manager) lets the website offer a name's Actions menu only to those who may act.
     """
     _staff_only(actor, "the allocation grid")
     week_from = clock.week_start(values.date(filters, "week_from", required=False) or clock.today())
@@ -235,10 +236,11 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
     # HAVING fragments are fixed strings written above; every value is a parameter.
     having_sql = sql.SQL(" HAVING {}").format(sql.SQL(" AND ").join(map(sql.SQL, having))) if having else sql.SQL("")
     people = paginate(conn, sql.SQL(_CELLS) + sql.SQL(
-        " SELECT pe.user_id, pe.name, pe.job_title, pe.weekly_capacity_hours, pe.overtime_allowed,"
+        " SELECT pe.user_id, pe.name, pe.job_title, pe.manager_id, pe.weekly_capacity_hours, pe.overtime_allowed,"
         " max(GREATEST(c.booked_hours - pe.weekly_capacity_hours, 0)) AS peak_over_by"
         " FROM people pe JOIN cells c ON c.user_id = pe.user_id"
-        " GROUP BY pe.user_id, pe.name, pe.job_title, pe.weekly_capacity_hours, pe.overtime_allowed") + having_sql,
+        " GROUP BY pe.user_id, pe.name, pe.job_title, pe.manager_id, pe.weekly_capacity_hours, pe.overtime_allowed")
+        + having_sql,
         params, sql.SQL("peak_over_by DESC, name, user_id"), page, page_size)
 
     ids = [p["user_id"] for p in people["items"]]
@@ -262,7 +264,7 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
     for p in people["items"]:
         peak = int(p["peak_over_by"])
         rows[p["user_id"]] = {
-            "user_id": p["user_id"], "name": p["name"], "job_title": p["job_title"],
+            "user_id": p["user_id"], "name": p["name"], "job_title": p["job_title"], "manager_id": p["manager_id"],
             "capacity_hours": p["weekly_capacity_hours"], "overtime_allowed": p["overtime_allowed"],
             "peak_over_by_hours": peak, "status": "OVER_ALLOCATED" if peak > 0 else "OK", "weeks": []}
     for c in cells:
