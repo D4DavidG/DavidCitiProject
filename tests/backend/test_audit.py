@@ -15,7 +15,7 @@ import pytest
 
 import factories as f
 from domain.errors import NotFound
-from services import audit, notifications, tasks, time_entries, users
+from services import audit, notifications, requests, tasks, time_entries, users
 
 NOW = dt.datetime(2026, 10, 14, 12, 0, tzinfo=dt.timezone.utc)
 
@@ -186,24 +186,32 @@ def test_only_admins_read_the_audit_log(conn, org):
 
 @pytest.fixture
 def trail(conn, org):
-    """Alice's trail: her account created by the admin, her own edit, her capacity set by Bob."""
+    """Alice's trail: her account created by the admin, her own edit, her capacity set by Bob,
+    and a request she sent (her change to something that isn't her account)."""
     users.update_self(conn, org["alice"], {"first_name": "Alicia"})
     users.set_capacity(conn, org["boss"], org["alice"].user_id, {"weekly_capacity_hours": 30})
+    requests.create_request(conn, org["alice"], {"kind": "OVERTIME", "justification": "Launch week"})
     users.update_self(conn, org["loner"], {"first_name": "Solo"})  # someone else's change
+    # Not about Alice: a project whose id happens to equal her user id.
+    audit.record_change(conn, org["admin"], "UPDATE", "projects", org["alice"].user_id, None, None,
+                        "Project with Alice's id changed")
     return org["alice"].user_id
 
 
 def test_history_holds_changes_by_and_to_the_person(conn, org, trail):
     page = audit.person_history(conn, org["admin"], trail, {}, page=1, page_size=10)
-    assert page["total"] == 3
+    assert page["total"] == 4
     ids = [r["audit_id"] for r in page["items"]]
     assert ids == sorted(ids, reverse=True)
     assert not any("Solo" in r["summary"] or "Lone" in r["summary"] for r in page["items"])
+    kinds = {(r["actor_user_id"], r["entity_type"]) for r in page["items"]}
+    assert (trail, "project_requests") in kinds  # a change she made to something else
+    assert not any(r["entity_type"] == "projects" for r in page["items"])  # same id, not her
 
 
 def test_line_manager_admin_and_self_may_read_history(conn, org, trail):
     for who in ("boss", "admin", "alice"):
-        assert audit.person_history(conn, org[who], trail, {}, page=1, page_size=10)["total"] == 3
+        assert audit.person_history(conn, org[who], trail, {}, page=1, page_size=10)["total"] == 4
 
 
 def test_others_get_404_like_a_missing_user(conn, org, trail):
@@ -221,9 +229,9 @@ def test_history_filters_by_action_and_date(conn, org, trail):
     before = {"date_to": (today - dt.timedelta(days=1)).isoformat()}
     assert audit.person_history(conn, org["admin"], trail, before, page=1, page_size=10)["total"] == 0
     since = {"date_from": today.isoformat()}
-    assert audit.person_history(conn, org["admin"], trail, since, page=1, page_size=10)["total"] == 3
+    assert audit.person_history(conn, org["admin"], trail, since, page=1, page_size=10)["total"] == 4
 
 
 def test_history_is_paginated(conn, org, trail):
     page = audit.person_history(conn, org["admin"], trail, {}, page=1, page_size=1)
-    assert (page["total"], page["total_pages"], len(page["items"])) == (3, 3, 1)
+    assert (page["total"], page["total_pages"], len(page["items"])) == (4, 4, 1)
