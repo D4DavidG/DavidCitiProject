@@ -45,11 +45,11 @@ outdated it.
   a salary never reaches a manager. **History** on People, **My history** on Account.
   Also not deployed: the dashboard's **Total projects** and **Total at risk** counters,
   both from the server across every page (`atRiskTotal` on `GET /dashboard/projects`).
-  Tests: 537 backend, 314 website, and 22 Playwright browser
-  tests in 8 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
+  Tests: 549 backend, 324 website, and 24 Playwright browser
+  tests in 9 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
-  `e2e/tour.spec.js` screenshots every screen at desktop and phone width;
-  `timeline`, `budget` and `workload` specs check the charts).
+  `e2e/history.spec.js` reads a person's history; `e2e/tour.spec.js` screenshots every
+  screen at desktop and phone width; `timeline`, `budget` and `workload` specs check the charts).
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);

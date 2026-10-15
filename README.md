@@ -230,7 +230,7 @@ and three scratch ones) and never touches the app's.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 537 passed
+.venv/bin/pytest -q                                                        # 549 passed
 .venv/bin/pytest -q tests/backend/test_work.py                             # one file
 .venv/bin/pytest -q -k capacity                                            # tests whose name matches
 .venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 97% of our code
@@ -258,8 +258,8 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 
 ```sh
 cd frontend
-npm test                                  # 314 passed: Vitest + React Testing Library
-npm run test:coverage                     # 94.93% of statements, 96.02% of lines
+npm test                                  # 324 passed: Vitest + React Testing Library
+npm run test:coverage                     # 94.7% of statements, 95.86% of lines
 npm run lint                              # ESLint, clean
 E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
 ```
@@ -274,7 +274,7 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
   `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
   `requests.spec.js`: an employee asks her line manager, he rejects it with a note from
   To decide, and she reads the answer at phone width.
-- Against the rubric's goals: frontend 94.93% of statements (goal 80%); the demo journey end to end.
+- Against the rubric's goals: frontend 94.7% of statements (goal 80%); the demo journey end to end.
 
 **Known gaps (the uncovered 3% of the backend, 5% of the frontend):**
 
