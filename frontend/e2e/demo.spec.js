@@ -37,10 +37,14 @@ async function signIn(page) {
 test('a manager walks the seven questions', async ({ page }) => {
   await signIn(page)
 
-  // Questions 1, 2 and 7: the dashboard card for Apollo, at risk, with its budget.
-  const apollo = page.getByRole('article', { name: 'Apollo' })
+  // Questions 1, 2 and 7: Apollo's card, at risk, with its budget, in the At risk column (15 Oct:
+  // two columns, At risk and On track, each with its 3 most recently updated projects and its count).
+  const atRisk = page.getByRole('region', { name: /^At risk \(\d+\)$/ })
+  await expect(page.getByRole('region', { name: /^On track \(\d+\)$/ })).toBeVisible()
+  const apollo = atRisk.getByRole('article', { name: 'Apollo' })
   await expect(apollo.getByText('At risk')).toBeVisible()
   await expect(apollo.getByText(/spent of \$150,000/)).toBeVisible()
+  await expect(apollo.getByText(/^Updated \w{3} \d+, \d{4}$/)).toBeVisible() // its latest change, which orders the column
 
   // Questions 3 and 5: Ben is over-allocated, and the grid says why.
   await page.getByRole('navigation', { name: 'Main menu' }).getByRole('link', { name: 'Allocation' }).click()
@@ -66,7 +70,8 @@ test.describe('on a phone', () => {
 
   test('the dashboard fits the screen and the menu opens from a button', async ({ page }) => {
     await signIn(page)
-    await expect(page.getByRole('article', { name: 'Apollo' })).toBeVisible()
+    // The columns stack on a phone, At risk first.
+    await expect(page.getByRole('region', { name: /^At risk \(\d+\)$/ }).getByRole('article', { name: 'Apollo' })).toBeVisible()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow, 'no sideways scrolling on the page').toBeLessThanOrEqual(1)
     await page.getByRole('button', { name: 'Open menu' }).click()
