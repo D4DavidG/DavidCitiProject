@@ -94,8 +94,8 @@ describe('AppLayout', () => {
     expect(within(bar).getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument()
   })
 
-  it.each([['light', '#1F7A3A', '#FFFFFF'], ['dark', '#D7D7D7', '#14602C']])(
-    'paints the top bar dark green in light mode and light grey in dark mode (%s)',
+  it.each([['light', '#165E26', '#FFFFFF'], ['dark', '#165E26', '#FFFFFF']])(
+    'paints the top bar the one forest green with white words, in both modes (%s)',
     (mode, background, words) => {
       renderLayout(USERS.manager, session(USERS.manager), makeTheme(mode))
       // MUI paints the bar through two CSS variables (jsdom does not resolve var()).
@@ -105,14 +105,24 @@ describe('AppLayout', () => {
     },
   )
 
-  it('keeps the tip of the A in the dark-mode bar: the gold shine is edged in the bar\'s green words', () => {
-    renderLayout(USERS.manager, session(USERS.manager), makeTheme('dark'))
+  it.each(['light', 'dark'])('draws the logo in the bar\'s white words, its gold tip standing out from the green (%s)', (mode) => {
+    renderLayout(USERS.manager, session(USERS.manager), makeTheme(mode))
     const bar = screen.getByRole('banner')
     const [background, words] = ['--AppBar-background', '--AppBar-color'].map((name) => getComputedStyle(bar).getPropertyValue(name))
     const tip = within(bar).getByRole('img', { name: 'ACME' }).querySelector('[data-part="tip"]')
-    expect(contrast(tip.getAttribute('fill'), background)).toBeLessThan(1.1) // the gold alone would vanish on the grey
-    expect(tip).toHaveAttribute('stroke', 'currentColor') // the logo takes the bar's words ...
-    expect(contrast(words, background)).toBeGreaterThanOrEqual(3) // ... which stand out from the bar
+    expect(contrast(tip.getAttribute('fill'), background)).toBeGreaterThanOrEqual(3)
+    expect(contrast(words, background)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('keeps the top bar\'s words bare: your name, your role and Sign out have no box, border or chip (spec 6.2)', () => {
+    renderLayout(USERS.manager)
+    const bar = screen.getByRole('banner')
+    for (const control of [screen.getByRole('link', { name: /my account/i }), screen.getByRole('button', { name: /sign out/i })]) {
+      expect(control).toHaveClass('MuiButton-text')
+      expect(getComputedStyle(control).borderStyle).not.toBe('solid')
+    }
+    expect(within(bar).getByText('Manager')).toBeInTheDocument()
+    expect(bar.querySelector('.MuiChip-root')).toBeNull()
   })
 
   it('draws the keyboard focus ring in the bar\'s own text colour inside the top bar', async () => {
@@ -159,12 +169,12 @@ describe('AppLayout', () => {
     responsive.useIsMobile.mockReturnValue(false)
   })
 
-  it('pads My account in the phone menu like every outlined button, so its words clear the border', async () => {
+  it('makes My account in the phone menu a filled button like every other', async () => {
     responsive.useIsMobile.mockReturnValue(true)
     renderLayout(USERS.manager)
     await userEvent.click(screen.getByRole('button', { name: /open menu/i }))
     const account = screen.getByRole('link', { name: 'My account' })
-    expect(account).toHaveClass('MuiButton-outlined')
+    expect(account).toHaveClass('MuiButton-contained')
     expect(getComputedStyle(account).paddingLeft).not.toBe('0px')
     responsive.useIsMobile.mockReturnValue(false)
   })
@@ -173,7 +183,20 @@ describe('AppLayout', () => {
 describe('the collapsible menu (desktop)', () => {
   const paper = () => screen.getByRole('navigation', { name: 'Main menu' }).closest('.MuiDrawer-paper')
 
-  it('shrinks to icons with the button at its foot; each icon keeps its name and a tooltip', async () => {
+  it('collapses from a bookmark tab sticking out of the menu\'s edge near the top, not a button at its foot', () => {
+    renderLayout(USERS.manager)
+    const tab = screen.getByRole('button', { name: 'Collapse menu' })
+    expect(paper().contains(tab)).toBe(false) // it sticks out of the menu, so it sits outside the menu's panel
+    expect(tab).toHaveStyle({ position: 'fixed', left: '240px', borderRadius: '0 8px 8px 0' })
+  })
+
+  it('moves the tab with the menu\'s edge when it shrinks', async () => {
+    renderLayout(USERS.manager)
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse menu' }))
+    expect(screen.getByRole('button', { name: 'Expand menu' })).toHaveStyle({ left: '64px' })
+  })
+
+  it('shrinks to icons; each icon keeps its name and a tooltip', async () => {
     renderLayout(USERS.manager)
     expect(paper()).toHaveStyle({ width: '240px' })
     await userEvent.click(screen.getByRole('button', { name: 'Collapse menu' }))

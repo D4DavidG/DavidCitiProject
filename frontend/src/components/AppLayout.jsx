@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import { NavLink } from 'react-router'
 import {
-  AppBar, Box, Button, Chip, Divider, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
+  AppBar, Box, Button, ButtonBase, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Snackbar, SnackbarContent, Toolbar, Tooltip, Typography,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
-import CollapseIcon from '@mui/icons-material/KeyboardDoubleArrowLeft'
-import ExpandIcon from '@mui/icons-material/KeyboardDoubleArrowRight'
+import CollapseIcon from '@mui/icons-material/ChevronLeft'
+import ExpandIcon from '@mui/icons-material/ChevronRight'
 import { useAuth } from '../auth/useAuth'
 import ColorModeToggle from '../theme/ColorModeToggle'
 import { useIsMobile } from '../theme/responsive'
@@ -89,8 +89,8 @@ NavList.propTypes = {
 
 /**
  * The frame around every signed-in page: a top bar (logo, light/dark switch, bell, who you
- * are, sign out) and the menu: a sidebar on desktop that collapses to icons (remembered in
- * this browser), a drawer on phones. After every successful change it says "Saved" for
+ * are, sign out, all bare words and icons on the green) and the menu: a sidebar on desktop that
+ * collapses to icons from a bookmark tab on its edge (remembered in this browser), a drawer on phones. After every successful change it says "Saved" for
  * 3 seconds at the top centre, so it never covers the bell's pop-up at the bottom.
  */
 export default function AppLayout({ children }) {
@@ -109,6 +109,8 @@ export default function AppLayout({ children }) {
 
   const width = collapsed ? RAIL_WIDTH : DRAWER_WIDTH
   const widthChange = (t) => t.transitions.create('width', { duration: t.transitions.duration.shorter })
+  const edgeChange = (t) => t.transitions.create('left', { duration: t.transitions.duration.shorter })
+  const menuLabel = collapsed ? 'Expand menu' : 'Collapse menu'
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -133,13 +135,16 @@ export default function AppLayout({ children }) {
           </Box>
           <ColorModeToggle color="inherit" />
           <NotificationBell />
+          {/* Bare words on the bar (spec 6.2): variant text with color inherit is the theme's one unboxed button. */}
           {!isMobile && (
-            <Button component={NavLink} to="/account" aria-label="My account" color="inherit" sx={{ gap: 1 }}>
-              <Typography variant="body2">{user.firstName} {user.lastName}</Typography>
-              <Chip size="small" variant="outlined" label={ROLE_LABELS[user.role]} sx={{ color: 'inherit', borderColor: 'currentColor' }} />
+            <Button component={NavLink} to="/account" aria-label="My account" variant="text" color="inherit" sx={{ gap: 1 }}>
+              <Typography variant="body2" component="span" sx={{ fontWeight: 600 }}>{user.firstName} {user.lastName}</Typography>
+              <Typography variant="body2" component="span" sx={{ opacity: 0.85 }}>{ROLE_LABELS[user.role]}</Typography>
             </Button>
           )}
-          <Button color="inherit" onClick={logout} aria-label="Sign out" sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Sign out</Button>
+          <Button variant="text" color="inherit" onClick={logout} aria-label="Sign out" sx={{ whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 600 }}>
+            Sign out
+          </Button>
         </Toolbar>
       </AppBar>
 
@@ -164,15 +169,34 @@ export default function AppLayout({ children }) {
         >
           <Toolbar />
           <NavList role={user.role} collapsed={collapsed} />
-          <Divider />
-          <Box sx={{ p: 1, display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end' }}>
-            <Tooltip title={collapsed ? 'Expand menu' : 'Collapse menu'} placement="right">
-              <IconButton aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} onClick={toggleCollapsed}>
-                {collapsed ? <ExpandIcon fontSize="small" /> : <CollapseIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
-          </Box>
         </Drawer>
+      )}
+
+      {/* The bookmark tab: sticks out of the menu's right edge near the top and follows it as it shrinks.
+          It sits outside the menu's panel, which hides anything that overflows it. */}
+      {!isMobile && (
+        <Tooltip title={menuLabel} placement="right">
+          <ButtonBase
+            aria-label={menuLabel}
+            onClick={toggleCollapsed}
+            sx={{
+              position: 'fixed',
+              top: 80,
+              left: width,
+              zIndex: (t) => t.zIndex.drawer + 1,
+              width: 22,
+              height: 48,
+              borderRadius: '0 8px 8px 0',
+              bgcolor: 'fill.main',
+              color: 'fill.contrastText',
+              boxShadow: '1px 1px 4px rgba(0, 0, 0, 0.25)',
+              transition: edgeChange,
+              '&:hover': { bgcolor: 'fill.hover' },
+            }}
+          >
+            {collapsed ? <ExpandIcon sx={{ fontSize: 18 }} /> : <CollapseIcon sx={{ fontSize: 18 }} />}
+          </ButtonBase>
+        </Tooltip>
       )}
 
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 4 } }}>
