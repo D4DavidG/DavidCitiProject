@@ -14,6 +14,7 @@ import ProjectTimelines from '../../components/ProjectTimelines'
 import SearchField from '../../components/SearchField'
 import StatusChip from '../../components/StatusChip'
 import { formatDate, formatHours, todayIso } from '../../services/format'
+import { useIsMobile } from '../../theme/responsive'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
 
@@ -67,7 +68,7 @@ function TaskCard({ task, busy = false, notice = null, onMove, onLog, onCloseNot
         >
           {TASK_STATUSES.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
         </TextField>
-        <Button variant="outlined" onClick={() => onLog(task)} disabled={busy}>Log time</Button>
+        <Button variant="contained" onClick={() => onLog(task)} disabled={busy}>Log time</Button>
       </CardActions>
       <Notice notice={notice} onClose={onCloseNotice} />
     </Card>
@@ -108,7 +109,7 @@ function ReadyCard({ task, onTake, taking }) {
         <Typography variant="body2">Estimate {formatHours(task.estimateMinutes)}</Typography>
       </CardContent>
       <CardActions sx={{ px: 2, pb: 2 }}>
-        <Button variant="outlined" disabled={taking} onClick={() => onTake(task)}>Take this</Button>
+        <Button variant="contained" disabled={taking} onClick={() => onTake(task)}>Take this</Button>
       </CardActions>
     </Card>
   )
@@ -129,15 +130,16 @@ ReadyCard.propTypes = {
 }
 
 /**
- * The employee's Dashboard (route /my-tasks): their projects as a timeline, their open tasks
- * (tick work off by moving status), the Ready tasks they may take, and the time they've logged,
- * folded away. Both task lists search on the server as you type. Logging past their weekly
+ * The employee's Dashboard (route /my-tasks): their projects as a timeline, then their open tasks
+ * (tick work off by moving status) beside the Ready tasks they may take (stacked on a phone), and
+ * the time they've logged below both, folded away. Both task lists search on the server as you type. Logging past their weekly
  * capacity (without overtime allowed) asks "Log anyway?" with the server's message; Log anyway
  * resends with confirmOverCapacity and their manager is told. Other refusals show in the form.
  * Messages sit by what you pressed (spec 5c): a refused move on its card, a refused take in
  * Ready to take; a success only when it says something new.
  */
 export default function MyTasksPage() {
+  const isMobile = useIsMobile()
   const [taskSearch, setTaskSearch] = useState('')
   const loadTasks = useCallback(() => request('GET', '/me/tasks', { query: { q: taskSearch } }), [taskSearch])
   const tasks = useApi(loadTasks)
@@ -230,7 +232,7 @@ export default function MyTasksPage() {
     { key: 'minutes', label: 'Time', render: (e) => <>{formatHours(e.minutes)} {e.overCapacity && <OverCapacityMark />}</> },
     { key: 'status', label: 'Approval', render: (e) => <StatusChip status={e.status} /> },
     { key: 'note', label: 'Note' },
-    { key: 'actions', label: '', align: 'right', render: (e) => <Button variant="outlined" size="small" onClick={() => setEditing(e)}>Edit</Button> },
+    { key: 'actions', label: '', align: 'right', render: (e) => <Button variant="contained" size="small" onClick={() => setEditing(e)}>Edit</Button> },
   ]
 
   return (
@@ -239,55 +241,59 @@ export default function MyTasksPage() {
 
       <ProjectTimelines title="My projects" headingVariant="h2" version={timelineVersion} />
 
-      <Typography variant="h2" sx={{ mb: 1 }}>My tasks</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Move your tasks along as you work, and log the time you spend on them.
-      </Typography>
-      <Box sx={{ mb: 2 }}>
-        <SearchField id="my-tasks-search" label="Search my tasks" placeholder={TASK_SEARCH_HINT} onSearch={setTaskSearch} />
-      </Box>
-      <PageState
-        loading={tasks.loading && !tasks.data}
-        error={tasks.error}
-        onRetry={tasks.reload}
-        empty={tasks.data && items.length === 0 ? (taskSearch ? 'No tasks match your search.' : 'No open tasks. Nice work.') : null}
-      >
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
-          {items.map((task) => (
-            <TaskCard
-              key={task.taskId}
-              task={task}
-              busy={movingId === task.taskId}
-              notice={notice?.where === `task-${task.taskId}` ? notice : null}
-              onMove={move}
-              onLog={setLogging}
-              onCloseNotice={() => setNotice(null)}
-            />
-          ))}
-        </Box>
-      </PageState>
-
-      <Box component="section" aria-labelledby="ready-heading">
-        <Typography id="ready-heading" variant="h2" sx={{ mt: 4, mb: 1 }}>Ready to take</Typography>
-        <Box sx={{ mb: 2 }}>
-          <SearchField id="ready-search" label="Search ready tasks" placeholder={TASK_SEARCH_HINT} onSearch={setReadySearch} />
-        </Box>
-        <PageState loading={ready.loading && !ready.data} error={ready.error} onRetry={ready.reload}>
-          {ready.data && (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {`You hold ${ready.data.held} of ${ready.data.limit}`}
-            </Typography>
-          )}
-          {notice?.where === 'ready' && (
-            <Alert severity="error" onClose={() => setNotice(null)} sx={{ mb: 2 }}>{notice.text}</Alert>
-          )}
-          {ready.data && readyItems.length === 0 && (
-            <Typography variant="body2">{readySearch ? 'No Ready tasks match your search.' : 'No Ready tasks on your projects right now.'}</Typography>
-          )}
-          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
-            {readyItems.map((task) => <ReadyCard key={task.taskId} task={task} onTake={take} taking={takingId === task.taskId} />)}
+      {/* Two equal columns on desktop, one above the other on a phone (spec 6.4). minmax(0, 1fr) lets a
+          column shrink below its widest card, so the two always stay equal. */}
+      <Box sx={{ display: 'grid', gap: 4, alignItems: 'start', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
+        <Box component="section" aria-labelledby="my-tasks-heading">
+          <Typography id="my-tasks-heading" variant="h2" sx={{ mb: 1 }}>My tasks</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Move your tasks along as you work, and log the time you spend on them.
+          </Typography>
+          <Box sx={{ mb: 2 }}>
+            <SearchField id="my-tasks-search" label="Search my tasks" placeholder={TASK_SEARCH_HINT} onSearch={setTaskSearch} />
           </Box>
-        </PageState>
+          <PageState
+            loading={tasks.loading && !tasks.data}
+            error={tasks.error}
+            onRetry={tasks.reload}
+            empty={tasks.data && items.length === 0 ? (taskSearch ? 'No tasks match your search.' : 'No open tasks. Nice work.') : null}
+          >
+            <Box sx={{ display: 'grid', gap: 2 }}>
+              {items.map((task) => (
+                <TaskCard
+                  key={task.taskId}
+                  task={task}
+                  busy={movingId === task.taskId}
+                  notice={notice?.where === `task-${task.taskId}` ? notice : null}
+                  onMove={move}
+                  onLog={setLogging}
+                  onCloseNotice={() => setNotice(null)}
+                />
+              ))}
+            </Box>
+          </PageState>
+        </Box>
+
+        <Box component="section" aria-labelledby="ready-heading">
+          <Typography id="ready-heading" variant="h2" sx={{ mb: 1 }}>Ready to take</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {ready.data ? `You hold ${ready.data.held} of ${ready.data.limit}` : 'Tasks on your projects that nobody holds yet.'}
+          </Typography>
+          <Box sx={{ mb: 2 }}>
+            <SearchField id="ready-search" label="Search ready tasks" placeholder={TASK_SEARCH_HINT} onSearch={setReadySearch} />
+          </Box>
+          <PageState loading={ready.loading && !ready.data} error={ready.error} onRetry={ready.reload}>
+            {notice?.where === 'ready' && (
+              <Alert severity="error" onClose={() => setNotice(null)} sx={{ mb: 2 }}>{notice.text}</Alert>
+            )}
+            {ready.data && readyItems.length === 0 && (
+              <Typography variant="body2">{readySearch ? 'No Ready tasks match your search.' : 'No Ready tasks on your projects right now.'}</Typography>
+            )}
+            <Box sx={{ display: 'grid', gap: 2 }}>
+              {readyItems.map((task) => <ReadyCard key={task.taskId} task={task} onTake={take} taking={takingId === task.taskId} />)}
+            </Box>
+          </PageState>
+        </Box>
       </Box>
 
       {/* Folded away by default: the count is in its title. The table mounts only when opened. MUI gives
