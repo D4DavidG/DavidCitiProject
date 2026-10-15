@@ -3,6 +3,7 @@ import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import { Box, Button, Card, Tooltip, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
+import { visuallyHidden } from '@mui/utils'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
 import BlockedIcon from '@mui/icons-material/BlockOutlined'
@@ -33,9 +34,9 @@ const LEGEND = [['DONE', 'Done'], ['IN_PROGRESS', 'In progress'], ['NOT_STARTED'
 /** This week's column: a light wash of the highlight colour (palette.secondary, so dark mode follows). */
 const THIS_WEEK = (theme) => alpha(theme.palette.secondary.main, 0.12)
 /**
- * Every project's bar is the theme's green ink (#14602C, 7.7:1 on the white panel; dark mode #7CC78F,
- * 9.6:1 on its panel). Each row names its project, so a colour per project would add nothing, and it
- * could clash with the workload chart's project colours on the same Dashboard.
+ * Every project's bar is the theme's one green (palette.primary, so dark mode follows; no glow).
+ * Each row names its project, so a colour per project would add nothing, and it could clash with
+ * the workload chart's project colours on the same Dashboard.
  */
 const BAR_COLOUR = 'primary.main'
 /** Your booking band, and its legend swatch: a quieter neutral, so it reads as "not the project". */
@@ -224,11 +225,11 @@ function ProjectRow({ project, axis, today, thisWeek, userId }) {
   return (
     <Box component="li" sx={{ ...ROW, borderTop: 1, borderColor: 'divider' }}>
       <Box sx={NAME_CELL}>
-        {/* A project's name in a list is a secondary button that opens it (spec 5c), left aligned. */}
+        {/* A project's name in a list is a button that opens it, filled like every button (spec 6.2), left aligned. */}
         <Button
           component={Link}
           to={`/projects/${project.projectId}`}
-          variant="outlined"
+          variant="contained"
           size="small"
           sx={{ justifyContent: 'flex-start', textAlign: 'left', maxWidth: '100%' }}
         >
@@ -331,6 +332,7 @@ Legend.propTypes = { withBand: PropTypes.bool.isRequired }
 export default function ProjectTimelines({ title, today = todayIso(), headingVariant = 'h3', version = 0 }) {
   const { user } = useAuth()
   const headingId = useId()
+  const hintId = useId()
   const [pageNumber, setPageNumber] = useState(1)
   const [moves, setMoves] = useState(0)
 
@@ -348,20 +350,19 @@ export default function ProjectTimelines({ title, today = todayIso(), headingVar
   return (
     <Card component="section" aria-labelledby={headingId} sx={{ p: 2, mb: 3, minWidth: 0 }}>
       <Typography id={headingId} variant={headingVariant} component="h2">{title}</Typography>
-      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-        One row per project, from its start to its end date, with its deliverables on their due dates. Hover, focus or tap a mark for
-        details; with a keyboard, Tab to a row and move along it with the arrow keys.
-      </Typography>
+      {/* One short line (spec 6.4); the keyboard hint is read out with the weeks below instead. */}
+      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>Hover or tap a mark for details.</Typography>
       {/* Only the first load shows the spinner: a new page keeps the old rows (and your focus) until it arrives. */}
       <PageState loading={loading && !data} error={error} onRetry={reload} empty={data && projects.length === 0 ? 'No projects yet.' : null}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 1 }}>
-          <Button variant="outlined" size="small" startIcon={<PrevIcon />} onClick={() => setMoves((m) => m - 1)}>Earlier</Button>
+          <Button variant="contained" size="small" startIcon={<PrevIcon />} onClick={() => setMoves((m) => m - 1)}>Earlier</Button>
           <Typography aria-live="polite" sx={{ minWidth: 150, textAlign: 'center' }}>{`${formatDay(axis.from)} – ${formatDate(axis.to)}`}</Typography>
-          <Button variant="outlined" size="small" endIcon={<NextIcon />} onClick={() => setMoves((m) => m + 1)}>Later</Button>
+          <Button variant="contained" size="small" endIcon={<NextIcon />} onClick={() => setMoves((m) => m + 1)}>Later</Button>
           {/* Never disabled: a disabled button drops the keyboard focus it holds. At this week it does nothing. */}
-          <Button variant="outlined" size="small" onClick={() => setMoves(0)}>This week</Button>
+          <Button variant="contained" size="small" onClick={() => setMoves(0)}>This week</Button>
         </Box>
-        <Box role="region" aria-label="Weeks, scrolls sideways" tabIndex={0} sx={{ overflowX: 'auto', scrollPaddingLeft: NAME }}>
+        <Box component="span" id={hintId} sx={visuallyHidden}>With a keyboard, Tab to a row and move along it with the arrow keys.</Box>
+        <Box role="region" aria-label="Weeks, scrolls sideways" aria-describedby={hintId} tabIndex={0} sx={{ overflowX: 'auto', scrollPaddingLeft: NAME }}>
           <Box aria-hidden="true" sx={ROW}>
             <Box sx={{ ...NAME_CELL, py: 0.5, borderRight: 'none' }} />
             <Box sx={{ position: 'relative', pb: todayCentre === null ? 0 : 2.5 }}>
