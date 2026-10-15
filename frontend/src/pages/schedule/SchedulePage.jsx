@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import {
-  Box, Button, FormControlLabel, MenuItem, Pagination, Switch, TextField, Tooltip, Typography,
+  Box, Button, FormControlLabel, MenuItem, Switch, TextField, Tooltip, Typography,
 } from '@mui/material'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
@@ -10,7 +10,7 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import { visuallyHidden } from '@mui/utils'
 import { ChartFigure, ChartLegend } from '../../components/charts/ChartParts'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
 import ProjectPicker from '../../components/ProjectPicker'
 import { addDays, formatDay, formatPerWeek } from '../../services/format'
 import { request } from '../../services/request'
@@ -303,11 +303,7 @@ export default function SchedulePage() {
         >
           {people.map((person) => <PersonRow key={person.userId} person={person} weeks={weeks} colours={colours} />)}
         </ChartFigure>
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>
   )
