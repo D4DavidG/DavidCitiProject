@@ -27,7 +27,7 @@ const BEN = {
 /** Overrides merge into the defaults, so a test that changes one answer keeps the others. */
 function renderDashboard(answers = {}) {
   const calls = stubApi({
-    'GET /dashboard/projects': [200, page([APOLLO, HERMES])],
+    'GET /dashboard/projects': [200, page([APOLLO, HERMES], { atRiskTotal: 1 })],
     'GET /dashboard/allocation': [200, { ...page([BEN], { total: 12 }), weeks: ['2026-10-12'] }],
     ...answers,
   })
@@ -68,17 +68,25 @@ describe('DashboardPage', () => {
     expect(within(card).getByText('$1,370 spent of $150,000')).toBeInTheDocument()
   })
 
-  it('counts projects and at-risk projects at the top', async () => {
+  it('counts every project and every at-risk project, not just this page', async () => {
+    renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO, HERMES], { total: 30, totalPages: 3, atRiskTotal: 7 })] })
+    await screen.findByRole('article', { name: 'Apollo' })
+    expect(screen.getByLabelText('Total projects')).toHaveTextContent('30')
+    expect(screen.getByLabelText('Total at risk')).toHaveTextContent('7') // this page alone has 1
+  })
+
+  it('says the counts follow the filter', async () => {
     renderDashboard()
     await screen.findByRole('article', { name: 'Apollo' })
-    expect(screen.getByLabelText('Projects shown')).toHaveTextContent('2')
-    expect(screen.getByLabelText('At risk')).toHaveTextContent('1')
+    expect(screen.queryByText(/counts are for the current search/i)).not.toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
+    expect(await screen.findByText(/counts are for the current search/i)).toBeInTheDocument()
   })
 
   it('draws the budget chart between the counts and the cards', async () => {
     renderDashboard()
     const chart = await screen.findByRole('figure', { name: 'Budget by project' })
-    expect(screen.getByLabelText('At risk').compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByLabelText('Total at risk').compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(chart.compareDocumentPosition(screen.getByRole('article', { name: 'Apollo' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 

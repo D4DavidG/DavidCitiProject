@@ -113,6 +113,7 @@ function WorkloadPanel() {
 /**
  * The manager's landing screen: every live project they run (admins: all), each
  * with status, risk and budget. At-risk projects come first (the server orders them).
+ * Both counters come from the server and cover every page: `total` and `atRiskTotal`.
  */
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -147,9 +148,12 @@ export default function DashboardPage() {
 
       <PageState loading={loading} error={error} onRetry={reload} empty={data && items.length === 0 ? 'No projects to show.' : null}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
-          <Stat label="Projects shown" value={data?.total ?? 0} />
-          <Stat label="At risk" value={items.filter((p) => p.atRisk).length} color="error.main" />
+          <Stat label="Total projects" value={data?.total ?? 0} />
+          <Stat label="Total at risk" value={data?.atRiskTotal ?? 0} color="error.main" />
         </Box>
+        {(search || status) && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: -2, mb: 3 }}>Counts are for the current search and status.</Typography>
+        )}
         <Box sx={{ mb: 3 }}><BudgetChart projects={items} /></Box>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' } }}>
           {items.map((project) => <ProjectCard key={project.projectId} project={project} />)}
