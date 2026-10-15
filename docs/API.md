@@ -60,8 +60,8 @@ Three roles: **admin**, **manager**, **employee**. Every call passes three check
   `test_another_managers_project_is_byte_identical_to_a_missing_one`
   ([`tests/backend/test_api.py`](../tests/backend/test_api.py)).
 - **Who sees which records:** admins see everything, archived records too. Managers see the
-  projects they manage. Employees see the projects they are booked on, and only their own
-  account. Salaries: admins and the person only.
+  projects they manage and everyone's account. Employees see the projects they are booked on,
+  and only their own account. Pay: admins and the person only.
 - **First sign-in:** an account starts with a generated password. Until it is changed, every
   route except `GET /auth/me` and `POST /auth/change-password` answers 403
   `Change your generated password before continuing.`
@@ -95,9 +95,10 @@ field:
 | `OVER_CAPACITY` | logging time past the person's weekly capacity, with overtime off | `"confirmOverCapacity": true` (the entry is saved and marked "Over capacity") |
 | `ON_PROJECTS` | archiving a person still on a live project (a booking that hasn't ended, or an open task); the message names the projects | `"confirmOnProjects": true` (their bookings end; their open tasks stay assigned to them) |
 
-**Lists** are always one page: `{"items": [...], "page": 1, "pageSize": 20, "total": 57,
-"totalPages": 3}`. Ask with `?page=2&pageSize=50`; the default page size is 20 (10 on the
-timeline) and the most is 100. The lists that have a search box on screen take `q`: people,
+**Lists** all answer in one shape: `{"items": [...], "page": 1, "pageSize": 20, "total": 57,
+"totalPages": 3}`. Long lists come a page at a time: ask with `?page=2&pageSize=50`; the
+default page size is 20 (10 on the timeline) and the most is 100. A few short lists, such as
+your own tasks, always come whole, as page 1 of 1. The lists that have a search box on screen take `q`: people,
 projects, your tasks, approvals, requests, notifications, the audit log, the dashboard and the
 allocation grid. **Writes** return the record as it now is; a create answers 201, logout 204.
 
@@ -115,7 +116,7 @@ purpose, so anyone reviewing the project can sign in as each role:
 | Ben Okafor | Employee | `BO435681` | `Demo-pass-2026` |
 | Chloe Kim | Employee | `CK971979` | `Demo-pass-2026` |
 | Dev Shah | Employee | `DS516414` | `Demo-pass-2026` |
-| Ana Ruiz | Employee | `AR553882` | archived on AWS, so her sign-in is refused |
+| Ana Ruiz | Employee | `AR553882` | archived on AWS, so signing in is refused |
 
 Usernames are initials plus six digits, made by the server and never changed. If one of these
 passwords stops working, someone changed it: the admin can set a new one (People > Actions >
@@ -179,7 +180,8 @@ Maria.
 
 1. Sign in as Ana. **users > PATCH /users/me** with `{"lastName": "Ruiz-Test"}`: 200.
 2. Sign in as Maria. **notifications > GET /notifications/unread-count**, then
-   **GET /notifications** with `unread` = true: the newest is "Ana Ruiz changed ...".
+   **GET /notifications** with `unread` = true: the newest is "Ana Ruiz-Test updated their
+   profile".
 3. **POST /notifications/{id}/read** with that notification's `notificationId`: `isRead` is
    true and the count drops by one.
 4. Undo: sign in as Ana and send `{"lastName": "Ruiz"}`.
@@ -190,12 +192,12 @@ The change, its audit row and its notifications are saved together or not at all
 **B. Read the audit log as the admin** (reads only, so fine on AWS too):
 
 1. Sign in as `AD000001`.
-2. **users > GET /users** with `q` = Ana: note her `userId`.
-3. **admin > GET /admin/audit-log** with `entityType` = users, `entityId` = her `userId`,
+2. **users > GET /users** with `q` = Ana (on AWS, Ben): note the `userId`.
+3. **admin > GET /admin/audit-log** with `entityType` = users, `entityId` = that `userId`,
    `pageSize` = 5: each row has `beforeState` and `afterState`, newest first. Other filters:
    `q`, `actorId`, `dateFrom`, `dateTo`.
-4. **users > GET /users/{id}/history** with her `userId`: what she did and what was done to her
-   account, newest first.
+4. **users > GET /users/{id}/history** with that `userId`: what the person did and what was done
+   to their account, newest first.
 5. **admin > GET /admin/integrity-check**: every list is empty when the data is healthy.
 
 **C. Watch the API refuse** (sign in as an employee: Ana locally, Ben on AWS). None of these
@@ -291,8 +293,9 @@ Firefox warns that it will stop accepting `*`.
 
 From [`backend/tracker/api/routes.py`](../backend/tracker/api/routes.py). "Who may call" is the
 route table's gate (403 for any other role); the services then narrow it to your own records
-(404). The status is 200 unless shown. Each route's text is the first line of its function's
-description, which is also its summary in Swagger UI.
+(404). The status is 200 unless shown. Each row starts with the route's summary, the same one
+Swagger UI shows (the first line of the function's description in
+[`api/handlers.py`](../backend/tracker/api/handlers.py)).
 
 ### Health and sign-in
 
