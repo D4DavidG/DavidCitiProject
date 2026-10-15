@@ -66,7 +66,10 @@ test('on a phone, a first-week bar brought into view by focus is not hidden unde
   const ben = chart.locator('li').filter({ hasText: 'Ben Okafor' })
   const box = chart.getByRole('list').filter({ hasText: 'Ben Okafor' }).locator('..')
   await box.evaluate((el) => { el.scrollLeft = el.scrollWidth })
-  const bar = apolloBar(chart)
+  // Zeus runs only in the first weeks, so after scrolling right it is wholly out of view (Apollo
+  // spans every week and stays partly in view, so focusing it would not scroll at all).
+  const bar = chart.getByRole('link', { name: /^Ben Okafor, Zeus, / }).first()
+  await expect(bar).not.toBeInViewport()
   await bar.focus() // the browser scrolls the box to bring the bar into view
   const names = await ben.getByText('Ben Okafor', { exact: true }).locator('..').boundingBox()
   const shown = await bar.boundingBox()
