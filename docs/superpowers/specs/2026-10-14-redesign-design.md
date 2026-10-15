@@ -53,6 +53,10 @@ notes were ambiguous, the ruling is written here so it can be corrected.
   | `GET /notifications` | message text |
   | `GET /admin/audit-log` | actor's name, entity type, action |
 
+  `GET /project-requests` also takes `scope`: `sent` (requests you sent) or `decide`
+  (requests you may decide, i.e. not your own); without it, both, as today. The Requests
+  page's two tabs use it, so each tab stays server-side paginated.
+
   Existing: `GET /users` and `GET /projects`. People's search becomes live (it already
   searches on the server).
 - `docs/openapi.json` regenerated (`.venv/bin/python tools/openapi.py`).
