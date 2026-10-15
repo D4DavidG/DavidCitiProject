@@ -56,6 +56,22 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Wrong username or password.')).toBeInTheDocument()
   })
 
+  it('makes both boxes glow red, with the message under the password box, and puts the cursor back in the username', async () => {
+    const login = vi.fn().mockRejectedValue(new ApiError(401, 'Wrong username or password.'))
+    renderLogin(session(null, { login }))
+    await signIn('ML662930', 'nope')
+    const message = await screen.findByText('Wrong username or password.')
+    const username = screen.getByLabelText(/username/i)
+    const password = screen.getByLabelText(/^password/i)
+    for (const box of [username, password]) {
+      expect(box).toHaveAttribute('aria-invalid', 'true')
+      expect(box.getAttribute('aria-describedby')).toBe(message.id) // a screen reader hears why on either box
+    }
+    expect(message.closest('.MuiFormControl-root')).toBe(password.closest('.MuiFormControl-root'))
+    expect(screen.queryByRole('alert')).toBeNull() // no message box at the top of the card
+    await waitFor(() => expect(username).toHaveFocus())
+  })
+
   it('upper-cases the username, which is always capitals', async () => {
     const auth = session(null, { login: vi.fn().mockResolvedValue(USERS.manager) })
     renderLogin(auth)

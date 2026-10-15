@@ -1,9 +1,10 @@
 import { Suspense } from 'react'
 import { describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { ThemeProvider } from '@mui/material/styles'
-import { AppRoutes } from './App'
+import App, { AppRoutes } from './App'
 import appSource from './App.jsx?raw'
 import { AuthContext } from './auth/useAuth'
 import lazyPage from './components/lazyPage'
@@ -59,6 +60,18 @@ describe('routes', () => {
   it('answers an unknown address with a not-found page', async () => {
     renderApp('/nowhere', session(USERS.manager))
     expect(await screen.findByText(/page not found/i)).toBeInTheDocument()
+  })
+})
+
+describe('colour mode', () => {
+  it('switches the whole app between light and dark from the sign-in page', async () => {
+    localStorage.clear()
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Switch to dark mode' }))
+    expect(getComputedStyle(document.body).backgroundColor).toBe('rgb(15, 29, 21)') // the dark green page
+    await userEvent.click(screen.getByRole('button', { name: 'Switch to light mode' }))
+    expect(getComputedStyle(document.body).backgroundColor).toBe('rgb(242, 244, 241)') // the light grey page
+    localStorage.clear()
   })
 })
 

@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
 import { HashRouter, Link, Navigate, Outlet, Route, Routes } from 'react-router'
 import { Alert, Button, CssBaseline } from '@mui/material'
-import { ThemeProvider } from '@mui/material/styles'
 import AuthProvider from './auth/AuthContext'
 import RequireRole from './auth/RequireRole'
 import { STAFF, homePath, useAuth } from './auth/useAuth'
@@ -10,7 +9,7 @@ import lazyPage from './components/lazyPage'
 import PageState from './components/PageState'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
-import theme from './theme/theme'
+import ColorModeProvider from './theme/ColorModeProvider'
 
 const AccountPage = lazyPage(() => import('./pages/account/AccountPage'))
 const AllocationPage = lazyPage(() => import('./pages/allocation/AllocationPage'))
@@ -86,16 +85,16 @@ export function AppRoutes() {
   )
 }
 
-/** The whole app: theme, session, router. */
+/** The whole app: light or dark theme (with the graph-paper page), session, router. */
 export default function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ColorModeProvider>
+      <CssBaseline enableColorScheme />
       <HashRouter>
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>
       </HashRouter>
-    </ThemeProvider>
+    </ColorModeProvider>
   )
 }

@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Alert, Box, Button, TextField } from '@mui/material'
+import { Box, Button, TextField, Typography } from '@mui/material'
 import { homePath, useAuth } from '../../auth/useAuth'
 import { request } from '../../services/request'
 import AuthCard from './AuthCard'
@@ -15,6 +15,8 @@ const FIELDS = [
  * Change your password. Required on first sign-in: until then the server answers
  * every other request with 403, and RequireRole keeps sending you back here.
  * While saving, every field and the button are disabled and a second submit is ignored.
+ * A problem with a field shows under that field, which takes the cursor; any other error
+ * is one line just above the button.
  */
 export default function ChangePasswordPage() {
   const { user, startSession } = useAuth()
@@ -24,6 +26,13 @@ export default function ChangePasswordPage() {
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const sending = useRef(false) // set at once, so two submits in the same moment send once
+  const boxes = useRef({})
+
+  // After the fields are enabled again, so the cursor can land in the first one with a problem.
+  useEffect(() => {
+    const first = FIELDS.find(({ name }) => fieldErrors[name])
+    if (first) boxes.current[first.name]?.focus()
+  }, [fieldErrors])
 
   async function submit(event) {
     event.preventDefault()
@@ -58,7 +67,6 @@ export default function ChangePasswordPage() {
         ? 'Choose your own password before continuing. The one you were given only works once.'
         : 'Choose a new password.'}
     >
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Box component="form" onSubmit={submit} noValidate sx={{ display: 'grid', gap: 2 }}>
         {FIELDS.map(({ name, label, autoComplete, helper }) => (
           <TextField
@@ -71,11 +79,19 @@ export default function ChangePasswordPage() {
             autoComplete={autoComplete}
             required
             disabled={busy}
+            inputRef={(box) => { boxes.current[name] = box }}
             error={Boolean(fieldErrors[name])}
             helperText={fieldErrors[name] ?? helper}
           />
         ))}
-        <Button type="submit" variant="contained" size="large" disabled={busy || Object.values(values).some((v) => !v)}>
+        {error && <Typography id="change-password-error" role="alert" variant="body2" sx={{ color: 'error.main' }}>{error}</Typography>}
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          disabled={busy || Object.values(values).some((v) => !v)}
+          aria-describedby={error ? 'change-password-error' : undefined}
+        >
           {busy ? 'Saving…' : 'Change password'}
         </Button>
       </Box>

@@ -54,6 +54,32 @@ describe('ChangePasswordPage', () => {
     expect(input.getAttribute('aria-describedby')).toBeTruthy()
   })
 
+  it('puts the cursor in the field with the problem', async () => {
+    stubApi({})
+    renderPage()
+    await fill('Generated-123', 'my-new-password', 'something-else')
+    await waitFor(() => expect(screen.getByLabelText(/confirm/i)).toHaveFocus())
+  })
+
+  it('puts the cursor in the field the server named', async () => {
+    stubApi({ 'POST /auth/change-password': [400, { error: 'Password must be at least 8 characters.', field: 'newPassword' }] })
+    renderPage()
+    await fill('Generated-123', 'short', 'short')
+    await waitFor(() => expect(screen.getByLabelText(/^new password/i)).toHaveFocus())
+  })
+
+  it('shows an error with no field as one line just above the button, not at the top of the card', async () => {
+    stubApi({ 'POST /auth/change-password': [503, { error: 'The database is waking up. Try again.' }] })
+    renderPage()
+    await fill('Generated-123', 'my-new-password', 'my-new-password')
+    const message = await screen.findByText('The database is waking up. Try again.')
+    const button = screen.getByRole('button', { name: /change password/i })
+    const confirm = screen.getByLabelText(/confirm/i)
+    expect(confirm.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(message.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(button.getAttribute('aria-describedby')).toBe(message.id)
+  })
+
   it('shows a general error when the current password is wrong', async () => {
     stubApi({ 'POST /auth/change-password': [400, { error: 'Your current password is wrong.', field: 'currentPassword' }] })
     renderPage()
