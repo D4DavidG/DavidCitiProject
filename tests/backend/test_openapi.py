@@ -112,8 +112,18 @@ def test_every_ref_resolves():
 
 def _body_fields(doc, route) -> dict:
     body = _op(doc, route.method, route.path)["requestBody"]
-    assert body["required"] is True
+    assert body["required"] is (route.handler.__name__ not in openapi_tool.OPTIONAL_BODIES)
     return body["content"]["application/json"]["schema"]["properties"]
+
+
+def test_the_archive_confirmation_and_the_dashboard_columns_are_documented():
+    doc = openapi_tool.build()
+    archive = _op(doc, "POST", "/users/{id}/archive")["requestBody"]
+    assert archive["required"] is False
+    assert archive["content"]["application/json"]["schema"]["properties"] == {"confirmOnProjects": {"type": "boolean"}}
+    query = {p["name"]: p["schema"] for p in _op(doc, "GET", "/dashboard/projects")["parameters"] if p["in"] == "query"}
+    assert query["atRisk"] == {"type": "boolean"} and query["sort"]["enum"] == ["risk", "updated"]
+    assert "page" in {p["name"] for p in _op(doc, "GET", "/users/{id}/projects")["parameters"]}
 
 
 def test_bodies_are_listed_for_exactly_the_handlers_that_read_one():

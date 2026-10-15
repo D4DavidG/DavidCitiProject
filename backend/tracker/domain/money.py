@@ -8,6 +8,10 @@ frozen on each time entry), so no fraction of a cent is carried.
 from domain.errors import ValidationError
 
 HOURS_PER_YEAR = 2080
+# The lowest pay anyone may be given: $20 an hour for 2,080 hours, $41,600 a year. Checked on
+# every new account and every pay change (services/users.py); the bootstrap admin has no pay.
+MIN_ANNUAL_SALARY_CENTS = 4_160_000
+PAY_TOO_LOW = "Pay must be at least $20 an hour ($41,600 a year)."
 
 
 def cents(data: dict, key: str, required: bool = True) -> int | None:

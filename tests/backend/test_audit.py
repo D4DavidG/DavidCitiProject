@@ -155,7 +155,8 @@ def test_you_are_not_told_about_your_own_change(conn, org, work):
 
 
 def test_an_archived_subject_is_told_nothing(conn, org, work):
-    users.archive_user(conn, org["admin"], org["alice"].user_id, NOW)  # her task stays assigned to her
+    users.archive_user(conn, org["admin"], org["alice"].user_id, NOW,  # her task stays assigned to her
+                       {"confirm_on_projects": True})
     tasks.update_task(conn, work["pam"], work["task"]["task_id"], {"title": "Renamed"})
     assert recipients_of_last_change(conn) == admins_and(org)
 

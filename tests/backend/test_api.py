@@ -130,9 +130,55 @@ def test_forged_token_is_401(conn, org):
 
 def test_archived_users_token_stops_working(conn, org):
     c = client_for(conn, org, "alice")
-    client_for(conn, org, "admin").call("POST", f"/users/{org['alice'].user_id}/archive")
+    status, _ = client_for(conn, org, "admin").call("POST", f"/users/{org['alice'].user_id}/archive",
+                                                    {"confirmOnProjects": True})  # she is booked on Apollo
+    assert status == 200
     status, _ = c.call("GET", "/auth/me")
     assert status == 401
+
+
+ON_APOLLO = ("Alice Tester is still on 1 live project: Apollo. Archiving ends their bookings there;"
+             " their open tasks stay assigned to them.")
+
+
+def test_archiving_someone_on_a_live_project_asks_first(conn, org):
+    a, alice = client_for(conn, org, "admin"), org["alice"].user_id
+    assert a.call("POST", f"/users/{alice}/archive") == (409, {"error": ON_APOLLO, "code": "ON_PROJECTS"})
+    assert a.call("POST", f"/users/{alice}/archive", {"confirmOnProjects": "true"})[0] == 409  # exactly true
+    status, payload = a.call("POST", f"/users/{alice}/archive", {"confirmOnProject": True})  # misspelt: refused
+    assert (status, payload["field"]) == (400, "confirmOnProject")
+    status, payload = a.call("POST", f"/users/{alice}/archive", {"confirmOnProjects": True})
+    assert (status, payload["isArchived"]) == (200, True)
+
+
+def test_a_persons_live_projects(conn, org):
+    alice = org["alice"].user_id
+    status, payload = client_for(conn, org, "bob").call("GET", f"/users/{alice}/projects")
+    assert status == 200
+    assert payload == {"items": [{"projectId": org["apollo"]["project_id"], "name": "Apollo", "status": "PLANNING",
+                                  "hoursPerWeek": 20, "bookingEndDate": "2026-12-31", "openTaskCount": 0}],
+                       "page": 1, "pageSize": 20, "total": 1, "totalPages": 1}
+    not_hers = app.dispatch(event("GET", f"/users/{alice}/projects", token=client_for(conn, org, "carol").token),
+                            conn, SECRET, NOW)
+    missing = app.dispatch(event("GET", "/users/999999/projects", token=client_for(conn, org, "admin").token),
+                           conn, SECRET, NOW)
+    assert (not_hers["statusCode"], not_hers["body"]) == (missing["statusCode"], missing["body"])
+    assert (missing["statusCode"], json.loads(missing["body"])) == (404, {"error": "User not found."})
+
+
+def test_dashboard_columns_come_from_at_risk_and_sort(conn, org):
+    a = client_for(conn, org, "admin")
+    status, calm = a.call("GET", "/dashboard/projects", query={"atRisk": "false", "sort": "updated"})
+    assert status == 200 and calm["items"] and not any(c["atRisk"] for c in calm["items"])
+    assert all(dt.datetime.fromisoformat(c["lastActivityAt"]).tzinfo for c in calm["items"])
+    status, risky = a.call("GET", "/dashboard/projects", query={"atRisk": "true"})
+    assert status == 200 and all(c["atRisk"] for c in risky["items"])
+    assert calm["atRiskTotal"] == risky["atRiskTotal"] == risky["total"]
+    assert a.call("GET", "/dashboard/projects", query={"sort": "newest"}) == (
+        400, {"error": "Sort must be one of risk, updated.", "field": "sort"})
+    assert a.call("GET", "/dashboard/projects", query={"atRisk": "yes"}) == (
+        400, {"error": "atRisk must be true or false.", "field": "atRisk"})
+    assert client_for(conn, org, "alice").call("GET", "/dashboard/projects", query={"sort": "updated"})[0] == 403
 
 
 # --- sessions: refresh and logout ----------------------------------------------------
@@ -179,7 +225,8 @@ def test_change_password_returns_a_working_session(conn, org):
 @pytest.mark.parametrize("action", ["reset-password", "archive"])
 def test_reset_and_archive_end_the_targets_refresh_tokens(conn, org, action):
     alice = client_for(conn, org, "alice")
-    status, _ = client_for(conn, org, "admin").call("POST", f"/users/{org['alice'].user_id}/{action}")
+    body = {"confirmOnProjects": True} if action == "archive" else None  # she is booked on Apollo
+    status, _ = client_for(conn, org, "admin").call("POST", f"/users/{org['alice'].user_id}/{action}", body)
     assert status == 200
     live = conn.execute("SELECT count(*) AS n FROM refresh_tokens WHERE user_id = %s AND revoked_at IS NULL",
                         (org["alice"].user_id,)).fetchone()["n"]
@@ -363,9 +410,20 @@ def test_lists_use_the_pagination_envelope(conn, org):
 
 def test_create_returns_201_and_the_new_resource(conn, org):
     status, payload = client_for(conn, org, "admin").call("POST", "/users", {
-        "firstName": "David", "lastName": "Guamao", "email": "david@acme.test", "role": "EMPLOYEE"})
+        "firstName": "David", "lastName": "Guamao", "email": "david@acme.test", "role": "EMPLOYEE",
+        "annualSalaryCents": 4_160_000})
     assert status == 201
     assert payload["user"]["username"].startswith("DG") and len(payload["temporaryPassword"]) == 12
+
+
+def test_pay_under_20_dollars_an_hour_is_refused_on_the_pay_field(conn, org):
+    a = client_for(conn, org, "admin")
+    status, payload = a.call("POST", "/users", {"firstName": "David", "lastName": "Guamao", "email": "david@acme.test",
+                                                "role": "EMPLOYEE", "annualSalaryCents": 100})
+    assert (status, payload) == (400, {"error": "Pay must be at least $20 an hour ($41,600 a year).",
+                                       "field": "annualSalaryCents"})
+    status, payload = a.call("PATCH", f"/users/{org['alice'].user_id}", {"annualSalaryCents": 4_159_999})
+    assert (status, payload["field"]) == (400, "annualSalaryCents")
 
 
 def test_salary_is_hidden_from_managers(conn, org):
