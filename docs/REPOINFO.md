@@ -549,10 +549,14 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    (Selenium makes you write the waits, the usual cause of flaky tests), talks to the browser
    directly, has a trace viewer for failures, and installs all browsers with one command.
    *Point at: `docs/TESTING.md` section 5*
-4. **"k6 for performance testing?"** Not built. Today the load test is our own script,
-   `tools/loadtest.py`: on AWS, 25 users, 16,184 reads, 539 requests per second, p95 57 to
-   65 ms, 2 failures, measured 13 Oct. k6 is queued; it isn't installed on the VDI.
-   *Point at: `README.md` "Load test" section; `docs/TESTING.md` section 1, last row*
+4. **"k6 for performance testing?"** Yes, built 14 Oct: `tools/k6/load.js` (k6 v2.2.0). Each
+   virtual user logs in once and loops over a manager's eight reads, then 20 logins go out ten
+   at a time. Thresholds in the script: under 1% failed, reads p95 under 1 s, logins p95 under
+   3 s (PBKDF2 is slow on purpose). Local run, 10 users: 4,038 requests in 107 s, 0 failed,
+   reads p95 67 ms, logins p95 1.3 s. Not yet run on AWS (`K6_PROFILE=aws`, 25 users). The
+   earlier Python script, `tools/loadtest.py`, measured AWS on 13 Oct: 25 users, 16,184
+   reads, 539 requests per second, p95 57 to 65 ms, 2 failures.
+   *Point at: `tools/k6/load.js`; `docs/TESTING.md` section 7*
 5. **"Why Vite?"** David chose it: the dev server reloads on save and the production build
    takes seconds. Vitest, the test runner made for Vite, reuses the same config, so tests
    see the code exactly as the app does. Built. *Point at: `frontend/vite.config.js` (the `test:` block); `docs/TESTING.md` section 5*
