@@ -3,10 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { ThemeProvider } from '@mui/material/styles'
 import {
-  CHART_COLOURS, GRID, INK, MARK, STATE_COLOURS, SURFACE, projectColours, useChartColours,
+  CHART_COLOURS, MARK, projectColours, useChartColours,
 } from './chartColours'
 import { makeTheme } from './theme'
 import { contrast } from '../test/contrast'
+
+const {
+  grid: GRID, ink: INK, state: STATE_COLOURS, surface: SURFACE,
+} = CHART_COLOURS.light
 
 describe('projectColours', () => {
   it('colours projects by id, lowest first, whatever order they arrive in', () => {
@@ -80,11 +84,6 @@ describe('the dark set', () => {
 })
 
 describe('the light set', () => {
-  it('keeps the old names working', () => {
-    expect(CHART_COLOURS.light.state).toBe(STATE_COLOURS)
-    expect([CHART_COLOURS.light.ink, CHART_COLOURS.light.surface]).toEqual([INK, SURFACE])
-  })
-
   it('draws the Today line gold, at least 3:1 on the white card', () => {
     expect(contrast(CHART_COLOURS.light.today, SURFACE)).toBeGreaterThanOrEqual(3)
   })

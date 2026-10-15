@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { CHART_COLOURS, OTHER_COLOUR, PROJECT_COLOURS } from '../../theme/chartColours'
-import {
-  keepColours, keepSlots, scheduleBars, slotColours,
-} from './schedule'
+import { CHART_COLOURS } from '../../theme/chartColours'
+import { keepSlots, scheduleBars, slotColours } from './schedule'
+
+const { light, dark } = CHART_COLOURS
 
 const apollo = (hours) => ({ projectId: 1, name: 'Apollo', hours })
 const zeus = (hours) => ({ projectId: 2, name: 'Zeus', hours })
@@ -53,33 +53,18 @@ describe('keepSlots', () => {
   })
 })
 
-describe('keepColours (light colours, for ProjectTimelines)', () => {
-  it('gives new projects the next free colour, lowest id first, and never changes one already given', () => {
-    const first = keepColours(new Map(), [7])
-    const later = keepColours(first, [3, 7])
-    expect([later.get(7), later.get(3)]).toEqual([PROJECT_COLOURS[0], PROJECT_COLOURS[1]])
-  })
-
-  it('gives the grey Other past the last colour, and the same map when nothing is new', () => {
-    const ids = PROJECT_COLOURS.map((_, i) => i + 1)
-    const colours = keepColours(new Map(), [...ids, 98])
-    expect(colours.get(98)).toBe(OTHER_COLOUR)
-    expect(keepColours(colours, [98, 1])).toBe(colours)
-  })
-})
-
 describe('slotColours', () => {
-  const ids = PROJECT_COLOURS.map((_, i) => i + 1)
+  const ids = light.project.map((_, i) => i + 1)
   const slots = keepSlots(new Map(), [...ids, 98, 99])
 
   it('colours each slot from the set for the mode, so light/dark repaints a project in its own colour', () => {
-    expect(slotColours(slots, CHART_COLOURS.light).get(1)).toBe(PROJECT_COLOURS[0])
-    expect(slotColours(slots, CHART_COLOURS.dark).get(1)).toBe(CHART_COLOURS.dark.project[0])
+    expect(slotColours(slots, light).get(1)).toBe(light.project[0])
+    expect(slotColours(slots, dark).get(1)).toBe(dark.project[0])
   })
 
   it('gives the grey Other to every project past the last colour', () => {
-    const colours = slotColours(slots, CHART_COLOURS.light)
-    expect([colours.get(98), colours.get(99)]).toEqual([OTHER_COLOUR, OTHER_COLOUR])
-    expect(slotColours(slots, CHART_COLOURS.dark).get(99)).toBe(CHART_COLOURS.dark.other)
+    const colours = slotColours(slots, light)
+    expect([colours.get(98), colours.get(99)]).toEqual([light.other, light.other])
+    expect(slotColours(slots, dark).get(99)).toBe(dark.other)
   })
 })

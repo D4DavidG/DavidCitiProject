@@ -53,7 +53,7 @@ AxisLabel.propTypes = {
 /**
  * Question 4 as a picture: one bar per deliverable on a date axis, from its start to its due day,
  * filled to its progress and coloured by its state. Late (past due, not signed off) wins, and
- * carries a word and the warning icon. The Today line is orange. Positions are day counts, never money.
+ * carries a word and the warning icon. The Today line is gold. Positions are day counts, never money.
  * @param {object} props deliverables and edges from GET /projects/{id}/dependency-graph, the project's dates, today
  */
 export default function TimelineChart({ deliverables, edges, projectStart, projectEnd, today = todayIso() }) {

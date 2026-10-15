@@ -85,16 +85,10 @@ export function useChartColours() {
 /** Mark sizes in pixels: bar thickness, corner rounding (none: sharp corners), gap between segments, reference line, one-day bar. */
 export const MARK = { bar: 12, radius: 0, gap: 2, line: 2, minDay: 8 }
 
-// The light set under its first names, so older imports keep working.
-export const SURFACE = LIGHT.surface
-export const INK = LIGHT.ink
-export const GRID = LIGHT.grid
-export const STATE_COLOURS = LIGHT.state
-export const BUDGET_COLOURS = LIGHT.budget
-export const OVER = LIGHT.over
+// Two light colours under their first names: only ProjectTimelines.test.jsx still reads them.
+// Once it reads CHART_COLOURS.light, delete both. Code reads useChartColours(), which follows the mode.
 export const PROJECT_COLOURS = LIGHT.project
 export const OTHER_COLOUR = LIGHT.other
-export const STRIPE = LIGHT.stripe
 
 /**
  * Give each project a colour slot by id, lowest id first, so a project keeps its colour

@@ -9,7 +9,7 @@ import { MARK, useChartColours } from '../../theme/chartColours'
 
 /**
  * A chart's frame: a figure named by its heading, a one-line summary, then axis, rows, legend and note.
- * The card is the theme's card colour (white, or dark green in dark mode).
+ * The card is the theme's card colour (white, or near-black in dark mode).
  * Marks carry data-mark; problem marks carry data-state="late" or "over" and get stripes only in
  * print and high-contrast mode, so colour is never the only signal.
  * `scroll` (the box's name) puts the axis and rows in a box that scrolls sideways (the Schedule's

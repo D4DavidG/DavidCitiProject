@@ -3,7 +3,6 @@
  * Both work only on what GET /dashboard/allocation already sent: per person, per week, the
  * hours each project has.
  */
-import { CHART_COLOURS } from '../../theme/chartColours'
 
 /**
  * Turn one person's weeks into bars: one bar per project per run of consecutive weeks with the
@@ -46,21 +45,6 @@ export function keepSlots(known, projectIds) {
   const slots = new Map(known)
   fresh.forEach((id) => slots.set(id, slots.size))
   return slots
-}
-
-/**
- * The light-mode form of keepSlots, kept for ProjectTimelines: a Map of id to light colour.
- * keepSlots with slotColours follows dark mode too.
- * @param {Map<number, string>} known the colours given so far
- * @param {number[]} projectIds the projects on screen now
- * @returns {Map<number, string>} `known` itself when nothing is new, otherwise a new map
- */
-export function keepColours(known, projectIds) {
-  const fresh = [...new Set(projectIds)].filter((id) => !known.has(id)).sort((a, b) => a - b)
-  if (fresh.length === 0) return known
-  const colours = new Map(known)
-  fresh.forEach((id) => colours.set(id, CHART_COLOURS.light.project[colours.size] ?? CHART_COLOURS.light.other))
-  return colours
 }
 
 /**
