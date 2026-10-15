@@ -1,7 +1,9 @@
 /*
  * The deliverables timeline in a real browser: what jsdom can't show. The row's tooltip
- * opens on mouse hover and on a finger tap, and a late bar gets its stripes only in print
- * and in Windows high-contrast (forced colours) mode, never on screen by default.
+ * opens on mouse hover and on a finger tap, and a late row's tooltip says why it is late (the
+ * day it was due, today, and how many days late), as the late mark on the dashboard's own
+ * timeline does. A late bar gets its stripes only in print and in Windows high-contrast
+ * (forced colours) mode, never on screen by default.
  *
  * Read-only, so it is safe against the deployed demo. It signs in as Sam, who manages Zeus,
  * because Zeus's "Migration" is the seed's one late deliverable (Apollo has none).
@@ -49,6 +51,9 @@ async function openZeus(page) {
 /** The Migration row: the late one. */
 const migration = (chart) => chart.getByRole('img', { name: / · Migration · .* · Late/ })
 
+/** Why a deliverable is late, as its tooltip ends (15 Oct): "Late · was due Sat, Oct 10 · today is Thu, Oct 15 · 5 days late". */
+const WHY_LATE = 'Late · was due \\w{3}, \\w{3} \\d+ · today is \\w{3}, \\w{3} \\d+ · \\d+ days? late'
+
 /** The computed background-image of the late bar and of its fill. */
 const backgrounds = (row) => Promise.all(['bar', 'fill'].map((id) => row.getByTestId(id)
   .evaluate((el) => getComputedStyle(el).backgroundImage)))
@@ -77,7 +82,7 @@ test('a late row says Late with the icon, and its tooltip opens on hover', async
   await expect(row.getByText('Late, 0%')).toHaveCSS('color', 'rgb(194, 31, 31)') // the theme's error.main, #C21F1F (15 Oct)
   await expect(page.getByRole('tooltip')).toHaveCount(0)
   await row.hover()
-  await expect(page.getByRole('tooltip')).toHaveText(/^0% done · Migration · Aug \d+ – Oct \d+, 2026 · Late$/)
+  await expect(page.getByRole('tooltip')).toHaveText(new RegExp(`^0% done · Migration · Aug \\d+ – Oct \\d+, 2026 · ${WHY_LATE}$`))
   if (DIR) await page.screenshot({ path: `${DIR}/timeline-desktop-zeus.png`, fullPage: true })
 })
 
@@ -87,11 +92,24 @@ test.describe('on a phone', () => {
   test('a tap opens the tooltip, and nothing scrolls sideways', async ({ page }) => {
     const chart = await openZeus(page)
     await fingerTap(page, migration(chart))
-    await expect(page.getByRole('tooltip')).toHaveText(/ · Migration · .* · Late$/)
+    await expect(page.getByRole('tooltip')).toHaveText(new RegExp(` · Migration · .* · ${WHY_LATE}$`))
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(1)
     if (DIR) await page.screenshot({ path: `${DIR}/timeline-phone-zeus.png`, fullPage: true })
   })
+})
+
+test("on the dashboard, a late deliverable's mark says why when hovered", async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Username').fill(sam)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible() // Sam is a manager
+  // Zeus's row on "My projects this week": the late mark's spoken label and its tooltip both say why.
+  const timeline = page.getByRole('region', { name: 'My projects this week', exact: true })
+  const mark = timeline.getByRole('img', { name: /^Zeus deliverable Migration, Late, was due \w{3}, \w{3} \d+, today is \w{3}, \w{3} \d+, \d+ days? late$/ })
+  await mark.hover()
+  await expect(page.getByRole('tooltip')).toHaveText(new RegExp(`^Migration · ${WHY_LATE}$`))
 })
 
 test('the late bar and fill are striped only in print and forced colours', async ({ page }) => {
