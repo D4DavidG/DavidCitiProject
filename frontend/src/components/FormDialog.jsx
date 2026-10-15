@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, FormLabel, MenuItem, TextField,
@@ -30,7 +30,7 @@ const minutesKey = (name) => `${name}.minutes`
  * size, grouped under the field's label. Whole numbers only: type text with a
  * numeric keypad, so "2.5" reaches validation instead of being mangled by the browser.
  */
-function DurationField({ field, value, errors, onChange }) {
+function DurationField({ field, value, errors, disabled = false, onChange }) {
   const helperId = `field-${field.name}-helper`
   const box = (part, label, error) => (
     <TextField
@@ -40,6 +40,7 @@ function DurationField({ field, value, errors, onChange }) {
       onChange={(e) => onChange({ ...value, [part]: e.target.value })}
       error={Boolean(error)}
       helperText={error}
+      disabled={disabled}
       sx={{ flex: 1 }}
       slotProps={{ htmlInput: { inputMode: 'numeric' } }}
     />
@@ -72,6 +73,8 @@ DurationField.propTypes = {
   value: PropTypes.shape({ hours: PropTypes.string, minutes: PropTypes.string }).isRequired,
   /** The message to show under each box, if any. */
   errors: PropTypes.shape({ hours: PropTypes.string, minutes: PropTypes.string }).isRequired,
+  /** True while the form is saving. */
+  disabled: PropTypes.bool,
   onChange: PropTypes.func.isRequired,
 }
 
@@ -83,7 +86,9 @@ DurationField.propTypes = {
  * anything is sent; a mistake shows under its box and nothing is sent. With `initial`,
  * only the fields that changed are sent, so a manager never sends an admin-only field
  * they didn't touch. Server errors with a `field` show on that field (a duration's
- * under its Hours box); others show above the form.
+ * under its Hours box); others show above the form. While it saves, every field and
+ * button is disabled, Escape can't close it, and a second submit is ignored; all of it
+ * comes back on success or error.
  */
 export default function FormDialog({ open, title, fields, initial = null, defaults = null, submitLabel = 'Save', onSubmit, onClose }) {
   const [values, setValues] = useState(() => Object.fromEntries(
@@ -92,9 +97,13 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  // Set at once, unlike `busy` (state lands on the next render): a second submit in the
+  // same moment, e.g. a double Enter, sees it and sends nothing.
+  const saving = useRef(false)
 
   async function submit(event) {
     event.preventDefault()
+    if (saving.current) return
     const body = {}
     const problems = {}
     fields.forEach((field) => {
@@ -120,6 +129,7 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
       onClose()
       return
     }
+    saving.current = true
     setBusy(true)
     try {
       await onSubmit(body)
@@ -128,12 +138,13 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
       if (failure.field && fields.some((f) => f.name === failure.field)) setFieldErrors({ [failure.field]: failure.message })
       else setError(failure.message)
     } finally {
+      saving.current = false
       setBusy(false)
     }
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={() => { if (!busy) onClose() }} fullWidth maxWidth="sm">
       <form onSubmit={submit} noValidate>
         <DialogTitle>{title}</DialogTitle>
         <DialogContent sx={{ display: 'grid', gap: 2, pt: '8px !important' }}>
@@ -144,6 +155,7 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
               field={field}
               value={values[field.name]}
               errors={{ hours: fieldErrors[field.name], minutes: fieldErrors[minutesKey(field.name)] }}
+              disabled={busy}
               onChange={(value) => setValues({ ...values, [field.name]: value })}
             />
           ) : (
@@ -160,6 +172,7 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
               onChange={(e) => setValues({ ...values, [field.name]: String(e.target.value) })}
               error={Boolean(fieldErrors[field.name])}
               helperText={fieldErrors[field.name] ?? field.helper}
+              disabled={busy}
               slotProps={{
                 inputLabel: field.type === 'date' ? { shrink: true } : undefined,
                 htmlInput: field.type === 'money' ? { inputMode: 'decimal' } : undefined,
@@ -171,7 +184,7 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
           )))}
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose} disabled={busy}>Cancel</Button>
           <Button type="submit" variant="contained" disabled={busy}>{busy ? 'Saving…' : submitLabel}</Button>
         </DialogActions>
       </form>
