@@ -34,10 +34,10 @@ describe('WorkloadChart', () => {
     const ben = row('Ben Okafor')
     const [apollo, zeus] = within(ben).getAllByTestId('segment')
     expect(apollo).toHaveStyle({ backgroundColor: '#3987e5' })
-    expect(zeus).toHaveStyle({ backgroundColor: '#199e70', borderLeft: '2px solid #0B0E0B' }) // the gap is the dark panel
-    expect(within(ben).getByTestId('over')).toHaveStyle({ backgroundColor: '#F28B82' })
-    expect(within(ben).getByTestId('capacity')).toHaveStyle({ background: '#D7D7D7' })
-    expect(screen.getByRole('figure')).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+    expect(zeus).toHaveStyle({ backgroundColor: '#c98500', borderLeft: '2px solid #212D23' }) // the gap is the dark card
+    expect(within(ben).getByTestId('over')).toHaveStyle({ backgroundColor: '#FF5A5A' })
+    expect(within(ben).getByTestId('capacity')).toHaveStyle({ background: '#ECEEE6' })
+    expect(screen.getByRole('figure')).toHaveStyle({ backgroundColor: 'rgb(33, 45, 35)' })
   })
 
   it('draws a row per person, in server order, each with its sentence', () => {
@@ -57,12 +57,12 @@ describe('WorkloadChart', () => {
     expect(within(ben).getAllByTestId('segment')).toHaveLength(2)
     expect(apollo).toHaveStyle({ backgroundColor: '#1c5cab' })
     expect(width(apollo)).toBeCloseTo(41.67, 2)
-    expect(zeus).toHaveStyle({ backgroundColor: '#199e70' })
+    expect(zeus).toHaveStyle({ backgroundColor: '#eda100' })
     expect(left(zeus)).toBeCloseTo(41.67, 2)
     expect(width(zeus)).toBeCloseTo(25, 2) // 15 h fill Ben up to his 40 h
     const over = within(ben).getByTestId('over')
     expect(over).toHaveAttribute('data-state', 'over')
-    expect(over).toHaveStyle({ backgroundColor: '#C62828' })
+    expect(over).toHaveStyle({ backgroundColor: '#C21F1F' })
     expect(left(over)).toBeCloseTo(66.67, 2)
     expect(width(over)).toBeCloseTo(8.33, 2)
     expect(within(ben).getByText('+5 h over')).toBeInTheDocument()
@@ -96,16 +96,16 @@ describe('WorkloadChart', () => {
     expect(left(screen.getByTestId('capacity'))).toBeCloseTo(40, 2)
   })
 
-  it('folds the 6th project and later into Other, and lists them all in the sentence', () => {
+  it('folds the 5th project and later into Other, and lists them all in the sentence', () => {
     const projects = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ projectId: id, name: `P${id}`, hours: 2 }))
     draw([{ ...ANA, weeks: [week(14, 0, projects)] }])
     const legend = screen.getByRole('list', { name: 'Legend' })
     expect(within(legend).getAllByRole('listitem').map((li) => li.textContent))
-      .toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'Other (2)', 'Over capacity', 'Capacity'])
+      .toEqual(['P1', 'P2', 'P3', 'P4', 'Other (3)', 'Over capacity', 'Capacity'])
     const segments = within(row('Ana Ruiz')).getAllByTestId('segment')
-    expect(segments).toHaveLength(6)
-    expect(segments.at(-1)).toHaveStyle({ backgroundColor: '#D1D5DB' })
-    expect(width(segments.at(-1))).toBeCloseTo(10, 2) // 4 h of a 40 h axis
+    expect(segments).toHaveLength(5)
+    expect(segments.at(-1)).toHaveStyle({ backgroundColor: '#D6DACB' })
+    expect(width(segments.at(-1))).toBeCloseTo(15, 2) // 6 h of a 40 h axis
     expect(row('Ana Ruiz')).toHaveAttribute(
       'aria-label',
       '14 h booked, capacity 40 h · P1 2 h, P2 2 h, P3 2 h, P4 2 h, P5 2 h, P6 2 h, P7 2 h · Ana Ruiz',

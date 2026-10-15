@@ -14,18 +14,18 @@ const {
 
 describe('projectColours', () => {
   it('colours projects by id, lowest first, whatever order they arrive in', () => {
-    const expected = new Map([[3, '#1c5cab'], [7, '#199e70'], [9, '#9085e9']])
+    const expected = new Map([[3, '#1c5cab'], [7, '#eda100'], [9, '#9085e9']])
     expect(projectColours([7, 3, 9])).toEqual(expected)
     expect(projectColours([9, 3, 7, 3])).toEqual(expected)
   })
 
   it('takes the colours of the set it is given (dark mode)', () => {
-    expect(projectColours([7, 3], CHART_COLOURS.dark)).toEqual(new Map([[3, '#3987e5'], [7, '#199e70']]))
+    expect(projectColours([7, 3], CHART_COLOURS.dark)).toEqual(new Map([[3, '#3987e5'], [7, '#c98500']]))
   })
 
-  it('folds the 6th project and later into Other', () => {
+  it('folds the 5th project and later into Other', () => {
     const colours = projectColours([1, 2, 3, 4, 5, 6, 7])
-    expect([colours.get(5), colours.get(6), colours.get(7)]).toEqual(['#eda100', '#D1D5DB', '#D1D5DB'])
+    expect([colours.get(4), colours.get(5), colours.get(7)]).toEqual(['#e87ba4', '#D6DACB', '#D6DACB'])
   })
 })
 
@@ -33,13 +33,13 @@ describe('projectColours', () => {
 describe('timeline state colours', () => {
   it('are spec section 5\'s table, word for word', () => {
     expect(STATE_COLOURS).toEqual({
-      DONE: { fill: '#2E7D32', track: '#B6D2B7' },
+      DONE: { fill: '#165E26', track: '#B3C9B5' }, // the site's one green
       IN_PROGRESS: { fill: '#0B3D91', track: '#AABBD8' },
       NOT_STARTED: { fill: '#6B7280', track: '#CBCED3' },
       BLOCKED: { fill: '#6B7280', track: '#CBCED3' },
-      LATE: { fill: '#C62828', track: '#EBB4B4' },
+      LATE: { fill: '#C21F1F', track: '#EDB6B6' }, // the site's red
     })
-    expect([INK, GRID, SURFACE]).toEqual(['#1F2937', '#E5E7EB', '#FFFFFF'])
+    expect([INK, GRID, SURFACE]).toEqual(['#161A16', '#E1E5D6', '#FAFBF5'])
   })
 
   it('give every fill and the Today line at least 3:1 on the card, and keep tracks quieter than their fill', () => {
@@ -61,8 +61,8 @@ describe('the dark set', () => {
     }
   })
 
-  it('is the project palette the dataviz validator passed on the dark card (14 Oct)', () => {
-    expect(dark.project).toEqual(['#3987e5', '#199e70', '#9085e9', '#d55181', '#c98500'])
+  it('is the project palette the dataviz validator passed on the dark card, with no green (15 Oct)', () => {
+    expect(dark.project).toEqual(['#3987e5', '#c98500', '#9085e9', '#d55181'])
   })
 
   it('gives every mark, line and project at least 3:1 on the dark card, tracks quieter than fills, louder than gridlines', () => {

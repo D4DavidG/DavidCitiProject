@@ -16,7 +16,7 @@ describe('chart parts', () => {
         </ChartFigure>
       </ThemeProvider>,
     )
-    expect(screen.getByRole('figure', { name: 'Dark' })).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+    expect(screen.getByRole('figure', { name: 'Dark' })).toHaveStyle({ backgroundColor: 'rgb(33, 45, 35)' })
     const swatch = within(screen.getByRole('list', { name: 'Legend' })).getByText('Spent').querySelector('[data-mark]')
     expect(swatch.style.borderRadius).toBe('0px')
   })
