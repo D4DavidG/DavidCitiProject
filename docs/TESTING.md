@@ -3,14 +3,23 @@
 Every number on this page was measured on the VDI on 14 Oct 2026, with the local stack
 running (`bin/start-dev.sh`) and the demo data seeded (`tools/demo.py seed`).
 
+**Read the counts as "before the redesign".** The test counts, coverage blocks and run times
+below come from the full run of 14 Oct, night: 565 backend tests, 404 website tests, 30 browser
+tests. The redesign adds tests (the backend alone now collects more than 600), so a run today
+prints higher counts. What must not change is the result: every test passes. Where this page
+says what to expect, it says "all passed" and gives the old count only as a reference. The
+current facts are the route count (70), the browser file list (12 files, 30 tests; `./tools/e2e.sh
+--list` prints it) and the AWS results. The final integration run re-measures the rest.
+
 **One command runs everything:** `./tools/test-all.sh` (section 6).
 **One command runs the browser tests alone, on your machine or against the live site:**
 `./tools/e2e.sh` (section 8).
 
 ## 1. The kinds of test we have
 
-A test is a small program that uses our code and checks the result. We have nine kinds of
-test and two checks that read the code (1.10). Each one looks at a different part of the system, so each one catches a different sort of
+A test is a small program that uses our code and checks the result. We have ten kinds of
+test (1.1 to 1.9, and the live API walk, 1.11) and the checks that read the code (1.10). Each
+one looks at a different part of the system, so each one catches a different sort of
 mistake. This section gives every kind the same five headings: why we use it, what it does,
 which part of the stack it tests, what the results mean, and what kind of coverage it gives.
 
@@ -54,10 +63,13 @@ running it. `-` = it does not touch that layer.
 | 1.9 k6 load test | - | - | - | yes | yes | yes | yes | yes |
 | 1.10 Lint | - | reads | - | - | - | - | - | - |
 | 1.10 Bandit | - | - | - | - | reads | reads | reads | - |
+| 1.10 npm audit, terraform validate | - | reads the package list | - | - | - | - | - | - (terraform validate reads `infra/`, which is not a layer above) |
+| 1.11 Live API walk (`demo.py demo`) | - | - | - | yes | yes | yes | yes | yes |
 
-Read the table by column to see how well a layer is guarded. Postgres is hit by seven kinds.
+Read the table by column to see how well a layer is guarded. Postgres is hit by eight kinds.
 The browser, the proxy and CloudFront are hit only by the browser tests (and, for the proxy
-and CloudFront, k6). That is why the browser tests exist even though they are the slowest.
+and CloudFront, k6 and the live API walk). That is why the browser tests exist even though
+they are the slowest.
 
 ### All kinds at a glance
 
@@ -75,8 +87,12 @@ Commands run from the repo root. Times and counts are from the last full run (14
 | 1.8 Accessibility scan | inside `frontend/e2e/tour.spec.js` | `./tools/e2e.sh tour` | part of the browser run (not timed alone) | 50 scans in 4 tests, all passed |
 | 1.9 k6 load test | `tools/k6/load.js` | `K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js` (section 7; the AWS command is there too) | 107 s | 4,038 requests, 0 failed, all 4 thresholds passed (local, 14 Oct) |
 | 1.10 Lint and bandit | the website code; `backend/tracker` | `cd frontend && npm run lint`; `.venv/bin/bandit -r backend/tracker -x backend/tracker/psycopg,backend/tracker/psycopg_binary,backend/tracker/psycopg_binary.libs` | 5 s; under 1 s | both clean |
+| 1.10 npm audit, terraform validate | `frontend/package-lock.json`; `infra/` | `cd frontend && npm audit --audit-level=high`; `terraform -chdir=infra validate` | not timed | not run again for this page (CLAUDE.md: 0 high findings on 14 Oct) |
+| 1.11 Live API walk | `tools/demo.py` | `TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo` (add `TRACKER_API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker` for AWS) | not timed | 7 questions answered, 10 rules refused, then `5 integrity checks, 0 violations` |
 
-Backend total: `.venv/bin/pytest -q` printed `565 passed in 27.19s` (88 + 317 + 156 + 2 + 2).
+Backend total: `.venv/bin/pytest -q` printed `565 passed in 27.19s` (88 + 317 + 156 + 2 + 2) before the
+redesign. `pytest --collect-only` in the redesign's worktree now lists more than 600 (1.2 and 1.3 grew; 1.1,
+1.4 and 1.5 did not), and the integration run prints the new total.
 Website total: `npm test` printed `Test Files  36 passed (36)`, `Tests  404 passed (404)`, `Duration  117.60s`.
 Browser total: 30 tests in 12 files; Playwright printed 29 passed, 1 skipped (the skip is the README screenshots).
 (14 Oct, night. Steps 1 to 5 from `tools/test-all.sh`; the browser tests were run by hand against this branch's own site, see section 6.)
@@ -131,7 +147,7 @@ that lives only in Python, a constraint nobody wrote a test for, or slowness on 
 
 ### 1.2 Business-rule (service) tests
 
-Run: `.venv/bin/pytest -q tests/backend/test_users.py tests/backend/test_work.py tests/backend/test_projects.py tests/backend/test_requests.py tests/backend/test_dashboard.py tests/backend/test_audit.py tests/backend/test_domain.py tests/backend/test_security.py tests/backend/test_sessions.py`. Takes 7 s. 317 tests.
+Run: `.venv/bin/pytest -q tests/backend/test_users.py tests/backend/test_work.py tests/backend/test_projects.py tests/backend/test_requests.py tests/backend/test_dashboard.py tests/backend/test_audit.py tests/backend/test_domain.py tests/backend/test_security.py tests/backend/test_sessions.py`. Takes 7 s. 317 tests before the redesign (more now).
 
 #### Why we use it
 
@@ -155,7 +171,7 @@ The services, the store they call, and Postgres. Not the API layer, not the webs
 
 #### What the results mean
 
-Passing reads `317 passed in` and then the seconds (about 7). A failure shows the test name
+Passing reads `N passed in` and then the seconds (about 7; N was 317 before the redesign). A failure shows the test name
 (for example `tests/backend/test_work.py::test_logging_past_capacity_asks_first_without_overtime`)
 and the assertion that did not hold. A failure at the end of a test with an integrity-check
 message is different: the rule's own assertions passed, but it left the data broken, which
@@ -171,7 +187,7 @@ Five real rules still have no test; they are named in the README under **Known g
 
 ### 1.3 API tests
 
-Run: `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py tests/backend/test_openapi.py`. Takes 4 s. 156 tests.
+Run: `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py tests/backend/test_openapi.py`. Takes 4 s. 156 tests before the redesign (more now).
 
 #### Why we use it
 
@@ -202,7 +218,7 @@ but never runs them.
 
 #### What the results mean
 
-Passing reads `156 passed in` and then the seconds (about 4). A failure that says a route
+Passing reads `N passed in` and then the seconds (about 4; N was 156 before the redesign). A failure that says a route
 was not walked means you added a route: add it to the walk. A failure in `test_openapi.py`
 means the saved OpenAPI file is out of date; regenerate it with
 `.venv/bin/python tools/openapi.py`. Any other failure shows the status or body that came
@@ -210,8 +226,8 @@ back against the one expected.
 
 #### What kind of coverage it gives
 
-The `api/` folder is 100% of lines and branches, and all 69 routes are called by the two
-walks. `api/errors.py` (the error table) is 100%. It can't catch real network problems, what
+The `api/` folder was 100% of lines and branches before the redesign, and all 70 routes (the
+redesign added `GET /dashboard/timeline`) are called by the two walks. `api/errors.py` (the error table) is 100%. It can't catch real network problems, what
 CloudFront does to headers (checked by hand on AWS: the `Authorization` header arrives), or
 real-world speed.
 
@@ -374,7 +390,8 @@ site.
 
 #### What the results mean
 
-Passing ends like this (the counts change with the files you ran):
+Passing ends like this (the counts change with the files you ran; this is the whole local
+suite on 14 Oct night):
 
 ```
   1 skipped
@@ -439,8 +456,10 @@ What it found on its first run (14 Oct), both fixed:
   `<a>` links directly, so a screen reader could not announce "list, 9 items". Fixed with a
   `ListItem` around each link (`components/AppLayout.jsx`).
 - `color-contrast` (serious, 10 cells) on `/allocation`: empty weeks ("0 / 40 h") were
-  `#9e9e9e` on white, 2.7:1 (AA needs 4.5:1). Now `text.secondary`, `#4B5563`, 7.6:1
-  (`pages/allocation/AllocationPage.jsx`).
+  `#9e9e9e` on white, 2.7:1 (AA needs 4.5:1). Now `text.secondary`, which was `#4B5563`, 7.6:1,
+  when this was fixed; the redesign's theme makes it `#4A564F`, 7.7:1 on white
+  (`theme/theme.js`, checked by `theme.test.jsx`). The cell's code is in
+  `pages/allocation/AllocationPage.jsx`.
 
 #### What kind of coverage it gives
 
@@ -513,6 +532,13 @@ They are cheap to find early, and CI runs bandit on every push (`.github/workflo
   Python. It flags `assert`
   (B101), `random` used for passwords (B311), SQL built from strings (B608) and hard-coded
   passwords (B105, B106).
+- **npm audit** (`cd frontend && npm audit --audit-level=high`): lists known security
+  problems in the website's packages. CI runs it and fails on a high one
+  (`.github/workflows/react.actions.yml`). **terraform validate**
+  (`terraform -chdir=infra validate`): checks the infrastructure files are well formed. We run
+  it by hand before committing infra changes; CI runs Checkov instead, which reports but never
+  fails the build (`soft_fail: true`). Neither runs our code. A failure of either names the
+  package or the file.
 
 #### Which part of the stack it tests
 
@@ -532,7 +558,53 @@ a `# nosec` with the reason (two exist today).
 
 None by lines; each is pass or fail over every file in scope. Lint: clean in 5 s on 14 Oct.
 Bandit: clean in under 1 s, 3,150 lines scanned on 14 Oct night. Neither can find a logic
-error: code can pass both and still be wrong.
+error: code can pass both and still be wrong. `npm audit` is a count of known problems
+(0 high on 14 Oct); `terraform validate` is pass or fail.
+
+### 1.11 Live API walk (`tools/demo.py demo`)
+
+Run: `TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo`; for AWS add
+`TRACKER_API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker` (the full steps are in
+`docs/DEMO-RUNBOOK.md`, section 3). Not timed here.
+
+#### Why we use it
+
+It is the one check of the business rules that runs against the real AWS system (CloudFront,
+the Lambda and Aurora) with no browser and no test database. Everything else runs on the VDI.
+It is also the demo's terminal half: the seven questions answered, then ten requests that try to
+break a rule, with the server's own refusal text shown for each.
+
+#### What it does
+
+It signs in as the admin, Maria, Ana and Ben over HTTPS and prints, in order: the accounts, the
+answers to the seven questions (dashboard, allocation, deliverables, dependency chain), then ten
+requests that break a rule (logging past 40 hours, logging time tomorrow, opening another
+manager's project, an id that does not exist, an employee creating a project, an employee
+approving time, a dependency loop, signing off a deliverable with open tasks, a DELETE, a request
+with no token), then the integrity check. Each rule line is marked `REFUSED as designed` when the
+server answered the status the rule demands, `OK` when a success was expected, and `UNEXPECTED`
+for anything else.
+
+#### Which part of the stack it tests
+
+From the front door down: CloudFront (or the local proxy), the API layer, the services, the
+store and Postgres. It sends HTTP itself, so the website and the browser are not involved.
+
+#### What the results mean
+
+Healthy: every refusal line says `REFUSED as designed`, nothing says `UNEXPECTED`, and the last
+line says `5 integrity checks, 0 violations`. An `UNEXPECTED` line means the server answered
+with a different status than the rule demands: either a rule did not hold, or the data is no
+longer the seed's (from Mon 19 Oct the first refusal is accepted, and writes a real entry: see
+the line about it in `docs/DEMO-RUNBOOK.md`, section 1). The script exits non-zero only when a
+request it needs fails (a sign-in, a read), not for an `UNEXPECTED` line, so read the lines
+rather than the exit code.
+
+#### What kind of coverage it gives
+
+By rules, not lines: the seven questions and ten refused requests, each once, plus the
+invariant. It is a smoke test of the deployed system, not a replacement for the 88 database
+and 300-odd rule tests behind it. It needs the seeded demo data.
 
 ### Import the API into Postman or SwaggerHub
 
@@ -668,8 +740,9 @@ runs underneath.
 | `requests.spec.js` | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` | **Yes**: one rejected request, audit rows, bell notifications (it skips itself unless the site is on localhost) | No |
 | `history.spec.js` | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` | No | Yes |
 | `schedule.spec.js` | `E2E_MANAGER_USERNAME` (defaults to local Maria) | No | Yes |
-| `timeline.spec.js` | `E2E_ZEUS_MANAGER_USERNAME` (Sam; or `E2E_ADMIN_PASSWORD` to look him up); its last test signs in as `E2E_MANAGER_USERNAME` | No | Yes (not yet run there) |
-| `budget.spec.js`, `workload.spec.js` | `E2E_MANAGER_USERNAME` (defaults to local Maria) | No | Yes (not yet run there) |
+| `timeline.spec.js` | `E2E_ZEUS_MANAGER_USERNAME` (Sam; or `E2E_ADMIN_PASSWORD` to look him up); its last test signs in as `E2E_MANAGER_USERNAME` | No | Reads only, but 1 of 4 tests failed there on 14 Oct night (the Late-row icon was not found); run it only when named |
+| `budget.spec.js` | `E2E_MANAGER_USERNAME` (defaults to local Maria) | No | Yes (3 of 3 passed there, 14 Oct night) |
+| `workload.spec.js` | `E2E_MANAGER_USERNAME` (defaults to local Maria) | No | Reads only, but 1 of 5 tests failed there on 14 Oct night (`Not booked` matched 3 people, not 1); run it only when named |
 | `timelog.spec.js` | `E2E_MANAGER_USERNAME` | **Yes**: one approved 15-minute entry, audit rows, bell notifications (it skips itself unless the site is on localhost) | No |
 | `project-lifecycle.spec.js` | `E2E_ADMIN_PASSWORD` | **Yes**: one archived project, audit rows, notifications (it skips itself unless the site is on localhost) | No |
 | `tour.spec.js` | `E2E_TOUR_DIR` (a folder for screenshots) and both usernames | No | Yes |
@@ -745,9 +818,17 @@ cd ~/DavidCitiProject/frontend
 E2E_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net E2E_MANAGER_USERNAME=ML662930 E2E_EMPLOYEE_USERNAME=AR553882 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test demo tour
 ```
 
-- **Safe on AWS:** `demo`, `tour`, `history` and `schedule` (they only read; signing in
-  writes no audit row, `tests/backend/test_api_audit_walk.py:3-5`). `timeline`, `budget` and
-  `workload` also only read, but have not been run against AWS yet.
+- **Safe on AWS, and seen passing there:** `demo`, `tour`, `history` and `schedule` (they only
+  read; signing in writes no audit row, `tests/backend/test_api_audit_walk.py:3-5`).
+  `./tools/e2e.sh --aws` with no names runs exactly these four.
+- **Read-only, but not in that default set:** `budget` (3 of 3 passed on AWS, 14 Oct night),
+  `timeline` (3 of 4 passed) and `workload` (4 of 5 passed). The one failure in each comes from
+  the live data, not from a write: the live database has two people left over from manual
+  testing, so `workload.spec.js` finds three people marked `Not booked` where its test expects
+  one (Playwright's strict mode refuses an ambiguous match), and `timeline.spec.js` does not
+  find the Late row's warning icon on Zeus's Migration (most likely the live data differs from
+  the seed; the exact difference was not looked into). Name them (`./tools/e2e.sh --aws
+  budget`) if you want to run them.
 - **Not on AWS:** `pull.spec.js` writes a task and sends notifications to Maria and every
   admin, which would show up in the live demo. It also calls the API at `E2E_API`, which
   defaults to the local one. `requests`, `timelog` and `project-lifecycle` write too (the
@@ -761,6 +842,10 @@ Results against AWS:
 - `demo.spec.js` alone, 14 Oct: `2 passed (7.0s)`.
 - `demo`, `history`, `schedule` and `tour` together, 14 Oct, night, after the deploy:
   13 passed in 1.4 minutes. That run included the axe scan of every tour screen, and it passed.
+  A later review run through `tools/e2e.sh --aws` saw the same: `demo` 2 passed, then
+  `history schedule tour` 11 passed (13 tests in all, the default set).
+- `timeline`, `budget` and `workload` together through `tools/e2e.sh --aws`, same review run:
+  10 passed, 2 failed, exit code 1 (the two failures are described above).
 
 ## 5. Why these tools
 
@@ -805,7 +890,7 @@ to the local stack, even if `E2E_BASE_URL` is still set from an AWS run, because
 `pull.spec.js`, `requests.spec.js`, `timelog.spec.js` and `project-lifecycle.spec.js` write data. Each run therefore adds one archived
 task, one rejected request from Ana, audit rows and bell notifications (for Ana, Maria and
 every admin) to the local database. It ends with a table
-and exits with an error code if any step failed. Last results, 14 Oct, night (one real `bash tools/test-all.sh` run on the merged branch; its browser and accessibility rows were SKIP because the script's site on port 3000 served another folder's code, so those two steps were run by hand against this branch's own site on port 3002, and passed):
+and exits with an error code if any step failed. Last results, 14 Oct, night, before the redesign (one real `bash tools/test-all.sh` run on the merged branch; its browser and accessibility rows were SKIP because the script's site on port 3000 served another folder's code, so those two steps were run by hand against this branch's own site on port 3002, and passed):
 
 ```
 Step            Result Detail
@@ -861,12 +946,11 @@ thresholds are the same; about 4 minutes):
 
 ```sh
 K6_PROFILE=aws K6_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net/api/tracker \
-K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
+K6_USERNAME=ML662930 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
 ```
 
-On AWS, use the username Maria has there if it differs, and her password there. Warm the
-app up first (section 7 of `CLAUDE.md`: Aurora pauses itself). `K6_VUS=50` raises the
-number of users.
+`ML662930` is Maria's username on AWS (`ML460428` is her local one). Warm the app up first
+(section 7 of `CLAUDE.md`: Aurora pauses itself). `K6_VUS=50` raises the number of users.
 
 **Last local run, 14 Oct** (ramp to 10 users over 1 minute, hold 30 s, then the login
 burst; 107 s in all). k6 exited 0:
@@ -903,10 +987,11 @@ Run them from `~/DavidCitiProject`:
 ```sh
 ./tools/e2e.sh --list              # first of all: shows the tests without running them (needs no server)
 ./tools/e2e.sh                     # every browser test, on the local stack
-./tools/e2e.sh demo                # one file (names are Playwright's filters)
+./tools/e2e.sh demo                # one file (any part of a spec file name)
 ./tools/e2e.sh demo tour           # several files
 ./tools/e2e.sh --show demo         # a real browser window, slowed down so people can watch
-./tools/e2e.sh --aws demo tour     # against the live AWS site; read-only files only
+./tools/e2e.sh --aws               # the live AWS site, the four files seen passing there (13 tests)
+./tools/e2e.sh --aws demo tour     # the live AWS site, just those files; read-only files only
 ./tools/e2e.sh --aws --show demo   # the live site, with a visible window
 ./tools/e2e.sh --report demo       # then open Playwright's HTML report
 ./tools/e2e.sh --help              # the same list, from the script itself
@@ -929,13 +1014,16 @@ word can't match the folder path by accident.
   usernames (Maria `ML662930`, Ana `AR553882`, Sam `SP918535`), and wakes the site first with
   a call to `/api/tracker/health` (the database sleeps when idle). It clears
   `E2E_ADMIN_PASSWORD` so a local password is never sent to the live site. It **refuses** any
-  file that writes data, before anything runs. With no file named, it runs the seven
-  read-only ones.
+  file that writes data, before anything runs. With no file named, it runs the four seen
+  passing there: `demo`, `history`, `schedule` and `tour` (13 tests). `timeline`, `budget` and
+  `workload` also only read, so you may name them, but on the live data `timeline` and
+  `workload` each have one failing test (section 4).
 - **Screenshots:** the tour saves one per screen in `E2E_TOUR_DIR` (default `$HOME/tour-shots`).
 - **`--show`:** opens a visible browser and waits 500 ms between steps (`E2E_SLOWMO=250`
   makes it faster, `E2E_SLOWMO=1000` slower). It also lifts the two-minute limit, because the
   slow steps would otherwise run out of time. It needs a screen, so run it from a terminal on
-  the VDI's desktop. Use it on one file; the whole suite would take a long time.
+  the VDI's desktop. Use it on one file: `--show demo` took about 16 s of test time at the
+  default 500 ms (a review run on 14 Oct night); the whole suite would take far longer.
 - **`--report`:** writes Playwright's HTML report (`frontend/playwright-report/`) and opens
   it when the run is over. Press Ctrl+C in the terminal to close it.
 
@@ -943,11 +1031,12 @@ word can't match the folder path by accident.
 
 | Name | What it checks | Writes data? | `--aws` |
 | --- | --- | --- | --- |
-| `demo` | The seven questions, then the phone menu | No | Yes |
-| `tour` | Every screen, desktop and phone, with the axe accessibility scan | No | Yes |
-| `history` | A manager reads a person's history | No | Yes |
-| `schedule` | The Schedule bars | No | Yes |
-| `timeline`, `budget`, `workload` | The three charts | No | Yes (not yet run there) |
+| `demo` | The seven questions, then the phone menu | No | Yes (default set) |
+| `tour` | Every screen, desktop and phone, with the axe accessibility scan | No | Yes (default set) |
+| `history` | A manager reads a person's history | No | Yes (default set) |
+| `schedule` | The Schedule bars | No | Yes (default set) |
+| `budget` | The budget chart | No | Yes when named (3 of 3 passed there) |
+| `timeline`, `workload` | The timeline and workload charts | No | Yes when named, but one test in each failed on the live data (section 4) |
 | `pull` | Ana takes a task and puts it back | **Yes** | Refused |
 | `requests` | Ana asks, Maria rejects | **Yes** | Refused |
 | `timelog` | Ben logs time, Maria approves | **Yes** | Refused |
@@ -983,22 +1072,41 @@ and 2 for a request the script refused.
 
 ### Before the demo
 
-1. Warm AWS and check the live site end to end: `./tools/e2e.sh --aws demo tour`. (The last
-   run of demo, history, schedule and tour together took 1.4 minutes; these two are part of it.)
+1. Warm AWS and check the live site end to end: `./tools/e2e.sh --aws` (the four files seen
+   passing there, 13 tests, about 1.4 minutes), or just `./tools/e2e.sh --aws demo tour` for
+   the two that matter most.
 2. Rehearse the live moment: `./tools/e2e.sh --aws --show demo`.
 3. If the live site is down, the same on the local stack: `./tools/e2e.sh --show demo`.
 
 ### How the script was checked
 
-On 14 Oct, night, in the redesign worktree. Checked for real: the syntax (`bash -n`),
-`shellcheck` (clean), `--help`, `--list` (30 tests in 12 files locally; 25 in 7 files with
-`--aws`), the refusals (`--aws pull`, `--aws time`, `--aws project`, `--aws screenshots`, an
-unknown name, an unknown option, `--show` with no display), the missing-port message, the
-usernames it looks up locally (Maria `ML460428`, Ana `AR836183`, Sam `SP345715`), and Sam's
-AWS username (`SP918535` signed in on the live site). Checked with a stand-in for
-Playwright, not a browser: the environment each mode sets, the summary block for passed,
-failed, skipped and could-not-run, and that `E2E_ADMIN_PASSWORD` is cleared for `--aws`.
+On 14 Oct, night, in the redesign worktree, and again after an independent review.
+
+Checked for real (no browser needed): the syntax (`bash -n`), `shellcheck` (clean), `--help`,
+`--list` (30 tests in 12 files locally; 13 tests in 4 files with `--aws`), the refusals
+(`--aws pull`, `--aws time`, `--aws project`, `--aws screenshots`, an unknown name, an unknown
+option, `--show` with no display), the missing-port message, the usernames it looks up locally
+(Maria `ML460428`, Ana `AR836183`, Sam `SP345715`), and the AWS usernames (Maria `ML662930`, Ana
+`AR553882`, Sam `SP918535`, Ben `BO435681`, all read from the live site's people list or signed in
+with).
+
+Checked with a stand-in for Playwright, before and after each review fix: with `--aws` and no
+name the stand-in is handed exactly `demo history schedule tour` (before the fix it was handed
+all seven read-only files); with `--aws timeline budget workload` it is handed those three and the
+script prints a note about the two with a failing test; an exported `E2E_SCREENSHOTS=1` is dropped
+on a run with no names and kept when `screenshots` is named (before the fix a run with no names
+kept it and would have rewritten `docs/screenshots`). The summary block for passed, failed,
+skipped and could-not-run, and that `E2E_ADMIN_PASSWORD` is cleared for `--aws`, were checked the
+same way.
+
+Seen by a review run against the live site, with a real browser: `--aws demo` 2 passed;
+`--aws history schedule tour` 11 passed; `--aws timeline budget workload` 10 passed, 2 failed,
+`FAILED: 2 tests failed`, exit 1 (section 4 says why); `--show demo` on the VDI's display took
+16.3 s of test time at the default 500 ms and 18 s counting the script's own lines; headless
+with `E2E_SLOWMO=1500` the file took 24 s (its first test 14.4 s, against 4.8 s with no slowMo).
+
 A real local run through the script got through its first 20 tests before it was stopped:
 18 passed (budget, demo, history, pull, requests, schedule, timeline, timelog) and 2 skipped
-(project-lifecycle had no `E2E_ADMIN_PASSWORD`; screenshots runs only on request). Not yet
-run for real: a whole run to the end, `--show`, `--report`, and `--aws` with a browser.
+(project-lifecycle had no `E2E_ADMIN_PASSWORD`; screenshots runs only on request). Not run for
+real by the author of this page: a whole local run to the end, `--report`, and `--aws` with
+a browser. The integration run replaces this paragraph with a full local run.
