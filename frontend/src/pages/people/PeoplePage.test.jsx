@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PeoplePage from './PeoplePage'
+import * as responsive from '../../theme/responsive'
 import { USERS, holdOpen, page, renderAt, session, stubApi } from '../../test/utils'
+
+vi.mock('../../theme/responsive', () => ({ useIsMobile: vi.fn(() => false) }))
 
 const MARIA = { userId: 2, username: 'ML662930', firstName: 'Maria', lastName: 'Lopez', email: 'maria.lopez@acme.test', role: 'MANAGER', jobTitle: 'Delivery lead', managerId: null, weeklyCapacityHours: 40, overtimeAllowed: false, isArchived: false, annualSalaryCents: 13_000_000 }
 const BEN = { userId: 4, username: 'BO435681', firstName: 'Ben', lastName: 'Okafor', email: 'ben.okafor@acme.test', role: 'EMPLOYEE', jobTitle: 'Developer', managerId: 2, weeklyCapacityHours: 40, overtimeAllowed: false, isArchived: false, annualSalaryCents: 10_000_000 }
@@ -21,6 +24,14 @@ function renderPeople(user = USERS.admin, answers = {}) {
   renderAt(<PeoplePage />, { path: '/people', auth: session(user) })
   return calls
 }
+
+/** Open a person's Actions menu and pick one item. */
+async function choose(person, item) {
+  await userEvent.click(await screen.findByRole('button', { name: `Actions for ${person}` }))
+  await userEvent.click(await screen.findByRole('menuitem', { name: item }))
+}
+
+const CAPACITY = 'Capacity, overtime and task limit'
 
 describe('PeoplePage', () => {
   it('lists people with username, role, capacity, and salary where the server shares it', async () => {
@@ -64,7 +75,7 @@ describe('PeoplePage', () => {
     })
     await screen.findByRole('table', { name: 'People' })
     await userEvent.click(screen.getByRole('button', { name: /new person/i }))
-    await userEvent.type(screen.getByLabelText(/first name/i), 'Chloe')
+    await userEvent.type(await screen.findByLabelText(/first name/i), 'Chloe')
     await userEvent.type(screen.getByLabelText(/last name/i), 'Kim')
     await userEvent.type(screen.getByLabelText(/email/i), 'chloe.kim@acme.test')
     await userEvent.click(screen.getByRole('button', { name: /create/i }))
@@ -82,7 +93,7 @@ describe('PeoplePage', () => {
     })
     await screen.findByRole('table', { name: 'People' })
     await userEvent.click(screen.getByRole('button', { name: /new person/i }))
-    await userEvent.type(screen.getByLabelText(/first name/i), 'Chloe')
+    await userEvent.type(await screen.findByLabelText(/first name/i), 'Chloe')
     await userEvent.type(screen.getByLabelText(/last name/i), 'Kim')
     await userEvent.type(screen.getByLabelText(/email/i), 'chloe.kim@acme.test')
     await userEvent.click(screen.getByRole('button', { name: /create/i }))
@@ -95,8 +106,7 @@ describe('PeoplePage', () => {
   it('copies the username and the reset password together', async () => {
     const writeText = stubClipboard()
     renderPeople(USERS.admin, { 'POST /users/4/reset-password': [200, { temporaryPassword: 'N3wTempPass12' }] })
-    const table = await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(within(table).getByRole('button', { name: /reset password for ben okafor/i }))
+    await choose('Ben Okafor', 'Reset password')
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /reset password/i }))
     const shown = await screen.findByRole('dialog', { name: /password reset/i })
     await userEvent.click(within(shown).getByRole('button', { name: 'Copy username and password' }))
@@ -106,8 +116,7 @@ describe('PeoplePage', () => {
   it('says so when the browser refuses to copy, instead of failing silently', async () => {
     stubClipboard(vi.fn().mockRejectedValue(new Error('denied')))
     renderPeople(USERS.admin, { 'POST /users/4/reset-password': [200, { temporaryPassword: 'N3wTempPass12' }] })
-    const table = await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(within(table).getByRole('button', { name: /reset password for ben okafor/i }))
+    await choose('Ben Okafor', 'Reset password')
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /reset password/i }))
     const shown = await screen.findByRole('dialog', { name: /password reset/i })
     await userEvent.click(within(shown).getByRole('button', { name: 'Copy username and password' }))
@@ -118,14 +127,14 @@ describe('PeoplePage', () => {
     renderPeople(USERS.manager)
     const table = await screen.findByRole('table', { name: 'People' })
     expect(screen.queryByRole('button', { name: /new person/i })).not.toBeInTheDocument()
-    expect(within(table).getByRole('button', { name: /capacity for ben okafor/i })).toBeInTheDocument()
-    expect(within(table).queryByRole('button', { name: /capacity for dev shah/i })).not.toBeInTheDocument()
+    expect(within(table).queryByRole('button', { name: 'Actions for Dev Shah' })).not.toBeInTheDocument()
+    await choose('Ben Okafor', CAPACITY)
+    expect(await screen.findByRole('dialog', { name: 'Capacity for Ben Okafor' })).toBeInTheDocument()
   })
 
   it('sets weekly capacity and overtime', async () => {
     const calls = renderPeople(USERS.manager, { 'PATCH /users/4/capacity': [200, { ...BEN, weeklyCapacityHours: 32, overtimeAllowed: true }] })
-    const table = await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(within(table).getByRole('button', { name: /capacity for ben okafor/i }))
+    await choose('Ben Okafor', CAPACITY)
     const hours = screen.getByLabelText(/weekly capacity/i)
     await userEvent.clear(hours)
     await userEvent.type(hours, '32')
@@ -137,8 +146,7 @@ describe('PeoplePage', () => {
 
   it('refuses an out-of-range task limit on that box before sending anything', async () => {
     const calls = renderPeople(USERS.manager, {})
-    const table = await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(within(table).getByRole('button', { name: /capacity for ben okafor/i }))
+    await choose('Ben Okafor', CAPACITY)
     const limit = screen.getByLabelText(/task limit/i)
     await userEvent.clear(limit)
     await userEvent.type(limit, '11')
@@ -150,8 +158,7 @@ describe('PeoplePage', () => {
 
   it('sets the task limit', async () => {
     const calls = renderPeople(USERS.manager, { 'PATCH /users/4/capacity': [200, BEN] })
-    const table = await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(within(table).getByRole('button', { name: /capacity for ben okafor/i }))
+    await choose('Ben Okafor', CAPACITY)
     const limit = screen.getByLabelText(/task limit/i)
     await userEvent.clear(limit)
     await userEvent.type(limit, '5')
@@ -161,24 +168,21 @@ describe('PeoplePage', () => {
 
   it('resets a password and shows the new one once', async () => {
     renderPeople(USERS.admin, { 'POST /users/4/reset-password': [200, { temporaryPassword: 'N3wTempPass12' }] })
-    const table = await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(within(table).getByRole('button', { name: /reset password for ben okafor/i }))
+    await choose('Ben Okafor', 'Reset password')
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /reset password/i }))
     expect(await screen.findByText('N3wTempPass12')).toBeInTheDocument()
   })
 
   it('archives an account after confirming', async () => {
     const calls = renderPeople(USERS.admin, { 'POST /users/4/archive': [200, { ...BEN, isArchived: true }] })
-    const table = await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(within(table).getByRole('button', { name: /archive ben okafor/i }))
+    await choose('Ben Okafor', 'Archive')
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
     await waitFor(() => expect(calls.some((c) => c.path === '/users/4/archive')).toBe(true))
   })
 
   it('archives once, however often Archive account is pressed, and shows a refusal in the dialog', async () => {
     const calls = renderPeople(USERS.admin, { 'POST /users/4/archive': [409, { error: 'Ben Okafor manages a live project: hand it over first.' }] })
-    const table = await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(within(table).getByRole('button', { name: /archive ben okafor/i }))
+    await choose('Ben Okafor', 'Archive')
     const dialog = await screen.findByRole('dialog')
     const release = holdOpen('/users/4/archive')
     const confirm = within(dialog).getByRole('button', { name: /archive account/i })
@@ -190,15 +194,31 @@ describe('PeoplePage', () => {
     expect(calls.filter((c) => c.path === '/users/4/archive')).toHaveLength(1)
   })
 
-  it('draws row buttons as the secondary kind and Archive as the danger kind, with no bare words', async () => {
+  it("gives each row one filled Actions button instead of a row of buttons, Archive last in its menu", async () => {
     renderPeople()
     const table = await screen.findByRole('table', { name: 'People' })
-    ;['Capacity for Ben Okafor', 'History for Ben Okafor', 'Edit Ben Okafor', 'Reset password for Ben Okafor'].forEach((name) => {
-      const button = within(table).getByRole('button', { name })
-      expect(button).toHaveClass('MuiButton-outlined')
-      expect(button).not.toHaveClass('MuiButton-colorError')
-    })
-    expect(within(table).getByRole('button', { name: 'Archive Ben Okafor' })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+    const row = within(table).getByText('Ben Okafor').closest('tr')
+    const buttons = within(row).getAllByRole('button')
+    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Actions for Ben Okafor'])
+    expect(buttons[0]).toHaveClass('MuiButton-contained')
+    await userEvent.click(buttons[0])
+    const items = within(await screen.findByRole('menu')).getAllByRole('menuitem')
+    expect(items.at(-1)).toHaveTextContent('Archive')
+  })
+
+  it('shows names in bold', async () => {
+    renderPeople()
+    const table = await screen.findByRole('table', { name: 'People' })
+    expect(within(table).getByText('Ben Okafor')).toHaveStyle({ fontWeight: '600' })
+  })
+
+  it('gives each phone card the same one Actions button', async () => {
+    responsive.useIsMobile.mockReturnValue(true)
+    renderPeople()
+    const cards = await screen.findByRole('list', { name: 'People' })
+    const ben = within(cards).getByText('Ben Okafor').closest('li')
+    expect(within(ben).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Actions for Ben Okafor'])
+    responsive.useIsMobile.mockReturnValue(false)
   })
 
   it('steps back to the last page that exists when archiving empties the page you are on', async () => {
@@ -213,7 +233,7 @@ describe('PeoplePage', () => {
     })
     await screen.findByText('Maria Lopez')
     await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
-    await userEvent.click(await screen.findByRole('button', { name: 'Archive Ben Okafor' }))
+    await choose('Ben Okafor', 'Archive')
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
     expect(await screen.findByText('Maria Lopez')).toBeInTheDocument()
     expect(screen.queryByText('Nobody matches.')).not.toBeInTheDocument()
@@ -229,20 +249,26 @@ describe('PeoplePage', () => {
       return { calls, release }
     }
 
+    /** Open Ana's menu and return its Reactivate item. */
+    async function reactivateItem() {
+      await userEvent.click(await screen.findByRole('button', { name: 'Actions for Ana Ruiz' }))
+      return screen.findByRole('menuitem', { name: 'Reactivate' })
+    }
+
     it('sends one request when pressed twice while the first is on its way', async () => {
       const { calls, release } = renderArchived([200, { ...ANA, isArchived: false }])
-      const button = await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' })
-      fireEvent.click(button)
-      fireEvent.click(button)
+      const item = await reactivateItem()
+      fireEvent.click(item)
+      fireEvent.click(item)
       release()
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Reactivate Ana Ruiz' })).toHaveTextContent(/^Reactivate$/))
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Actions for Ana Ruiz' })).toHaveTextContent(/^Actions$/))
       expect(calls.filter((c) => c.path === '/users/8/reactivate')).toHaveLength(1)
     })
 
-    it('is disabled and reads Reactivating… while the request runs', async () => {
+    it('locks her Actions button, reading Reactivating…, while the request runs', async () => {
       const { release } = renderArchived([200, { ...ANA, isArchived: false }])
-      const button = await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' })
-      fireEvent.click(button)
+      fireEvent.click(await reactivateItem())
+      const button = screen.getByRole('button', { name: 'Actions for Ana Ruiz' })
       await waitFor(() => expect(button).toBeDisabled())
       expect(button).toHaveTextContent('Reactivating…')
       release()
@@ -251,52 +277,52 @@ describe('PeoplePage', () => {
 
     it("shows the server's refusal and enables the button again", async () => {
       const { calls, release } = renderArchived([409, { error: 'Their line manager is archived: reactivate them first.' }])
-      const button = await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' })
-      fireEvent.click(button)
+      fireEvent.click(await reactivateItem())
       release()
       expect(await screen.findByText('Their line manager is archived: reactivate them first.')).toBeInTheDocument()
-      expect(button).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Actions for Ana Ruiz' })).toBeEnabled()
       expect(calls.filter((c) => c.path === '/users/8/reactivate')).toHaveLength(1)
     })
 
-    it('shows that refusal in the row of the person, under their buttons, not in a page-wide alert', async () => {
+    it('shows that refusal in the row of the person, under their button, not in a page-wide alert', async () => {
       const { release } = renderArchived([409, { error: 'Their line manager is archived: reactivate them first.' }])
-      fireEvent.click(await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' }))
+      fireEvent.click(await reactivateItem())
       release()
       const refusal = await screen.findByText('Their line manager is archived: reactivate them first.')
       expect(refusal).toHaveAttribute('role', 'alert')
-      expect(refusal.closest('tr')).toBe(screen.getByRole('button', { name: 'Reactivate Ana Ruiz' }).closest('tr'))
+      expect(refusal.closest('tr')).toBe(screen.getByRole('button', { name: 'Actions for Ana Ruiz' }).closest('tr'))
       expect(refusal.closest('.MuiAlert-root')).toBeNull()
     })
 
     it('reloads the list after it succeeds', async () => {
       const { calls, release } = renderArchived([200, { ...ANA, isArchived: false }])
-      fireEvent.click(await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' }))
+      fireEvent.click(await reactivateItem())
       const listsBefore = calls.filter((c) => c.method === 'GET' && c.path === '/users').length
       release()
       await waitFor(() => expect(calls.filter((c) => c.method === 'GET' && c.path === '/users').length).toBeGreaterThan(listsBefore))
     })
   })
 
-  it('shows History to admins on every row', async () => {
+  it('gives admins an Actions menu, with History in it, on every row', async () => {
     renderPeople(USERS.admin)
     await screen.findByRole('table', { name: 'People' })
-    expect(screen.getAllByRole('button', { name: /^history for/i })).toHaveLength(3)
+    expect(screen.getAllByRole('button', { name: /^actions for/i })).toHaveLength(3)
+    await choose('Maria Lopez', 'History')
+    expect(await screen.findByRole('dialog', { name: 'History: Maria Lopez' })).toBeInTheDocument()
   })
 
-  it('shows a manager History only for their own reports', async () => {
+  it('shows a manager an Actions menu only for their own reports', async () => {
     renderPeople(USERS.manager)
     await screen.findByRole('table', { name: 'People' })
-    const buttons = screen.getAllByRole('button', { name: /^history for/i })
-    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['History for Ben Okafor'])
+    const buttons = screen.getAllByRole('button', { name: /^actions for/i })
+    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Actions for Ben Okafor'])
   })
 
   it("opens a person's history", async () => {
     const calls = renderPeople(USERS.admin, {
       'GET /users/4/history': [200, page([{ auditId: 5, actorUserId: 4, actorRole: 'EMPLOYEE', action: 'UPDATE', entityType: 'users', entityId: 4, summary: 'Ben Okafor updated their profile', createdAt: '2026-10-14T01:03:25+00:00', actorName: 'Ben Okafor' }])],
     })
-    await screen.findByRole('table', { name: 'People' })
-    await userEvent.click(screen.getByRole('button', { name: 'History for Ben Okafor' }))
+    await choose('Ben Okafor', 'History')
     const dialog = await screen.findByRole('dialog', { name: 'History: Ben Okafor' })
     expect(await within(dialog).findByText('Ben Okafor updated their profile')).toBeInTheDocument()
     expect(calls.some((c) => c.path === '/users/4/history')).toBe(true)

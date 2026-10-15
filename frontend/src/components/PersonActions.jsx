@@ -245,7 +245,8 @@ export default function PersonActions({ person = null, userId, name, label = 'Ac
   const targetName = fullName(target)
 
   return (
-    <Box sx={{ display: 'grid', gap: 0.5, justifyItems: 'inherit' }}>
+    // Inline, so it sits where the cell aligns it: the end of a People row, the start of an Allocation row.
+    <Box sx={{ display: 'inline-grid', gap: 0.5, justifyItems: 'start' }}>
       <Button
         id={triggerId}
         variant="contained"
@@ -257,7 +258,7 @@ export default function PersonActions({ person = null, userId, name, label = 'Ac
         endIcon={<ArrowIcon />}
         onClick={openMenu}
         disabled={reactivating}
-        sx={{ justifySelf: 'start', textAlign: 'left' }}
+        sx={{ textAlign: 'left' }}
       >
         {reactivating ? 'Reactivating…' : label}
       </Button>
