@@ -267,7 +267,7 @@ export default function FormDialog({
         {/* An error that belongs to no field: one line next to the buttons just pressed. */}
         {error && <FormHelperText error role="alert" sx={{ mx: 3, mb: 1, fontSize: '0.875rem' }}>{error}</FormHelperText>}
         <DialogActions>
-          <Button onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="contained" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button type="submit" variant="contained" color={danger ? 'error' : 'primary'} disabled={busy}>{busy ? 'Saving…' : submitLabel}</Button>
         </DialogActions>
       </form>
