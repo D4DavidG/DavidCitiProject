@@ -453,6 +453,61 @@ def test_pending_approvals_search_person_task_and_project_ignoring_case(conn, or
     assert found("zeus") == []
 
 
+def task_so_far(conn, actor):
+    """Each pending entry's (minutes, task estimate, task logged so far, over estimate), oldest first."""
+    return [(e["minutes"], e["task_estimate_minutes"], e["task_logged_minutes"], e["over_estimate"])
+            for e in time_entries.pending_approvals(conn, actor, {}, 1, 50)["items"]]
+
+
+def test_pending_approvals_say_how_the_task_stands_against_its_estimate(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"], estimate_minutes=120)
+    log(conn, org["alice"], t, "2026-10-12", 1)
+    assert task_so_far(conn, org["bob"]) == [(60, 120, 60, False)]                       # under
+    log(conn, org["alice"], t, "2026-10-13", 1)
+    assert task_so_far(conn, org["bob"]) == [(60, 120, 120, False), (60, 120, 120, False)]  # equal is not over
+    log(conn, org["alice"], t, "2026-10-14", 0.5)
+    assert task_so_far(conn, org["bob"]) == [(60, 120, 150, True)] * 2 + [(30, 120, 150, True)]  # over
+
+
+def test_rejected_time_does_not_count_toward_the_estimate_but_approved_time_does(conn, org):
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"], estimate_minutes=120)
+    first, second = log(conn, org["alice"], t, "2026-10-12", 1), log(conn, org["alice"], t, "2026-10-13", 1)
+    log(conn, org["alice"], t, "2026-10-14", 0.5)
+    time_entries.decide_entry(conn, org["bob"], first["entry_id"], approve=False)
+    assert task_so_far(conn, org["bob"]) == [(60, 120, 90, False), (30, 120, 90, False)]
+    time_entries.decide_entry(conn, org["bob"], second["entry_id"], approve=True)
+    assert task_so_far(conn, org["bob"]) == [(30, 120, 90, False)]
+
+
+def test_task_so_far_counts_only_that_tasks_time(conn, org):
+    big = f.task(conn, org["bob"], org["design"], assignee=org["alice"], estimate_minutes=600)
+    small = f.task(conn, org["bob"], org["design"], assignee=org["alice"], estimate_minutes=30)
+    log(conn, org["alice"], big, "2026-10-12", 2)
+    log(conn, org["alice"], small, "2026-10-12", 1)
+    assert task_so_far(conn, org["bob"]) == [(120, 600, 120, False), (60, 30, 60, True)]
+
+
+def test_pending_approvals_run_the_same_two_queries_however_many_entries(conn, org):
+    def queue_queries():
+        counter = CountingConn(conn)
+        time_entries.pending_approvals(counter, org["admin"], {}, 1, 50)
+        return counter.count
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    log(conn, org["alice"], t, "2026-10-12", 1)
+    before = queue_queries()
+    for day in ("2026-10-09", "2026-10-13", "2026-10-14"):
+        log(conn, org["alice"], t, day, 1)
+    assert (before, queue_queries()) == (2, 2)   # count + page; the task sums are inside the page query
+
+
+def test_my_entries_and_snapshots_leave_the_estimate_fields_out(conn, org):
+    from services.views import entry_view
+    t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    entry = log(conn, org["alice"], t, "2026-10-12", 1)
+    [mine] = time_entries.my_entries(conn, org["alice"], {}, 1, 50)["items"]
+    assert "over_estimate" not in mine and "overEstimate" not in entry_view(entry)
+
+
 def test_shrinking_a_booking_past_logged_time_is_refused(conn, org):
     from services import assignments
     t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])

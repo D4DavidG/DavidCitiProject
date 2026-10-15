@@ -185,10 +185,22 @@ def decide_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, approve:
     return row
 
 
-_LISTED = ("SELECT e.*, t.title AS task_title, p.name AS project_name,"
-           " u.first_name || ' ' || u.last_name AS person_name FROM time_entries e"
-           " JOIN tasks t ON t.task_id = e.task_id JOIN projects p ON p.project_id = e.project_id"
-           " JOIN users u ON u.user_id = e.user_id")
+# One SELECT for both lists. {columns} and {joins} are empty for your own time; the
+# approvals queue fills them with _TASK_SO_FAR.
+_LISTED = sql.SQL("SELECT e.*, t.title AS task_title, p.name AS project_name,"
+                  " u.first_name || ' ' || u.last_name AS person_name{columns} FROM time_entries e"
+                  " JOIN tasks t ON t.task_id = e.task_id JOIN projects p ON p.project_id = e.project_id"
+                  " JOIN users u ON u.user_id = e.user_id{joins}")
+_PLAIN = {"columns": sql.SQL(""), "joins": sql.SQL("")}
+# How the entry's task stands: its estimate, every minute logged on it that wasn't rejected
+# (this entry included), and whether that passes the estimate. Summed per row inside the
+# same query (LATERAL), never one query per entry.
+_TASK_SO_FAR = {
+    "columns": sql.SQL(", t.estimate_minutes AS task_estimate_minutes, so_far.minutes AS task_logged_minutes,"
+                       " so_far.minutes > t.estimate_minutes AS over_estimate"),
+    "joins": sql.SQL(" CROSS JOIN LATERAL (SELECT COALESCE(sum(x.minutes), 0) AS minutes FROM time_entries x"
+                     " WHERE x.task_id = e.task_id AND x.status <> 'REJECTED') so_far"),
+}
 
 
 def my_entries(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
@@ -200,14 +212,15 @@ def my_entries(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     if date_to := values.date(filters, "date_to", required=False):
         where.append("e.work_date <= %(to)s")
         params["to"] = date_to
-    query = sql.SQL("{} WHERE {}").format(sql.SQL(_LISTED), sql.SQL(" AND ").join(map(sql.SQL, where)))
+    query = sql.SQL("{} WHERE {}").format(_LISTED.format(**_PLAIN), sql.SQL(" AND ").join(map(sql.SQL, where)))
     return paginate(conn, query, params, sql.SQL("e.work_date DESC, e.entry_id DESC"), page, page_size)
 
 
 def pending_approvals(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
     """Entries waiting for `actor`: their reports' (managers) or everyone's (admins).
 
-    `q` searches the person's name, the task title and the project name.
+    `q` searches the person's name, the task title and the project name. Each entry also
+    says how its task stands against its estimate (_TASK_SO_FAR).
     """
     if actor.is_employee:
         raise Forbidden("Only managers and admins approve time.")
@@ -218,5 +231,5 @@ def pending_approvals(conn: psycopg.Connection, actor: Actor, filters: dict, pag
         where.append("(u.first_name || ' ' || u.last_name ILIKE %(q)s OR t.title ILIKE %(q)s OR p.name ILIKE %(q)s)")
         params["q"] = pattern
     # WHERE fragments are fixed strings written above; every value is a parameter.
-    query = sql.SQL("{} WHERE {}").format(sql.SQL(_LISTED), sql.SQL(" AND ").join(map(sql.SQL, where)))
+    query = sql.SQL("{} WHERE {}").format(_LISTED.format(**_TASK_SO_FAR), sql.SQL(" AND ").join(map(sql.SQL, where)))
     return paginate(conn, query, params, sql.SQL("e.work_date, e.entry_id"), page, page_size)

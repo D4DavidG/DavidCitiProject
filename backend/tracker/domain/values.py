@@ -6,6 +6,7 @@ integer and "false" is not a boolean.
 """
 
 import datetime as dt
+import re
 
 from domain.errors import ValidationError
 
@@ -64,6 +65,33 @@ def search(filters: dict) -> str | None:
     if not term:
         return None
     return "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+MAX_IDS = 100
+
+
+def id_list(data: dict, key: str, required: bool = True) -> list[int] | None:
+    """Ids written "3,7,12", as a query string carries a list; blank counts as missing.
+
+    Only digits and single commas (no spaces, signs or empty parts), each id at most 18
+    digits so it fits a BIGINT, at most 100 ids. Repeats are dropped, order kept.
+    """
+    value = _get(data, key, required)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValidationError(f"{_label(key)} must be whole numbers separated by commas.", field=key)
+    value = value.strip()
+    if not value:
+        if required:
+            raise ValidationError(f"{_label(key)} is required.", field=key)
+        return None
+    if not re.fullmatch(r"[0-9]{1,18}(,[0-9]{1,18})*", value):
+        raise ValidationError(f"{_label(key)} must be whole numbers separated by commas.", field=key)
+    ids = list(dict.fromkeys(int(part) for part in value.split(",")))
+    if len(ids) > MAX_IDS:
+        raise ValidationError(f"{_label(key)} may list at most {MAX_IDS}.", field=key)
+    return ids
 
 
 def date(data: dict, key: str, required: bool = True) -> dt.date | None:

@@ -187,16 +187,21 @@ def at_risk(conn: psycopg.Connection, actor: Actor) -> list[dict]:
 # --- Q3 and Q5: allocation ---
 
 # One row per active employee per shown week: hours booked, projects, minutes logged.
+# %(q)s (a name pattern) and %(projects)s (a list of project ids) are NULL when not asked
+# for; a booking counts when no projects were chosen or it is on one of them.
 _CELLS = (
     "WITH w AS (SELECT generate_series(%(from)s::date, %(from)s::date + 7 * (%(n)s - 1), '7 days')::date AS week),"
     " people AS (SELECT user_id, first_name || ' ' || last_name AS name, job_title, weekly_capacity_hours,"
-    "            overtime_allowed FROM users WHERE role = 'EMPLOYEE' AND NOT is_archived),"
+    "            overtime_allowed FROM users WHERE role = 'EMPLOYEE' AND NOT is_archived"
+    "            AND (%(q)s::text IS NULL OR first_name || ' ' || last_name ILIKE %(q)s)),"
     " cells AS (SELECT pe.user_id, w.week,"
     "  COALESCE((SELECT sum(a.hours_per_week) FROM assignments a JOIN projects p ON p.project_id = a.project_id"
     "    WHERE a.user_id = pe.user_id AND NOT a.is_archived AND NOT p.is_archived"
+    "      AND (%(projects)s::bigint[] IS NULL OR a.project_id = ANY(%(projects)s::bigint[]))"
     "      AND a.start_date <= w.week + 6 AND a.end_date >= w.week), 0) AS booked_hours,"
     "  (SELECT count(DISTINCT a.project_id) FROM assignments a JOIN projects p ON p.project_id = a.project_id"
     "    WHERE a.user_id = pe.user_id AND NOT a.is_archived AND NOT p.is_archived"
+    "      AND (%(projects)s::bigint[] IS NULL OR a.project_id = ANY(%(projects)s::bigint[]))"
     "      AND a.start_date <= w.week + 6 AND a.end_date >= w.week) AS project_count,"
     "  COALESCE((SELECT sum(e.minutes) FROM time_entries e WHERE e.user_id = pe.user_id"
     "    AND e.status <> 'REJECTED' AND e.work_date BETWEEN w.week AND w.week + 6), 0) AS logged_minutes"
@@ -209,19 +214,29 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
 
     A person's peak is their largest "over by" in any shown week. The list is
     sorted by it, and over_only keeps people whose peak is above zero. Weeks start on Monday.
+    q searches people's names. project_ids keeps only bookings on those projects (hours,
+    projects, over flags and peak), and drops anyone with none of them in the shown weeks.
+    Logged time stays the person's whole week.
     """
     _staff_only(actor, "the allocation grid")
     week_from = clock.week_start(values.date(filters, "week_from", required=False) or clock.today())
     weeks = values.integer(filters, "weeks", required=False, minimum=1, maximum=26) or 8
     over_only = values.boolean(filters, "over_only", required=False)
-    params = {"from": week_from, "n": weeks}
+    project_ids = values.id_list(filters, "project_ids", required=False)
+    params = {"from": week_from, "n": weeks, "q": values.search(filters), "projects": project_ids}
 
-    over_filter = sql.SQL(" HAVING max(c.booked_hours - pe.weekly_capacity_hours) > 0" if over_only else "")
+    having = []
+    if over_only:
+        having.append("max(c.booked_hours - pe.weekly_capacity_hours) > 0")
+    if project_ids:
+        having.append("max(c.project_count) > 0")  # booked on a chosen project in some shown week
+    # HAVING fragments are fixed strings written above; every value is a parameter.
+    having_sql = sql.SQL(" HAVING {}").format(sql.SQL(" AND ").join(map(sql.SQL, having))) if having else sql.SQL("")
     people = paginate(conn, sql.SQL(_CELLS) + sql.SQL(
         " SELECT pe.user_id, pe.name, pe.job_title, pe.weekly_capacity_hours, pe.overtime_allowed,"
         " max(GREATEST(c.booked_hours - pe.weekly_capacity_hours, 0)) AS peak_over_by"
         " FROM people pe JOIN cells c ON c.user_id = pe.user_id"
-        " GROUP BY pe.user_id, pe.name, pe.job_title, pe.weekly_capacity_hours, pe.overtime_allowed") + over_filter,
+        " GROUP BY pe.user_id, pe.name, pe.job_title, pe.weekly_capacity_hours, pe.overtime_allowed") + having_sql,
         params, sql.SQL("peak_over_by DESC, name, user_id"), page, page_size)
 
     ids = [p["user_id"] for p in people["items"]]
@@ -233,6 +248,7 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
         " FROM w JOIN assignments a ON a.start_date <= w.week + 6 AND a.end_date >= w.week"
         " JOIN projects p ON p.project_id = a.project_id"
         " WHERE a.user_id = ANY(%(ids)s) AND NOT a.is_archived AND NOT p.is_archived"
+        "   AND (%(projects)s::bigint[] IS NULL OR a.project_id = ANY(%(projects)s::bigint[]))"
         " GROUP BY a.user_id, w.week, p.project_id, p.name ORDER BY hours DESC, p.name",
         {**params, "ids": ids}).fetchall()
     by_cell: dict[tuple, list] = {}

@@ -309,6 +309,39 @@ def test_confirmed_over_capacity_is_201_and_marked(conn, org):
     assert [e["overCapacity"] for e in queue] == [True]
 
 
+def test_approvals_queue_marks_time_past_the_tasks_estimate(conn, org):
+    bob = client_for(conn, org, "bob")
+    ms = bob.call("POST", f"/projects/{org['apollo']['project_id']}/milestones",
+                  {"name": "D", "startDate": "2026-10-01", "dueDate": "2026-11-30"})[1]
+    task = bob.call("POST", f"/milestones/{ms['milestoneId']}/tasks",
+                    {"title": "T", "estimateMinutes": 60, "assigneeUserId": org["alice"].user_id})[1]
+    alice = client_for(conn, org, "alice")
+    status, entry = alice.call("POST", f"/tasks/{task['taskId']}/time-entries",
+                               {"workDate": "2026-10-13", "minutes": 90})
+    assert status == 201 and "overEstimate" not in entry
+    [queued] = bob.call("GET", "/approvals/time-entries")[1]["items"]
+    assert (queued["taskEstimateMinutes"], queued["taskLoggedMinutes"], queued["overEstimate"]) == (60, 90, True)
+    [mine] = alice.call("GET", "/me/time-entries")[1]["items"]
+    assert "overEstimate" not in mine
+
+
+def test_allocation_takes_a_name_search_and_a_project_list(conn, org):
+    bob = client_for(conn, org, "bob")
+    apollo, zeus = org["apollo"]["project_id"], org["zeus"]["project_id"]
+    status, grid = bob.call("GET", "/dashboard/allocation", query={"q": "ALICE", "projectIds": f"{zeus},{apollo}"})
+    assert status == 200 and [p["name"] for p in grid["items"]] == ["Alice Tester"]
+    assert grid["items"][0]["weeks"][0]["projects"] == [{"projectId": apollo, "name": "Apollo", "hours": 20}]
+    assert bob.call("GET", "/dashboard/allocation", query={"projectIds": str(zeus)})[1]["total"] == 0
+    assert bob.call("GET", "/dashboard/allocation", query={"q": "nobody"})[1]["total"] == 0
+
+
+@pytest.mark.parametrize("raw", ["abc", "1,,2", "-1", "1.5"])
+def test_allocation_refuses_a_bad_project_list_with_400_naming_project_ids(conn, org, raw):
+    status, payload = client_for(conn, org, "bob").call("GET", "/dashboard/allocation", query={"projectIds": raw})
+    assert (status, payload) == (400, {"error": "Project ids must be whole numbers separated by commas.",
+                                       "field": "projectIds"})
+
+
 def test_over_capacity_answer_carries_its_code():
     assert to_response(OverCapacity("x")) == (409, {"error": "x", "code": "OVER_CAPACITY"})
 

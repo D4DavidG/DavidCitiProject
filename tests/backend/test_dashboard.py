@@ -6,7 +6,7 @@ Today is frozen on Wednesday 14 Oct 2026.
 import pytest
 
 import factories as f
-from domain.errors import Forbidden, NotFound
+from domain.errors import Forbidden, NotFound, ValidationError
 from services import assignments, dashboard, milestones, projects, tasks, time_entries, users
 
 
@@ -282,6 +282,66 @@ def test_allocation_grid_flags_overtime_worked(conn, org):
     grid = dashboard.allocation(conn, org["admin"], {"week_from": "2026-10-12", "weeks": 1})
     week = row_for(grid, org["alice"])["weeks"][0]
     assert (week["logged_hours"], week["overtime"]) == (12, True)
+
+
+def people_in(grid):
+    return [r["name"] for r in grid["items"]]
+
+
+def test_allocation_search_finds_people_by_name_ignoring_case(conn, org, crowd):
+    admin, two_weeks = org["admin"], {"week_from": "2026-10-12", "weeks": 2}
+    assert people_in(dashboard.allocation(conn, admin, {**two_weeks, "q": "ALI"})) == ["Alice Tester"]
+    assert people_in(dashboard.allocation(conn, admin, {**two_weeks, "q": "e te"})) == ["Alice Tester", "Eve Tester"]
+    nobody = dashboard.allocation(conn, admin, {**two_weeks, "q": "nobody"})
+    assert (nobody["items"], nobody["total"], nobody["weeks"]) == ([], 0, ["2026-10-12", "2026-10-19"])
+    assert dashboard.allocation(conn, admin, {**two_weeks, "q": "%"})["total"] == 0  # % matches itself, not anything
+
+
+def test_allocation_project_filter_counts_only_those_projects(conn, org, crowd):
+    """Alice: Apollo 20 h every week, Zeus 25 h in week 2. Dan: Apollo 30 h in week 1. Eve: Zeus 10 h."""
+    admin, two_weeks = org["admin"], {"week_from": "2026-10-12", "weeks": 2}
+    apollo, zeus = org["apollo"]["project_id"], org["zeus"]["project_id"]
+    grid = dashboard.allocation(conn, admin, {**two_weeks, "project_ids": str(apollo)})
+    assert people_in(grid) == ["Dan Tester", "Alice Tester"] and grid["total"] == 2  # Eve has no Apollo booking
+    alice = row_for(grid, org["alice"])
+    second = alice["weeks"][1]
+    assert (second["booked_hours"], second["project_count"], second["over_allocated"]) == (20, 1, False)
+    assert second["projects"] == [{"project_id": apollo, "name": "Apollo", "hours": 20}]
+    assert (alice["peak_over_by_hours"], alice["status"]) == (0, "OK")  # over only once Zeus counts too
+    both = dashboard.allocation(conn, admin, {**two_weeks, "project_ids": f"{zeus},{apollo}"})
+    assert row_for(both, org["alice"])["weeks"][1]["booked_hours"] == 45 and both["total"] == 3
+
+
+def test_allocation_project_filter_drops_people_not_booked_on_them_in_the_shown_weeks(conn, org):
+    later, _ = f.person(conn, org["admin"], first_name="Later")
+    f.booking(conn, org["bob"], org["apollo"], later, start_date="2026-12-01", end_date="2026-12-31")
+    apollo = str(org["apollo"]["project_id"])
+    shown = dashboard.allocation(conn, org["admin"], {"week_from": "2026-10-12", "weeks": 2, "project_ids": apollo})
+    assert people_in(shown) == ["Alice Tester"]
+    december = dashboard.allocation(conn, org["admin"], {"week_from": "2026-12-07", "weeks": 1, "project_ids": apollo})
+    assert people_in(december) == ["Alice Tester", "Later Tester"]
+
+
+def test_allocation_search_and_project_filter_together(conn, org, crowd):
+    admin, two_weeks = org["admin"], {"week_from": "2026-10-12", "weeks": 2}
+    zeus, apollo = str(org["zeus"]["project_id"]), str(org["apollo"]["project_id"])
+    eve_on_zeus = dashboard.allocation(conn, admin, {**two_weeks, "q": "eve", "project_ids": zeus})
+    assert people_in(eve_on_zeus) == ["Eve Tester"]
+    assert dashboard.allocation(conn, admin, {**two_weeks, "q": "eve", "project_ids": apollo})["total"] == 0
+
+
+def test_allocation_project_filter_keeps_over_only_and_paging(conn, org, crowd):
+    admin, two_weeks = org["admin"], {"week_from": "2026-10-12", "weeks": 2}
+    both = f"{org['apollo']['project_id']},{org['zeus']['project_id']}"
+    over = dashboard.allocation(conn, admin, {**two_weeks, "project_ids": both, "over_only": True}, page=2, page_size=1)
+    assert (over["total"], over["total_pages"], people_in(over)) == (2, 2, ["Alice Tester"])
+
+
+@pytest.mark.parametrize("raw", ["abc", "1,,2", "-1", "1;2"])
+def test_allocation_refuses_a_bad_project_list_naming_the_field(conn, org, raw):
+    with pytest.raises(ValidationError) as refused:
+        dashboard.allocation(conn, org["admin"], {"project_ids": raw})
+    assert refused.value.field == "project_ids"
 
 
 def test_employees_do_not_get_the_allocation_grid(conn, org):

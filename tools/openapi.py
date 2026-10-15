@@ -83,7 +83,11 @@ FILTERS = {
     "list_requests": {"q": TEXT, "scope": {"type": "string", "enum": ["sent", "decide"]}, "status": TEXT,
                       "kind": TEXT},
     "project_cards": {"q": TEXT, "search": TEXT, "status": TEXT},
-    "allocation": {"weekFrom": DATE, "weeks": INT, "overOnly": BOOL},
+    "allocation": {"weekFrom": DATE, "weeks": INT, "overOnly": BOOL, "q": TEXT,
+                   "projectIds": {"type": "string", "pattern": "^[0-9]+(,[0-9]+)*$",
+                                  "description": "Project ids separated by commas, such as 3,7: only bookings on"
+                                                 " those projects count, and people with none in the shown weeks"
+                                                 " drop out. At most 100."}},
     "audit_log": {"q": TEXT, "actorId": INT, "entityType": TEXT, "entityId": INT, "dateFrom": DATE, "dateTo": DATE},
     "list_notifications": {"q": TEXT, "unread": BOOL},
 }
