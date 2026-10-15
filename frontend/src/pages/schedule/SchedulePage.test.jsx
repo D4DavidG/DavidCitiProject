@@ -10,9 +10,30 @@ import { page, renderAt, stubApi } from '../../test/utils'
 const WEEKS = ['2026-10-12', '2026-10-19', '2026-10-26']
 const apollo = (hours) => ({ projectId: 1, name: 'Apollo', hours })
 const zeus = (hours) => ({ projectId: 2, name: 'Zeus', hours })
+const hoursOf = (projects) => projects.reduce((sum, p) => sum + p.hours, 0)
 function week(iso, projects) {
-  const booked = projects.reduce((sum, p) => sum + p.hours, 0)
-  return { week: iso, bookedHours: booked, overAllocated: booked > 40, overByHours: Math.max(booked - 40, 0), projects }
+  const booked = hoursOf(projects)
+  return { week: iso, bookedHours: booked, shownHours: booked, overAllocated: booked > 40, overByHours: Math.max(booked - 40, 0), projects }
+}
+/**
+ * A person as the server sends them with projectIds: each week lists only the chosen projects,
+ * with their hours as shownHours, while bookedHours, the over flag and over by still count every
+ * booking (b676892), so choosing projects never hides that someone is over.
+ */
+function onlyProjects(person, ids) {
+  return {
+    ...person,
+    weeks: person.weeks.map((w) => {
+      const projects = w.projects.filter((p) => ids.includes(p.projectId))
+      return { ...w, projects, shownHours: hoursOf(projects) }
+    }),
+  }
+}
+/** The server's answer for `people`, narrowed as above to the projectIds asked for; anyone with none of them drops out. */
+const narrowed = (people) => ({ query }) => {
+  const ids = query.projectIds?.split(',').map(Number)
+  const shown = ids ? people.map((p) => onlyProjects(p, ids)).filter((p) => p.weeks.some((w) => w.projects.length)) : people
+  return [200, { ...page(shown), weeks: WEEKS }]
 }
 // Ben: Apollo 25 h for two weeks then 10 h; Zeus 20 h for two weeks; 45 h (5 over) in each of the first two.
 const BEN = {
@@ -317,12 +338,43 @@ describe('SchedulePage', () => {
     expect(await screen.findByText('No one is booked on the chosen projects in these weeks.')).toBeInTheDocument()
   })
 
-  it('says, with projects chosen, that the over-capacity count is from those projects alone (the server counts only them)', async () => {
-    renderSchedule()
+  it('says, with projects chosen, that over capacity still counts all their projects (the server counts every booking)', async () => {
+    // Ben with Apollo chosen: one 25 h bar, yet 45 h booked in all (20 h on Zeus), so his weeks are still over.
+    renderSchedule(narrowed([BEN, CHLOE]))
     await bar(/Ben Okafor, Apollo, 25/)
     expect(screen.getByText('1 of 2 people shown are booked past capacity in at least one of these weeks.')).toBeInTheDocument()
+    await choose('Apollo')
+    expect(await screen.findByText('1 of 1 people shown are booked past capacity in at least one of these weeks, counting all their projects, not only the chosen ones.')).toBeInTheDocument()
+    expect(screen.queryByText(/chosen projects alone/)).not.toBeInTheDocument()
+  })
+
+  it('says no one shown is over, counting all their projects, when projects are chosen and no one is', async () => {
+    renderSchedule(narrowed([CHLOE]))
+    await bar(/Chloe Kim, Zeus/)
+    expect(screen.getByText('No one shown is booked past capacity in these weeks.')).toBeInTheDocument()
     await choose('Zeus')
-    expect(await screen.findByText('1 of 2 people shown are booked past capacity by the chosen projects alone in at least one of these weeks.')).toBeInTheDocument()
+    expect(await screen.findByText('No one shown is booked past capacity in these weeks, counting all their projects, not only the chosen ones.')).toBeInTheDocument()
+  })
+
+  it('with projects chosen, says in an over week the hours booked in all and the hours on the chosen projects', async () => {
+    renderSchedule(narrowed([BEN, CHLOE]))
+    await bar(/Ben Okafor, Zeus/)
+    await choose('Apollo')
+    await waitFor(() => expect(screen.queryByRole('link', { name: /Ben Okafor, Zeus/ })).not.toBeInTheDocument())
+    const words = screen.getAllByTestId('over-words')
+    expect(words).toHaveLength(2) // still over: the Zeus hours count though their bar is not drawn
+    expect(words[0]).toHaveTextContent('Week of Oct 12: 45 of 40 hours booked in all, 25 on the chosen projects, +5 h over')
+    expect(words[1]).toHaveTextContent('Week of Oct 19: 45 of 40 hours booked in all, 25 on the chosen projects, +5 h over')
+  })
+
+  it('leaves out the chosen-projects hours when every booked hour is on them', async () => {
+    const calls = renderSchedule(narrowed([BEN]))
+    await bar(/Ben Okafor, Zeus/)
+    await choose('Apollo')
+    await choose('Zeus')
+    await waitFor(() => expect(lastAllocation(calls).query.projectIds).toBe('1,2'))
+    expect(await bar(/Ben Okafor, Zeus/)).toBeInTheDocument()
+    expect(screen.getAllByTestId('over-words')[0]).toHaveTextContent(/^Week of Oct 12: 45 of 40 hours booked, \+5 h over$/)
   })
 
   it('says so when there is no one to show', async () => {

@@ -103,7 +103,9 @@ BookingBar.propTypes = {
 
 /**
  * One person's row: their name, a lane per project with its bars, and a last line with the words
- * for any week booked past their capacity (that week also gets a red outline).
+ * for any week booked past their capacity (that week also gets a red outline). Over capacity is
+ * always their whole week (bookedHours); with projects chosen the bars show only those, so when
+ * some hours are elsewhere the words also give the chosen projects' share (shownHours).
  */
 function PersonRow({ person, weeks, colours }) {
   const c = useChartColours()
@@ -149,13 +151,17 @@ function PersonRow({ person, weeks, colours }) {
         </Typography>
       )}
       {person.weeks.map((w, i) => w.overAllocated && (
+        // shownHours is below bookedHours only when projects are chosen and some hours are on others.
         <Typography
           key={w.week}
           data-testid="over-words"
           variant="caption"
           sx={{ gridColumn: i + 2, gridRow: laneCount + 1, px: 0.75, pb: 0.5, color: 'error.main', display: 'flex', alignItems: 'center', gap: 0.5 }}
         >
-          <Box component="span" sx={visuallyHidden}>{`Week of ${formatDay(w.week)}: ${w.bookedHours} of ${person.capacityHours} hours booked, `}</Box>
+          <Box component="span" sx={visuallyHidden}>
+            {`Week of ${formatDay(w.week)}: ${w.bookedHours} of ${person.capacityHours} hours booked`}
+            {w.shownHours < w.bookedHours ? ` in all, ${w.shownHours} on the chosen projects, ` : ', '}
+          </Box>
           <WarningAmberRoundedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
           <span>{`+${w.overByHours} h over`}</span>
         </Typography>
@@ -171,6 +177,8 @@ PersonRow.propTypes = {
     weeks: PropTypes.arrayOf(PropTypes.shape({
       week: PropTypes.string.isRequired,
       bookedHours: PropTypes.number.isRequired,
+      /** Hours on the chosen projects (every project when none is chosen). */
+      shownHours: PropTypes.number,
       overAllocated: PropTypes.bool.isRequired,
       overByHours: PropTypes.number.isRequired,
       projects: PropTypes.arrayOf(PropTypes.shape({
@@ -192,8 +200,9 @@ function emptyText(overOnly, filtered) {
  * Questions 3 and 5 as a Float-style schedule: one row per person, weeks across, a bar per
  * booking in its project's colour, and a red outline plus words on any week past capacity.
  * It reads the same GET /dashboard/allocation as the Allocation grid. With projects chosen in
- * the picker it sends their ids (projectIds=1,2): the server keeps only those bookings, counts
- * hours and "over capacity" from them alone, and leaves out anyone with none of them.
+ * the picker it sends their ids (projectIds=1,2): the server lists only those bookings (the
+ * bars) and leaves out anyone with none of them, but still counts over capacity from every
+ * booking (b676892), so choosing projects never hides that someone is over. The summary says so.
  */
 export default function SchedulePage() {
   const [weekFrom, setWeekFrom] = useState('')
@@ -238,10 +247,11 @@ export default function SchedulePage() {
     ...(otherCount ? [{ label: `Other (${otherCount})`, colour: c.other, kind: 'swatch' }] : []),
     ...(overCount ? [{ label: 'Over capacity', colour: c.over, kind: 'problem' }] : []),
   ]
-  const by = filtered ? ' by the chosen projects alone' : ''
+  // The bars may show only the chosen projects, but over capacity counts the person's whole week.
+  const counting = filtered ? ', counting all their projects, not only the chosen ones' : ''
   const summary = overCount
-    ? `${overCount} of ${people.length} people shown are booked past capacity${by} in at least one of these weeks.`
-    : `No one shown is booked past capacity${by} in these weeks.`
+    ? `${overCount} of ${people.length} people shown are booked past capacity in at least one of these weeks${counting}.`
+    : `No one shown is booked past capacity in these weeks${counting}.`
 
   return (
     <>
