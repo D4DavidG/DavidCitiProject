@@ -116,7 +116,7 @@ export default function AppLayout({ children }) {
         position="fixed"
         color="header"
         enableColorOnDark // without it, MUI paints the bar in the card colour in dark mode
-        // The orange focus ring is too faint on the green bar: it takes the bar's text colour there.
+        // The green-ink focus ring disappears on the green bar, so in the bar it takes the bar's text colour.
         sx={{ zIndex: (t) => t.zIndex.drawer + 1, '& .MuiButtonBase-root.Mui-focusVisible': { outlineColor: 'currentColor' } }}
       >
         <Toolbar sx={{ gap: 1 }}>
@@ -148,7 +148,7 @@ export default function AppLayout({ children }) {
           <Box sx={{ p: 2 }}>
             <Typography variant="subtitle2">{user.firstName} {user.lastName}</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{ROLE_LABELS[user.role]}</Typography>
-            <Button component={NavLink} to="/account" size="small" sx={{ px: 0 }} onClick={() => setOpen(false)}>My account</Button>
+            <Button component={NavLink} to="/account" size="small" sx={{ mt: 1 }} onClick={() => setOpen(false)}>My account</Button>
           </Box>
           <NavList role={user.role} onNavigate={() => setOpen(false)} />
         </Drawer>

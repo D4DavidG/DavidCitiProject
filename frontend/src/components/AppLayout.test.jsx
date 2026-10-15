@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import AppLayout from './AppLayout'
 import { request } from '../services/request'
 import { makeTheme } from '../theme/theme'
+import { contrast } from '../test/contrast'
 import { USERS, renderAt, session, stubApi } from '../test/utils'
 
 vi.mock('../theme/responsive', () => ({ useIsMobile: vi.fn(() => false) }))
@@ -23,6 +24,7 @@ function renderLayout(user, auth = session(user), theme = undefined) {
 
 beforeEach(() => {
   localStorage.clear()
+  responsive.useIsMobile.mockReturnValue(false) // a phone test that fails part way must not leave the rest on a phone
 })
 
 describe('AppLayout', () => {
@@ -103,6 +105,26 @@ describe('AppLayout', () => {
     },
   )
 
+  it('keeps the tip of the A in the dark-mode bar: the gold shine is edged in the bar\'s green words', () => {
+    renderLayout(USERS.manager, session(USERS.manager), makeTheme('dark'))
+    const bar = screen.getByRole('banner')
+    const [background, words] = ['--AppBar-background', '--AppBar-color'].map((name) => getComputedStyle(bar).getPropertyValue(name))
+    const tip = within(bar).getByRole('img', { name: 'ACME' }).querySelector('[data-part="tip"]')
+    expect(contrast(tip.getAttribute('fill'), background)).toBeLessThan(1.1) // the gold alone would vanish on the grey
+    expect(tip).toHaveAttribute('stroke', 'currentColor') // the logo takes the bar's words ...
+    expect(contrast(words, background)).toBeGreaterThanOrEqual(3) // ... which stand out from the bar
+  })
+
+  it('draws the keyboard focus ring in the bar\'s own text colour inside the top bar', async () => {
+    renderLayout(USERS.manager)
+    await userEvent.tab() // the first control in the bar: the light/dark switch
+    expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toHaveClass('Mui-focusVisible')
+    // jsdom resolves currentColor whether or not a rule sets it, so read the rule the bar adds.
+    const bar = [...screen.getByRole('banner').classList].find((name) => name.startsWith('css-'))
+    const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
+    expect(css).toContain(`.${bar} .MuiButtonBase-root.Mui-focusVisible{outline-color:currentColor;}`)
+  })
+
   it.each([
     [/^notifications, no unread$/i, 'Notifications, no unread'],
     [/switch to dark mode/i, 'Switch to dark mode'],
@@ -134,6 +156,16 @@ describe('AppLayout', () => {
     expect(screen.queryByRole('navigation', { name: /main menu/i })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /open menu/i }))
     expect(screen.getByRole('navigation', { name: /main menu/i })).toBeInTheDocument()
+    responsive.useIsMobile.mockReturnValue(false)
+  })
+
+  it('pads My account in the phone menu like every outlined button, so its words clear the border', async () => {
+    responsive.useIsMobile.mockReturnValue(true)
+    renderLayout(USERS.manager)
+    await userEvent.click(screen.getByRole('button', { name: /open menu/i }))
+    const account = screen.getByRole('link', { name: 'My account' })
+    expect(account).toHaveClass('MuiButton-outlined')
+    expect(getComputedStyle(account).paddingLeft).not.toBe('0px')
     responsive.useIsMobile.mockReturnValue(false)
   })
 })

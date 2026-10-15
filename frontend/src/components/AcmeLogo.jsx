@@ -20,12 +20,16 @@ const brand = (t) => (t.palette.mode === 'dark' ? t.palette.text.primary : t.pal
 
 /**
  * The ACME logo, one image named "ACME". Brand tone: forest green on light, light grey on
- * dark. In the top bar, tone "inherit" takes the bar's text colour. The shine is bright gold
- * edged in the deep gold, so it reads on white, on the green bar and on dark.
+ * dark. The shine is bright gold edged in the deep gold. In the top bar, tone "inherit" takes
+ * the bar's text colour, and so does the shine's edge, one screen pixel wide at any size: the
+ * dark-mode bar is light grey, where the gold alone measures 1.02:1 and the A would lose its tip.
  */
 export default function AcmeLogo({ size = 32, tone = 'brand' }) {
   const titleId = useId()
-  const { light: shine, main: edge } = useTheme().palette.secondary
+  const { light: shine, main: deep } = useTheme().palette.secondary
+  const edge = (width) => (tone === 'inherit'
+    ? { stroke: 'currentColor', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' }
+    : { stroke: deep, strokeWidth: width })
   return (
     <Box
       component="svg"
@@ -38,8 +42,8 @@ export default function AcmeLogo({ size = 32, tone = 'brand' }) {
     >
       <title id={titleId}>ACME</title>
       <path data-part="a" d={A_BODY} fill="currentColor" fillRule="evenodd" />
-      <path data-part="tip" d={A_TIP} fill={shine} stroke={edge} strokeWidth={1} />
-      <path data-part="spark" d={SPARK} fill={shine} stroke={edge} strokeWidth={0.75} />
+      <path data-part="tip" d={A_TIP} fill={shine} {...edge(1)} />
+      <path data-part="spark" d={SPARK} fill={shine} {...edge(0.75)} />
       <path data-part="cme" d={CME} fill="currentColor" />
     </Box>
   )

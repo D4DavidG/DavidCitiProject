@@ -50,4 +50,16 @@ describe('AcmeLogo', () => {
       expect(logo.querySelector(`[data-part="${part}"]`)).toHaveAttribute('stroke', '#8A6100')
     }
   })
+
+  // The dark-mode bar is light grey (#D7D7D7) and the bright gold on it measures 1.02:1, so a gold
+  // edge would vanish with it and the A would lose its tip.
+  it.each(['light', 'dark'])('in the top bar, edges the shine in the bar\'s own text colour, one screen pixel wide (%s)', (mode) => {
+    const { logo } = draw({ tone: 'inherit' }, mode)
+    for (const part of ['tip', 'spark']) {
+      const shine = logo.querySelector(`[data-part="${part}"]`)
+      expect(shine).toHaveAttribute('stroke', 'currentColor')
+      expect(shine).toHaveAttribute('stroke-width', '1')
+      expect(shine).toHaveAttribute('vector-effect', 'non-scaling-stroke')
+    }
+  })
 })
