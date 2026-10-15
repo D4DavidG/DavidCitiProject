@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AllocationPage from './AllocationPage'
-import { page, renderAt, stubApi } from '../../test/utils'
+import { holdOpen, page, renderAt, stubApi } from '../../test/utils'
 
 const WEEKS = ['2026-10-12', '2026-10-19']
 function week(iso, booked, projects, extra = {}) {
@@ -102,9 +102,42 @@ describe('AllocationPage', () => {
     expect(await screen.findByText(/no one is over capacity in these weeks/i)).toBeInTheDocument()
   })
 
-  it('explains the colours', async () => {
+  it('starts with a "How to read this" panel in plain words', async () => {
     renderGrid()
     await screen.findByRole('row', { name: /Ben Okafor/ })
-    expect(screen.getByText(/booked past capacity/i)).toBeInTheDocument()
+    const panel = screen.getByRole('region', { name: 'How to read this' })
+    expect(within(panel).getByText(/each row is a person and each column is a week/i)).toBeInTheDocument()
+    expect(within(panel).getByText(/booked against that person's weekly capacity/i)).toBeInTheDocument()
+    expect(within(panel).getByText(/red with a warning icon means they are over capacity/i)).toBeInTheDocument()
+    expect(within(panel).getByText(/spot overbooking before it happens/i)).toBeInTheDocument()
+  })
+
+  it('shows the panel and its legend while the grid is still loading', async () => {
+    stubApi({ 'GET /dashboard/allocation': [200, { ...page([BEN]), weeks: WEEKS }] })
+    const release = holdOpen('/dashboard/allocation')
+    renderAt(<AllocationPage />, { path: '/allocation' })
+    expect(screen.getByRole('region', { name: 'How to read this' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Legend' })).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    release()
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+  })
+
+  it('has a one-line legend for the two warnings', async () => {
+    renderGrid()
+    await screen.findByRole('row', { name: /Ben Okafor/ })
+    const legend = screen.getByRole('group', { name: 'Legend' })
+    expect(within(legend).getByText('Booked past capacity')).toBeInTheDocument()
+    expect(within(legend).getByText('Logged past capacity (overtime)')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'How to read this' })).toContainElement(legend)
+  })
+
+  it('marks an over-capacity week with an icon as well as red, and an ordinary week with none', async () => {
+    renderGrid()
+    const ben = await screen.findByRole('row', { name: /Ben Okafor/ })
+    const over = within(ben).getByText('45 / 40 h').closest('[data-over]')
+    expect(within(over).getByTestId('WarningAmberOutlinedIcon')).toBeInTheDocument()
+    const fine = within(ben).getByText('25 / 40 h').closest('[data-over]')
+    expect(within(fine).queryByTestId('WarningAmberOutlinedIcon')).not.toBeInTheDocument()
   })
 })

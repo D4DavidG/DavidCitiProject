@@ -4,8 +4,10 @@ import {
   Box, Button, Chip, FormControlLabel, IconButton, Paper, Switch, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Tooltip, Typography,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
+import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined'
 import PageHeader from '../../components/PageHeader'
 import PageState, { Pager } from '../../components/PageState'
 import { addDays, formatDay, formatHours } from '../../services/format'
@@ -31,16 +33,21 @@ function WeekCell({ week, capacity }) {
           tabIndex={0}
           data-over={String(week.overAllocated)}
           aria-label={label}
-          sx={{
-            px: 1, py: 0.75, borderRadius: 1, minWidth: 96, cursor: 'default',
-            bgcolor: week.overAllocated ? 'rgba(198, 40, 40, 0.10)' : 'transparent',
+          sx={(theme) => ({
+            px: 1, py: 0.75, minWidth: 96, cursor: 'default',
+            bgcolor: week.overAllocated ? alpha(theme.palette.error.main, 0.1) : 'transparent',
             border: 1, borderColor: week.overAllocated ? 'error.main' : 'transparent',
-          }}
+          })}
         >
           <Typography variant="body2" sx={{ fontWeight: 600, color: week.overAllocated ? 'error.main' : week.bookedHours ? 'text.primary' : 'text.secondary' }}>
             {week.bookedHours} / {capacity} h
           </Typography>
-          {week.overAllocated && <Typography variant="caption" color="error.main" sx={{ display: 'block' }}>+{week.overByHours} h over</Typography>}
+          {week.overAllocated && (
+            // An icon as well as red, so the warning never depends on colour alone.
+            <Typography variant="caption" color="error.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <WarningAmberOutlined fontSize="inherit" aria-hidden />+{week.overByHours} h over
+            </Typography>
+          )}
           {week.loggedMinutes > 0 && (
             <Typography variant="caption" color={week.overtime ? 'warning.main' : 'text.secondary'} sx={{ display: 'block' }}>
               logged {formatHours(week.loggedMinutes)}{week.overtime ? ' · overtime' : ''}
@@ -94,6 +101,20 @@ export default function AllocationPage() {
         subtitle="Hours booked per person per week, across every project. Hover or tap a week to see which projects the hours come from."
       />
 
+      <Paper component="section" variant="outlined" aria-labelledby="allocation-help" sx={{ p: 2, mb: 3 }}>
+        <Typography id="allocation-help" component="h2" variant="subtitle1" sx={{ fontWeight: 600 }}>How to read this</Typography>
+        <Typography variant="body2" sx={{ mt: 0.5 }}>
+          Each row is a person and each column is a week. A cell shows the hours booked against that person&apos;s weekly
+          capacity, for example 32 / 40 h. Red with a warning icon means they are over capacity. Use it to spot
+          overbooking before it happens.
+        </Typography>
+        <Box role="group" aria-label="Legend" sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mt: 1.5 }}>
+          <Typography variant="caption" color="text.secondary">Legend</Typography>
+          <Chip size="small" variant="outlined" color="error" icon={<WarningAmberOutlined />} label="Booked past capacity" />
+          <Chip size="small" variant="outlined" color="warning" label="Logged past capacity (overtime)" />
+        </Box>
+      </Paper>
+
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <IconButton aria-label="Previous week" onClick={() => move(-7)} disabled={!start}><PrevIcon /></IconButton>
@@ -107,10 +128,6 @@ export default function AllocationPage() {
           control={<Switch checked={overOnly} onChange={(e) => { setOverOnly(e.target.checked); setPageNumber(1) }} />}
           label="Only over-allocated"
         />
-        <Box sx={{ display: 'flex', gap: 1, ml: { md: 'auto' }, flexWrap: 'wrap' }}>
-          <Chip size="small" variant="outlined" color="error" label="Red: booked past capacity" />
-          <Chip size="small" variant="outlined" color="warning" label="Orange: logged past capacity (overtime)" />
-        </Box>
       </Box>
 
       <PageState
