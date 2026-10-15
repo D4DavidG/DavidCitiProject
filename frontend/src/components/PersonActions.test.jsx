@@ -107,14 +107,48 @@ describe('PersonActions', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ jobTitle: 'Senior developer' }))
   })
 
+  it("won't clear a salary on edit: the box is required, with the $20-an-hour minimum under it", async () => {
+    const calls = renderActions({ person: { ...BEN, annualSalaryCents: 10_000_000 } })
+    await menuItems('Ben Okafor')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit details' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Ben Okafor' })
+    const salary = within(dialog).getByLabelText(/annual salary/i)
+    expect(salary).toBeRequired()
+    expect(salary).toHaveAccessibleDescription(/^At least \$41,600 a year \(\$20 an hour\)\./)
+    await userEvent.clear(salary)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(salary).toHaveAccessibleDescription('This field is required.'))
+    expect(calls.some((c) => c.method === 'PATCH')).toBe(false)
+  })
+
   it('archives after a confirm whose button is the red kind', async () => {
-    const calls = renderActions({ person: BEN }, { answers: { 'POST /users/4/archive': [200, { ...BEN, isArchived: true }] } })
+    const calls = renderActions({ person: BEN }, { answers: { 'GET /users/4/projects': [200, page([])], 'POST /users/4/archive': [200, { ...BEN, isArchived: true }] } })
     await menuItems('Ben Okafor')
     await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }))
     const confirm = within(await screen.findByRole('dialog')).getByRole('button', { name: 'Archive account' })
     expect(confirm).toHaveClass('MuiButton-colorError')
+    await waitFor(() => expect(confirm).toBeEnabled())
     await userEvent.click(confirm)
     await waitFor(() => expect(calls.some((c) => c.path === '/users/4/archive')).toBe(true))
+  })
+
+  it('flags, before archiving, that the person is still on live projects, and then sends the confirmation', async () => {
+    let changed = 0
+    const calls = renderActions({ person: BEN, onChanged: () => { changed += 1 } }, {
+      answers: {
+        'GET /users/4/projects': [200, page([{ projectId: 1, name: 'Apollo', status: 'ACTIVE', hoursPerWeek: 20, bookingEndDate: '2026-12-31', openTaskCount: 0 }])],
+        'POST /users/4/archive': [200, { ...BEN, isArchived: true }],
+      },
+    })
+    await menuItems('Ben Okafor')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Archive Ben Okafor?' })
+    const warning = await within(dialog).findByRole('alert')
+    expect(warning).toHaveTextContent('Ben Okafor is still on 1 live project')
+    expect(warning).toHaveTextContent('Apollo · 20 hours a week until Dec 31, 2026')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Archive anyway' }))
+    await waitFor(() => expect(changed).toBe(1))
+    expect(calls.find((c) => c.path === '/users/4/archive').body).toEqual({ confirmOnProjects: true })
   })
 
   it('reactivates in one press: the button is locked and reads Reactivating… until the answer', async () => {

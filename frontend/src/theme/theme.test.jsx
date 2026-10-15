@@ -13,7 +13,7 @@ const MODES = ['light', 'dark']
 const read = (t, path) => path.split('.').reduce((value, key) => value[key], t.palette)
 
 // Every pair the website draws: [foreground, background]. Text needs 4.5:1 (WCAG AA).
-const SURFACES = ['background.default', 'background.paper', 'gridLine']
+const SURFACES = ['background.default', 'background.paper']
 const TEXT_PAIRS = [
   ...['text.primary', 'text.secondary', 'text.muted', 'primary.main', 'error.main', 'warning.main', 'success.main']
     .flatMap((ink) => SURFACES.map((surface) => [ink, surface])),
@@ -31,7 +31,7 @@ const TEXT_PAIRS = [
   ['text.primary', 'overWash'],
 ]
 // UI parts need 3:1: the gold Today line, the green focus ring, a button's edge,
-// and a field's resting border, which sits on a dialog, on the page or across a grid line.
+// and a field's resting border, which sits on a dialog or on the page.
 const UI_PAIRS = [
   ['secondary.main', 'background.paper'],
   ['secondary.main', 'background.default'],
@@ -63,16 +63,25 @@ describe.each(MODES)('the %s theme', (mode) => {
     }
   })
 
-  it('draws the graph-paper grid on the page in 46 px squares, fainter than any text', () => {
+  it('paints the page one plain colour: no graph-paper grid (removed 15 Oct)', () => {
     const body = t.components.MuiCssBaseline.styleOverrides.body
     expect(body.backgroundColor).toBe(t.palette.background.default)
-    expect(body.backgroundImage.split(t.palette.gridLine)).toHaveLength(3) // two lines: across and down
-    expect(body.backgroundSize).toBe('46px 46px')
-    expect(contrast(t.palette.gridLine, t.palette.background.default)).toBeLessThan(1.3)
+    expect(body.backgroundImage).toBe('none')
+    expect(body.backgroundSize).toBeUndefined()
+    expect(t.palette.gridLine).toBeUndefined()
   })
 
   it('has square corners', () => {
     expect(t.shape.borderRadius).toBe(0)
+  })
+})
+
+describe('the light page', () => {
+  it('is a touch greener than the old matcha #E8ECDC: more green than red and blue, by more than before', () => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(makeTheme('light').palette.background.default.slice(i, i + 2), 16))
+    expect(g - r).toBeGreaterThan(0xEC - 0xE8)
+    expect(g - b).toBeGreaterThan(0xEC - 0xDC)
+    expect(makeTheme('dark').palette.background.default).toBe('#18221A') // dark mode keeps its page colour
   })
 })
 

@@ -20,7 +20,8 @@ function stubClipboard(writeText = vi.fn().mockResolvedValue(undefined)) {
 afterEach(() => { delete navigator.clipboard })
 
 function renderPeople(user = USERS.admin, answers = {}) {
-  const calls = stubApi({ 'GET /users': [200, page([MARIA, BEN, DEV])], ...answers })
+  // Ben is on no live project, so Archive asks nothing more (ArchivePersonDialog has the warning's own tests).
+  const calls = stubApi({ 'GET /users': [200, page([MARIA, BEN, DEV])], 'GET /users/4/projects': [200, page([])], ...answers })
   renderAt(<PeoplePage />, { path: '/people', auth: session(user) })
   return calls
 }
@@ -32,6 +33,13 @@ async function choose(person, item) {
 }
 
 const CAPACITY = 'Capacity, overtime and task limit'
+
+/** The Archive dialog's confirm button, once the check of their live projects has unlocked it. */
+async function archiveButton() {
+  const button = within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i })
+  await waitFor(() => expect(button).toBeEnabled())
+  return button
+}
 
 describe('PeoplePage', () => {
   it('lists people with username, role, capacity, and salary where the server shares it', async () => {
@@ -78,12 +86,48 @@ describe('PeoplePage', () => {
     await userEvent.type(await screen.findByLabelText(/first name/i), 'Chloe')
     await userEvent.type(screen.getByLabelText(/last name/i), 'Kim')
     await userEvent.type(screen.getByLabelText(/email/i), 'chloe.kim@acme.test')
+    await userEvent.type(screen.getByLabelText(/annual salary/i), '52,000')
     await userEvent.click(screen.getByRole('button', { name: /create/i }))
-    await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toMatchObject({ firstName: 'Chloe', lastName: 'Kim', email: 'chloe.kim@acme.test', role: 'EMPLOYEE' }))
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toMatchObject({ firstName: 'Chloe', lastName: 'Kim', email: 'chloe.kim@acme.test', role: 'EMPLOYEE', annualSalaryCents: 5_200_000 }))
     const shown = await screen.findByRole('dialog', { name: /account created/i })
     expect(within(shown).getByText('CK971979')).toBeInTheDocument()
     expect(within(shown).getByText('Xy7kQ2mP9aLw')).toBeInTheDocument()
     expect(within(shown).getByText(/shown only once/i)).toBeInTheDocument()
+  })
+
+  it('requires the annual salary for a new person, and says the $20-an-hour minimum under it', async () => {
+    const calls = renderPeople()
+    await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(screen.getByRole('button', { name: /new person/i }))
+    const salary = await screen.findByLabelText(/annual salary/i)
+    expect(salary).toBeRequired()
+    expect(salary).toHaveAccessibleDescription('At least $41,600 a year ($20 an hour). The hourly rate used for project costs is salary ÷ 2,080.')
+    await userEvent.type(screen.getByLabelText(/first name/i), 'Chloe')
+    await userEvent.type(screen.getByLabelText(/last name/i), 'Kim')
+    await userEvent.type(screen.getByLabelText(/email/i), 'chloe.kim@acme.test')
+    await userEvent.click(screen.getByRole('button', { name: /create/i }))
+    await waitFor(() => expect(salary).toHaveAccessibleDescription('This field is required.'))
+    expect(salary).toHaveAttribute('aria-invalid', 'true')
+    expect(calls.some((c) => c.method === 'POST')).toBe(false)
+  })
+
+  it("shows the server's minimum-pay refusal on the salary box itself, in red", async () => {
+    const message = 'Pay must be at least $20 an hour ($41,600 a year).'
+    const calls = renderPeople(USERS.admin, { 'POST /users': [400, { error: message, field: 'annualSalaryCents' }] })
+    await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(screen.getByRole('button', { name: /new person/i }))
+    await userEvent.type(await screen.findByLabelText(/first name/i), 'Chloe')
+    await userEvent.type(screen.getByLabelText(/last name/i), 'Kim')
+    await userEvent.type(screen.getByLabelText(/email/i), 'chloe.kim@acme.test')
+    const salary = screen.getByLabelText(/annual salary/i)
+    await userEvent.type(salary, '100')
+    await userEvent.click(screen.getByRole('button', { name: /create/i }))
+    await waitFor(() => expect(salary).toHaveAccessibleDescription(message))
+    expect(salary).toHaveAttribute('aria-invalid', 'true')
+    expect(salary).toHaveFocus()
+    expect(document.getElementById(salary.getAttribute('aria-describedby'))).toHaveClass('Mui-error')
+    expect(calls.find((c) => c.method === 'POST').body.annualSalaryCents).toBe(10_000)
+    expect(screen.getByRole('dialog', { name: 'New person' })).toBeInTheDocument() // nothing created: the form stays open
   })
 
   it('copies the new username and password together, as two lines', async () => {
@@ -96,6 +140,7 @@ describe('PeoplePage', () => {
     await userEvent.type(await screen.findByLabelText(/first name/i), 'Chloe')
     await userEvent.type(screen.getByLabelText(/last name/i), 'Kim')
     await userEvent.type(screen.getByLabelText(/email/i), 'chloe.kim@acme.test')
+    await userEvent.type(screen.getByLabelText(/annual salary/i), '52000')
     await userEvent.click(screen.getByRole('button', { name: /create/i }))
     const shown = await screen.findByRole('dialog', { name: /account created/i })
     await userEvent.click(within(shown).getByRole('button', { name: 'Copy username and password' }))
@@ -176,16 +221,16 @@ describe('PeoplePage', () => {
   it('archives an account after confirming', async () => {
     const calls = renderPeople(USERS.admin, { 'POST /users/4/archive': [200, { ...BEN, isArchived: true }] })
     await choose('Ben Okafor', 'Archive')
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
+    await userEvent.click(await archiveButton())
     await waitFor(() => expect(calls.some((c) => c.path === '/users/4/archive')).toBe(true))
   })
 
   it('archives once, however often Archive account is pressed, and shows a refusal in the dialog', async () => {
     const calls = renderPeople(USERS.admin, { 'POST /users/4/archive': [409, { error: 'Ben Okafor manages a live project: hand it over first.' }] })
     await choose('Ben Okafor', 'Archive')
-    const dialog = await screen.findByRole('dialog')
+    const confirm = await archiveButton()
+    const dialog = screen.getByRole('dialog')
     const release = holdOpen('/users/4/archive')
-    const confirm = within(dialog).getByRole('button', { name: /archive account/i })
     fireEvent.click(confirm)
     fireEvent.click(confirm)
     expect(within(dialog).getByRole('button', { name: /please wait/i })).toBeDisabled()
@@ -234,7 +279,7 @@ describe('PeoplePage', () => {
     await screen.findByText('Maria Lopez')
     await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
     await choose('Ben Okafor', 'Archive')
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
+    await userEvent.click(await archiveButton())
     expect(await screen.findByText('Maria Lopez')).toBeInTheDocument()
     expect(screen.queryByText('Nobody matches.')).not.toBeInTheDocument()
     expect(calls.at(-1).query.page).toBe('1')

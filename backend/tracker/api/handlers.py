@@ -146,9 +146,14 @@ def reset_password(ctx: Context) -> dict:
     return {"temporaryPassword": users.reset_password(ctx.conn, ctx.actor, ctx.id, ctx.now)}
 
 
+def user_projects(ctx: Context) -> dict:
+    """List the live projects a person is on: bookings from today on, and open tasks."""
+    return _page(users.live_projects(ctx.conn, ctx.actor, ctx.id, *ctx.page_args()), camelize)
+
+
 def archive_user(ctx: Context) -> dict:
-    """Archive a person (there is no delete)."""
-    return user_view(users.archive_user(ctx.conn, ctx.actor, ctx.id, ctx.now), include_salary=True)
+    """Archive a person (there is no delete); someone on live projects needs confirmOnProjects."""
+    return user_view(users.archive_user(ctx.conn, ctx.actor, ctx.id, ctx.now, ctx.body), include_salary=True)
 
 
 def reactivate_user(ctx: Context) -> dict:

@@ -21,7 +21,9 @@ test('README screenshots', async ({ page, request }) => {
   await page.getByLabel('Username').fill(maria)
   await page.getByRole('textbox', { name: 'Password', exact: true }).fill('Demo-pass-2026')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('article', { name: 'Apollo' })).toBeVisible()
+  // Both columns loaded (each heading shows its count once its answer is in), Apollo under At risk.
+  await expect(page.getByRole('region', { name: /^At risk \(\d+\)$/ }).getByRole('article', { name: 'Apollo' })).toBeVisible()
+  await expect(page.getByRole('region', { name: /^On track \(\d+\)$/ })).toBeVisible()
   await page.screenshot({ path: `${OUT}/dashboard.png` })
 
   await page.getByRole('navigation', { name: 'Main menu' }).getByRole('link', { name: 'Allocation' }).click()

@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  beforeAll, beforeEach, describe, expect, it, vi,
+} from 'vitest'
 import {
   act, cleanup, screen, waitFor, within,
 } from '@testing-library/react'
@@ -21,6 +23,15 @@ function renderLayout(user, auth = session(user), theme = undefined) {
   stubApi({ 'GET /notifications/unread-count': [200, { count: 0 }] })
   return renderAt(<AppLayout><p>page body</p></AppLayout>, { path: '/dashboard', auth, theme })
 }
+
+// The first render in a file pays MUI's one-time style setup for the whole bar (search, bell, menu):
+// over 5 s on a busy 2-CPU machine with coverage on (15 Oct), which timed out whichever test came first.
+// Pay it once here, under the hook's own 10 s limit, so each test times only itself.
+beforeAll(() => {
+  renderLayout(USERS.manager)
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 beforeEach(() => {
   localStorage.clear()
@@ -94,6 +105,23 @@ describe('AppLayout', () => {
     expect(within(bar).getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument()
   })
 
+  it('puts the search for pages and projects in the top bar, after the logo', () => {
+    renderLayout(USERS.manager)
+    const bar = screen.getByRole('banner')
+    const search = within(bar).getByRole('combobox', { name: 'Search pages and projects' })
+    const logo = within(bar).getByRole('img', { name: 'ACME' })
+    expect(logo.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('makes the search a button in the top bar on phones', async () => {
+    responsive.useIsMobile.mockReturnValue(true)
+    renderLayout(USERS.manager)
+    const bar = screen.getByRole('banner')
+    expect(within(bar).queryByRole('combobox')).not.toBeInTheDocument()
+    await userEvent.click(within(bar).getByRole('button', { name: 'Search pages and projects' }))
+    expect(within(bar).getByRole('combobox', { name: 'Search pages and projects' })).toHaveFocus()
+  })
+
   it.each([['light', '#165E26', '#FFFFFF'], ['dark', '#165E26', '#FFFFFF']])(
     'paints the top bar the one forest green with white words, in both modes (%s)',
     (mode, background, words) => {
@@ -127,7 +155,8 @@ describe('AppLayout', () => {
 
   it('draws the keyboard focus ring in the bar\'s own text colour inside the top bar', async () => {
     renderLayout(USERS.manager)
-    await userEvent.tab() // the first control in the bar: the light/dark switch
+    await userEvent.tab() // the first control in the bar: the search
+    await userEvent.tab() // then the light/dark switch
     expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toHaveClass('Mui-focusVisible')
     // jsdom resolves currentColor whether or not a rule sets it, so read the rule the bar adds.
     const bar = [...screen.getByRole('banner').classList].find((name) => name.startsWith('css-'))

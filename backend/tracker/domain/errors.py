@@ -44,6 +44,12 @@ class OverCapacity(Conflict):
     code = "OVER_CAPACITY"
 
 
+class OnProjects(Conflict):
+    """Archiving this person would end their live bookings: ask the admin to confirm."""
+
+    code = "ON_PROJECTS"
+
+
 class DependencyCycle(Conflict):
     """The dependency would make a deliverable depend on itself."""
 

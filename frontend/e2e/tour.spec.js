@@ -35,9 +35,10 @@ const FIGURES = {
   PROJECT: ['Deliverables timeline'],
 }
 
-// The home pages' project timelines (sections named by their titles), by screen key.
+// The home pages' sections, named by their titles, by screen key: the project timelines, and on the
+// dashboard its two columns (15 Oct), whose headings carry their counts.
 const REGIONS = {
-  '/dashboard': ['My projects this week'],
+  '/dashboard': ['My projects this week', /^At risk \(\d+\)$/, /^On track \(\d+\)$/],
   '/my-tasks': ['My projects'],
 }
 

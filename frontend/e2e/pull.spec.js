@@ -1,25 +1,30 @@
 /*
  * The pull board, end to end: an employee takes a Ready task from the Board tab and puts
  * it back. Run it LOCALLY only. Unlike demo.spec.js and tour.spec.js it writes: a task,
- * CREATE / CLAIM / RELEASE / ARCHIVE audit rows, and bell notifications for Ana's line
- * manager (Maria) and every admin. Against AWS those would show up in the live demo.
+ * CREATE / CLAIM / RELEASE / ARCHIVE audit rows, and bell notifications for the employee's
+ * line manager (Maria) and every admin. Against AWS those would show up in the live demo,
+ * so there it skips itself unless the run was started with ./tools/e2e.sh --aws --allow-writes.
  *
  * It makes its own Ready task, so the seeded "Go-live checklist" stays free for the demo.
- * Precondition: Ana holds at most 1 unfinished task (the seed gives her Portal API),
- * because her limit is 2. If someone took "Go-live checklist" as Ana, put it back first.
+ * Precondition: the employee (Ana locally, Ben on AWS) holds at most 1 unfinished task, because
+ * the limit is 2. If someone took "Go-live checklist" as them, put it back first.
  *
  * Needs E2E_ADMIN_PASSWORD, or E2E_MANAGER_USERNAME and E2E_EMPLOYEE_USERNAME.
  */
 import { expect, test } from '@playwright/test'
+import { employeeName, writesAllowed, WRITES_REFUSED } from './people.js'
 
 const API = process.env.E2E_API ?? 'http://localhost:3001/api/tracker'
 const DEMO_PASSWORD = 'Demo-pass-2026' // every seeded account's password (tools/demo.py)
 
-let ana
+let ana // the employee who takes the task (Ana Ruiz locally)
+let anaName
 let maria
 let mariaToken
 let task
 const title = `E2E pull ${Date.now()}`
+
+test.skip(!writesAllowed, WRITES_REFUSED)
 
 /** Signs in through the API and returns the bearer token. */
 async function login(request, username, password) {
@@ -44,6 +49,7 @@ test.beforeAll(async ({ request }) => {
     maria = await find('maria.lopez', 'maria.lopez@acme.test')
     ana = await find('ana.ruiz', 'ana.ruiz@acme.test')
   }
+  anaName = await employeeName(request, ana)
   mariaToken = await login(request, maria, DEMO_PASSWORD)
   const headers = { Authorization: `Bearer ${mariaToken}` }
   const projects = await (await request.get(`${API}/projects?search=Apollo`, { headers })).json()
@@ -80,7 +86,7 @@ test('an employee takes a Ready task from the board and puts it back', async ({ 
   const card = (column) => page.getByRole('region', { name: column }).getByRole('article', { name: title })
   await card('Ready').getByRole('button', { name: 'Take this' }).click()
   await expect(card('In progress')).toBeVisible()
-  await expect(card('In progress').getByText('Ana Ruiz')).toBeVisible()
+  await expect(card('In progress').getByText(anaName)).toBeVisible()
 
   await card('In progress').getByRole('button', { name: 'Put back' }).click()
   await expect(card('Ready')).toBeVisible()

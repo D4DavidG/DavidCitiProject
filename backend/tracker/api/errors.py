@@ -3,12 +3,13 @@
 Order matters: the first match wins, so a subclass must come before its parent
 (OverCapacity before Conflict). Every body is { "error": "..." }, plus "field"
 (camelCase) when one input is at fault, and "code" when the error has a tag
-(OVER_CAPACITY: the website asks to confirm).
+(OVER_CAPACITY or ON_PROJECTS: the website asks to confirm).
 """
 
 from api.http import to_camel
 from domain.errors import (AuthenticationError, Conflict, DependencyCycle, DomainError, Forbidden, MigrationError,
-                           NotFound, OverCapacity, PasswordChangeRequired, StorageUnavailable, ValidationError)
+                           NotFound, OnProjects, OverCapacity, PasswordChangeRequired, StorageUnavailable,
+                           ValidationError)
 
 
 class MethodNotAllowed(DomainError):
@@ -23,6 +24,7 @@ STATUS = [
     (NotFound, 404),                # doesn't exist, or exists and isn't yours
     (MethodNotAllowed, 405),
     (OverCapacity, 409),            # past capacity without overtime: ask to confirm
+    (OnProjects, 409),              # archiving someone still on live projects: ask to confirm
     (DependencyCycle, 409),         # would make the dependency chain loop
     (Conflict, 409),                # well formed, but the current state refuses it
     (StorageUnavailable, 503),      # database unreachable; nothing changed

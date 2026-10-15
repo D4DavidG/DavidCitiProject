@@ -39,7 +39,8 @@ def test_every_mutating_route_writes_an_audit_row(conn):
         return payload
 
     new_user = hit(a, "POST", "/users", "/users", {"firstName": "New", "lastName": "Person",
-                                                   "email": "new@acme.test", "role": "EMPLOYEE"})["user"]
+                                                   "email": "new@acme.test", "role": "EMPLOYEE",
+                                                   "annualSalaryCents": 5_000_000})["user"]
     uid = new_user["userId"]
     hit(a, "PATCH", "/users/{id}", f"/users/{uid}", {"jobTitle": "Analyst"})
     hit(b, "PATCH", "/users/me", "/users/me", {"firstName": "Robert"})

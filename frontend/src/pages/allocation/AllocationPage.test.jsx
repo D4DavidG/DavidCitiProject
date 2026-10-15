@@ -134,6 +134,15 @@ describe('AllocationPage', () => {
     expect(within(panel).getByText(/spot overbooking before it happens/i)).toBeInTheDocument()
   })
 
+  it('says in the dropdown why only some names open a menu', async () => {
+    renderGrid()
+    await screen.findByRole('row', { name: /Ben Okafor/ })
+    const panel = await openHelp()
+    expect(within(panel).getByText(/only some names open a menu/i)).toBeInTheDocument()
+    expect(within(panel).getByText(/a manager on the people who report to them, an admin on everyone/i)).toBeInTheDocument()
+    expect(within(panel).getByText(/only their line manager or an admin can change their capacity or read their history/i)).toBeInTheDocument()
+  })
+
   it('titles the dropdown as a level-2 heading with the h3 look', async () => {
     renderGrid()
     await screen.findByRole('row', { name: /Ben Okafor/ })

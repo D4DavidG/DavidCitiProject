@@ -118,7 +118,7 @@ describe('ProjectTimelines', () => {
     const design = screen.getByRole('img', { name: 'Apollo deliverable Design, due Oct 9, 2026, Done' })
     expect(within(design).getByTestId('CheckCircleOutlinedIcon')).toBeInTheDocument()
     expect(parseFloat(design.style.left)).toBeCloseTo(1150 / 84) // the middle of day 11
-    const build = screen.getByRole('img', { name: 'Apollo deliverable Build, due Oct 13, 2026, Late' })
+    const build = screen.getByRole('img', { name: 'Apollo deliverable Build, Late, was due Tue, Oct 13, today is Wed, Oct 14, 1 day late' })
     expect(within(build).getByTestId('WarningAmberRoundedIcon')).toBeInTheDocument()
     expect(build).toHaveAttribute('data-state', 'late')
     const launch = screen.getByRole('img', { name: 'Apollo deliverable Launch, due Nov 20, 2026, Not started' })
@@ -126,11 +126,18 @@ describe('ProjectTimelines', () => {
     expect(screen.queryByRole('img', { name: /Handover/ })).not.toBeInTheDocument() // due after the window
   })
 
-  it('shows the deliverable in a tooltip on hover', async () => {
+  it('shows the deliverable in a tooltip on hover; a late one says why: its due date, today and how many days late', async () => {
     renderTimelines()
     await projectBar('Apollo')
     await userEvent.hover(screen.getByRole('img', { name: /deliverable Build/ }))
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Build · due Oct 13, 2026 · Late')
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Build · Late · was due Tue, Oct 13 · today is Wed, Oct 14 · 1 day late$/)
+  })
+
+  it('counts the days late in the plural from two days', async () => {
+    const late = { ...APOLLO, deliverables: [{ milestoneId: 15, name: 'Test', dueDate: '2026-10-09', status: 'NOT_STARTED' }] }
+    renderTimelines({ answer: [200, page([late])] })
+    await projectBar('Apollo')
+    expect(screen.getByRole('img', { name: 'Apollo deliverable Test, Late, was due Fri, Oct 9, today is Wed, Oct 14, 5 days late' })).toBeInTheDocument()
   })
 
   it('shows the same tooltip on keyboard focus', async () => {
@@ -186,6 +193,17 @@ describe('ProjectTimelines', () => {
       'Sep 28', 'Oct 5', 'Oct 12', 'Oct 19', 'Oct 26', 'Nov 2', 'Nov 9', 'Nov 16', 'Nov 23', 'Nov 30', 'Dec 7', 'Dec 14',
     ])
     expect(screen.getByText('Sep 28 – Dec 20, 2026')).toBeInTheDocument()
+  })
+
+  it('says "Week of" at the start of the row of week dates, in the dates\' caption style', async () => {
+    renderTimelines()
+    await projectBar('Apollo')
+    const weekOf = screen.getByTestId('week-of')
+    expect(weekOf).toHaveTextContent(/^Week of$/)
+    expect(weekOf).toHaveClass('MuiTypography-caption')
+    // It sits in the name column of the dates' row, before the first date.
+    const firstDate = document.querySelector('[data-testid="week-label"]')
+    expect(weekOf.compareDocumentPosition(firstDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('moves the window 4 weeks with Earlier and Later, without asking the server again', async () => {

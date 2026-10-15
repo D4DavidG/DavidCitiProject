@@ -41,9 +41,11 @@ module "lambda" {
   authorization_type                = "NONE"
   dead_letter_target_arn            = aws_sqs_queue.this[each.key].arn
 
+  # The website is same-origin behind CloudFront, so this only matters to other pages, such as
+  # Swagger UI (docs/swagger.html). Browsers never let "*" cover Authorization, so it is named.
   cors = {
     allow_credentials = false
-    allow_headers     = ["*"]
+    allow_headers     = ["authorization", "content-type"]
     allow_methods     = ["*"]
     allow_origins     = ["*"]
     expose_headers    = []

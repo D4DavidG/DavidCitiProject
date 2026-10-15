@@ -5,17 +5,20 @@
  * and the admins' notifications. Nothing is deleted (archive is the D in CRUD here).
  *
  * Needs E2E_ADMIN_PASSWORD: only an admin creates, archives and reactivates projects, and the
- * local admin (AD000001) has a password set at first sign-in that is not in the repo.
+ * local admin (AD000001) has a password set at first sign-in that is not in the repo. On the live
+ * site it skips itself unless the run was started with ./tools/e2e.sh --aws --allow-writes.
  */
 import { expect, test } from '@playwright/test'
+import { writesAllowed, WRITES_REFUSED } from './people.js'
 
 const ADMIN = 'AD000001'
 const adminPassword = process.env.E2E_ADMIN_PASSWORD
 const name = `E2E project ${Date.now()}`
 
 test.skip(!adminPassword, 'Set E2E_ADMIN_PASSWORD (the local AD000001 password): only an admin creates and archives projects.')
-// It writes data, so never against the live demo, even if E2E_BASE_URL is left set from an AWS run.
-test.skip(!(process.env.E2E_BASE_URL ?? 'http://localhost').includes('localhost'), 'Writes data: local stack only.')
+// It writes data, so never against the live demo, even if E2E_BASE_URL is left set from an AWS run,
+// unless tools/e2e.sh --aws --allow-writes started the run.
+test.skip(!writesAllowed, WRITES_REFUSED)
 
 /** An ISO date `days` from today (the browser's date input takes YYYY-MM-DD). */
 const isoIn = (days) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10)

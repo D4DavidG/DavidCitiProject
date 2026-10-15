@@ -1,166 +1,93 @@
 # ACME Project Tracker
 
-A project-management and tracking platform for ACME Inc., built for the Citi coding
-workshop (13 to 15 Oct 2026). It answers the client's seven questions from live data:
-React with Material UI on the front, Python on AWS Lambda behind it,
-PostgreSQL (Aurora) underneath, deployed with Terraform and the repo's shell scripts.
+> **For:** anyone opening this repo for the first time. **Answers:** what the tool is, how to
+> try it, how to sign in as each kind of user, and where every file, test and guide lives.
 
-- How it works, how to demo it, likely questions: [docs/GUIDE.md](./docs/GUIDE.md)
-- Scope, rules and screens: [MVP.md](./MVP.md)
-- Database design and reasoning: [docs/superpowers/specs/2026-10-13-database-design.md](./docs/superpowers/specs/2026-10-13-database-design.md)
-- Workshop guides: [docs/README.md](./docs/README.md)
+A web app that shows a company's managers how their projects are doing: which are late or
+over budget, who is working on what, and who is booked for more hours than they have. It was
+built by David Gusmao, alone, in three days (13 to 15 Oct 2026) for the Citi coding workshop.
 
-## The seven questions, and where the answers come from
+- **Website:** React 19 with Material UI and react-responsive (works on phones).
+- **API:** Python 3.13 on AWS Lambda, one function, 71 endpoints.
+- **Database:** PostgreSQL (Aurora Serverless v2 on AWS, a local Postgres on the dev machine).
+- **Hosting:** S3 and CloudFront, all built by Terraform and the repo's shell scripts.
 
-| # | Question | Computed by | Endpoint |
+## Contents
+
+1. [What it does](#what-it-does)
+2. [Try it live](#try-it-live)
+3. [Screenshots](#screenshots)
+4. [Features](#features)
+5. [Find your way around the repo](#find-your-way-around-the-repo)
+6. [Tests](#tests)
+7. [Try the API in Swagger](#try-the-api-in-swagger)
+8. [Documentation](#documentation)
+9. [How it fits together](#how-it-fits-together)
+10. [Run it yourself, or deploy it](#run-it-yourself-or-deploy-it)
+11. [How it was built](#how-it-was-built)
+12. [Known gaps](#known-gaps)
+
+## What it does
+
+ACME Inc. runs many projects and can't see their progress, who is working on what, or where
+the money goes. The tracker answers the client's seven questions, each on its own screen:
+
+| # | Question | Screen |
+| --- | --- | --- |
+| 1 | What is the status of each active project? | Dashboard, Projects |
+| 2 | Which projects are at risk of missing deadlines? | Dashboard: the **At risk** column, with the reason |
+| 3 | How are people allocated across projects? | Allocation grid and Schedule: people down, weeks across |
+| 4 | What are the key deliverables, and how complete are they? | A project's Deliverables tab and timeline |
+| 5 | Who is over-allocated? | Allocation grid and Schedule: weeks past a person's capacity in red |
+| 6 | Which deliverables depend on which? | A project's dependency view |
+| 7 | How much budget is spent versus planned? | Budget bar on the dashboard and on each project |
+
+It is **portfolio and resource management** (the kind of tool Float, Harvest Forecast and
+Smartsheet Resource Management are), not a task tracker like Jira. Tasks exist so that "how
+complete is this deliverable" is a measured number, not a guess. Every figure (risk, progress,
+money, over capacity) is computed by the server; the website only displays it.
+
+The full list of requirements, rules and who may do what: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md).
+
+## Try it live
+
+**https://d1gov8jpsxhwer.cloudfront.net**
+
+The first visit after a quiet spell can take about 15 seconds: the database pauses itself when
+idle and wakes on the first request.
+
+| Role | Name | Username | Password |
 | --- | --- | --- | --- |
-| 1 | Status of each active project | project status + progress from task estimates | `GET /dashboard/projects` (one card per project), `GET /projects` |
-| 2 | Projects at risk of missing deadlines | past end date, overdue or behind-schedule deliverables, budget burning faster than time | `GET /dashboard/projects` (at risk first, with reasons; `atRiskTotal` counts every page), `GET /dashboard/at-risk` |
-| 3 | Resource allocation across projects | bookings (hours/week per person per project), with the projects behind each week's hours | `GET /dashboard/allocation` |
-| 4 | Key deliverables and completion | deliverable status and progress computed from their tasks | `GET /projects/{id}/milestones` |
-| 5 | Over-allocated team members | weeks booked past each person's capacity (worst week first, `?overOnly=true`), and weeks logged past it | `GET /dashboard/allocation` |
-| 6 | Dependency chain between deliverables | live dependency links, one project at a time | `GET /projects/{id}/dependency-graph` |
-| 7 | Budget consumed vs planned | planned = bookings x rate; consumed = approved time x the rate frozen when logged | `GET /dashboard/projects`, `GET /projects/{id}/budget` |
+| Admin | System Administrator | `AD000001` | `gusmao123` |
+| Manager | Maria Lopez | `ML662930` | `Demo-pass-2026` |
+| Manager | Sam Patel | `SP918535` | `Demo-pass-2026` |
+| Employee | Guy Gardner | `GG530359` | `bobyboby` |
+| Employee | Ben Okafor | `BO435681` | `Demo-pass-2026` |
+| Employee | Chloe Kim | `CK971979` | `Demo-pass-2026` |
+| Employee | Dev Shah | `DS516414` | `Demo-pass-2026` |
+| Employee | Ana Ruiz | `AR553882` | `Demo-pass-2026` |
 
-We read the brief as a portfolio and resource-management problem (the category of
-Float, Harvest Forecast and Smartsheet Resource Management), not task tracking (Jira,
-Trello). So the manager lands on the dashboard (`/dashboard/projects`: status, risk and
-budget per project, answering questions 1, 2 and 7 at a glance), then the allocation grid
-(questions 3 and 5: who is over capacity, in which week, and which projects the hours come
-from). Tasks exist only to make deliverable completion (question 4) a measured number.
-The dashboard, the risk panel and the budget screen share one money query and one risk
-function, so they can never disagree; each screen costs a fixed number of queries,
-however many projects or people there are.
+Ana Ruiz was archived during the 15 Oct demo, then reactivated and booked on Apollo again the
+same afternoon. David chose to publish these logins so reviewers can try every
+role. Anything you change on the live site is real and rings other people's notification bells.
 
-## Architecture
+**What each role sees** (the menu is `frontend/src/components/navigation.js`; the server
+enforces the same rules, so hiding a button is never the only protection):
 
-One Lambda, `backend/tracker/`: an entry point and four folders, with Postgres underneath.
-Dependencies only point downward: nothing below `api/` knows HTTP exists.
+| Role | Menu | Can do |
+| --- | --- | --- |
+| Admin | Dashboard, Allocation, Schedule, Projects, Approvals, People, Requests, Notifications, Audit log | Everything: create accounts and projects, reset passwords, set salaries, archive and reactivate anything, read the audit log |
+| Manager | Dashboard, Allocation, Schedule, Projects, Approvals, People, Requests, Notifications | Run the projects they manage (dates, budget, bookings, deliverables, tasks); approve their reports' time; set their reports' capacity, overtime and task limit; ask the admins for a new project |
+| Employee | Dashboard (their own projects and tasks), Projects, Requests, Notifications | Take Ready tasks, move their tasks, log time; ask their line manager for overtime or a higher task limit |
 
-```
-request -> function.py      Lambda entry: one connection per warm instance, migrate on cold start
-        -> api/             parse the event, match the route table, authorise, map errors to status codes
-        -> services/        the business rules and their SQL; raise domain errors, know nothing about HTTP
-        -> store/           Postgres connection and transactions, migrations, integrity queries
-        -> PostgreSQL       constraints refuse bad rows even if a service has a bug
-           domain/          errors, money, clock, values: shared by every layer, imports nothing else
-```
+Everyone also has **Account** (name, email, password, **My history**), the notification bell
+and the search box in the top bar.
 
-- **`api/routes.py`** is the one route table: method, path, which roles may call it.
-  `api/app.py` reads the token, then **re-reads the user's role from the database** on
-  every request, so a demoted user's old token can't keep powers it no longer has.
-- **Sessions (`services/tokens.py`, `services/sessions.py`).** Login returns a 15-minute
-  access token (a JWT) and a refresh token (random, only its SHA-256 stored in
-  `refresh_tokens`). `POST /auth/refresh` swaps the refresh token for a new pair and
-  retires the old one; a retired token coming back means someone has a copy, so every
-  session of that user ends. Every refresh token dies 8 hours after login. A password
-  change, an admin reset or archiving a user ends that user's sessions
-  (`users.password_changed_at`, migration 005).
-- **`api/errors.py`** is the one table from domain error to status: 400 validation,
-  401 not signed in, 403 role can't, 404 missing *or not yours* (identical messages,
-  so ids can't be probed), 409 state refuses (over capacity, dependency loop), 503
-  database down. The body is `{"error": ...}`, plus `field` when one input is at fault and
-  `code` when the website should act on it: `OVER_CAPACITY` means "ask, then resend with
-  `confirmOverCapacity: true`".
-- **`services/`** holds the business rules (overlap and self-approval are Postgres only);
-  rule tests call it directly, never through HTTP, which shows the rules don't need HTTP.
-  What keeps the layers apart is the import direction: nothing below `api/` imports it
-  (`api/app.py` does reach past `services/` for `store.postgres.translate_errors`).
-- **`store/postgres.py`** opens every connection in autocommit mode and wraps every
-  multi-statement write in `atomic()`. psycopg's default would silently never commit after a read;
-  `tests/backend/test_store_commits.py` guards that.
-- **Wire format:** JSON is camelCase; Python and SQL are snake_case. `services/views.py`
-  names every output field, so a password hash can never leak.
-- **Requests (`services/requests.py`):** everyone but admins asks. Managers ask the admins
-  (new project, archive a project, free text); employees ask their line manager or an
-  admin (higher task limit, overtime, free text). Who may decide is one SQL condition,
-  the same people `record_change` notifies when the request is sent. Approving calls the
-  existing service (`archive_project`, `set_capacity`) in the same transaction, so the
-  same rules and audit rows apply, and the decision notifies the asker.
-- **History (`GET /users/{id}/history`, `audit.person_history`):** one person's trail from
-  the audit log: the changes they made and the changes to their account, newest first,
-  filtered by action and date. Admins read anyone's, a manager their direct reports', and
-  everyone their own (**History** on People, **My history** on Account); anyone else gets
-  the same 404 as a missing id. Only admins get the before/after state: a user snapshot
-  holds the salary, so for everyone else `views.audit_view` leaves both state keys out,
-  and the one-line summary never contains it (`test_history_never_shows_salary_to_a_manager`).
+To run your own copy, see [docs/SETUP.md](docs/SETUP.md). Its logins are your own: the
+server generates every username, so local ones differ on each machine
+([how to sign in locally](docs/SETUP.md#4-sign-in-locally-and-add-demo-data)).
 
-### Data model (`backend/tracker/store/migrations/001_init.sql` to `005_sessions.sql`)
-
-`users`, `projects`, `assignments` (bookings, "Resources" on screen), `milestones`
-(deliverables), `milestone_dependencies`, `tasks`, `time_entries`, `project_requests`,
-`audit_log`, `notifications`, and (from `005_sessions.sql`) `refresh_tokens`: eleven tables
-for the app, plus `schema_migrations`, which the migration runner keeps for itself (12 in all). `002_task_limit.sql` adds one column, `users.task_limit`
-(1 to 10, default 2), because the first file never changes once it has run on Aurora.
-`003_request_kinds.sql` gives `project_requests` a `kind` (new project, archive a project,
-task limit, overtime, other), with a check per kind; old rows default to new project.
-`004_over_capacity.sql` adds `time_entries.over_capacity` (default false): the entry was
-logged past capacity without overtime, after the person confirmed.
-`005_sessions.sql` adds the `refresh_tokens` table (only each token's SHA-256 is stored) and
-`users.password_changed_at`, so a password change, reset or archive ends older sessions.
-Money is integer cents. Nothing is deleted: a trigger refuses `DELETE` on every
-application table, and records are archived and reactivated instead.
-
-The database itself refuses whatever one row can prove wrong:
-
-- a malformed username, a negative budget, or a 41-hour booking;
-- overlapping bookings for one person on one project;
-- a task on another project's deliverable, or time logged on another project's task;
-- a dependency across projects;
-- someone approving their own time.
-
-Postgres enforces what a constraint can express; rules that need the clock, sums or the
-caller (weekly capacity, sign-off, dependency loops, ownership) live in the services; the
-five integrity queries catch what neither can prevent. Some rules are in both (booking
-hours, date order), and some only in the database (overlap, self-approval).
-
-**Integrity check** (`store/integrity.py`, `GET /admin/integrity-check`): five queries
-that must always return no rows:
-
-- no dependency loops;
-- nothing live under an archived project;
-- every record has its creation audit row;
-- no time logged outside a booking;
-- no signed-off deliverable with unfinished work.
-
-They run after every database test.
-
-### Business rules
-
-- **Accounts:** admins create them. The server generates the username (initials plus 6
-  digits, never changed) and a 12-character password, shown once and changed at first
-  login. Passwords are hashed with PBKDF2-SHA256 at 600,000 rounds. An unknown username
-  costs the same hashing work as a wrong password, so the reply time doesn't reveal which
-  usernames exist (test: `test_unknown_username_costs_the_same_hashing_as_a_wrong_password`).
-- **Projects:** admins create projects. A manager runs their own: description, dates,
-  budget, status, bookings, deliverables, tasks.
-- **Tasks:** employees move the tasks assigned to them and log time on them. They can't
-  log on a future date or outside their booking, or more than 24 hours a day.
-- **Pull board:** a manager can leave a task unassigned, and it shows as Ready. An
-  employee booked on the project presses **Take this** (it becomes theirs and In progress),
-  up to their task limit (default 2), and **Put back** returns it. Managers can still assign
-  past the limit. In `services/tasks.py`, `claim_task` and `release_task` lock the task row,
-  then the person's row, inside the same `atomic()` that writes the CLAIM or RELEASE audit
-  row, so two people can't take one task and one person can't slip past the limit
-  (`tests/backend/test_claim_race.py` runs both races on separate connections).
-- **Capacity:** logging past a person's weekly capacity without overtime asks first
-  (409, `code: "OVER_CAPACITY"`, "This puts you 2 h over your 40 h week. Log anyway?").
-  Resent with `confirmOverCapacity: true`, it is saved, marked "Over capacity" on My
-  logged time and Approvals, and the notification to the manager says by how much. With
-  overtime on, it is saved unmarked and the week is flagged. Booking someone past capacity
-  is allowed but flagged.
-- **Approval:** the line manager or an admin approves logged time. Only approved time
-  is charged.
-- **Deliverables:** their status is computed. Sign-off is refused until all tasks and
-  dependencies are done, and reopening work clears the sign-off down the chain.
-- **Audit:** every change writes an audit row in the same transaction, and notifies
-  the people above the actor (in-app bell): for an employee, their line manager, the admins
-  and, for work on a project (a task, logged time), that project's manager.
-
-## The website (`frontend/`)
-
-React 19 with Material UI, react-responsive and React Router, built with Vite. It has one
-screen per question, in the order a manager needs them:
+## Screenshots
 
 | Dashboard (questions 1, 2, 7) | Allocation grid (questions 3, 5) |
 | --- | --- |
@@ -168,324 +95,248 @@ screen per question, in the order a manager needs them:
 | **Project (question 4): deliverables, tasks, resources, budget** | **Dependency view (question 6)** |
 | ![Project page with deliverables and tasks](docs/screenshots/project.png) | ![Dependencies: Design, then Build, then Launch (blocked)](docs/screenshots/dependencies.png) |
 
-Three charts, drawn with plain MUI boxes and no chart library: a deliverables timeline on each project, and a budget chart and this week's workload on the dashboard. The server sends every percentage.
+On a phone the menu becomes a drawer, tables become cards and the grid scrolls sideways
+(<img src="docs/screenshots/phone-dashboard.png" alt="Dashboard at phone width" width="120">).
+These were taken before the 15 Oct changes below, so the dashboard's two columns are not in them yet.
 
-**Schedule** (questions 3 and 5, Float-style; managers and admins): one row per person, weeks across (8, 13 or 26), a bar per booking in its project's colour labelled "Apollo · 25 h/wk", a red outline and "+5 h over" on weeks past capacity; a bar opens its project. Same `GET /dashboard/allocation` as the grid.
+## Features
 
-Also: login and the forced first password change; My account (your own name, email and password); My tasks (employees move status and
-log time, typed in two boxes, Hours and Minutes; a **Ready to take** section); a **Board** tab on each project
-(Ready, To do, In progress, Done, with Take this, Put back and Assign); Approvals; People (accounts, capacity,
-overtime, task limit, password resets; a new or reset password is shown once, with a **Copy username
-and password** button); Requests (everyone asks: Mine and To decide tabs for managers); Notifications (a bell polled every 10 s while the tab is visible, at once when you return to it, and after every change, with a pop-up when something new arrives); Audit log
-(admins, with before/after changes). On phones the sidebar becomes a drawer, tables
-become cards and the grid scrolls sideways (<img src="docs/screenshots/phone-dashboard.png" alt="Dashboard at phone width" width="120">).
+**Seeing the portfolio**
 
+- **Dashboard** (managers, admins): two columns, **At risk** and **On track**, each showing the
+  3 projects with the most recent activity, with **See all** for the rest, so it stays readable
+  with hundreds of projects. Totals of projects and of projects at risk, a budget chart, this
+  week's workload, and a timeline per project whose row of dates starts "Week of".
+- **Late deliverables explain themselves:** hover a late deliverable on a timeline to read "was
+  due … · today is … · N days late".
+- **Allocation grid:** people by weeks, sorted by each person's worst week; each cell lists the
+  projects its hours come from. **How to read this** explains the colours, and why only some
+  names open a menu (you can act only on people you manage).
+- **Schedule:** one bar per booking, in its project's colour; weeks past capacity outlined in red.
+- **Projects:** Deliverables (with a timeline), Tasks, Board, Resources (bookings) and Budget
+  tabs, and a dependency view.
+- **Search** in the top bar finds pages (the ones your role may open) and projects by name.
+  Press `/`, `Ctrl+K` or `Cmd+K` to jump to it.
+
+**Doing the work**
+
+- **Tasks:** managers create them; employees take a Ready task (**Take this**, up to their task
+  limit, default 2) or **Put back** one; the assignee moves it To do, In progress, Done.
+- **Logging time** in Hours and Minutes boxes. Past the weekly capacity (default 40 h) without
+  overtime, the app asks **Log anyway?**; confirmed time is marked "Over capacity" and the
+  manager is told.
+- **Approvals:** the line manager or an admin approves logged time; only approved time costs
+  money; nobody approves their own.
+- **Requests:** employees ask their line manager (overtime, a higher task limit, anything else);
+  managers ask the admins (a new project, archiving one, anything else). Approving applies the
+  change.
+
+**Running the company**
+
+- **People** (admins create accounts): the server generates the username (initials plus 6
+  digits) and a 12-character password, shown once with a **Copy username and password** button
+  and changed at first sign-in.
+- **Minimum pay:** every new account and every pay change is at least $20 an hour, which is
+  $41,600 a year (the hourly rate is salary / 2,080 hours). The API refuses less.
+- **Archive warning:** archiving someone still on a live project (a booking that hasn't ended,
+  or an unfinished task) shows a red warning listing those projects, and the button becomes
+  **Archive anyway**.
+- **Nothing is deleted:** people, projects, deliverables, tasks and bookings are archived and can
+  be reactivated, so every past cost can still be explained.
+- **Audit log and notifications:** every change writes one audit row and notifies the people
+  above whoever made it, and the person it concerns (the bell checks every 10 seconds). Admins
+  see the before and after of every change; **History** shows one person's trail.
+- **Sessions:** 15-minute sign-in tokens, renewed in the background by a refresh token that
+  lasts up to 8 hours.
+- Light and dark themes, phone layouts, and accessibility checked by an automated scan (axe) on
+  every screen.
+
+## Find your way around the repo
+
+```text
+.
+├── README.md              you are here
+├── CLAUDE.md              the working notes Claude Code reads first: rules, decisions, traps, commands
+├── LICENSE                MIT-0, from the workshop template
+├── backend/               the API: one Python Lambda in backend/tracker/ (api, services, store, domain)
+├── frontend/              the website: React + Material UI + Vite; unit tests sit beside the code, browser tests in e2e/
+├── tests/                 start here for tests: the map of every suite, the backend tests, the k6 load test
+├── infra/                 Terraform: Lambda, Aurora PostgreSQL, S3, CloudFront, secrets
+├── bin/                   the workshop's shell scripts: set up the machine, run locally, deploy, clean up
+├── tools/                 our helpers: demo data, Swagger, the browser-test runner, the OpenAPI builder
+├── docs/                  every guide, the API description (openapi.json), Swagger UI, screenshots
+├── .github/               security checks on every push (bandit, npm audit, Checkov) and coding instructions for AI assistants
+├── pytest.ini             tells pytest where the tests and the backend code are
+├── .coveragerc            coverage counts our code only, not the database driver vendored for LocalStack
+├── requirements-dev.txt   Python packages for running the tests (psycopg, pytest, pytest-cov)
+└── .gitignore             what git leaves out; it also drops any folder named lib, build, dist or coverage
 ```
-frontend/src/
-  services/request.js   the one module that calls the API: base URL, token, JSON, errors
-                        as { status, message, field }; on a 401 it refreshes once and
-                        retries, and only if that fails signs out, in one place
-  services/format.js    the only code that turns cents, minutes and dates into text (and
-                        typed dollars into cents, as text, never floating point; typed
-                        hours and minutes into minutes)
-  auth/                 session (both tokens in sessionStorage, probed with /auth/me on load),
-                        RequireRole (signed-out -> login, must change password -> there first)
-  components/           layout, DataTable (table on desktop, cards on phones), FormDialog,
-                        BudgetBar, StatusChip, PageState (loading / error with Retry / empty,
-                        and Pager, the page numbers under every list)
-  components/charts/    the timeline, budget and workload charts, and their shared figure,
-                        row and legend
-  theme/chartColours.js the only chart colours, checked with a colour-blindness validator
-  pages/                one folder per screen
-```
 
-- **No business rules in the browser.** Every figure (risk, progress, money, over
-  capacity) comes from the server; the website formats it. Buttons a role can't use
-  aren't shown, but the server is what refuses. The one exception is convenience, not a
-  rule: the Hours and Minutes boxes check whole numbers and the server's own limits (24 h
-  of logged time, 1,000 h of estimate) so the dialog can say which box is wrong; the server
-  still enforces both.
-- **Each signed-in page is its own file**, downloaded on its first visit (`lazyPage`, defined in
-  `frontend/src/components/lazyPage.js` and used in `App.jsx`): the first download is 560 kB (177 kB gzip) instead of 739 kB. The sign-in
-  page stays in it. If a page's file can't be downloaded (offline, or a deploy replaced
-  it), the page says so and offers **Reload** instead of going blank.
-- **Hash URLs** (`/#/projects/7`): the server only ever serves `index.html`, so CloudFront
-  needs no rewrite rule (the one we removed also swallowed the API's 404s).
-- **Server errors are shown as written**, on the field they concern when there is one
-  ("2 tasks are not done yet", "This puts you 2 h over your 40 h week").
+Each important folder has its own README:
 
-## Running it locally (on the VDI)
+| Folder | README answers |
+| --- | --- |
+| `backend/` | [backend/README.md](backend/README.md): the four layers, the route table, how a request is handled |
+| `frontend/` | [frontend/README.md](frontend/README.md): the screens, shared components, how the website calls the API |
+| `tests/` | [tests/README.md](tests/README.md): every test suite, where it lives and how to run it |
+| `infra/` | [infra/README.md](infra/README.md): what Terraform builds on AWS and in LocalStack |
+| `bin/` | [bin/README.md](bin/README.md): each shell script, and when to run it |
+| `tools/` | [tools/README.md](tools/README.md): demo data, Swagger, the browser-test runner, the OpenAPI builder |
+| `docs/` | [docs/README.md](docs/README.md): the index of every guide |
 
-```sh
-source ~/.bashrc && ./bin/start-dev.sh          # Postgres, LocalStack, deploys the Lambda, proxy :3001, Vite :3000
-curl http://localhost:3001/api/tracker/health   # {"status": "ok"}
-```
-
-Then open `http://localhost:3000`. For demo data, run `tools/demo.py seed` (see "Live
-demo" below); every seeded account's password is `Demo-pass-2026`.
-
-The first admin is `AD000001`. Its generated password differs per environment:
-
-```sh
-AWS_ENDPOINT_URL=http://localhost.localstack.cloud:4566 AWS_ENDPOINT_URL_S3=http://s3.localhost.localstack.cloud:4566 \
-AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_REGION=us-east-1 \
-  terraform -chdir=infra output -raw bootstrap_admin_password
-```
+`.github/` has no README. Its [workflows](.github/workflows/) run three security checks on every
+push: bandit on `backend/` (`python.actions.yml`), `npm audit` at high severity on `frontend/`
+(`react.actions.yml`) and Checkov on the Terraform (`terraform.actions.yml`). Its instructions
+are the organisation's coding rules for AI assistants, one per language:
+[Python](.github/instructions/python.instructions.md),
+[React](.github/instructions/react.instructions.md) and
+[Terraform](.github/instructions/terraform.instructions.md).
 
 ## Tests
 
-Local PostgreSQL must be running. The suite builds its own databases (`tracker_test`
-and three scratch ones) and never touches the app's.
+About 1,600 automated tests, in four kinds. **Backend** (pytest, 683 tests, 97% of statements)
+checks every business rule, every route and that Postgres itself refuses bad rows. **Website**
+(Vitest and React Testing Library, 889 tests in 54 files, 98.11% of lines) checks what each
+screen shows and sends. **Browser** (Playwright, 37 passed and 1 skipped on request) clicks
+through the real app, takes screenshots of every screen and runs 100 accessibility scans in
+light and dark; 17 of them are safe to run against the live AWS site, and all 17 passed there
+after the 15 Oct deploy. A **load test** (k6) measures speed under many users. Numbers are from
+15 Oct, before the post-demo changes.
 
 ```sh
-python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # once
-.venv/bin/pytest -q                                                        # 565 passed
-.venv/bin/pytest -q tests/backend/test_work.py                             # one file
-.venv/bin/pytest -q -k capacity                                            # tests whose name matches
-.venv/bin/pytest --cov --cov-report=term-missing                           # coverage: 97% of our code
+python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt bandit   # once
+(cd frontend && npm install)                                                       # once
+./tools/test-all.sh                     # every local check in order, then a PASS or FAIL table (about 2.5 min)
+./tools/e2e.sh --aws --show demo        # watch the demo walk in a real browser, on the live site
+./tools/e2e.sh --aws --video demo       # the same, recorded: opens the report with the videos
 ```
 
-Against the rubric's coverage goals (`docs/full-stack.md`): backend 97% (goal 80%);
-the API layer (`api/`: routing, auth, error mapping, every handler) 100% (goal 90%), with
-every route in the table called by the two walk tests. They run in-process: a
-Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exercised by
-`tools/demo.py` and Playwright.
+The backend tests need the local Postgres (port 5432); the browser tests run in `test-all.sh`
+only while `./bin/start-dev.sh` is up ([setting up a machine for the tests](docs/TESTING.md#4-set-up-a-machine-to-run-the-tests)).
+Where each suite lives and how to run it: [tests/README.md](tests/README.md). What each test
+proves, the coverage, and why the gaps are there: [docs/TESTING.md](docs/TESTING.md).
 
-| File | What it proves |
+## Try the API in Swagger
+
+Swagger UI is a web page that lists every endpoint and lets you call it. It reads
+[docs/openapi.json](docs/openapi.json) (71 operations, built from the route table).
+
+**Against the live AWS site** (nothing else needs to be running):
+
+1. Run `./tools/swagger.sh` from the repo root, then open http://localhost:8090/swagger.html.
+2. In **Servers**, pick `https://d1gov8jpsxhwer.cloudfront.net/api/tracker`.
+3. Open **auth**, then **POST /auth/login**, **Try it out**, and send
+   `{"username": "ML662930", "password": "Demo-pass-2026"}` with **Execute**. The page puts the
+   token into **Authorize** for you (it lasts 15 minutes). Now try, for example,
+   **GET /dashboard/projects**.
+
+On AWS, anything but a GET changes the live data. Use your local copy to try changes.
+
+**Against your local copy:**
+
+1. Start the app with `./bin/start-dev.sh` (see [docs/SETUP.md](docs/SETUP.md)).
+2. Run `./tools/swagger.sh`, open http://localhost:8090/swagger.html, and pick the server
+   `http://localhost:3001/api/tracker`.
+3. **POST /auth/login** with a local username and password, then call anything. Local
+   usernames differ on every machine; [docs/SETUP.md](docs/SETUP.md#4-sign-in-locally-and-add-demo-data)
+   shows how to list them and where the passwords come from.
+
+To sign in as someone else, log in again: the new token replaces the old one. More, including
+Postman, curl, the audit log and notifications step by step, and every error code:
+[docs/API.md](docs/API.md) (Swagger: [section 5](docs/API.md#5-swagger-ui-step-by-step)).
+
+## Documentation
+
+Start at the index, [docs/README.md](docs/README.md). Every guide:
+
+| Guide | Answers |
 | --- | --- |
-| `test_schema.py`, `test_no_delete.py` | Postgres refuses each bad row by its named constraint; nothing can be deleted |
-| `test_migrate.py`, `test_store_commits.py`, `test_function.py` | migrations are all-or-nothing and run once; writes really commit; cold start, first admin, 503s |
-| `test_integrity.py` | each integrity query catches a deliberately planted violation |
-| `test_users.py`, `test_audit.py`, `test_projects.py`, `test_work.py`, `test_requests.py`, `test_dashboard.py` | every business rule, calling services directly |
-| `test_api.py` | routing (both path shapes), every non-public route needs a token, role from the database, 404 not 403, error and list shapes, no DELETE anywhere, refresh and logout over HTTP, a password change ends older tokens |
-| `test_openapi.py` | the OpenAPI file matches the route table; every handler documented; bodies match the services |
-| `test_api_audit_walk.py` | calls every write route and checks each one left an audit row |
-| `test_api_read_walk.py` | calls every read route and checks its shape; audit-log filters; malformed queries and bodies; a crash is a 500 with a generic message (`{"error": ...}`) |
-| `test_domain.py`, `test_security.py` | validation, money, the Eastern-time clock, hashing (and that production stays at 600k rounds), tokens (valid at 14:59, refused at 15:00) |
-| `test_sessions.py` | refresh tokens: only the hash is stored, rotation, fixed 8-hour expiry, reuse ends every session, logout twice is fine |
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | What the brief asked for, which screen meets each item, who may do what, the rules |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the parts fit, where the data lives, the security measures in plain words |
+| [docs/API.md](docs/API.md) | The endpoints, Swagger and Postman, errors, how to watch the audit log and notifications |
+| [docs/TESTING.md](docs/TESTING.md) | What every test proves, where it is, why, coverage and its gaps, the load test results |
+| [docs/SETUP.md](docs/SETUP.md) | Run it on your machine, deploy it to AWS, fix what usually goes wrong |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Every design decision, why it was made and what was rejected |
+| [docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md) | How David used Claude Code: instructions, agents and orchestration |
+| [CLAUDE.md](CLAUDE.md) | The working notes Claude Code reads on every session |
 
-### Frontend tests
+The design write-ups, build plans and demo-day notes from 13 to 15 Oct were folded into these
+guides and removed from the tree; [DECISIONS.md, section 14](docs/DECISIONS.md#14-original-write-ups-in-git-history)
+gives the command that reads each one from git history.
 
-```sh
-cd frontend
-npm test                                  # 404 passed in 36 files: Vitest + React Testing Library
-npm run test:coverage                     # 95.5% of statements, 97.04% of lines
-npm run lint                              # ESLint, clean
-E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against the running app
+## How it fits together
+
+```text
+browser ─> CloudFront ─┬─> S3: the website (static files)
+                       └─> /api/tracker/* ─> Lambda (backend/tracker/) ─> Aurora PostgreSQL
+
+inside the Lambda:
+  function.py   entry point: one database connection per warm instance; migrations on a cold start
+  api/          one route table, one authorise() that re-reads the role from the database, one error table
+  services/     the business rules and their SQL; know nothing about HTTP
+  store/        connection, transactions, numbered migrations, the 5 integrity queries
+  domain/       errors, money (integer cents), the Eastern-time clock; imports nothing else
 ```
 
-- **Component and screen tests** (beside the code, `*.test.jsx`) render each screen with
-  the API stubbed at `fetch`, and check what a person would see and what gets sent:
-  field names, cents, minutes, only-changed fields on edit, the server's refusals shown
-  as written, role-dependent buttons, phone layout.
-- **End to end** (`frontend/e2e/demo.spec.js`, against the local API and database): a
-  manager signs in and walks the seven questions (dashboard, allocation, a project, its
-  dependencies), and the dashboard at phone width has no sideways scrolling.
-  `E2E_ADMIN_PASSWORD` is only used to look up the seeded manager's generated username.
-  `requests.spec.js`: an employee asks her line manager, he rejects it with a note from
-  To decide, and she reads the answer at phone width. `timelog.spec.js`: Ben logs time,
-  Maria approves it, and the project's spent figure goes up. `project-lifecycle.spec.js`: an
-  admin creates, edits, archives and reactivates a project. `schedule.spec.js`: the Schedule
-  bars, the over week and the keyboard. 30 tests in 12 files; 29 passed and 1 (README
-  screenshots, only on request) skipped on 14 Oct; the screen tour runs axe on 50 scans.
-- Against the rubric's goals: frontend 95.5% of statements (goal 80%); the demo journey end to end.
+Three choices worth knowing before you read the code:
 
-**Known gaps (the uncovered 3% of the backend, 5% of the frontend):**
+- **Archive instead of delete.** The workshop rubric asks for DELETE returning 204. The tracker
+  archives instead, because deleting a project would make every cost that referred to it
+  impossible to explain. There is no DELETE route, tests assert it, and a database trigger
+  refuses deletes.
+- **The database refuses what one row can prove wrong** (a 41-hour booking, overlapping
+  bookings, approving your own time), and five integrity queries, run after every database test
+  and on `GET /admin/integrity-check`, catch the rest.
+- **Something you may not see answers 404, not 403,** with the same message as a missing record,
+  so nobody can probe which ids exist.
 
-- a manager cannot put a task back to Ready from the screen (the Assign dialog has no
-  empty choice); the API allows it (`PATCH /tasks/{id}` with `assigneeUserId: null`);
-- guard branches in the services for ids that don't exist or records already archived
-  (for example, archiving an archived task); the same guards are tested on other records;
-- a handful of real rules with no test yet: reactivating a deliverable or task clears a
-  sign-off (`milestones.py:197`, `tasks.py:215`); adding a dependency clears a sign-off
-  (`milestones.py:291`); archived deliverables can't be in dependencies
-  (`milestones.py:268`); a manager who still runs live projects can't be demoted
-  (`users.py:239`);
-- the database-down branch inside a request (the cold-start one is tested);
-- in the frontend, mostly the People screen's less-used paths: an
-  admin editing a person, "Show archived" and paging; plus the Reactivate buttons for an
-  archived project or person;
-- end to end covers the demo journeys, log time then approve, and an admin's project life
-  cycle; the forced password change at first sign-in has no browser test;
-- 2 of 16,184 requests at 25 users on AWS got no HTTP response (status 0) and are unexplained;
-  the Lambda logged no error for them (below).
+The full picture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The reasons:
+[docs/DECISIONS.md](docs/DECISIONS.md).
 
-### Load test
+## Run it yourself, or deploy it
 
-`tools/k6/load.js` (k6) runs N simulated managers looping over the dashboard's reads,
-then a burst of logins, and passes or fails on thresholds (under 1% failed, reads p95 under
-1 s, logins p95 under 3 s). Full numbers and the AWS command: `docs/TESTING.md` section 7.
-An earlier Python script, `tools/loadtest.py`, was removed on 14 Oct because k6 covers the
-same reads and the login burst.
+The workshop ran everything on an Ubuntu 22.04 virtual desktop. In short:
 
 ```sh
-K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js        # 10 users, local
-K6_PROFILE=aws K6_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net/api/tracker \
-K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js        # 25 users, AWS
+source ~/.bashrc && ./bin/start-dev.sh   # local: Postgres, LocalStack (fake AWS), the API on :3001, the website on :3000
+./bin/setup-participant.sh               # AWS: fresh temporary credentials (they expire)
+./bin/deploy-backend.sh                  # AWS: Lambda, Aurora, CloudFront (terraform apply)
+./bin/deploy-frontend.sh                 # AWS: build the website, upload it to S3, print the URL
 ```
 
-Results on AWS (CloudFront, Lambda at 512 MB, Aurora Serverless v2; 13 Oct, seeded data,
-measured with the removed Python script):
+First-time setup, the local logins, demo data, troubleshooting and the AWS details:
+[docs/SETUP.md](docs/SETUP.md).
 
-| Users | Reads | Throughput | p50 / p95 | Failed | Login p50 / p95 |
-| --- | --- | --- | --- | --- | --- |
-| 10 | 4,190 | 209 req/s | 28–35 / 40–50 ms | 0 | 1.10 / 1.13 s |
-| 25 | 16,184 | 539 req/s | 35–41 / 57–65 ms | 2 (0.01%, no response) | 1.11 / 1.13 s |
+## How it was built
 
-Inside Lambda a warm request takes 6 ms (p50) and 13 ms (p95), from the CloudWatch
-`REPORT` lines; the rest is the network to CloudFront and back.
+David designed it and directed Claude Code (Anthropic's coding agent), which wrote most of the
+code and tests under the rules in [CLAUDE.md](CLAUDE.md): explain every change, prove it with a
+test that fails without it, and never push or deploy (David did that). How the sessions, agents
+and orchestration worked: [docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md). Why the app is the way it
+is: [docs/DECISIONS.md](docs/DECISIONS.md).
 
-**What the load test found.** The `max` column (7 to 11 s) was cold starts, and the
-CloudWatch logs showed them as a staircase: 1.3, 2.4, 3.4, 4.5 ... 9.8 s, each about 1.07 s
-after the one before. Every cold start re-hashed the bootstrap admin's password
-(600,000 rounds, about 1 s) inside the migration's advisory lock, even though the
-admin already existed, so simultaneous cold starts queued. With the lock's 10 s timeout,
-a bigger burst would have started answering 503. Fixed 13 Oct: `bootstrap_admin` checks
-for the admin before hashing (test: `test_bootstrap_admin_skips_the_hash_once_the_admin_exists`).
-Measured on AWS after the fix (25 users, same day): 25 simultaneous cold starts each
-answered in 0.17 to 0.30 s, with no queue.
+## Known gaps
 
-A login costs about 1.1 s whatever the load, because the password hash is deliberately
-slow and CPU-bound. 1024 MB of Lambda memory would roughly halve it.
+- **Every live login is public** (David's choice, so reviewers can try every role), and signing
+  in has no rate limit or lockout, so anyone can change the live demo data. How to close it, and
+  the other security gaps said plainly (tokens in `sessionStorage`, no firewall or browser
+  security headers, and more): [docs/ARCHITECTURE.md, section 8](docs/ARCHITECTURE.md#8-known-gaps).
+- **No email or text messages.** The workshop's AWS role can't send them (no `ses:`
+  permission, and the Lambda's private network has no way out), so a new or reset password is
+  shown once to the admin and changed at first sign-in.
+- **Changing your own email needs no current password** (`update_self` in
+  `backend/tracker/services/users.py`). It would matter once an emailed reset exists.
+- **A manager who books someone can work out their pay** from the project's planned cost.
+- **"Mark all as read"** marks only the notifications on the current page.
+- **Signing in costs about 1.1 seconds**, on purpose: the password hash is deliberately slow.
+  More Lambda memory would roughly halve it.
+- **Untested corners:** the uncovered 3% of the backend and 2% of the website are mostly guard
+  branches for records that don't exist or are already archived, and less-used People screen
+  paths. The list, with reasons: [docs/TESTING.md](docs/TESTING.md).
+- **Not yet on AWS:** the Swagger CORS change and the 15 Oct post-demo features are committed but
+  reach the live site only after the next `./bin/deploy-backend.sh` and
+  `./bin/deploy-frontend.sh`.
 
-Results on LocalStack (VDI, 13 Oct, seeded data):
+## Licence
 
-| Users | Reads | Throughput | p50 / p95 | Failed | Login p50 |
-| --- | --- | --- | --- | --- | --- |
-| 10 | 1,348 | 60 req/s | 108 / 225 ms | 0 | 1.0 s |
-| 15 | 1,819 | 59 req/s | | 3 (0.2%) | 1.1 s |
-| 25 | 2,120 | 35 req/s | 340 / 2,700 ms | 58 (2.7%) | 2.3 s |
-
-Every failure was a 500 from LocalStack itself, not from our code: its container
-has a 1,024 open-file limit, and past about 15 parallel Lambda environments it logs
-`Could not start new environment ... Too many open files`. Our Lambda logged no
-unhandled errors, and the demo and integrity check were clean afterwards.
-Throughput levels off at about 60 req/s because the emulator runs everything on
-one VDI. On AWS the same 10 users got 3.5 times the throughput with no failures.
-
-## Live demo from the terminal
-
-`tools/demo.py` talks to the API over HTTP, so it works locally and against the
-deployed URL (set `TRACKER_API`).
-
-```sh
-read -rsp 'Admin password: ' TRACKER_ADMIN_PASSWORD; echo; export TRACKER_ADMIN_PASSWORD
-python3 tools/demo.py seed   # once
-python3 tools/demo.py demo
-```
-
-`seed` creates two managers and four employees (password `Demo-pass-2026`), three live
-projects, bookings, a dependency chain, tasks, a week of logged time, requests and an
-archived project. `demo` prints the seven answers, then tries to break the rules: over
-capacity, a future date, another manager's project, an employee creating a project, a
-dependency loop, signing off unfinished work, DELETE, no token. It ends on the
-integrity check.
-
-### API file (Postman, SwaggerHub)
-
-`docs/openapi.json` (OpenAPI 3.0.3) lists all 69 endpoints: method, path, who may call
-it, the body it takes and the status it answers. `tools/openapi.py` builds it from the
-route table (`backend/tracker/api/routes.py`); each summary is the handler's docstring.
-`tests/backend/test_openapi.py` fails when the saved file is stale, so after a route
-change run:
-
-```sh
-.venv/bin/python tools/openapi.py   # Wrote docs/openapi.json: 69 operations
-```
-
-- **Postman:** Import, Files, choose `docs/openapi.json`, import as a Postman Collection.
-  Set the collection's `baseUrl` to the local or AWS server, send "Log in", and paste
-  `token` from the answer into the collection's Authorization tab (Bearer Token, 15 minutes).
-- **SwaggerHub:** Create New, Import and Document API, upload `docs/openapi.json`.
-  "Try it out" from swaggerhub.com may be blocked by CORS; Postman is not a browser, so
-  CORS does not apply there.
-
-## Deploying to AWS
-
-```sh
-./bin/setup-participant.sh       # fresh temporary AWS credentials (they expire)
-./bin/deploy-backend.sh          # terraform apply: Lambda, Aurora, CloudFront, secrets
-./bin/deploy-frontend.sh         # builds the website, uploads it to S3, prints the CloudFront URL
-terraform -chdir=infra output -raw bootstrap_admin_password   # right after the AWS deploy
-```
-
-The first request after a deploy migrates Aurora and creates `AD000001`.
-
-## Trade-offs and assumptions
-
-- **Archive instead of DELETE.** The rubric asks for DELETE returning 204. We archive,
-  because deleting a project would make every cost figure that referenced it
-  unreconstructable. There is no DELETE route and the database refuses deletes.
-- **PATCH for edits:** a manager may change only some fields of a project.
-- **Logged time, not payroll.** There's no clock-in, pay periods or overtime pay; those
-  belong to HR systems. Cost is minutes x the hourly rate (salary / 2080) frozen on the
-  entry when logged.
-- **Cost arithmetic in SQL.** Budget and risk figures sum `minutes x rate / 60` in SQL,
-  one aggregate query rather than a row-by-row loop, using the same rounding as
-  `domain/money.py`. The budget test pins the two together.
-- **Refresh token in the response body, not a cookie.** It sits in `sessionStorage` next to
-  the access token. An HttpOnly cookie would hide it from page scripts, but locally the
-  page (:3000) and the proxy (:3001) are different origins and the proxy answers
-  `Access-Control-Allow-Origin: *`, which browsers never combine with cookies. Rotation
-  and reuse detection limit a copied token: the second use signs both sides out. A
-  duplicated browser tab copies `sessionStorage`, so whichever copy refreshes second
-  signs both out ([design](./docs/superpowers/specs/2026-10-14-tokens-design.md)).
-- **Secrets in Terraform state.** The JWT secret and the first admin's password are
-  generated by Terraform, so they are in its state file. The forced password change
-  limits the exposure.
-- **"Today" is Eastern time,** from one constant (`domain/clock.py`).
-- **Lambda memory is 512 MB,** because the 600k-round PBKDF2 login is CPU-bound and
-  Lambda gives CPU in proportion to memory. We estimated 0.5 s; AWS measured about 1.1 s.
-- **Known disclosure:** a manager who books one person can work out that person's rate
-  from planned cost.
-- **No email or text messages.** On AWS the Lambda runs on the organisers' role, which has
-  no `ses:` permission, inside a private network with no NAT gateway or email/SNS
-  endpoint, and our role can't create either. So a new or reset password is shown once to
-  the admin and must be changed at first sign-in
-  ([findings](./docs/superpowers/specs/2026-10-14-email-and-sms-findings.md)).
-- **Deliberately out of scope:** an installable or offline app (PWA), AI features and background
-  jobs. The brief's feature list names none of them, and nothing here is slow enough to need a
-  queue: every write finishes in one transaction in about 6 ms
-  ([requirements check](./docs/superpowers/specs/2026-10-14-requirements-check.md), gap 1).
-- **Known security gap.** Changing your own email needs no current password
-  (`update_self`, `services/users.py`), which would matter once an emailed reset exists.
-
-## Contributing
-
-See the [CONTRIBUTING](./CONTRIBUTING.md) resource for more details.
-
-## License
-
-This library is licensed under the MIT-0 License.
-See the [LICENSE](./LICENSE) resource for more details.
-
-## Roadmap
-
-See the
-[open issues](https://github.com/citi/coding-workshop-participant/issues)
-for a list of proposed roadmap features (and known issues).
-
-## Security
-
-See the
-[Security Issue Notifications](./CONTRIBUTING.md#security-issue-notifications)
-resource for more details.
-
-## Authors
-
-The following people have contributed to this workshop:
-
-* Colin Heilman - [@heilmancs](https://github.com/heilmancs)
-* Eugene Istrati - [@eistrati](https://github.com/eistrati)
-* Isaiah Cornelius Smith - [@corneliusmith](https://github.com/corneliusmith)
-* Juan Arevalo - [@jparevalo27](https://github.com/jparevalo27)
-* Michael Annucci - [@michael-annucci](https://github.com/michael-annucci)
-
-## Feedback
-
-We'd love to hear your feedback! Please:
-
-* ⭐ Star the repository if you find it helpful
-* 🐛 Report issues on GitHub
-* 💡 Suggest improvements
-* 📝 Share your experience
+MIT-0, from the Citi coding workshop template: see [LICENSE](LICENSE).

@@ -1,272 +1,206 @@
-# Coding Workshop - Deployment Scripts
+# bin/: the setup, run and deploy scripts
 
-## Overview
+For anyone running or deploying the tracker. It answers: what each script in this folder
+does, when to run it, what it writes, and what we changed. The step-by-step walkthrough
+(first-time setup, seeding, deploying, troubleshooting) is [docs/SETUP.md](../docs/SETUP.md).
+Back to the [README](../README.md).
 
-This directory contains development and deployment scripts that can be used with local development and cloud deployment.
+These scripts came with the Citi workshop's template. All but one are unchanged: we changed
+only `proxy-server.js` ([below](#proxy-serverjs)). Run them from the repo root on Ubuntu
+22.04 (the workshop VDI), in your own terminal: they read `PARTICIPANT_ID` and
+`PARTICIPANT_CODE` from `~/.bashrc`, which Ubuntu skips in non-interactive shells.
 
-## Quick Start
+| Script | Run it | In one line |
+| --- | --- | --- |
+| [`setup-environment.sh`](#setup-environmentsh) | once per machine | installs the toolchain |
+| [`setup-participant.sh`](#setup-participantsh) | once, then whenever AWS says `ExpiredToken` | gets temporary AWS credentials |
+| [`start-dev.sh`](#start-devsh) | every time you work locally | starts Postgres, LocalStack, the backend, the proxy and the website |
+| [`deploy-backend.sh`](#deploy-backendsh) | to deploy (with the next one) | Terraform: builds or updates everything in `infra/` |
+| [`deploy-frontend.sh`](#deploy-frontendsh) | to deploy (right after the one above) | builds the website and uploads it |
+| [`generate-env.sh`](#generate-envsh) | rarely by hand (`start-dev.sh` runs it) | writes `frontend/.env.local` |
+| [`proxy-server.js`](#proxy-serverjs) | never by hand (`start-dev.sh` runs it) | the local proxy on port 3001 |
+| [`cleanup-environment.sh`](#cleanup-environmentsh) | **only to delete the AWS deployment for good** | backs up the code, then destroys everything |
 
-### Local Development
+Every shell script prints its options with `-h`.
 
-To run your application locally:
+---
+
+## setup-environment.sh
+
+Installs everything the project needs on Ubuntu 22.04: system packages (`curl`, `jq`,
+`unzip` and others), Python 3.13 (made the default with `PYENV_VERSION`, line 13), Node.js, Docker, LocalStack, the AWS command line (version 2), Terraform,
+PostgreSQL, MongoDB, VS Code, PyCharm and IntelliJ. It also installs the workshop's other
+tracks' tools (Spark, Trino, Jupyter, kubectl, Helm), which this app doesn't use; their
+failures don't matter here.
 
 ```sh
-./bin/start-dev.sh
+cd ~/DavidCitiProject
+./bin/setup-environment.sh -d
+source ~/.bashrc
 ```
 
-### Cloud Deployment
+| Option | Effect |
+| --- | --- |
+| `-d` | Also installs dnsmasq, so `*.localhost.localstack.cloud` resolves to your own machine. Use it |
+| `-n` | Dry run: prints what it would do and changes nothing |
 
-To deploy your backend to AWS:
+- **When:** once per machine. It skips what is already installed, so rerun it if it fails
+  part way.
+- **Writes:** system packages (it asks for your sudo password); a log in
+  `~/.local/share/workspace-setup/`.
+- **Doesn't install:** `dig`. If `setup-participant.sh` needs it: `sudo apt install -y dnsutils`.
+
+## setup-participant.sh
+
+Trades your workshop Participant ID and Code for **temporary** AWS credentials.
+
+1. Reads the DNS TXT record of `codingworkshop.net` to find the workshop's credentials
+   address for your `EVENT_ID`.
+2. Calls it with `PARTICIPANT_ID` and `PARTICIPANT_CODE` (sent as the `x-id` and `x-code`
+   headers) and stops with `Workshop API returned HTTP 4xx` if they are wrong.
+3. Saves the credentials as the AWS command line's default profile (`aws configure set`) and
+   looks up the account ID.
+4. Writes `ENVIRONMENT.config` at the repo root: the credentials, the account ID, the
+   Terraform state bucket (`coding-workshop-tfstate-c7dabfc1` for David), and the `TF_VAR_...`
+   values Terraform reads (`aws_app_code`, `aws_project`, `aws_ds_ip`).
 
 ```sh
+cd ~/DavidCitiProject
+./bin/setup-participant.sh && aws sts get-caller-identity
+```
+
+- **When:** once before the first AWS deploy, then whenever an AWS command says
+  `ExpiredToken`. `deploy-backend.sh`, `deploy-frontend.sh` and `cleanup-environment.sh`
+  run it themselves first, so a deploy always starts with fresh credentials.
+- **Needs:** `aws`, `curl`, `jq` and `dig`, plus `EVENT_ID`, `PARTICIPANT_ID`,
+  `PARTICIPANT_CODE` and `AWS_REGION=us-east-2` exported in `~/.bashrc`
+  ([SETUP.md, section 2](../docs/SETUP.md#2-first-time-setup-once-per-machine)).
+- **Writes:** `~/.aws/credentials` and `ENVIRONMENT.config`. **`ENVIRONMENT.config` holds live
+  credentials.** Git ignores it (the `*.config` rule in `.gitignore`); never commit it.
+
+## start-dev.sh
+
+Starts or repairs the whole local stack, one step at a time (it runs with `set -e`, so it
+stops at the first command that fails):
+
+| Step | What it does |
+| --- | --- |
+| 1. PostgreSQL | Starts it and rebinds it to `0.0.0.0` with `trust` sign-in in `pg_hba.conf`, so the Lambda inside Docker can reach it (development only) |
+| 2. MongoDB | Starts it on 27017. Part of the template; this app doesn't use it |
+| 3. LocalStack | Starts the container (`localstack start -d`) and waits until it answers on 4566 |
+| 4. Backend | Installs each service's `requirements.txt` into its own folder (for us, `psycopg` into `backend/tracker/`), then deploys to LocalStack with `deploy-backend.sh local`, but only if a service is missing or none answers |
+| 5. Website | `npm install` if needed, runs `generate-env.sh`, restarts `proxy-server.js` on 3001, then runs Vite (`npm run dev`) on 3000 in the foreground |
+
+```sh
+cd ~/DavidCitiProject
+source ~/.bashrc && ./bin/start-dev.sh
+```
+
+- **When:** each time you sit down to work. Done when it prints `All Components Verified!`.
+  `Ctrl+C` stops the website and the proxy; Postgres and LocalStack keep running.
+- **Writes:** `frontend/.env.local`; the packages it installs into `backend/tracker/` (git
+  ignores them through `backend/tracker/.gitignore`); logs in `/tmp/tf-init.log`,
+  `/tmp/backend-deploy.log`, `/tmp/npm-install.log` and `/tmp/proxy-server.log`.
+- **Side effect:** it points Terraform's state at LocalStack, so a plain `terraform output`
+  afterwards answers for the local copy, not AWS.
+- **Trap:** pip's errors in step 4 are hidden (`2>/dev/null || true`, line 342). If the local
+  API answers 502 with `No module named 'psycopg'`, see
+  [SETUP.md, Troubleshooting](../docs/SETUP.md#9-troubleshooting).
+
+## deploy-backend.sh
+
+Runs Terraform on `infra/`: creates or updates the Lambda, the database, the website bucket
+and CloudFront. Terraform changes only what differs, so a code-only deploy is quick.
+
+```sh
+cd ~/DavidCitiProject
 ./bin/deploy-backend.sh
-```
-
-To deploy your frontend to AWS:
-
-```sh
 ./bin/deploy-frontend.sh
 ```
 
-## Available Scripts
+| Form | Target |
+| --- | --- |
+| `./bin/deploy-backend.sh` or `./bin/deploy-backend.sh aws` | AWS. Runs `setup-participant.sh` first, loads `ENVIRONMENT.config`, then `terraform init` against the state bucket in S3 |
+| `(source ENVIRONMENT.config && ./bin/deploy-backend.sh local)` | LocalStack, with its fake credentials. Load `ENVIRONMENT.config` first, as shown, or the app id falls back to `abcd1234` and Terraform renames every resource |
 
-### `deploy-backend.sh`
+- **When:** to put backend or infrastructure changes on AWS, always followed by
+  `deploy-frontend.sh` ([why both](../docs/SETUP.md#6-deploy-to-aws)). Locally, only after
+  changing Terraform or adding or removing a folder under `backend/`: Python edits are live
+  without it.
+- **Runs `terraform apply -auto-approve`:** it does not stop to ask.
+- **Prints:** Terraform's changes, `Apply complete! Resources: ...`, the outputs
+  (`bootstrap_admin_password` shows as `<sensitive>`), then
+  `INFO: Infrastructure deployment complete!`. New database migrations then run on the
+  Lambda's first cold start, not during the deploy.
 
-**The main deployment script** - deploys complete infrastructure including backend Lambda functions.
+## deploy-frontend.sh
 
-**What it does**:
+Builds the website and publishes it behind CloudFront.
 
-* Creates VPC, security groups, and networking
-* Deploys all Lambda functions with Function URLs
-* Sets up S3 bucket for frontend hosting
-* Creates CloudFront distribution with routing (AWS only)
-* Sets up DocumentDB cluster
-* Auto-detects environment (LocalStack vs AWS)
-* Loads participant credentials for multi-participant workshops
+1. Runs `setup-participant.sh`, then reads the bucket name, the API address and the CloudFront
+   distribution from Terraform's outputs (so the backend must be deployed first).
+2. `npm run build` in `frontend/`, giving `frontend/dist/`.
+3. `aws s3 sync dist/ s3://coding-workshop-website-c7dabfc1/ --delete` (David's bucket):
+   uploads the new files and removes old ones.
+4. Invalidates `/*` on CloudFront, so it stops serving cached old files.
+5. Prints `INFO: Frontend deployment complete!` and
+   `CloudFront URL: https://d1gov8jpsxhwer.cloudfront.net`.
 
-**When to use**:
+- **When:** right after `deploy-backend.sh`, every time.
+- **`local`:** `./bin/deploy-frontend.sh local` builds nothing; it only tells you to use
+  `start-dev.sh`, because Vite on port 3000 reloads in about a second.
 
-* Initial deployment
-* After changing Lambda function code
-* After adding new Lambda functions (auto-discovered!)
-* After infrastructure changes
+## generate-env.sh
 
-**Key feature**: Terraform only updates changed resources, so running this after Lambda code changes is fast (~5-10 seconds).
+Writes `frontend/.env.local` from Terraform's outputs: `VITE_API_URL`, `VITE_API_ENDPOINTS`
+and `VITE_LAMBDA_URLS` (and the same three as `REACT_APP_...` for the template's older
+React setup). It checks whether LocalStack answers on 4566 to decide between local and AWS.
+Locally the API address is the proxy, `http://localhost:3001`.
 
-**Usage**:
+- **When:** `start-dev.sh` runs it on every start. By hand only after deploying to LocalStack
+  without `start-dev.sh`.
+- **Writes:** `frontend/.env.local` (git ignores `.env.*`). `proxy-server.js` reads its
+  `VITE_API_ENDPOINTS` line to learn where the Lambda is.
 
-```sh
-./bin/deploy-backend.sh [aws|local]
-```
+## proxy-server.js
 
-### `deploy-frontend.sh`
-
-Builds and deploys the React frontend to AWS.
-
-**What it does**:
-
-* LocalStack: Displays message to use `npm run dev` (skips S3 deployment)
-* AWS:
-  * Loads participant environment credentials
-  * Runs `npm run build` to create production build
-  * Uploads static files to S3 bucket
-  * Invalidates CloudFront cache
-  * Displays CloudFront URL
-
-**When to use**:
-
-* LocalStack: Don't use this - use `./bin/start-dev.sh` for hot-reload instead
-* AWS only: After making changes to React components
-
-**Why skip LocalStack S3?** The dev server (`npm run dev`) provides instant hot-reload (1-2 seconds) vs full build+deploy (~30-60 seconds).
-
-**Usage**:
-
-```sh
-./bin/deploy-frontend.sh [aws|local]
-```
-
-### `start-dev.sh`
-
-Starts the complete development environment with hot-reload.
-
-**What it does**:
-
-* Checks LocalStack is running
-* Verifies backend is deployed
-* Generates `.env.local` for frontend
-* Starts proxy server on port 3001 (CORS workaround)
-* Starts React dev server on port 3000 (hot-reload)
-
-**When to use**:
-
-* LocalStack development (recommended workflow)
-* Frontend development with backend integration
-* Testing full stack locally
-
-**Usage**:
+A small Node.js server on port **3001**, for local work only. The website calls
+`http://localhost:3001/api/tracker/...`; the proxy drops `/api/tracker` and forwards the
+rest to the tracker Lambda's address inside LocalStack. It exists because LocalStack's Lambda
+addresses mishandle browsers' cross-origin (CORS) headers, so the proxy removes the browser
+headers (`origin`, `referer`, `sec-fetch-*`) and adds its own CORS answer. On AWS, CloudFront
+does this job and the proxy isn't used.
 
 ```sh
-./bin/start-dev.sh
+curl -s http://localhost:3001/
+curl -s http://localhost:3001/api/tracker/health
 ```
 
-### `generate-env.sh`
+The first lists the services it knows; the second should print `{"status": "ok"}`.
 
-Generates `.env.local` file for React frontend.
+**What we changed (13 Oct, commit `dc3935f`), and why.** Without these two changes every
+signed-in request failed locally:
 
-**What it does**:
+| Change | Why |
+| --- | --- |
+| It forwards the `Authorization` header (and `Content-Length`) | The template forwarded only `accept`, `content-type`, `user-agent` and `host`, so the sign-in token never reached the Lambda and every signed-in call answered 401 |
+| `Access-Control-Allow-Headers: Authorization, Content-Type` instead of `*` | Under the browsers' Fetch standard, `*` never covers `Authorization`, so the browser blocked the request before it was even sent |
 
-* Detects LocalStack vs AWS environment
-* Reads Terraform outputs (API URLs, endpoints)
-* Generates frontend environment configuration
-* LocalStack: Sets proxy URL (`http://localhost:3001`)
-* AWS: Sets CloudFront URL
+The same `*` problem was fixed on AWS on 15 Oct, in the Lambda's own CORS settings
+([infra/README.md](../infra/README.md)).
 
-**When to use**:
+## cleanup-environment.sh
 
-* After deploying backend
-* After adding new Lambda functions
-* When switching between LocalStack and AWS
+**Deletes the whole AWS deployment. It cannot be undone and does not ask first.**
 
-**Usage**:
+1. Runs `setup-participant.sh` and loads `ENVIRONMENT.config`.
+2. Zips the repo folder (without `.git`, `node_modules`, `.venv`, caches and Terraform's
+   working files) and moves the zip to
+   `s3://coding-workshop-tfstate-c7dabfc1/backup/backup-c7dabfc1.zip` (for David).
+3. `terraform destroy -auto-approve`: removes CloudFront, the Lambda, the website bucket and
+   the Aurora database **with all its data** (`skip_final_snapshot = true` in
+   `infra/rds.tf`, so no final copy is kept).
 
-```sh
-./bin/generate-env.sh
-```
-
-### `proxy-server.js`
-
-Development CORS proxy server for LocalStack.
-
-**What it does**:
-
-* Listens on port 3001
-* Forwards `/api/*` requests to LocalStack Lambda URLs
-* Strips browser headers that trigger LocalStack CORS bug
-* Adds proper CORS headers to responses
-
-**Why needed**: LocalStack Lambda Function URLs have a CORS bug.
-
-**Usage** (automatically started by `start-dev.sh`):
-
-```sh
-node ./bin/proxy-server.js
-```
-
-### `setup-participant.sh`
-
-**One-time setup for multi-participant AWS workshops** - configures participant credentials automatically.
-
-**What it does**:
-
-* Auto-detects AWS Account ID from your credentials
-* Constructs IAM role ARN: `arn:aws:iam::{ACCOUNT}:role/coding-workshop-{PARTICIPANT_ID}`
-* Constructs S3 backend bucket: `coding-workshop-tfstate-{PARTICIPANT_ID}`
-* Creates AWS CLI profile: `coding-workshop-{PARTICIPANT_ID}`
-* Generates Terraform backend config: `BACKEND.config`
-* Creates environment file: `ENVIRONMENT.config` (auto-loaded by `deploy-backend.sh`)
-
-**When to use**:
-
-* Required: Before your first AWS deployment in multi-participant workshops
-* Not needed: For LocalStack development (no participant isolation required)
-
-**What you need**: Just 2 things from instructor:
-
-1. Participant ID (e.g., `efgh5678`)
-2. Participant Code (e.g., `xK9mP2nR4vT8wQ`)
-
-Everything else (AWS Account ID, S3 bucket name, IAM role) is **automatically detected/derived**.
-
-**Usage**:
-
-```sh
-# 1. First, set up environment variables
-echo 'export EVENT_ID=your-id' >> ~/.bashrc
-echo 'export PARTICIPANT_ID=your-id' >> ~/.bashrc
-echo 'export PARTICIPANT_CODE=your-code' >> ~/.bashrc
-source ~/.bashrc
-
-# 2. Then, run the setup participant script
-./bin/setup-participant.sh
-```
-
-### `setup-environment.sh`
-
-Sets up the complete local development environment on Ubuntu 22.04.
-
-**What it does**:
-
-* Installs Docker (Container runtime)
-* Installs LocalStack (AWS service emulation)
-* Installs AWS CLI v2 (AWS command-line tools)
-* Installs Terraform (Infrastructure as Code)
-* Installs PostgreSQL (Relational database)
-* Installs MongoDB (NoSQL database)
-* Optionally: Installs and configures dnsmasq (DNS resolution)
-
-**When to use**:
-
-* Initial machine setup for Ubuntu 22.04
-* First-time local development environment installation
-* One-time per developer machine
-
-**Prerequisites**:
-
-* Ubuntu 22.04 Desktop
-* Administrator/sudo access
-* Internet connection for package downloads
-
-**Usage**:
-
-```sh
-# Basic setup (without dnsmasq)
-./bin/setup-environment.sh
-
-# With dnsmasq DNS configuration
-./bin/setup-environment.sh -d
-
-# Dry run (show what would be done without making changes)
-./bin/setup-environment.sh -n
-
-# Both dnsmasq and dry run
-./bin/setup-environment.sh -d -n
-```
-
-**Notes**:
-
-* Script auto-detects if dependencies are already installed and skips redundant steps
-* Continues on non-critical errors and reports all issues at the end
-* Dry run mode (`-n`) shows planned actions without making changes
-* dnsmasq (`-d`) is optional - enables DNS resolution for `.local` domains
-
-### `cleanup-environment.sh`
-
-Destroys all infrastructure resources created by the deployment scripts.
-
-**What it does**:
-
-* Removes all AWS/LocalStack resources (VPC, Lambda, S3, CloudFront, DocumentDB, etc.)
-* Uses Terraform to cleanly destroy infrastructure
-* Verifies Terraform is installed before proceeding
-
-**When to use**:
-
-* End of workshop to clean up resources
-* Before redeploying from scratch
-* To avoid unnecessary AWS charges
-* When resetting the environment
-
-**Warning**: This action **cannot be undone**. All data and resources will be permanently deleted.
-
-**Prerequisites**:
-
-* Terraform must be installed
-* Valid AWS credentials configured (for AWS deployments)
-* LocalStack running (for LocalStack deployments)
-
-**Usage**:
-
-```sh
-./bin/cleanup-environment.sh
-```
+The backup holds the code, not the data. After it, the live site and every login stop
+working. Run it only when the AWS deployment should be gone for good. More in
+[SETUP.md, section 10](../docs/SETUP.md#10-danger-cleanup-environmentsh).

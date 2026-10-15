@@ -743,6 +743,64 @@
         }
       }
     },
+    "/users/{id}/projects": {
+      "get": {
+        "operationId": "user_projects",
+        "summary": "List the live projects a person is on: bookings from today on, and open tasks.",
+        "description": "Any signed-in user.",
+        "tags": [
+          "users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/users/{id}/capacity": {
       "patch": {
         "operationId": "set_capacity",
@@ -868,7 +926,7 @@
     "/users/{id}/archive": {
       "post": {
         "operationId": "archive_user",
-        "summary": "Archive a person (there is no delete).",
+        "summary": "Archive a person (there is no delete); someone on live projects needs confirmOnProjects.",
         "description": "Roles: ADMIN.",
         "tags": [
           "users"
@@ -886,6 +944,21 @@
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirmOnProjects": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -3612,6 +3685,25 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "atRisk",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "risk",
+                "updated"
+              ],
+              "description": "risk (the default): at risk first, then by name. updated: the latest change to the project or anything in it first."
             }
           }
         ],

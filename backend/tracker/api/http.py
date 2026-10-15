@@ -20,7 +20,7 @@ from domain.errors import ValidationError
 
 PREFIX = "/api/tracker"
 INT_QUERY_KEYS = {"page", "page_size", "actor_id", "entity_id", "weeks"}
-BOOL_QUERY_KEYS = {"include_archived", "unread", "over_only"}
+BOOL_QUERY_KEYS = {"include_archived", "unread", "over_only", "at_risk"}
 
 
 @dataclass

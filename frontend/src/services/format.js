@@ -107,8 +107,51 @@ export function daysBetween(fromIso, toIso) {
   return Math.round((to - from) / DAY_MS)
 }
 
+const weekdayDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+
+/** "2026-10-12" -> "Mon, Oct 12": a day with its weekday. A date only, so read as UTC, like formatDay. */
+export function formatWeekdayDay(iso) {
+  if (!iso) return DASH
+  return weekdayDay.format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
+}
+
+/**
+ * Why a deliverable is late, from its due date and today (both ISO days, Eastern):
+ * "was due Mon, Oct 12 · today is Thu, Oct 15 · 3 days late"; spoken (aria-labels), the same with commas.
+ */
+export function formatLateness(dueIso, today, { spoken = false } = {}) {
+  const days = daysBetween(dueIso, today)
+  const parts = [`was due ${formatWeekdayDay(dueIso)}`, `today is ${formatWeekdayDay(today)}`, `${days} ${days === 1 ? 'day' : 'days'} late`]
+  return parts.join(spoken ? ', ' : ' · ')
+}
+
 /** A timestamp, shown in Eastern time: "Oct 13, 2026, 9:03 PM". */
 export function formatDateTime(iso) {
   if (!iso) return DASH
   return dateTime.format(new Date(iso))
+}
+
+const dayInZone = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ZONE })
+
+/** A project's latest change (a timestamp) as its day in Eastern time: "Updated Oct 13, 2026". */
+export function formatUpdated(iso) {
+  return `Updated ${iso ? dayInZone.format(new Date(iso)) : DASH}`
+}
+
+/** 1 -> "1 live project", 3 -> "3 live projects". */
+export function formatLiveProjects(count) {
+  return `${count} live ${count === 1 ? 'project' : 'projects'}`
+}
+
+/**
+ * One project a person is still on, as a line of the archive warning:
+ * "Apollo · 20 hours a week until Dec 31, 2026 · 2 open tasks". A part that is 0 or
+ * missing is left out; a booking that only starts later reads "booked until <date>".
+ */
+export function formatInvolvement({ name, hoursPerWeek, bookingEndDate, openTaskCount }) {
+  const parts = [name]
+  if (hoursPerWeek > 0) parts.push(`${formatPerWeek(hoursPerWeek, { spoken: true })}${bookingEndDate ? ` until ${formatDate(bookingEndDate)}` : ''}`)
+  else if (bookingEndDate) parts.push(`booked until ${formatDate(bookingEndDate)}`)
+  if (openTaskCount > 0) parts.push(`${openTaskCount} open ${openTaskCount === 1 ? 'task' : 'tasks'}`)
+  return parts.join(' · ')
 }

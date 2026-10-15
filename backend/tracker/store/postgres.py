@@ -60,7 +60,7 @@ def settings_from_env() -> dict:
         "connect_timeout": 15,
     }
     if os.getenv("IS_LOCAL", "true") == "false":
-        result["sslmode"] = "require"  # encrypt the connection to Aurora on AWS (docs/full-stack.md asks for it)
+        result["sslmode"] = "require"  # encrypt the connection to Aurora on AWS (the workshop brief asks for it; docs/ARCHITECTURE.md)
     return result
 
 

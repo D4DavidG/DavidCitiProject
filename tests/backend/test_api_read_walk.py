@@ -46,6 +46,8 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert get(a, "/users/{id}", f"/users/{world['alice'].user_id}")["firstName"] == "Alice"
     history = get(b, "/users/{id}/history", f"/users/{world['alice'].user_id}/history")
     assert PAGE_KEYS <= history.keys() and history["items"][0]["actorName"]
+    on = get(b, "/users/{id}/projects", f"/users/{world['alice'].user_id}/projects")
+    assert PAGE_KEYS <= on.keys() and [(p["name"], p["openTaskCount"]) for p in on["items"]] == [("Apollo", 1)]
 
     assert PAGE_KEYS <= get(b, "/projects", "/projects").keys()
     assert get(b, "/projects/{id}", f"/projects/{pid}")["name"] == "Apollo"

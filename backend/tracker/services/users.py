@@ -5,6 +5,8 @@
 - Login is by username; every login failure gets the same 401.
 - A user edits only their own name and email. Nobody edits a username or
   changes their own role or salary.
+- Pay is at least $20 an hour on every new account and every pay change.
+- Archiving someone still on live projects asks the admin to confirm first.
 """
 
 import datetime as dt
@@ -12,8 +14,8 @@ import datetime as dt
 import psycopg
 from psycopg import sql
 
-from domain import values
-from domain.errors import AuthenticationError, Conflict, Forbidden, NotFound, ValidationError
+from domain import clock, money, values
+from domain.errors import AuthenticationError, Conflict, Forbidden, NotFound, OnProjects, ValidationError
 from services import audit, passwords, sessions
 from services.actors import ADMIN, EMPLOYEE, MANAGER, Actor
 from services.paging import paginate
@@ -30,6 +32,7 @@ _PROFILE_FIELDS = {"first_name", "last_name", "email"}
 _ADMIN_FIELDS = _PROFILE_FIELDS | {"job_title", "role", "manager_id", "annual_salary_cents",
                                    "weekly_capacity_hours", "overtime_allowed", "task_limit"}
 _CAPACITY_FIELDS = {"weekly_capacity_hours", "overtime_allowed", "task_limit"}
+MAX_SALARY_CENTS = 10**12
 
 
 def _row(conn: psycopg.Connection, user_id: int) -> dict | None:
@@ -60,7 +63,7 @@ def _validate_fields(data: dict) -> dict:
     if "manager_id" in data:
         clean["manager_id"] = values.integer(data, "manager_id", required=False)
     if "annual_salary_cents" in data:
-        clean["annual_salary_cents"] = values.integer(data, "annual_salary_cents", minimum=0, maximum=10**12)
+        clean["annual_salary_cents"] = _salary(data)
     if "weekly_capacity_hours" in data:
         clean["weekly_capacity_hours"] = values.integer(data, "weekly_capacity_hours", minimum=1, maximum=60)
     if "overtime_allowed" in data:
@@ -68,6 +71,23 @@ def _validate_fields(data: dict) -> dict:
     if "task_limit" in data:
         clean["task_limit"] = values.integer(data, "task_limit", minimum=1, maximum=10)
     return clean
+
+
+def _salary(data: dict) -> int:
+    """Yearly pay in whole cents: required, and at least $20 an hour (money.MIN_ANNUAL_SALARY_CENTS).
+
+    Checked whenever pay is given, so a salary set before the rule stays until it is changed.
+    """
+    salary = data.get("annual_salary_cents")
+    if salary is None:
+        raise ValidationError("Pay is required.", field="annual_salary_cents")
+    if isinstance(salary, bool) or not isinstance(salary, int):
+        raise ValidationError("Pay must be a whole number of cents.", field="annual_salary_cents")
+    if salary < money.MIN_ANNUAL_SALARY_CENTS:
+        raise ValidationError(money.PAY_TOO_LOW, field="annual_salary_cents")
+    if salary > MAX_SALARY_CENTS:
+        raise ValidationError("Pay must be at most $10,000,000,000 a year.", field="annual_salary_cents")
+    return salary
 
 
 def _check_line_manager(conn: psycopg.Connection, manager_id: int | None, user_id: int | None) -> None:
@@ -131,6 +151,7 @@ def create_user(conn: psycopg.Connection, actor: Actor, data: dict) -> tuple[dic
     values.only_allowed(data, _ADMIN_FIELDS)
     for required in ("first_name", "last_name", "email", "role"):
         values.text(data, required)  # presence check; the error names the right field
+    _salary(data)  # every new account is paid at least $20 an hour
     clean = _validate_fields(data)
     password = passwords.generate_password()
     with atomic(conn):
@@ -304,6 +325,48 @@ def list_users(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     return paginate(conn, query, params, sql.SQL("last_name, first_name, user_id"), page, page_size)
 
 
+# --- what a person is on now ---
+
+# The live projects a person is on: a live booking that ends today or later, or an open (not
+# DONE) task assigned to them, on a project that isn't archived. Hours and end date come from
+# the bookings that cover today, so someone booked only from next month shows 0 h and no end.
+_LIVE_PROJECTS = (
+    "SELECT p.project_id, p.name, p.status, COALESCE(b.hours_per_week, 0) AS hours_per_week,"
+    " b.booking_end_date, COALESCE(t.open_task_count, 0) AS open_task_count"
+    " FROM projects p"
+    " LEFT JOIN (SELECT project_id,"
+    "                   sum(hours_per_week) FILTER (WHERE start_date <= %(today)s) AS hours_per_week,"
+    "                   max(end_date) FILTER (WHERE start_date <= %(today)s) AS booking_end_date"
+    "            FROM assignments WHERE user_id = %(uid)s AND NOT is_archived AND end_date >= %(today)s"
+    "            GROUP BY project_id) b ON b.project_id = p.project_id"
+    " LEFT JOIN (SELECT project_id, count(*) AS open_task_count FROM tasks"
+    "            WHERE assignee_user_id = %(uid)s AND NOT is_archived AND status <> 'DONE'"
+    "            GROUP BY project_id) t ON t.project_id = p.project_id"
+    " WHERE NOT p.is_archived AND (b.project_id IS NOT NULL OR t.project_id IS NOT NULL)"
+)
+
+
+def live_projects(conn: psycopg.Connection, actor: Actor, user_id: int, page: int, page_size: int) -> dict:
+    """The live projects a person is on now, by name: hours this week, booking end, open tasks.
+
+    Admins, the person's line manager and the person themself may read it; anyone else gets
+    the same 404 as a missing id. Archiving the person asks first when this list isn't empty.
+    """
+    row = conn.execute("SELECT manager_id FROM users WHERE user_id = %s", (user_id,)).fetchone()
+    allowed = row is not None and (actor.is_admin or actor.user_id == user_id
+                                   or (actor.is_manager and row["manager_id"] == actor.user_id))
+    if not allowed:
+        raise NotFound("User not found.")  # the same answer as a missing id (404, never 403)
+    result = paginate(conn, sql.SQL(_LIVE_PROJECTS), {"uid": user_id, "today": clock.today()},
+                      sql.SQL("name, project_id"), page, page_size)
+    return {**result, "items": [{
+        "project_id": r["project_id"], "name": r["name"], "status": r["status"],
+        "hours_per_week": int(r["hours_per_week"]),
+        "booking_end_date": r["booking_end_date"].isoformat() if r["booking_end_date"] else None,
+        "open_task_count": int(r["open_task_count"]),
+    } for r in result["items"]]}
+
+
 # --- archive ---
 
 def _manages_live_projects(conn: psycopg.Connection, user_id: int) -> bool:
@@ -311,10 +374,24 @@ def _manages_live_projects(conn: psycopg.Connection, user_id: int) -> bool:
                              (user_id,)).fetchone())
 
 
-def archive_user(conn: psycopg.Connection, actor: Actor, user_id: int, now: dt.datetime) -> dict:
-    """Admin only. Archives the person, their live bookings and their sessions, in one transaction."""
+def _on_projects_text(row: dict, projects: list[dict]) -> str:
+    count = f"{len(projects)} live project{'' if len(projects) == 1 else 's'}"
+    return (f"{_name(row)} is still on {count}: {', '.join(p['name'] for p in projects)}."
+            " Archiving ends their bookings there; their open tasks stay assigned to them.")
+
+
+def archive_user(conn: psycopg.Connection, actor: Actor, user_id: int, now: dt.datetime,
+                 data: dict | None = None) -> dict:
+    """Admin only. Archives the person, their live bookings and their sessions, in one transaction.
+
+    Someone still on live projects (see live_projects) is archived only when the body says
+    confirm_on_projects: exactly true; otherwise OnProjects (409, code ON_PROJECTS) names the
+    projects and nothing changes. Their open tasks stay assigned to them.
+    """
     if not actor.is_admin:
         raise Forbidden("Only admins archive accounts.")
+    data = data or {}
+    values.only_allowed(data, {"confirm_on_projects"})
     if user_id == actor.user_id:
         raise Conflict("You can't archive yourself.")
     with atomic(conn):
@@ -325,6 +402,11 @@ def archive_user(conn: psycopg.Connection, actor: Actor, user_id: int, now: dt.d
             raise Conflict(f"{_name(before)} still has live reports. Give them another line manager first.")
         if _manages_live_projects(conn, user_id):
             raise Conflict(f"{_name(before)} still manages live projects. Reassign them first.")
+        if data.get("confirm_on_projects") is not True:
+            on = conn.execute(sql.SQL(_LIVE_PROJECTS) + sql.SQL(" ORDER BY name, project_id"),
+                              {"uid": user_id, "today": clock.today()}).fetchall()
+            if on:
+                raise OnProjects(_on_projects_text(before, on))
         row = _update(conn, user_id, {"is_archived": True, "archived_at": now, "archived_by": actor.user_id})
         sessions.revoke_all(conn, user_id, now)
         audit.record_change(conn, actor, "ARCHIVE", "users", user_id, _snapshot(before), _snapshot(row),

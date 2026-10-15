@@ -68,7 +68,10 @@ BODIES = {
                        "proposedStart": DATE, "proposedEnd": DATE, "projectId": INT, "taskLimit": INT},
     "approve_request": {"startDate": DATE, "predictedEndDate": DATE, "budgetCents": INT, "decisionNote": TEXT},
     "reject_request": {"decisionNote": TEXT},
+    "archive_user": {"confirmOnProjects": BOOL},
 }
+# Bodies a caller may leave out: archiving someone on no live project needs no confirmation.
+OPTIONAL_BODIES = {"archive_user"}
 
 # Query filters beyond page and pageSize: handler name -> {query name: type}. `q` is the
 # search box on every list; `search` is its older name on the three lists that had one.
@@ -82,7 +85,10 @@ FILTERS = {
     "pending_time": {"q": TEXT},
     "list_requests": {"q": TEXT, "scope": {"type": "string", "enum": ["sent", "decide"]}, "status": TEXT,
                       "kind": TEXT},
-    "project_cards": {"q": TEXT, "search": TEXT, "status": TEXT},
+    "project_cards": {"q": TEXT, "search": TEXT, "status": TEXT, "atRisk": BOOL,  # true: at risk only; false: on track only
+                      "sort": {"type": "string", "enum": ["risk", "updated"],
+                               "description": "risk (the default): at risk first, then by name. updated: the"
+                                              " latest change to the project or anything in it first."}},
     "allocation": {"weekFrom": DATE, "weeks": INT, "overOnly": BOOL, "q": TEXT,
                    "projectIds": {"type": "string", "pattern": "^[0-9]+(,[0-9]+)*$",
                                   "description": "Project ids separated by commas, such as 3,7: each week's"
@@ -184,7 +190,8 @@ def _operation(route) -> dict:
         op["parameters"] = params
     if route.handler.__name__ in BODIES:
         schema = {"type": "object", "properties": BODIES[route.handler.__name__]}
-        op["requestBody"] = {"required": True, "content": {"application/json": {"schema": schema}}}
+        op["requestBody"] = {"required": route.handler.__name__ not in OPTIONAL_BODIES,
+                             "content": {"application/json": {"schema": schema}}}
     op["responses"] = _responses(route)
     return op
 
