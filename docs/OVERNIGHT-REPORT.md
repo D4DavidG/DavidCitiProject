@@ -297,8 +297,9 @@ first:
 
 **Small things noted but not fixed** (your call; none affects the demo path):
 
-- The dashboard's "At risk" counter counts only the current page (12 cards), while
-  "Projects shown" is the total.
+- ~~The dashboard's "At risk" counter counts only the current page (12 cards), while
+  "Projects shown" is the total.~~ Fixed 14 Oct: **Total projects** and **Total at risk**,
+  both counted by the server across every page (`atRiskTotal`).
 - A project's "Reactivate" button shows nothing if the server refuses.
 - Archiving a deliverable says it "can be reactivated", but there's no screen to list
   archived deliverables or tasks yet.

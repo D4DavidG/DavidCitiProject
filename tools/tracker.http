@@ -38,6 +38,7 @@ GET {{baseUrl}}/auth/me
 Authorization: Bearer {{token}}
 
 ### Q1 status of each project, Q2 at risk, Q7 budget: dashboard cards, at-risk first.
+### total and atRiskTotal count every page (try ?pageSize=1).
 GET {{baseUrl}}/dashboard/projects
 Authorization: Bearer {{token}}
 

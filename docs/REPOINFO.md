@@ -593,10 +593,14 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    change, reset or archive ends the user's older sessions. The role is still re-read on
    every request. *Point at: `services/tokens.py:21`; `services/sessions.py`;
    `services/actors.py:59-61`; `api/app.py:22-34`; `frontend/src/services/request.js` (refresh once, retry once)*
-10. **"Total number of projects?"** Built. The dashboard's first counter, "Projects shown",
-    is the server's count for the current search and status filter (all of them when no
-    filter is set). "At risk" beside it counts only the cards on the current page. The budget
-    chart sits under the counters. *Point at: `frontend/src/pages/dashboard/DashboardPage.jsx:150-153`*
+10. **"Total number of projects?"** Built. The dashboard's two counters, **Total projects**
+    and **Total at risk**, both come from the server and count every page, not just the 12
+    cards shown: `GET /dashboard/projects` returns `total` and `atRiskTotal`, worked out from
+    the same cards before the page is cut, so the tile and the cards never disagree. They
+    follow the search and status filter (all live projects in scope when none is set), and a
+    line under them says so when a filter is on. The budget chart sits under the counters.
+    *Point at: `services/dashboard.py` `project_cards()` (last line);
+    `frontend/src/pages/dashboard/DashboardPage.jsx:151-156`*
 11. **"How can you delete projects?"** You can't, by design: an admin archives (and can
     reactivate), and a Postgres trigger refuses any DELETE on every application table. The
     rubric's D in CRUD is met by archive; we haven't yet asked an evaluator whether that
@@ -911,7 +915,6 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
    (`PATCH /tasks/{id}` with `assigneeUserId: null`).
 8. Small website bugs:
    - "Mark all as read" is enabled based only on the current page; the server marks all;
-   - the "At risk" counter counts one page;
    - approving an already-decided entry again is allowed (`services/time_entries.py:146-166`).
 9. Unexplained: 2 of 16,184 load-test requests got no response.
 10. Ask the evaluators whether archive counts as the D in CRUD.

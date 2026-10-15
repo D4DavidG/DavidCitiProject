@@ -43,6 +43,8 @@ outdated it.
   what a person did and what was done to their account; admins, their line manager and
   the person may read it (others get 404), and only admins see the before/after state, so
   a salary never reaches a manager. **History** on People, **My history** on Account.
+  Also not deployed: the dashboard's **Total projects** and **Total at risk** counters,
+  both from the server across every page (`atRiskTotal` on `GET /dashboard/projects`).
   Tests: 537 backend, 314 website, and 22 Playwright browser
   tests in 8 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
