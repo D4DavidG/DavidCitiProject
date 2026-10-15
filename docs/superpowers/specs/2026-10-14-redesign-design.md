@@ -120,6 +120,44 @@ Never the actor; archived users get nothing; one notification per person per cha
 (no duplicates when they are also above the actor). Request decisions already notify the
 asker (`also_notify`). Tests: one per entity row, plus actor-is-subject and archived-subject.
 
+## 5a. Errors show on the field (David, 14 Oct night)
+
+"If there is an error when writing out a field I want that field to glow red, not a message
+at the top of a card."
+
+- **The field glows red:** the theme gives an outlined field in error a red border and a
+  soft red glow (both modes; the border reaches 3:1 against its surface), and the reason in
+  one short line right under the field. The words stay: colour alone can't tell a
+  colour-blind or screen-reader user what is wrong (WCAG 3.3.1). The line is tied to the
+  field with `aria-describedby`, and focus moves to the first field with a problem.
+- **Checked before sending** wherever the browser can tell: a required field left empty,
+  Minutes of 60 or more, a number out of range, an end date before the start date. No round
+  trip, no extra click.
+- **Server errors with a `field`** land on that field (as today). Errors with no field show
+  as one line just above the dialog's buttons, next to where you pressed, never at the top
+  of the card.
+- **Sign-in:** a wrong username or password makes both boxes glow red, with the message
+  under the password box.
+
+## 5b. Fewer clicks, easier on the eyes (David, 14 Oct night)
+
+"Minimize the amount of clicks to do a task: in the past you had to press Projects, open
+it, and look somewhere else to archive a project."
+
+- **Do it where you see it.** Common tasks happen from the row you are looking at, not on
+  another page: archive or request archive from the Projects list; approve or reject logged
+  time from its row (reject asks only for the note); take a task from Ready to take; log
+  time and move status from a task's row; book a person from the Resources tab; reset a
+  password or change capacity from a person's row. A confirm step stays only where the
+  action is hard to undo.
+- **A click count.** For each common task per role: clicks before, clicks after. It goes
+  in `docs/REPOINFO.md`, so David can say it.
+- **Easy on the eyes:** one main button per screen, always in the same place (page actions
+  top right, row actions at the end of the row), body text at least 14 px with comfortable
+  line spacing, spacing rather than lines to separate things, no walls of borders, and the
+  same order of sections on every page. Checked by looking at real screenshots of every
+  screen, light and dark, desktop and phone.
+
 ## 5. Not changing
 
 Routes, roles and rules other than the above; the API shapes; the database schema (no
