@@ -94,10 +94,18 @@ describe('NotificationsPage', () => {
     expect(await screen.findByText('Changes made by the people who report to you, and changes others made to your own work or account.')).toBeInTheDocument()
   })
 
-  it('draws "Mark as read" as a button of the secondary kind, not a bare word', async () => {
+  it('draws "Mark as read" and "Mark all as read" as filled buttons (spec 6.2), not bare words', async () => {
     renderPage()
     const unread = await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
-    expect(within(unread).getByRole('button', { name: /mark as read/i })).toHaveClass('MuiButton-outlined')
+    expect(within(unread).getByRole('button', { name: /mark as read/i })).toHaveClass('MuiButton-contained')
+    expect(screen.getByRole('button', { name: /mark all as read/i })).toHaveClass('MuiButton-contained')
+  })
+
+  it('labels an unread one "New" in filled red with white words (spec 6.4)', async () => {
+    renderPage()
+    const unread = await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    const chip = within(unread).getByText('New').closest('.MuiChip-root')
+    expect(chip).toHaveClass('MuiChip-filled', 'MuiChip-colorError')
   })
 
   it('cannot mark everything as read while a search hides some of it, and can again once the search is cleared', async () => {
