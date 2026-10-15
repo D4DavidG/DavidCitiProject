@@ -37,7 +37,7 @@ function WeekCell({ week, capacity }) {
             border: 1, borderColor: week.overAllocated ? 'error.main' : 'transparent',
           }}
         >
-          <Typography variant="body2" sx={{ fontWeight: 600, color: week.overAllocated ? 'error.main' : week.bookedHours ? 'text.primary' : 'text.disabled' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: week.overAllocated ? 'error.main' : week.bookedHours ? 'text.primary' : 'text.secondary' }}>
             {week.bookedHours} / {capacity} h
           </Typography>
           {week.overAllocated && <Typography variant="caption" color="error.main" sx={{ display: 'block' }}>+{week.overByHours} h over</Typography>}

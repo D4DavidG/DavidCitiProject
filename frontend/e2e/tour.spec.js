@@ -2,12 +2,14 @@
  * A read-only tour of every screen a manager and an employee can reach, at desktop and
  * phone width: checks each page renders with no sideways scrolling, saves a screenshot
  * of each for review, and checks that refreshing a deep link works. Changes no data, so
- * it is safe against the deployed demo. Runs only when asked:
+ * it is safe against the deployed demo. Also runs axe on every screen: serious or critical
+ * WCAG A/AA problems fail the test. Runs only when asked:
  *
  *   E2E_TOUR_DIR=/some/folder E2E_MANAGER_USERNAME=ML662930 E2E_EMPLOYEE_USERNAME=AR553882 \
  *   E2E_BASE_URL=https://<cloudfront> npx playwright test tour
  */
 import { expect, test } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 
 const DIR = process.env.E2E_TOUR_DIR
 const PASSWORD = 'Demo-pass-2026' // the seeded demo accounts (tools/demo.py)
@@ -31,6 +33,9 @@ const FIGURES = {
   PROJECT: ['Deliverables timeline'],
 }
 
+const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] // every WCAG 2.0-2.2 A and AA rule axe has
+const FAILING = ['serious', 'critical']
+
 test.skip(!DIR, 'Set E2E_TOUR_DIR (and the usernames) to run the screen tour.')
 
 async function signIn(page, username) {
@@ -42,6 +47,14 @@ async function signIn(page, username) {
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
 }
 
+// Runs axe on the page as it is now and adds one line per serious or critical problem.
+async function scan(page, where, problems) {
+  const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze()
+  for (const v of violations.filter((x) => FAILING.includes(x.impact))) {
+    problems.push(`${where}: ${v.id} (${v.impact}, ${v.nodes.length} elements: ${v.nodes[0].target.join(' ')})`)
+  }
+}
+
 async function projectId(page) {
   await page.goto('/#/projects')
   await page.getByRole('link', { name: 'Apollo' }).first().click()
@@ -51,9 +64,13 @@ async function projectId(page) {
 
 for (const [role, { username, screens }] of Object.entries(ROLES)) {
   for (const [viewport, size] of Object.entries(VIEWPORTS)) {
-    test(`${role} at ${viewport} width: every screen renders without sideways scrolling`, async ({ page }) => {
+    test(`${role} at ${viewport} width: every screen renders without sideways scrolling or serious accessibility problems (axe)`, async ({ page }) => {
       test.skip(!username, `Set E2E_${role.toUpperCase()}_USERNAME`)
       await page.setViewportSize(size)
+      const problems = []
+      await page.goto('/')
+      await expect(page.getByLabel('Username')).toBeVisible()
+      await scan(page, 'sign-in page', problems)
       await signIn(page, username)
       const id = await projectId(page)
       const overflowing = []
@@ -75,12 +92,22 @@ for (const [role, { username, screens }] of Object.entries(ROLES)) {
         // and leaves its tooltip open across the screenshot.
         await page.mouse.move(0, 0)
         await expect(page.getByRole('tooltip')).toHaveCount(0)
+        await scan(page, screen, problems)
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
         if (overflow > 1) overflowing.push(`${screen} (${overflow}px)`)
         const name = screen.replace(/^\//, '').replace(/[/:]/g, '-').toLowerCase() || 'home'
         await page.screenshot({ path: `${DIR}/${role}-${viewport}-${name}.png`, fullPage: true })
       }
+      if (viewport === 'phone') {
+        // The menu is closed on phones, so open it once and scan it too.
+        await page.goto(`/#${screens[0]}`)
+        await page.getByRole('button', { name: 'Open menu' }).click()
+        await expect(page.getByRole('navigation', { name: 'Main menu' })).toBeVisible()
+        await scan(page, 'phone menu', problems)
+        await page.keyboard.press('Escape')
+      }
       expect(overflowing, 'pages that scroll sideways').toEqual([])
+      expect(problems, 'accessibility problems (axe, serious or critical)').toEqual([])
     })
   }
 }
