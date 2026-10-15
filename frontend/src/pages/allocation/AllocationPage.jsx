@@ -130,6 +130,12 @@ export default function AllocationPage() {
             capacity, for example 32 / 40 h. Red with a warning icon means they are over capacity. Use it to spot
             overbooking before it happens. Press a person&apos;s name for what you can change for them.
           </Typography>
+          {/* The rule behind it is mayActOn (services/personAccess.js); the server checks it again. */}
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Only some names open a menu. A name opens one when you can act on that person: a manager on the people who
+            report to them, an admin on everyone. Other names are plain words, because only their line manager or an
+            admin can change their capacity or read their history.
+          </Typography>
           <Box role="group" aria-label="Legend" sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mt: 1.5 }}>
             <Typography variant="caption" color="text.secondary">Legend</Typography>
             <Chip size="small" variant="outlined" color="error" icon={<WarningAmberOutlined />} label="Booked past capacity" />
