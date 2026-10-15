@@ -14,7 +14,7 @@
 # Files:    name any part of a file name below; a word that matches several runs them all
 #           ("time" runs timeline and timelog). Several names are fine: ./tools/e2e.sh demo tour
 #   demo       the seven questions, then the phone menu            read-only
-#   tour       every screen, desktop and phone, axe accessibility   read-only
+#   tour       every screen, desktop and phone, light and dark, axe  read-only
 #   history    a manager reads a person's history                   read-only
 #   schedule   the Schedule bars                                    read-only
 #   timeline budget workload   the three charts                     read-only
@@ -28,10 +28,12 @@
 #           tools/test-all.sh does. The admin password comes only from E2E_ADMIN_PASSWORD;
 #           without it project-lifecycle skips. The files that write add rows to the local database.
 # AWS:      runs only the read-only files. A file that writes is refused. With no name it runs
-#           the four seen passing on AWS on 14 Oct night: demo, history, schedule, tour (13 tests).
-#           timeline, budget and workload only read too, so you may name them, but on the live
-#           data budget passed 3 of 3 and timeline and workload each had one test that failed
-#           (the live data is not the seed's), so they are not in that default set.
+#           the four seen passing on AWS on 14 Oct night: demo, history, schedule, tour (17 tests
+#           since the tour gained its dark-mode pass on 15 Oct). timeline, budget and workload only
+#           read too, so you may name them. On 14 Oct night budget passed 3 of 3 on the live site and
+#           timeline and workload each had one test that failed there. Both causes were fixed in the
+#           specs on 15 Oct (a MUI icon test id that only development builds have; several people
+#           "Not booked"), but not yet re-run on AWS, so they stay out of that default set.
 #           The site is warmed first (the database sleeps when idle).
 # Screens:  the tour saves its screenshots in E2E_TOUR_DIR (default $HOME/tour-shots).
 # Exit:     0 all passed, 1 a test failed or Playwright could not run, 2 bad request.
@@ -50,7 +52,7 @@ AWS_ZEUS="SP918535"      # Sam Patel
 # Which files only read. Anything not named here counts as one that writes.
 READ_ONLY="demo history schedule tour timeline budget workload"
 # What --aws runs when no file is named: the files seen passing on the live site (14 Oct night).
-# timeline and workload each have one test that fails on the live data, so they run there only when named.
+# timeline and workload each had one test fail on the live site (fixed 15 Oct, not yet re-run there), so they run there only when named.
 AWS_DEFAULT="demo history schedule tour"
 
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed -e '/^$/d' -e 's/^# \{0,1\}//'; }
@@ -141,7 +143,7 @@ if [ "$AWS" -eq 1 ]; then
   fi
   for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
     case "$name" in
-      timeline|workload) echo "Note: $name.spec.js has one test that failed on the live data on 14 Oct night (the live data is not the seed's). The other tests in it passed." ;;
+      timeline|workload) echo "Note: $name.spec.js had one test fail on the live site on 14 Oct night; the spec was fixed on 15 Oct but not yet re-run there." ;;
     esac
   done
 fi
