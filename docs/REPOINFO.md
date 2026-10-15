@@ -14,7 +14,7 @@ work, requests for everyone (migration 003), the overtime warning (migration 004
 points at a file and line you can open.
 
 **Contents:** [1 Pitch](#1-the-pitch) · [2 Seven questions](#2-the-seven-questions) ·
-[3 Architecture](#3-architecture) · [4 Data and tables](#4-where-the-data-lives-and-the-10-tables) ·
+[3 Architecture](#3-architecture) · [4 Data and tables](#4-where-the-data-lives-and-the-11-tables) ·
 [5 Database](#5-database-design) · [6 Security](#6-security) · [7 Testing](#7-testing) ·
 [8 Performance](#8-performance) ·
 [9 Stories](#9-three-things-that-went-wrong) · [10 Question bank](#10-the-question-bank) (14 Oct meeting questions and the security table are at its top) ·
@@ -128,11 +128,11 @@ browser -> CloudFront (/api/tracker*) -> Lambda Function URL
 
 ---
 
-## 4. Where the data lives, and the 10 tables
+## 4. Where the data lives, and the 11 tables
 
 **Say this out loud:**
 
-> "All the data lives in PostgreSQL, and nowhere else. Ten tables for the app, plus one
+> "All the data lives in PostgreSQL, and nowhere else. Eleven tables for the app, plus one
 > the migration runner keeps for itself."
 
 **Three copies of the database:**
@@ -177,7 +177,7 @@ All of it is built by Terraform (infra/).
 Dependencies only point downward: `api` to `services` to `store` to Postgres, and every
 layer uses `domain`.
 
-**The ten tables**, all in `store/migrations/001_init.sql`, plus one later column, `users.task_limit`, in `002_task_limit.sql`:
+**The eleven tables**: ten in `store/migrations/001_init.sql` and `refresh_tokens` in `005_sessions.sql`, plus one later column, `users.task_limit`, in `002_task_limit.sql`:
 
 | Table | One row is | On screen |
 | --- | --- | --- |
@@ -191,8 +191,9 @@ layer uses `domain`.
 | `project_requests` | A request of one `kind`: a manager asks the admins for a new project (`created_project_id` once approved) or to archive one (`project_id`); an employee asks their line manager for a higher task limit (`task_limit`) or overtime; either asks anything else. The decision, by whom, and its note | Requests |
 | `audit_log` | One row per change: who, their role, the action, which record, before and after (JSONB), a one-line summary | Audit log |
 | `notifications` | One per person told, per audit row; read or unread | The bell |
+| `refresh_tokens` | One per sign-in session: only a SHA-256 of the refresh token (never the token), the user, expiry, and whether it was revoked or replaced. Created by migration `005_sessions.sql` | Stays signed in (no screen) |
 
-The database holds 11 tables: `store/migrate.py` creates `schema_migrations`, which
+The database holds 12 tables: the 11 above, and `schema_migrations`, which `store/migrate.py` creates and which
 records which SQL files have run.
 
 **How they link:**

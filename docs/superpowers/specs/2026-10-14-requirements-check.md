@@ -91,7 +91,7 @@ failing test.
 
 | Expectation | Status | Evidence | Smallest fix |
 | --- | --- | --- | --- |
-| Store and manage data | MET | 10 tables, `store/migrations/001_init.sql`, `002_task_limit.sql` | |
+| Store and manage data | MET | 11 tables plus `schema_migrations`, `store/migrations/001_init.sql`, `005_sessions.sql` | |
 | Authenticate and authorise | MET | See section 6 below | |
 | API endpoints | MET | 66 routes, `api/routes.py:46-122` | |
 | Business logic | MET | `services/`; rules listed in `MVP.md:86-105` | |

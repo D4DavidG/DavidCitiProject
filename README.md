@@ -89,8 +89,8 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
 
 `users`, `projects`, `assignments` (bookings, "Resources" on screen), `milestones`
 (deliverables), `milestone_dependencies`, `tasks`, `time_entries`, `project_requests`,
-`audit_log`, `notifications`: ten tables for the app, plus `schema_migrations`, which the
-migration runner keeps for itself. `002_task_limit.sql` adds one column, `users.task_limit`
+`audit_log`, `notifications`, and (from `005_sessions.sql`) `refresh_tokens`: eleven tables
+for the app, plus `schema_migrations`, which the migration runner keeps for itself (12 in all). `002_task_limit.sql` adds one column, `users.task_limit`
 (1 to 10, default 2), because the first file never changes once it has run on Aurora.
 `003_request_kinds.sql` gives `project_requests` a `kind` (new project, archive a project,
 task limit, overtime, other), with a check per kind; old rows default to new project.

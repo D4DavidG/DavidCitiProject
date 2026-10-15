@@ -39,7 +39,7 @@ What's done and what isn't, honestly:
 
 | Part | State |
 | --- | --- |
-| Database (10 tables, rules enforced by Postgres) | Done, tested, deployed to Aurora |
+| Database (11 tables plus schema_migrations, rules enforced by Postgres) | Done, tested, deployed to Aurora |
 | Backend API (66 routes, roles, audit log, notifications) | Done and tested. 62 of the routes are on Lambda; the 4 pull-board routes and migration `002_task_limit.sql` arrive with the next `./bin/deploy-backend.sh` |
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
 | Tests | Backend: 559 passing, 97% coverage, 100% for the API layer. Frontend: 325 passing, 94.7% of statements and 95.86% of lines covered, plus 24 browser (Playwright) tests in 9 files (14 Oct) |
