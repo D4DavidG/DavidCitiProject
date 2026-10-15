@@ -312,6 +312,10 @@ is: [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Known gaps
 
+- **Every live login is public** (David's choice, so reviewers can try every role), and signing
+  in has no rate limit or lockout, so anyone can change the live demo data. How to close it, and
+  the other security gaps said plainly (tokens in `sessionStorage`, no firewall or browser
+  security headers, and more): [docs/ARCHITECTURE.md, section 8](docs/ARCHITECTURE.md#8-known-gaps).
 - **No email or text messages.** The workshop's AWS role can't send them (no `ses:`
   permission, and the Lambda's private network has no way out), so a new or reset password is
   shown once to the admin and changed at first sign-in.
