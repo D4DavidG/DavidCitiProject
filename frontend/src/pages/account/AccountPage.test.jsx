@@ -60,7 +60,8 @@ describe('AccountPage', () => {
     const { calls } = renderAccount({
       'GET /users/3/history': [200, page([{ auditId: 8, actorUserId: 1, actorRole: 'ADMIN', action: 'RESET_PASSWORD', entityType: 'users', entityId: 3, summary: 'System Administrator reset the password of Ana Ruiz', createdAt: '2026-10-14T01:03:25+00:00', actorName: 'System Administrator' }])],
     })
-    expect(screen.getByRole('heading', { name: 'My history' })).toBeInTheDocument()
+    // A section title like every other page's: the h3 style (capitals, tracking) on an h2 under the page's h1.
+    expect(screen.getByRole('heading', { name: 'My history', level: 2 })).toHaveClass('MuiTypography-h3')
     expect(await screen.findByText('System Administrator reset the password of Ana Ruiz')).toBeInTheDocument()
     expect(calls.some((c) => c.path === '/users/3/history')).toBe(true)
   })

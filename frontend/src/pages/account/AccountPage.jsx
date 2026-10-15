@@ -63,7 +63,7 @@ export default function AccountPage() {
 
       <Card sx={{ mt: 3 }}>
         <CardContent>
-          <Typography variant="h6" component="h2" sx={{ mb: 2 }}>My history</Typography>
+          <Typography variant="h3" component="h2" sx={{ mb: 2 }}>My history</Typography>
           <HistoryPanel userId={user.userId} />
         </CardContent>
       </Card>

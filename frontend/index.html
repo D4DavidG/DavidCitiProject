@@ -4,10 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Inter, 400 to 800 (spec 5c); the theme falls back to the system font if this can't load. -->
+    <!-- Inter, 400 to 800 (spec 5c), loaded without holding up the first paint: as a print sheet that
+         switches to the screen when it arrives. Until then, or if it never does, the system font is used. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" /></noscript>
     <meta name="description" content="ACME Project Tracker: project status, risk, resource allocation and budget" />
     <title>ACME Project Tracker</title>
   </head>
