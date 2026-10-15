@@ -48,7 +48,7 @@ outdated it.
   Also not deployed: two accessibility fixes found by the axe scan (the menu's links each
   in a list item, `components/AppLayout.jsx`; empty weeks on the allocation grid in
   readable grey, `pages/allocation/AllocationPage.jsx`).
-  Tests: 549 backend, 324 website, and 24 Playwright browser
+  Tests: 559 backend, 325 website, and 24 Playwright browser
   tests in 9 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
   `e2e/history.spec.js` reads a person's history; `e2e/tour.spec.js` screenshots every

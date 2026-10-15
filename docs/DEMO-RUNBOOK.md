@@ -287,12 +287,12 @@ All counts and times measured on the VDI on 14 Oct 2026.
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `549 passed in 21.51s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  32 passed (32)` and `Tests  324 passed (324)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | about 15 s (10.5 to 20 s) | `559 passed in 22.58s` |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about a minute and a half | `Test Files  32 passed (32)` and `Tests  325 passed (325)` |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 324 website tests do **not** touch a database: they fake the
+rolled back afterwards. The 325 website tests do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
