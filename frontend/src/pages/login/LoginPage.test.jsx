@@ -72,6 +72,23 @@ describe('LoginPage', () => {
     await waitFor(() => expect(username).toHaveFocus())
   })
 
+  it.each([
+    ['the server cannot be reached', new ApiError(0, "Couldn't reach the server. Check your connection and try again.")],
+    ['the database is still waking up', new ApiError(503, 'The service is starting up. Try again in a moment.')],
+  ])('when %s, says so above the Sign in button and leaves both boxes unmarked', async (_, failure) => {
+    renderLogin(session(null, { login: vi.fn().mockRejectedValue(failure) }))
+    await signIn()
+    const message = await screen.findByRole('alert')
+    expect(message).toHaveTextContent(failure.message)
+    const button = screen.getByRole('button', { name: 'Sign in' })
+    expect(button).toHaveAttribute('aria-describedby', message.id)
+    expect(message.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy() // just above it
+    for (const box of [screen.getByLabelText(/username/i), screen.getByLabelText(/^password/i)]) {
+      expect(box).not.toHaveAttribute('aria-invalid', 'true') // the details weren't wrong
+    }
+    await waitFor(() => expect(button).toHaveFocus()) // Enter tries again
+  })
+
   it('upper-cases the username, which is always capitals', async () => {
     const auth = session(null, { login: vi.fn().mockResolvedValue(USERS.manager) })
     renderLogin(auth)
