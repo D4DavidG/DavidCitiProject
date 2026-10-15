@@ -28,10 +28,19 @@ const CHLOE = {
   ],
 }
 
-function renderGrid(answer = () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }]) {
-  const calls = stubApi({ 'GET /dashboard/allocation': answer })
+/** Ben's full account record, as GET /users/4 returns it; Maria (the default signed-in manager) is his line manager. */
+const BEN_RECORD = { userId: 4, username: 'BO435681', firstName: 'Ben', lastName: 'Okafor', email: 'ben.okafor@acme.test', role: 'EMPLOYEE', jobTitle: 'Developer', managerId: 2, weeklyCapacityHours: 40, overtimeAllowed: false, taskLimit: 2, isArchived: false }
+
+function renderGrid(answer = () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }], answers = {}) {
+  const calls = stubApi({ 'GET /dashboard/allocation': answer, ...answers })
   renderAt(<AllocationPage />, { path: '/allocation' })
   return calls
+}
+
+/** "How to read this" is folded away by default; open it and return its region. */
+async function openHelp() {
+  await userEvent.click(screen.getByRole('button', { name: 'How to read this' }))
+  return screen.findByRole('region', { name: 'How to read this' })
 }
 
 describe('AllocationPage', () => {
@@ -102,47 +111,85 @@ describe('AllocationPage', () => {
     expect(await screen.findByText(/no one is over capacity in these weeks/i)).toBeInTheDocument()
   })
 
-  it('starts with a "How to read this" panel in plain words', async () => {
+  it('folds "How to read this" away by default, and opens it to plain words', async () => {
     renderGrid()
     await screen.findByRole('row', { name: /Ben Okafor/ })
-    const panel = screen.getByRole('region', { name: 'How to read this' })
+    const summary = screen.getByRole('button', { name: 'How to read this' })
+    expect(summary).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText(/each row is a person and each column is a week/i)).not.toBeInTheDocument()
+    const panel = await openHelp()
+    expect(summary).toHaveAttribute('aria-expanded', 'true')
     expect(within(panel).getByText(/each row is a person and each column is a week/i)).toBeInTheDocument()
     expect(within(panel).getByText(/booked against that person's weekly capacity/i)).toBeInTheDocument()
     expect(within(panel).getByText(/red with a warning icon means they are over capacity/i)).toBeInTheDocument()
     expect(within(panel).getByText(/spot overbooking before it happens/i)).toBeInTheDocument()
   })
 
-  it('titles the panel like every other section title (the h3 look on a level-2 heading)', async () => {
+  it('titles the dropdown as a level-2 heading with the h3 look', async () => {
     renderGrid()
     await screen.findByRole('row', { name: /Ben Okafor/ })
     const title = screen.getByRole('heading', { level: 2, name: 'How to read this' })
-    expect(title).toHaveClass('MuiTypography-h3')
+    expect(within(title).getByText('How to read this')).toHaveClass('MuiTypography-h3')
   })
 
-  it('draws "This week" as a button of the secondary kind', async () => {
+  it('draws "This week" as a filled button', async () => {
     renderGrid()
     await screen.findByRole('row', { name: /Ben Okafor/ })
-    expect(screen.getByRole('button', { name: 'This week' })).toHaveClass('MuiButton-outlined')
+    expect(screen.getByRole('button', { name: 'This week' })).toHaveClass('MuiButton-contained')
   })
 
-  it('shows the panel and its legend while the grid is still loading', async () => {
+  it('shows the "How to read this" dropdown while the grid is still loading', async () => {
     stubApi({ 'GET /dashboard/allocation': [200, { ...page([BEN]), weeks: WEEKS }] })
     const release = holdOpen('/dashboard/allocation')
     renderAt(<AllocationPage />, { path: '/allocation' })
-    expect(screen.getByRole('region', { name: 'How to read this' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Legend' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'How to read this' })).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     release()
     expect(await screen.findByRole('table')).toBeInTheDocument()
   })
 
-  it('has a one-line legend for the two warnings', async () => {
+  it('has a one-line legend for the two warnings inside the dropdown', async () => {
     renderGrid()
     await screen.findByRole('row', { name: /Ben Okafor/ })
-    const legend = screen.getByRole('group', { name: 'Legend' })
+    const panel = await openHelp()
+    const legend = within(panel).getByRole('group', { name: 'Legend' })
     expect(within(legend).getByText('Booked past capacity')).toBeInTheDocument()
     expect(within(legend).getByText('Logged past capacity (overtime)')).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'How to read this' })).toContainElement(legend)
+  })
+
+  it('searches people on the server as you type, from page 1', async () => {
+    const calls = renderGrid(() => [200, { ...page([BEN, CHLOE], { totalPages: 3 }), weeks: WEEKS }])
+    await screen.findByRole('row', { name: /Ben Okafor/ })
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search people' }), 'ben')
+    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'ben', page: '1' }))
+  })
+
+  it('says so when a search finds nobody', async () => {
+    renderGrid(({ query }) => [200, { ...page(query.q ? [] : [BEN]), weeks: WEEKS }])
+    await screen.findByRole('row', { name: /Ben Okafor/ })
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search people' }), 'zzz{Enter}')
+    expect(await screen.findByText('Nobody matches that search.')).toBeInTheDocument()
+  })
+
+  it("opens a person's People actions from their name, and redraws the grid after a change", async () => {
+    const calls = renderGrid(undefined, {
+      'GET /users/4': [200, BEN_RECORD],
+      'PATCH /users/4/capacity': [200, { ...BEN_RECORD, weeklyCapacityHours: 45 }],
+    })
+    const row = await screen.findByRole('row', { name: /Ben Okafor/ })
+    const name = within(row).getByRole('button', { name: 'Actions for Ben Okafor' })
+    expect(name).toHaveTextContent(/^Ben Okafor$/)
+    await userEvent.click(name)
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Capacity, overtime and task limit' }))
+    const hours = await screen.findByLabelText(/weekly capacity/i)
+    await userEvent.clear(hours)
+    await userEvent.type(hours, '45')
+    const gridsBefore = calls.filter((c) => c.path === '/dashboard/allocation').length
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ weeklyCapacityHours: 45 }))
+    await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/allocation').length).toBeGreaterThan(gridsBefore))
   })
 
   it('marks an over-capacity week with an icon as well as red, and an ordinary week with none', async () => {
