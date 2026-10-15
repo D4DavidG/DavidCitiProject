@@ -38,6 +38,23 @@ describe('FormDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith({ hoursPerWeek: 30 })
   })
 
+  it('sends an emptied optional box when editing, so a description or note can be cleared', async () => {
+    const onSubmit = vi.fn().mockResolvedValue({})
+    render(
+      <FormDialog
+        open
+        title="Edit project"
+        fields={[{ name: 'name', label: 'Name', required: true }, { name: 'description', label: 'Description', type: 'textarea' }]}
+        initial={{ name: 'Apollo', description: 'Old words' }}
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    )
+    await userEvent.clear(screen.getByLabelText(/description/i))
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    expect(onSubmit).toHaveBeenCalledWith({ description: '' })
+  })
+
   it('shows a money input that is not an amount as a field error, without submitting', async () => {
     const onSubmit = renderForm({})
     await userEvent.type(screen.getByLabelText(/budget/i), 'lots')

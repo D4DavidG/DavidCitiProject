@@ -187,6 +187,7 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
       if (initial && text === toInput(field, initial[field.name])) return
       if (text === '') {
         if (field.required) flag(field.name, boxId(field), REQUIRED[field.type] ?? 'This field is required.')
+        else if (initial) body[field.name] = fromInput(field, '') // an edit that empties an optional box clears it
         return
       }
       const value = fromInput(field, text)
