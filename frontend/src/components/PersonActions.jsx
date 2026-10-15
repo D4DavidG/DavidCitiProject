@@ -44,6 +44,13 @@ const LABELS = {
   archive: 'Archive',
 }
 
+// Archive is red words. A hover or focus wash under them would drop them below 4.5:1, so the
+// background stays flat: hover shows an underline and keyboard focus shows the site's focus ring.
+const ARCHIVE_ITEM = {
+  color: 'error.main',
+  '&:hover, &.Mui-focusVisible': { backgroundColor: 'transparent', textDecoration: 'underline' },
+}
+
 /** A menu line you can't press (loading, nothing to do), kept fully readable rather than faded. */
 const NOTE = { whiteSpace: 'normal', maxWidth: 300, '&.Mui-disabled': { opacity: 1, color: 'text.secondary' } }
 
@@ -216,7 +223,7 @@ export default function PersonActions({ person = null, userId, name, label = 'Ac
       return <MenuItem disabled sx={NOTE}>No actions here: only their line manager or an admin can change this person.</MenuItem>
     }
     return actions.map((kind) => (
-      <MenuItem key={kind} onClick={() => choose(kind)} sx={kind === 'archive' ? { color: 'error.main' } : undefined}>
+      <MenuItem key={kind} onClick={() => choose(kind)} sx={kind === 'archive' ? ARCHIVE_ITEM : undefined}>
         {LABELS[kind]}
       </MenuItem>
     ))

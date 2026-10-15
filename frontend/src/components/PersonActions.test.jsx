@@ -49,6 +49,16 @@ describe('PersonActions', () => {
     expect(screen.getByRole('menuitem', { name: 'History' })).not.toHaveStyle({ color: theme.palette.error.main })
   })
 
+  // A hover or focus wash under the red words would drop them below 4.5:1 (3.2:1 in dark mode),
+  // so Archive keeps a flat background and shows hover with an underline (the focus ring shows focus).
+  it('keeps the red words readable on hover and focus: no wash, an underline instead', async () => {
+    renderActions({ person: BEN })
+    await menuItems('Ben Okafor')
+    const scope = [...screen.getByRole('menuitem', { name: 'Archive' }).classList].find((name) => name.startsWith('css-'))
+    const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
+    expect(css).toMatch(new RegExp(`\\.${scope}:hover,\\.${scope}\\.Mui-focusVisible\\{[^}]*background-color:transparent;[^}]*text-decoration:underline`))
+  })
+
   it('never offers an admin Reset password or Archive on their own account', async () => {
     renderActions({ person: ADMIN_RECORD })
     expect(await menuItems('System Administrator')).toEqual(['Capacity, overtime and task limit', 'History', 'Edit details'])
