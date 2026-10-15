@@ -135,18 +135,28 @@ describe('PeoplePage', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ weeklyCapacityHours: 32, overtimeAllowed: true }))
   })
 
-  it('sets the task limit, and shows an out-of-range refusal on that box', async () => {
-    const calls = renderPeople(USERS.manager, {
-      'PATCH /users/4/capacity': [400, { error: 'Task limit must be between 1 and 10.', field: 'taskLimit' }],
-    })
+  it('refuses an out-of-range task limit on that box before sending anything', async () => {
+    const calls = renderPeople(USERS.manager, {})
     const table = await screen.findByRole('table', { name: 'People' })
     await userEvent.click(within(table).getByRole('button', { name: /capacity for ben okafor/i }))
     const limit = screen.getByLabelText(/task limit/i)
     await userEvent.clear(limit)
     await userEvent.type(limit, '11')
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
-    await waitFor(() => expect(limit).toHaveAccessibleDescription('Task limit must be between 1 and 10.'))
-    expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ taskLimit: 11 })
+    expect(limit).toHaveAccessibleDescription('Enter a whole number from 1 to 10.')
+    expect(limit).toHaveFocus()
+    expect(calls.some((c) => c.method === 'PATCH')).toBe(false)
+  })
+
+  it('sets the task limit', async () => {
+    const calls = renderPeople(USERS.manager, { 'PATCH /users/4/capacity': [200, BEN] })
+    const table = await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(within(table).getByRole('button', { name: /capacity for ben okafor/i }))
+    const limit = screen.getByLabelText(/task limit/i)
+    await userEvent.clear(limit)
+    await userEvent.type(limit, '5')
+    await userEvent.click(screen.getByRole('button', { name: /save/i }))
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ taskLimit: 5 }))
   })
 
   it('resets a password and shows the new one once', async () => {

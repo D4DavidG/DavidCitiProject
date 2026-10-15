@@ -23,7 +23,7 @@ import { PROJECT_STATUSES } from './constants'
 const MANAGER_FIELDS = [
   { name: 'description', label: 'Description', type: 'textarea' },
   { name: 'startDate', label: 'Start date', type: 'date' },
-  { name: 'predictedEndDate', label: 'End date', type: 'date' },
+  { name: 'predictedEndDate', label: 'End date', type: 'date', notBefore: 'startDate' },
   { name: 'budgetCents', label: 'Budget ($)', type: 'money' },
   { name: 'status', label: 'Status', type: 'select', options: PROJECT_STATUSES },
 ]

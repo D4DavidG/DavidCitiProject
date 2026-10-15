@@ -34,7 +34,7 @@ function NewProjectDialog({ onClose, onCreated }) {
         { name: 'description', label: 'Description', type: 'textarea' },
         { name: 'managerId', label: 'Manager', type: 'select', numeric: true, options, required: true },
         { name: 'startDate', label: 'Start date', type: 'date', required: true },
-        { name: 'predictedEndDate', label: 'End date', type: 'date', required: true },
+        { name: 'predictedEndDate', label: 'End date', type: 'date', required: true, notBefore: 'startDate' },
         { name: 'budgetCents', label: 'Budget ($)', type: 'money', helper: 'In dollars, e.g. 150,000' },
       ]}
       onSubmit={async (body) => onCreated(await request('POST', '/projects', { body }))}

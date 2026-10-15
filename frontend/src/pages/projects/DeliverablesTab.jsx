@@ -16,7 +16,7 @@ const FIELDS = [
   { name: 'name', label: 'Name', required: true },
   { name: 'description', label: 'Description', type: 'textarea' },
   { name: 'startDate', label: 'Start date', type: 'date', required: true },
-  { name: 'dueDate', label: 'Due date', type: 'date', required: true },
+  { name: 'dueDate', label: 'Due date', type: 'date', required: true, notBefore: 'startDate' },
 ]
 
 /**

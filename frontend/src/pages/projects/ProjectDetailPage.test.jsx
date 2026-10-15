@@ -115,6 +115,23 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ userId: 5, hoursPerWeek: 10, startDate: '2026-10-15', endDate: '2026-12-31' }))
   })
 
+  it('checks a booking in the browser: 41 hours and an end before the start send nothing', async () => {
+    const calls = renderDetail(USERS.manager, { 'GET /users': [200, page([{ userId: 5, firstName: 'Chloe', lastName: 'Kim', role: 'EMPLOYEE' }])] })
+    await screen.findByRole('heading', { name: 'Apollo' })
+    await userEvent.click(screen.getByRole('tab', { name: 'Resources' }))
+    await userEvent.click(await screen.findByRole('button', { name: /book someone/i }))
+    await userEvent.click(screen.getByLabelText(/person/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Chloe Kim' }))
+    await userEvent.type(screen.getByLabelText(/hours per week/i), '41')
+    await userEvent.type(screen.getByLabelText(/start date/i), '2026-10-15')
+    await userEvent.type(screen.getByLabelText(/end date/i), '2026-10-01')
+    await userEvent.click(screen.getByRole('button', { name: /^book$/i }))
+    expect(screen.getByLabelText(/hours per week/i)).toHaveAccessibleDescription('Enter a whole number from 1 to 40.')
+    expect(screen.getByLabelText(/end date/i)).toHaveAccessibleDescription("End date can't be before start date.")
+    expect(screen.getByLabelText(/hours per week/i)).toHaveFocus()
+    expect(calls.some((c) => c.method === 'POST')).toBe(false)
+  })
+
   it('shows the budget figures', async () => {
     renderDetail()
     await screen.findByRole('heading', { name: 'Apollo' })

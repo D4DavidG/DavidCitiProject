@@ -22,9 +22,9 @@ import { useIsMobile } from '../../theme/responsive'
 
 const ROLE_OPTIONS = [['EMPLOYEE', 'Employee'], ['MANAGER', 'Manager'], ['ADMIN', 'Admin']]
 const CAPACITY_FIELDS = [
-  { name: 'weeklyCapacityHours', label: 'Weekly capacity (hours)', type: 'number', helper: 'Logging past this asks the person to confirm and tells their manager, unless overtime is allowed.' },
+  { name: 'weeklyCapacityHours', label: 'Weekly capacity (hours)', type: 'number', min: 1, max: 60, helper: 'Logging past this asks the person to confirm and tells their manager, unless overtime is allowed.' },
   { name: 'overtimeAllowed', label: 'Overtime allowed', type: 'boolean' },
-  { name: 'taskLimit', label: 'Task limit', type: 'number', helper: 'The most unfinished tasks they can take from the board themselves, 1 to 10. Managers can still assign past it.' },
+  { name: 'taskLimit', label: 'Task limit', type: 'number', min: 1, max: 10, helper: 'The most unfinished tasks they can take from the board themselves, 1 to 10. Managers can still assign past it.' },
 ]
 
 function accountFields(managers) {

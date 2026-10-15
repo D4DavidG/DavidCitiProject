@@ -51,6 +51,7 @@ describe('FormDialog', () => {
       .mockRejectedValueOnce(new ApiError(400, 'Hours must be between 1 and 40.', 'hoursPerWeek'))
       .mockRejectedValueOnce(new ApiError(409, 'That would overlap an existing booking.'))
     renderForm({ onSubmit })
+    await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
     await userEvent.type(screen.getByLabelText(/hours per week/i), '60')
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
     expect(await screen.findByText('Hours must be between 1 and 40.')).toBeInTheDocument()
@@ -74,6 +75,166 @@ describe('FormDialog', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Ben Okafor' }))
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
     expect(onSubmit).toHaveBeenCalledWith({ assigneeUserId: 4 })
+  })
+
+  describe('checks before sending (spec 5a)', () => {
+    const PAIR = [
+      { name: 'startDate', label: 'Start date', type: 'date', required: true },
+      { name: 'endDate', label: 'End date', type: 'date', required: true, notBefore: 'startDate' },
+    ]
+
+    it('catches a required text field left empty, under the field, and sends nothing', async () => {
+      const onSubmit = renderForm({})
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/^name/i)).toHaveAccessibleDescription('This field is required.')
+      expect(screen.getByLabelText(/^name/i)).toHaveAttribute('aria-invalid', 'true')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('catches a required textarea, select and date the same way', async () => {
+      const onSubmit = vi.fn()
+      render(
+        <FormDialog
+          open
+          title="Ask"
+          fields={[
+            { name: 'why', label: 'Why is it needed?', type: 'textarea', required: true },
+            { name: 'projectId', label: 'Project', type: 'select', numeric: true, options: [[1, 'Apollo']], required: true },
+            { name: 'due', label: 'Due', type: 'date', required: true },
+          ]}
+          onClose={vi.fn()}
+          onSubmit={onSubmit}
+        />,
+      )
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/why is it needed/i)).toHaveAccessibleDescription('This field is required.')
+      expect(screen.getByRole('combobox', { name: /project/i })).toHaveAccessibleDescription('Choose an option.')
+      expect(screen.getByLabelText(/due/i)).toHaveAccessibleDescription('Enter a date.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('does not mind an optional field left empty', async () => {
+      const onSubmit = renderForm({})
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).toHaveBeenCalledWith({ name: 'Apollo' })
+    })
+
+    it('when editing, clearing a required field is caught, but leaving it alone is not', async () => {
+      const onSubmit = renderForm({ initial: { name: 'Apollo', hoursPerWeek: 20 } })
+      await userEvent.clear(screen.getByLabelText(/^name/i))
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/^name/i)).toHaveAccessibleDescription('This field is required.')
+      expect(onSubmit).not.toHaveBeenCalled()
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Gemini')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).toHaveBeenCalledWith({ name: 'Gemini' })
+    })
+
+    it('puts the focus on the first field with a problem, and then on the next one', async () => {
+      renderForm({})
+      await userEvent.type(screen.getByLabelText(/budget/i), 'lots')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/^name/i)).toHaveFocus() // Name comes before Budget in the form
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/budget/i)).toHaveFocus()
+    })
+
+    it("focuses a duration's Minutes box when only the minutes are wrong", async () => {
+      render(<FormDialog open title="Log" fields={[{ name: 'minutes', label: 'Time', type: 'duration', max: 1440, required: true }]} onClose={vi.fn()} onSubmit={vi.fn()} />)
+      await userEvent.type(screen.getByLabelText('Hours'), '1')
+      await userEvent.type(screen.getByLabelText('Minutes'), '75')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText('Minutes')).toHaveFocus()
+    })
+
+    it("focuses the field the server names, once the form is enabled again", async () => {
+      const onSubmit = vi.fn().mockRejectedValue(new ApiError(400, 'Hours must be between 1 and 40.', 'hoursPerWeek'))
+      renderForm({ onSubmit })
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      await userEvent.type(screen.getByLabelText(/hours per week/i), '60')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      await screen.findByText('Hours must be between 1 and 40.')
+      await waitFor(() => expect(screen.getByLabelText(/hours per week/i)).toHaveFocus())
+    })
+
+    it('refuses an end date before the start date, under the end date', async () => {
+      const onSubmit = vi.fn()
+      render(<FormDialog open title="Book" fields={PAIR} onClose={vi.fn()} onSubmit={onSubmit} />)
+      await userEvent.type(screen.getByLabelText(/start date/i), '2026-10-20')
+      await userEvent.type(screen.getByLabelText(/end date/i), '2026-10-10')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/end date/i)).toHaveAccessibleDescription("End date can't be before start date.")
+      expect(screen.getByLabelText(/end date/i)).toHaveFocus()
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('takes an end date the same day as the start date, and one after it', async () => {
+      const onSubmit = vi.fn().mockResolvedValue({})
+      render(<FormDialog open title="Book" fields={PAIR} onClose={vi.fn()} onSubmit={onSubmit} />)
+      await userEvent.type(screen.getByLabelText(/start date/i), '2026-10-20')
+      await userEvent.type(screen.getByLabelText(/end date/i), '2026-10-20')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).toHaveBeenCalledWith({ startDate: '2026-10-20', endDate: '2026-10-20' })
+    })
+
+    it('when editing only the end date, it is still held against the start date already on the record', async () => {
+      const onSubmit = vi.fn()
+      render(<FormDialog open title="Edit" fields={PAIR} initial={{ startDate: '2026-10-20', endDate: '2026-11-01' }} onClose={vi.fn()} onSubmit={onSubmit} />)
+      fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2026-10-01' } })
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/end date/i)).toHaveAccessibleDescription("End date can't be before start date.")
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('when only the start date is edited past the end date on the record, the end date is flagged', async () => {
+      const onSubmit = vi.fn()
+      render(<FormDialog open title="Edit" fields={PAIR} initial={{ startDate: '2026-10-20', endDate: '2026-11-01' }} onClose={vi.fn()} onSubmit={onSubmit} />)
+      fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-12-01' } })
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText(/end date/i)).toHaveAccessibleDescription("End date can't be before start date.")
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('holds a number to its range: below, above and not whole are refused, the ends are taken', async () => {
+      const onSubmit = vi.fn().mockResolvedValue({})
+      render(<FormDialog open title="Book" fields={[{ name: 'hoursPerWeek', label: 'Hours per week', type: 'number', min: 1, max: 40 }]} onClose={vi.fn()} onSubmit={onSubmit} />)
+      const box = screen.getByLabelText(/hours per week/i)
+      const save = () => userEvent.click(screen.getByRole('button', { name: /save/i }))
+      for (const bad of ['0', '41', '2.5']) {
+        fireEvent.change(box, { target: { value: bad } })
+        await save()
+        expect(box).toHaveAccessibleDescription('Enter a whole number from 1 to 40.')
+      }
+      expect(onSubmit).not.toHaveBeenCalled()
+      fireEvent.change(box, { target: { value: '40' } })
+      await save()
+      expect(onSubmit).toHaveBeenCalledWith({ hoursPerWeek: 40 })
+    })
+
+    it('shows an error with no field on one line just above the buttons, never at the top of the form', async () => {
+      const onSubmit = vi.fn().mockRejectedValue(new ApiError(409, 'That would overlap an existing booking.'))
+      renderForm({ onSubmit })
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      const line = await screen.findByRole('alert')
+      expect(line).toHaveTextContent('That would overlap an existing booking.')
+      expect(line.closest('.MuiDialogContent-root')).toBeNull()
+      expect(line.nextElementSibling).toBe(screen.getByRole('button', { name: /cancel/i }).parentElement)
+    })
+
+    it('clears that line when the form is sent again', async () => {
+      const onSubmit = vi.fn()
+        .mockRejectedValueOnce(new ApiError(409, 'That would overlap an existing booking.'))
+        .mockResolvedValueOnce({})
+      renderForm({ onSubmit })
+      await userEvent.type(screen.getByLabelText(/^name/i), 'Apollo')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      await screen.findByRole('alert')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    })
   })
 
   describe('a duration field (Hours and Minutes boxes)', () => {

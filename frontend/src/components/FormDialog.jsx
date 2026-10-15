@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, FormLabel, MenuItem, TextField,
+  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, FormLabel, MenuItem, TextField,
 } from '@mui/material'
 import { centsToDollarsInput, formatHours, parseDollars, splitMinutes } from '../services/format'
 
@@ -26,6 +26,22 @@ const YES_NO = [['true', 'Yes'], ['false', 'No']]
 const minutesKey = (name) => `${name}.minutes`
 
 const WHOLE = /^\d+$/
+
+/** What a required field says when it is empty; the label sits right above it, so the words stay short. */
+const REQUIRED = { select: 'Choose an option.', boolean: 'Choose an option.', date: 'Enter a date.' }
+
+/** The id of the box to focus for a field: a duration's Hours box, or the field itself. */
+const boxId = (field, part = 'hours') => (field.type === 'duration' ? `field-${field.name}-${part}` : `field-${field.name}`)
+
+/** Message for a number outside min..max (either end may be missing) or not whole, else null. */
+function checkNumber(text, { min, max }) {
+  const n = Number(text)
+  if (Number.isInteger(n) && (min === undefined || n >= min) && (max === undefined || n <= max)) return null
+  if (min !== undefined && max !== undefined) return `Enter a whole number from ${min} to ${max}.`
+  if (min !== undefined) return `Enter a whole number, ${min} or more.`
+  if (max !== undefined) return `Enter a whole number, ${max} or less.`
+  return null
+}
 
 /** Logged time is capped at a day by the database (`time_entries_minutes_range`); say so in its own words. */
 const ONE_DAY = 1440
@@ -111,13 +127,15 @@ DurationField.propTypes = {
  * where type is text (default), textarea, number, money (typed in dollars, sent as
  * cents), duration (typed as whole Hours and Minutes, sent as minutes; Hours takes
  * any whole number, Minutes 0 to 59, and the total at most `max` minutes), date, select
- * or boolean (Yes/No). Durations and money are checked before anything is sent; a
- * mistake shows under its box and nothing is sent. With `initial`,
+ * or boolean (Yes/No). A required field left empty, a number outside `min` to `max` (whole
+ * numbers), a date before the one named in `notBefore`, a bad amount and a bad duration are
+ * all caught before anything is sent: the mistake shows under its box, focus moves to the
+ * first box with a problem, and nothing is sent. With `initial`,
  * only the fields that changed are sent, so a manager never sends an admin-only field
  * they didn't touch. Server errors with a `field` show on that field (a duration's
- * under its Hours box); others show above the form. While it saves, every field and
- * button is disabled, Escape can't close it, and a second submit is ignored; all of it
- * comes back on success or error.
+ * under its Hours box); others show as one line just above the buttons. While it saves,
+ * every field and button is disabled, Escape can't close it, and a second submit is
+ * ignored; all of it comes back on success or error.
  */
 export default function FormDialog({ open, title, fields, initial = null, defaults = null, submitLabel = 'Save', onSubmit, onClose }) {
   const [values, setValues] = useState(() => Object.fromEntries(
@@ -126,36 +144,62 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  // Which box to focus; a new object each time, so asking for the same box twice still moves focus.
+  const [focusRequest, setFocusRequest] = useState(null)
   // Set at once, unlike `busy` (state lands on the next render): a second submit in the
   // same moment, e.g. a double Enter, sees it and sends nothing.
   const saving = useRef(false)
+
+  // After the render, so a box the save had locked is enabled again and can take the focus.
+  useEffect(() => {
+    if (focusRequest) document.getElementById(focusRequest.id)?.focus()
+  }, [focusRequest])
 
   async function submit(event) {
     event.preventDefault()
     if (saving.current) return
     const body = {}
     const problems = {}
+    let firstBad = null // the id of the first box with a problem, in form order
+    const flag = (key, id, message) => {
+      problems[key] = message
+      firstBad ??= id
+    }
     fields.forEach((field) => {
       if (field.type === 'duration') {
         const { hours, minutes } = values[field.name]
         if (!field.required && hours.trim() === '' && minutes.trim() === '') return
         const checked = checkDuration(hours, minutes, field)
         if (checked.errors) {
-          if (checked.errors.hours) problems[field.name] = checked.errors.hours
-          if (checked.errors.minutes) problems[minutesKey(field.name)] = checked.errors.minutes
+          if (checked.errors.hours) flag(field.name, boxId(field), checked.errors.hours)
+          if (checked.errors.minutes) flag(minutesKey(field.name), boxId(field, 'minutes'), checked.errors.minutes)
         } else if (!initial || checked.minutes !== initial[field.name]) body[field.name] = checked.minutes
         return
       }
       const text = values[field.name].trim()
+      // An end date is held against its start date even when only the start was edited.
+      const start = field.notBefore && fields.find((f) => f.name === field.notBefore)
+      if (start && text !== '' && text < values[start.name].trim()) {
+        flag(field.name, boxId(field), `${field.label} can't be before ${start.label.toLowerCase()}.`)
+        return
+      }
+      // Unchanged on an edit: not sent, and not checked (the record already holds it).
       if (initial && text === toInput(field, initial[field.name])) return
-      if (!initial && text === '') return
+      if (text === '') {
+        if (field.required) flag(field.name, boxId(field), REQUIRED[field.type] ?? 'This field is required.')
+        return
+      }
       const value = fromInput(field, text)
-      if (field.type === 'money' && value === null) problems[field.name] = 'Enter an amount in dollars, e.g. 12,500.'
+      if (field.type === 'money' && value === null) flag(field.name, boxId(field), 'Enter an amount in dollars, e.g. 12,500.')
+      else if (field.type === 'number' && checkNumber(text, field)) flag(field.name, boxId(field), checkNumber(text, field))
       else body[field.name] = value
     })
     setFieldErrors(problems)
     setError(null)
-    if (Object.keys(problems).length) return
+    if (firstBad) {
+      setFocusRequest({ id: firstBad })
+      return
+    }
     if (initial && Object.keys(body).length === 0) {
       onClose()
       return
@@ -166,8 +210,11 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
       await onSubmit(body)
       onClose()
     } catch (failure) {
-      if (failure.field && fields.some((f) => f.name === failure.field)) setFieldErrors({ [failure.field]: failure.message })
-      else setError(failure.message)
+      const named = failure.field && fields.find((f) => f.name === failure.field)
+      if (named) {
+        setFieldErrors({ [named.name]: failure.message })
+        setFocusRequest({ id: boxId(named) })
+      } else setError(failure.message)
     } finally {
       saving.current = false
       setBusy(false)
@@ -179,7 +226,6 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
       <form onSubmit={submit} noValidate>
         <DialogTitle>{title}</DialogTitle>
         <DialogContent sx={{ display: 'grid', gap: 2, pt: '8px !important' }}>
-          {error && <Alert severity="error">{error}</Alert>}
           {fields.map((field) => (field.type === 'duration' ? (
             <DurationField
               key={field.name}
@@ -214,8 +260,10 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
             </TextField>
           )))}
         </DialogContent>
+        {/* An error that belongs to no field: one line next to the buttons just pressed. */}
+        {error && <FormHelperText error role="alert" sx={{ mx: 3, mb: 1, fontSize: '0.875rem' }}>{error}</FormHelperText>}
         <DialogActions>
-          <Button onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="outlined" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button type="submit" variant="contained" disabled={busy}>{busy ? 'Saving…' : submitLabel}</Button>
         </DialogActions>
       </form>
@@ -236,8 +284,12 @@ FormDialog.propTypes = {
     numeric: PropTypes.bool,
     required: PropTypes.bool,
     helper: PropTypes.node,
-    /** A duration's largest total in minutes, the server's own limit (1440 for logged time). It holds the total only, never the Hours box. */
+    /** A duration's largest total in minutes, the server's own limit (1440 for logged time; it holds the total only, never the Hours box). For a number, its largest value. */
     max: PropTypes.number,
+    /** A number's smallest value. */
+    min: PropTypes.number,
+    /** A date field that may not be earlier than the date field with this name (an end date names its start). */
+    notBefore: PropTypes.string,
   })).isRequired,
   /** Current values when editing (API field names); omit when creating. */
   initial: PropTypes.object,

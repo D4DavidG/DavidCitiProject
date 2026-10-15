@@ -18,16 +18,16 @@ const FIELDS_BY_KIND = {
     { name: 'description', label: 'Description', type: 'textarea' },
     NOTE,
     { name: 'proposedStart', label: 'Proposed start', type: 'date' },
-    { name: 'proposedEnd', label: 'Proposed end', type: 'date' },
+    { name: 'proposedEnd', label: 'Proposed end', type: 'date', notBefore: 'proposedStart' },
   ],
   ARCHIVE_PROJECT: [{ name: 'projectId', label: 'Project', type: 'select', numeric: true, required: true }, NOTE],
-  TASK_LIMIT: [{ name: 'taskLimit', label: 'New limit (1 to 10)', type: 'number', required: true }, NOTE],
+  TASK_LIMIT: [{ name: 'taskLimit', label: 'New limit (1 to 10)', type: 'number', min: 1, max: 10, required: true }, NOTE],
   OVERTIME: [NOTE],
   OTHER: [{ name: 'name', label: 'Subject', required: true }, NOTE],
 }
 const APPROVE_PROJECT_FIELDS = [
   { name: 'startDate', label: 'Start date', type: 'date', required: true },
-  { name: 'predictedEndDate', label: 'End date', type: 'date', required: true },
+  { name: 'predictedEndDate', label: 'End date', type: 'date', required: true, notBefore: 'startDate' },
   { name: 'budgetCents', label: 'Budget ($)', type: 'money' },
   { name: 'decisionNote', label: 'Note to the manager', type: 'textarea' },
 ]
