@@ -14,6 +14,9 @@ A caller may name one more recipient (`also_notify`), used to tell an asker
 their request was decided. Archived users receive nothing. A lone admin's change notifies nobody but is
 still recorded. The notification text is the one-line summary, never the
 before/after state, so nobody sees a salary through a notification.
+
+person_history() reads one person's trail back: admins, the person's line
+manager and the person themself may read it; only admins get the state.
 """
 
 import psycopg
@@ -21,7 +24,7 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from domain import values
-from domain.errors import Forbidden
+from domain.errors import Forbidden, NotFound
 from services.actors import Actor
 from services.paging import paginate
 
@@ -84,12 +87,38 @@ def list_audit(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     if (entity_id := values.integer(filters, "entity_id", required=False)) is not None:
         where.append("entity_id = %(entity_id)s")
         params["entity_id"] = entity_id
+    _date_filters(filters, where, params)
+    # The WHERE fragments are fixed strings from this function; every value is a parameter.
+    query = sql.SQL("SELECT * FROM audit_log WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
+    return paginate(conn, query, params, sql.SQL("audit_id DESC"), page, page_size)
+
+
+def person_history(conn: psycopg.Connection, actor: Actor, user_id: int, filters: dict,
+                   page: int, page_size: int) -> dict:
+    """One person's trail: changes they made and changes to their account, newest first."""
+    row = conn.execute("SELECT manager_id FROM users WHERE user_id = %s", (user_id,)).fetchone()
+    allowed = row is not None and (actor.is_admin or actor.user_id == user_id
+                                   or (actor.is_manager and row["manager_id"] == actor.user_id))
+    if not allowed:
+        raise NotFound("User not found.")  # the same answer as a missing id (404, never 403)
+    where = ["(a.actor_user_id = %(uid)s OR (a.entity_type = 'users' AND a.entity_id = %(uid)s))"]
+    params = {"uid": user_id}
+    if action := values.text(filters, "action", required=False, max_length=64):
+        where.append("a.action = %(action)s")
+        params["action"] = action.upper()
+    _date_filters(filters, where, params)
+    query = sql.SQL(
+        "SELECT a.*, (SELECT u.first_name || ' ' || u.last_name FROM users u"
+        " WHERE u.user_id = a.actor_user_id) AS actor_name FROM audit_log a WHERE {}"
+    ).format(sql.SQL(" AND ").join(map(sql.SQL, where)))
+    return paginate(conn, query, params, sql.SQL("audit_id DESC"), page, page_size)
+
+
+def _date_filters(filters: dict, where: list, params: dict) -> None:
+    """Add the dateFrom / dateTo filters (both days included) to a WHERE list."""
     if date_from := values.date(filters, "date_from", required=False):
         where.append("created_at >= %(date_from)s")
         params["date_from"] = date_from
     if date_to := values.date(filters, "date_to", required=False):
         where.append("created_at < %(date_to)s::date + 1")
         params["date_to"] = date_to
-    # The WHERE fragments are fixed strings from this function; every value is a parameter.
-    query = sql.SQL("SELECT * FROM audit_log WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
-    return paginate(conn, query, params, sql.SQL("audit_id DESC"), page, page_size)
