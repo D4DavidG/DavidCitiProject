@@ -40,6 +40,20 @@ def test_text_must_be_a_string():
         values.text({"name": 5}, "name")
 
 
+def test_search_box_reads_q_or_the_older_search_as_a_pattern():
+    assert values.search({"q": " Ali "}) == "%Ali%"
+    assert values.search({"search": "Ali"}) == "%Ali%"
+    assert values.search({"q": "new", "search": "old"}) == "%new%"
+    assert values.search({}) is None
+    assert values.search({"q": "   "}) is None  # a blank box is no search, not a search for spaces
+
+
+def test_search_longer_than_100_characters_is_refused_naming_q():
+    with pytest.raises(ValidationError) as refused:
+        values.search({"q": "x" * 101})
+    assert refused.value.field == "q"
+
+
 def test_date_parses_iso_format():
     assert values.date({"start_date": "2026-10-13"}, "start_date") == dt.date(2026, 10, 13)
 
