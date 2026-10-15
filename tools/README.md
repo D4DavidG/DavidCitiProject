@@ -142,7 +142,7 @@ TRACKER_NEW_ADMIN_PASSWORD="Pick-your-own-2026" python3 tools/demo.py seed
 - `seed` stops at once if the project Apollo already exists, so running it twice is harmless.
   The live site is already seeded.
 - `demo` changes no data: its attempts are refused. It is for the local stack: on AWS, Ana Ruiz
-  is archived, so it stops at her sign-in.
+  is archived, so it stops when it tries to sign in as Ana.
 
 ## openapi.py: rebuild the API description
 
