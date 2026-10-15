@@ -534,7 +534,7 @@ None by lines; each is pass or fail over every file in scope. Lint: clean in 5 s
 Bandit: clean in under 1 s, 3,150 lines scanned on 14 Oct night. Neither can find a logic
 error: code can pass both and still be wrong.
 
-### Try the API by hand: Postman or SwaggerHub
+### Import the API into Postman or SwaggerHub
 
 Not a test, but useful in a demo. `docs/openapi.json` is generated from the route table
 (`.venv/bin/python tools/openapi.py` after any route change; `test_openapi.py` fails if you

@@ -513,6 +513,7 @@ Run from `~/DavidCitiProject` on the VDI.
 .venv/bin/pytest -q                                   # backend tests (expect 565 passed)
 (cd frontend && npm test)                             # website tests (expect 404 passed)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)   # real browser, needs ./bin/start-dev.sh running
+./tools/e2e.sh --show demo                            # the easy way: browser tests, one file, visible window; --aws for the live site (docs/TESTING.md section 8)
 .venv/bin/pytest --cov --cov-report=term-missing      # with the coverage table
 .venv/bin/pytest -q -k capacity                       # only tests with "capacity" in the name
 

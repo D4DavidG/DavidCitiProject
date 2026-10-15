@@ -346,6 +346,10 @@ and `test_role_comes_from_the_database_not_the_token` (`tests/backend/test_api.p
 Every spec signs in with `Demo-pass-2026`. Without the right variables, a spec skips itself
 instead of failing.
 
+**The easy way is `./tools/e2e.sh`** (it sets the variables for you, locally or against AWS, and
+explains the result; the commands are under "Show a browser test live" below and in
+`docs/TESTING.md` section 8). The plain Playwright commands further down are what it runs.
+
 30 tests in 12 files. Last full local run (14 Oct, night, `bash tools/test-all.sh` steps 1 to 5, browser tests run by hand against this branch's site): 29 passed,
 1 skipped (`screenshots.spec.js`), axe clean on all 50 tour scans.
 
@@ -354,12 +358,12 @@ instead of failing.
 | `demo.spec.js` (2 tests) | Manager walks the seven questions: Apollo "At risk", Ben "Over-allocated" with "Apollo 25 h, Zeus 20 h", the Build deliverable, Launch "Blocked". Then at 375x812: no sideways scroll, **Open menu** shows Allocation | `E2E_MANAGER_USERNAME`, or `E2E_ADMIN_PASSWORD` to look Maria up |
 | `pull.spec.js` (1 test) | An employee takes a Ready task from the Board and puts it back. **Writes data** (makes and archives its own Ready task, plus audit rows and bell notifications), so **run it locally only, never against AWS**. "Go-live checklist" stays free for the live demo | `E2E_ADMIN_PASSWORD`, or `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME`. Ana must hold at most 1 task |
 | `requests.spec.js` (1 test) | An employee asks her line manager, he rejects it with a note from **To decide**, and she reads the answer at phone width. **Writes data**, so local only | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` |
-| `history.spec.js` (2 tests) | A manager reads a report's **History** without the before/after state; an employee sees **My history** on Account. Read-only. Local only until the next deploy | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` |
-| `tour.spec.js` (5 tests) | Every screen for manager and employee, desktop and phone, fails on sideways scroll or a serious axe accessibility problem, saves a screenshot of each. Plus: refreshing a deep link keeps the page. Read-only, safe on AWS | `E2E_TOUR_DIR`, `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME` |
-| `timeline.spec.js` (4 tests) | Zeus's late Migration says **Late** with the icon; its tooltip opens on hover and on a phone tap with no sideways scroll; stripes only in print and forced colours; Apollo reads Design **Done**, Build **In progress 0%**, Launch **Blocked**. Read-only. Local only until the charts are deployed | `E2E_ZEUS_MANAGER_USERNAME` (Sam, `SP345715` locally), or `E2E_ADMIN_PASSWORD` |
-| `budget.spec.js` (3 tests) | The Budget line sits at 100 of 125 of the bar column, desktop and phone; a row's tooltip opens on hover and on Tab. Read-only. Local only until the charts are deployed | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
-| `workload.spec.js` (5 tests) | Gridlines, hour labels and Ben's bar line up, desktop and phone, no sideways scroll; Tab opens a row's tooltip (whose sentence includes "+5 h over"); the over segment is striped only in print and forced colours; words and marks clear contrast. Read-only. Local only until the charts are deployed | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
-| `schedule.spec.js` (4 tests) | The Schedule screen, desktop and phone: Ben has an Apollo bar and a red-outlined "+5 h over" week, no sideways scroll; tabbing onto a bar opens its tooltip and Enter opens the project. Read-only | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
+| `history.spec.js` (2 tests) | A manager reads a report's **History** without the before/after state; an employee sees **My history** on Account. Read-only, safe on AWS (passed there 14 Oct, night) | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` |
+| `tour.spec.js` (5 tests) | Every screen for manager and employee, desktop and phone, fails on sideways scroll or a serious axe accessibility problem, saves a screenshot of each. Plus: refreshing a deep link keeps the page. Read-only, safe on AWS (passed there 14 Oct, night) | `E2E_TOUR_DIR`, `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME` |
+| `timeline.spec.js` (4 tests) | Zeus's late Migration says **Late** with the icon; its tooltip opens on hover and on a phone tap with no sideways scroll; stripes only in print and forced colours; Apollo reads Design **Done**, Build **In progress 0%**, Launch **Blocked**. Read-only, so safe on AWS (not yet run there) | `E2E_ZEUS_MANAGER_USERNAME` (Sam, `SP345715` locally), or `E2E_ADMIN_PASSWORD` |
+| `budget.spec.js` (3 tests) | The Budget line sits at 100 of 125 of the bar column, desktop and phone; a row's tooltip opens on hover and on Tab. Read-only, so safe on AWS (not yet run there) | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
+| `workload.spec.js` (5 tests) | Gridlines, hour labels and Ben's bar line up, desktop and phone, no sideways scroll; Tab opens a row's tooltip (whose sentence includes "+5 h over"); the over segment is striped only in print and forced colours; words and marks clear contrast. Read-only, so safe on AWS (not yet run there) | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
+| `schedule.spec.js` (4 tests) | The Schedule screen, desktop and phone: Ben has an Apollo bar and a red-outlined "+5 h over" week, no sideways scroll; tabbing onto a bar opens its tooltip and Enter opens the project. Read-only, safe on AWS (passed there 14 Oct, night) | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
 | `timelog.spec.js` (1 test) | Ben logs 15 minutes, Maria approves it on Approvals, Ben sees it Approved, and the project's "Spent (approved time)" goes up. **Writes data** (one approved entry, audit rows, bell notifications), so local only | `E2E_MANAGER_USERNAME` |
 | `project-lifecycle.spec.js` (1 test) | An admin creates, edits, archives, reactivates and re-archives a project (clicks **Create** in the New project dialog). **Writes data** (one archived project per run), so local only | `E2E_ADMIN_PASSWORD` |
 | `screenshots.spec.js` (1) | Not a test: rewrites the README pictures in `docs/screenshots/` | `E2E_SCREENSHOTS=1` and `E2E_ADMIN_PASSWORD`. Don't run it live |
@@ -371,10 +375,11 @@ cd ~/DavidCitiProject/frontend
 E2E_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net E2E_MANAGER_USERNAME=ML662930 npx playwright test demo
 ```
 
+The same with the script, which also warms the site up first: `./tools/e2e.sh --aws demo`.
+
 The full tour against AWS (5 tests, a screenshot and an axe accessibility scan of every
-screen; not run or timed on 14 Oct). Run `./bin/deploy-frontend.sh` first: until then the
-deployed site lacks the two accessibility fixes, and the four screen tests fail on `list`
-and `color-contrast`:
+screen). On 14 Oct, night, after the deploy, `demo`, `history`, `schedule` and `tour` ran
+together against AWS: 13 passed in 1.4 minutes:
 
 ```sh
 cd ~/DavidCitiProject/frontend
@@ -389,11 +394,49 @@ cd ~/DavidCitiProject/frontend
 E2E_MANAGER_USERNAME=ML460428 npx playwright test demo
 ```
 
-**What no browser test covers:** the employee journey, "log time, then the manager approves".
-It is covered by website screen tests with a faked API (`MyTasksPage.test.jsx`,
-`ApprovalsPage.test.jsx`), backend tests (`test_work.py`, "line manager or admin approves")
-and by `demo.py seed` against the real API, but not end to end in a browser. The README
-already says so (`README.md:253-254`).
+**What no browser test covers:** the forced password change at first sign-in. It is covered
+by backend tests and website screen tests, but not walked in a browser. "Log time, then the
+manager approves" is walked (`timelog.spec.js`, local only), and so is an admin's project
+life cycle (`project-lifecycle.spec.js`, local only).
+
+### Show a browser test live
+
+Playwright drives a real Chrome window by itself: it types, clicks and checks what appears.
+Showing it takes one command. `--show` slows every step to half a second so people can follow.
+
+```sh
+cd ~/DavidCitiProject
+./tools/e2e.sh --show demo             # on the local stack (section 7 running)
+./tools/e2e.sh --aws --show demo       # on the live AWS site
+```
+
+The script wakes the live site first, looks up the usernames, and prints what it is about to
+do. Run it from a terminal on the VDI's desktop (the window needs a screen).
+
+**What the audience sees:** a Chrome window opens on its own. It signs in as Maria (the
+manager), then walks the seven questions: the dashboard card for Apollo ("At risk", its
+budget), the allocation grid with Ben "Over-allocated" (Apollo 25 h, Zeus 20 h), Apollo's
+page with its Build deliverable, and the dependency view with Launch "Blocked". Then a
+second window opens at phone width (375 px), signs in again, checks nothing scrolls sideways
+and opens the menu, which shows Allocation. That is two tests. Headless the file takes about 10 seconds; with the slow steps expect
+around a minute (not timed). The terminal ends with "PASSED: 2 tests passed".
+
+**What to say:** "This is a real browser, driven by a script. It signs in as a manager and
+checks the answers to the seven questions are on screen. The same file runs headless in
+`tools/test-all.sh` with 29 others, and `./tools/e2e.sh --list` shows them all."
+
+**Don't:** use `--show` on all 30 tests (it takes too long), or name `pull`, `requests`,
+`timelog` or `project-lifecycle` with `--aws`: they write data, and the script refuses them.
+
+**Plan B if it fails:**
+
+1. The window doesn't open (`--show needs a screen`): run it without `--show`; the test
+   lines still scroll by and the last block says what happened.
+2. It fails on AWS (a timeout or a 503 on the first screen): the database was asleep. Wait 30
+   seconds and run it again. The script already tries the health check four times.
+3. Still failing on AWS: run `./tools/e2e.sh --show demo` on the local stack.
+4. No stack at all: show `./tools/e2e.sh --list` (it needs no server), the Last results block in
+   `docs/TESTING.md` section 6, and the tour screenshots from the last run in `~/tour-shots`.
 
 ---
 
