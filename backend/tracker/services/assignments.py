@@ -48,9 +48,7 @@ def _person_name(conn: psycopg.Connection, user_id: int) -> str:
 def create_booking(conn: psycopg.Connection, actor: Actor, project_id: int, data: dict) -> dict:
     """Book an employee on a project. The project's manager or an admin."""
     values.only_allowed(data, _FIELDS)
-    for required in _FIELDS:
-        if required not in data:
-            raise ValidationError(f"{required.replace('_', ' ').capitalize()} is required.", field=required)
+    values.require(data, _FIELDS)
     clean = _clean(data)
     _check_dates(clean)
     with atomic(conn):

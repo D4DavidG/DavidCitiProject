@@ -255,6 +255,22 @@ def test_validation_error_names_the_field_in_camel_case(conn, org):
     assert (status, payload["field"]) == (400, "budgetCents")
 
 
+@pytest.mark.parametrize("path, body, message, field", [
+    ("/projects", {}, "Name is required.", "name"),
+    ("/projects/{apollo}/milestones", {"startDate": "2026-10-05", "dueDate": "2026-10-20"},
+     "Name is required.", "name"),
+    ("/milestones/{deliverable}/tasks", {"estimateMinutes": 60}, "Title is required.", "title"),
+    ("/projects/{apollo}/assignments", {"userId": "{alice}", "startDate": "2026-10-05", "endDate": "2026-10-30"},
+     "Hours per week is required.", "hoursPerWeek"),
+])
+def test_each_create_names_its_missing_field(conn, org, path, body, message, field):
+    ids = {"apollo": org["apollo"]["project_id"], "alice": org["alice"].user_id,
+           "deliverable": f.deliverable(conn, org["admin"], org["apollo"])["milestone_id"]}
+    body = {k: ids["alice"] if v == "{alice}" else v for k, v in body.items()}
+    status, payload = client_for(conn, org, "admin").call("POST", path.format(**ids), body)
+    assert (status, payload["error"], payload["field"]) == (400, message, field)
+
+
 def test_malformed_json_is_400(conn, org):
     status, payload = client_for(conn, org, "admin").call("POST", "/projects", raw_body="{not json")
     assert status == 400 and "JSON" in payload["error"]

@@ -25,6 +25,16 @@ def _label(key: str) -> str:
     return key.replace("_", " ").capitalize()
 
 
+def require(data: dict, keys) -> None:
+    """Refuse a create body that lacks any of `keys`, naming the first one missing.
+
+    Presence only; each field's own helper checks its value.
+    """
+    for key in keys:
+        if key not in data:
+            raise ValidationError(f"{_label(key)} is required.", field=key)
+
+
 def text(data: dict, key: str, required: bool = True, max_length: int = 200) -> str | None:
     """A trimmed string; blank counts as missing."""
     value = _get(data, key, required)

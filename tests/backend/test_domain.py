@@ -79,6 +79,16 @@ def test_only_allowed_fields_names_the_first_extra_one():
     assert caught.value.field == "username"
 
 
+def test_require_names_the_first_missing_field():
+    with pytest.raises(ValidationError) as caught:
+        values.require({"name": "x"}, ("name", "start_date", "due_date"))
+    assert (str(caught.value), caught.value.field) == ("Start date is required.", "start_date")
+
+
+def test_require_passes_when_every_key_is_there():
+    assert values.require({"a": 1, "b": None}, ("a", "b")) is None  # presence only
+
+
 # --- money ----------------------------------------------------------------
 
 def test_cents_accepts_a_non_negative_integer():

@@ -68,9 +68,7 @@ def _signed_off(conn: psycopg.Connection, milestone_id: int) -> bool:
 
 def create_task(conn: psycopg.Connection, actor: Actor, milestone_id: int, data: dict) -> dict:
     values.only_allowed(data, _FIELDS)
-    for required in ("title", "estimate_minutes"):
-        if required not in data:
-            raise ValidationError(f"{required.replace('_', ' ').capitalize()} is required.", field=required)
+    values.require(data, ("title", "estimate_minutes"))
     clean = _clean(data)
     with atomic(conn):
         ms, project = milestones._load(conn, actor, milestone_id, manage=True)

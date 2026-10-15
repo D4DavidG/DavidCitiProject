@@ -68,9 +68,7 @@ def create_project(conn: psycopg.Connection, actor: Actor, data: dict) -> dict:
     if not actor.is_admin:
         raise Forbidden("Only admins create projects. Managers can file a project request.")
     values.only_allowed(data, _ADMIN_FIELDS)
-    for required in ("name", "manager_id", "start_date", "predicted_end_date"):
-        if required not in data:
-            raise ValidationError(f"{required.replace('_', ' ').capitalize()} is required.", field=required)
+    values.require(data, ("name", "manager_id", "start_date", "predicted_end_date"))
     clean = _clean(data)
     with atomic(conn):
         _check(conn, clean)

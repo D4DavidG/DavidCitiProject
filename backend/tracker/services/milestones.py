@@ -116,9 +116,7 @@ def _load(conn: psycopg.Connection, actor: Actor, milestone_id: int, manage: boo
 
 def create_milestone(conn: psycopg.Connection, actor: Actor, project_id: int, data: dict) -> dict:
     values.only_allowed(data, _FIELDS)
-    for required in ("name", "start_date", "due_date"):
-        if required not in data:
-            raise ValidationError(f"{required.replace('_', ' ').capitalize()} is required.", field=required)
+    values.require(data, ("name", "start_date", "due_date"))
     clean = _clean(data)
     _check_dates(clean)
     with atomic(conn):
