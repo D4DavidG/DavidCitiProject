@@ -83,7 +83,7 @@ export default function NotificationBell() {
   const close = () => setPopup(null)
   return (
     <>
-      <IconButton component={Link} to="/notifications" aria-label={label}>
+      <IconButton component={Link} to="/notifications" aria-label={label} color="inherit">
         <Badge badgeContent={count ?? 0} color="error" max={99}>
           <BellIcon />
         </Badge>

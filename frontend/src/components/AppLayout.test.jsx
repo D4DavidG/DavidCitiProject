@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AppLayout from './AppLayout'
 import { request } from '../services/request'
+import { makeTheme } from '../theme/theme'
 import { USERS, renderAt, session, stubApi } from '../test/utils'
 
 vi.mock('../theme/responsive', () => ({ useIsMobile: vi.fn(() => false) }))
@@ -13,10 +14,14 @@ function navLabels() {
   return within(nav).getAllByRole('link').map((link) => link.textContent)
 }
 
-function renderLayout(user, auth = session(user)) {
+function renderLayout(user, auth = session(user), theme = undefined) {
   stubApi({ 'GET /notifications/unread-count': [200, { count: 0 }] })
-  return renderAt(<AppLayout><p>page body</p></AppLayout>, { path: '/dashboard', auth })
+  return renderAt(<AppLayout><p>page body</p></AppLayout>, { path: '/dashboard', auth, theme })
 }
+
+beforeEach(() => {
+  localStorage.clear()
+})
 
 describe('AppLayout', () => {
   it('gives managers the dashboard and allocation grid, not the audit log', () => {
@@ -41,11 +46,12 @@ describe('AppLayout', () => {
     expect(navLabels()).toContain('Audit log')
   })
 
-  it('gives employees their tasks and projects only', () => {
+  it('gives employees their own Dashboard (their tasks page) and projects only', () => {
     renderLayout(USERS.employee)
     const labels = navLabels()
-    expect(labels).toEqual(expect.arrayContaining(['My tasks', 'Projects', 'Requests']))
-    expect(labels).not.toContain('Dashboard')
+    expect(labels).toEqual(expect.arrayContaining(['Dashboard', 'Projects', 'Requests']))
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/my-tasks')
+    expect(labels).not.toContain('My tasks')
     expect(labels).not.toContain('Allocation')
     expect(labels).not.toContain('Schedule')
     expect(labels).not.toContain('People')
@@ -77,6 +83,24 @@ describe('AppLayout', () => {
     expect(await screen.findByRole('link', { name: /notifications, no unread/i })).toBeInTheDocument()
   })
 
+  it('puts the ACME logo and the dark mode switch in the top bar', () => {
+    renderLayout(USERS.manager)
+    const bar = screen.getByRole('banner')
+    expect(within(bar).getByRole('img', { name: 'ACME' })).toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument()
+  })
+
+  it.each([['light', '#184429', '#FFFFFF'], ['dark', '#D5DBD7', '#184429']])(
+    'paints the top bar dark green in light mode and light grey in dark mode (%s)',
+    (mode, background, words) => {
+      renderLayout(USERS.manager, session(USERS.manager), makeTheme(mode))
+      // MUI paints the bar through two CSS variables (jsdom does not resolve var()).
+      const bar = getComputedStyle(screen.getByRole('banner'))
+      expect(bar.backgroundColor).toBe('var(--AppBar-background)')
+      expect([bar.getPropertyValue('--AppBar-background'), bar.getPropertyValue('--AppBar-color')]).toEqual([background, words])
+    },
+  )
+
   it('renders the page inside the layout', () => {
     renderLayout(USERS.manager)
     expect(screen.getByText('page body')).toBeInTheDocument()
@@ -88,6 +112,49 @@ describe('AppLayout', () => {
     expect(screen.queryByRole('navigation', { name: /main menu/i })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /open menu/i }))
     expect(screen.getByRole('navigation', { name: /main menu/i })).toBeInTheDocument()
+    responsive.useIsMobile.mockReturnValue(false)
+  })
+})
+
+describe('the collapsible menu (desktop)', () => {
+  const paper = () => screen.getByRole('navigation', { name: 'Main menu' }).closest('.MuiDrawer-paper')
+
+  it('shrinks to icons with the button at its foot; each icon keeps its name and a tooltip', async () => {
+    renderLayout(USERS.manager)
+    expect(paper()).toHaveStyle({ width: '240px' })
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse menu' }))
+    expect(paper()).toHaveStyle({ width: '64px' })
+    expect(screen.queryByText('Projects')).toBeNull() // no words, icons only
+    const projects = screen.getByRole('link', { name: 'Projects' })
+    expect(projects.closest('li')).not.toBeNull() // still one list item per link
+    await userEvent.hover(projects)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Projects')
+    await userEvent.click(screen.getByRole('button', { name: 'Expand menu' }))
+    expect(paper()).toHaveStyle({ width: '240px' })
+    expect(within(screen.getByRole('navigation', { name: 'Main menu' })).getByText('Projects')).toBeInTheDocument()
+  })
+
+  it('remembers the choice for next time', async () => {
+    const { unmount } = renderLayout(USERS.manager)
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse menu' }))
+    unmount()
+    renderLayout(USERS.manager)
+    expect(screen.getByRole('button', { name: 'Expand menu' })).toBeInTheDocument()
+    expect(paper()).toHaveStyle({ width: '64px' })
+  })
+
+  it('still collapses when the browser blocks storage', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    renderLayout(USERS.manager)
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse menu' }))
+    expect(paper()).toHaveStyle({ width: '64px' })
+  })
+
+  it('is not offered on phones, which keep the drawer', () => {
+    responsive.useIsMobile.mockReturnValue(true)
+    renderLayout(USERS.manager)
+    expect(screen.queryByRole('button', { name: /collapse menu|expand menu/i })).toBeNull()
     responsive.useIsMobile.mockReturnValue(false)
   })
 })
@@ -104,6 +171,17 @@ describe('AppLayout "Saved" message', () => {
     expect(await screen.findByText('Saved')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Saved')
   })
+
+  it.each([[true, 'phones'], [false, 'desktop']])(
+    'sits at the top centre, so it never covers the bell\'s pop-up at the bottom (%s: %s)',
+    async (mobile) => {
+      responsive.useIsMobile.mockReturnValue(mobile)
+      renderWith({ 'POST /projects': [201, { projectId: 9 }] })
+      await act(() => request('POST', '/projects', { body: { name: 'Apollo' } }))
+      expect((await screen.findByText('Saved')).closest('.MuiSnackbar-root')).toHaveClass('MuiSnackbar-anchorOriginTopCenter')
+      responsive.useIsMobile.mockReturnValue(false)
+    },
+  )
 
   it('says nothing when the change is refused', async () => {
     renderWith({ 'PATCH /projects/1': [409, { error: 'No.' }] })

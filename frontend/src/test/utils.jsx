@@ -29,10 +29,13 @@ export function session(user, overrides = {}) {
 /**
  * Render `ui` at `path`, inside a router whose route pattern is `route`.
  * Extra routes (e.g. a /login placeholder) let redirect tests see where they landed.
+ * `theme` defaults to the light theme; pass makeTheme('dark') to check dark mode.
  */
-export function renderAt(ui, { path = '/', route = '*', auth = session(USERS.manager), extraRoutes = null } = {}) {
+export function renderAt(ui, {
+  path = '/', route = '*', auth = session(USERS.manager), extraRoutes = null, theme: chosen = theme,
+} = {}) {
   return render(
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={chosen}>
       <AuthContext.Provider value={auth}>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
