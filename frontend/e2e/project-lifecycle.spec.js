@@ -44,7 +44,7 @@ test('an admin creates, edits, archives, reactivates and re-archives a project',
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await page.getByLabel('Username').fill(ADMIN)
-  await page.getByLabel('Password').fill(adminPassword)
+  await page.getByLabel('Password', { exact: true }).fill(adminPassword)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
 

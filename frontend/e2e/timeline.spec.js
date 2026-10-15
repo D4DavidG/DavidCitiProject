@@ -36,7 +36,7 @@ test.beforeAll(async ({ request }) => {
 async function openZeus(page) {
   await page.goto('/')
   await page.getByLabel('Username').fill(sam)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/projects')
@@ -114,7 +114,7 @@ test('the late bar and fill are striped only in print and forced colours', async
 test("Apollo's timeline reads Design Done, Build In progress 0%, Launch Blocked, as the runbook says", async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('Username').fill(process.env.E2E_MANAGER_USERNAME ?? 'ML460428') // Maria manages Apollo
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/projects')

@@ -24,7 +24,7 @@ const NEAR = 1.5 // CSS pixels: sub-pixel rounding, never a visible misalignment
 async function openDashboard(page) {
   await page.goto('/')
   await page.getByLabel('Username').fill(USERNAME)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/dashboard')

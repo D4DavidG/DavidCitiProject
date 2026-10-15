@@ -146,4 +146,14 @@ describe('LoginPage', () => {
       await waitFor(() => expect(screen.getByLabelText(/username/i)).toBeEnabled())
     })
   })
+
+  it('shows the typed password when you press the eye, and hides it again', async () => {
+    renderLogin(session(null))
+    const box = screen.getByLabelText(/^password/i)
+    await userEvent.type(box, 'Demo-pass-2026')
+    await userEvent.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(box).toHaveAttribute('type', 'text')
+    await userEvent.click(screen.getByRole('button', { name: 'Hide password' }))
+    expect(box).toHaveAttribute('type', 'password')
+  })
 })

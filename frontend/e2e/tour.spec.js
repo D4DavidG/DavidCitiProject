@@ -57,7 +57,7 @@ test.skip(!DIR, 'Set E2E_TOUR_DIR (and the usernames) to run the screen tour.')
 async function signIn(page, username) {
   await page.goto('/')
   await page.getByLabel('Username').fill(username)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   // Not "a heading": the login page has one too. Signed in means the app bar is there.
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()

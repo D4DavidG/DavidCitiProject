@@ -18,7 +18,7 @@ const DIR = process.env.E2E_TOUR_DIR
 async function openSchedule(page) {
   await page.goto('/')
   await page.getByLabel('Username').fill(USERNAME)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/schedule')

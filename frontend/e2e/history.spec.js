@@ -17,7 +17,7 @@ test.skip(!MANAGER || !EMPLOYEE, 'Set E2E_MANAGER_USERNAME and E2E_EMPLOYEE_USER
 async function signIn(page, username) {
   await page.goto('/')
   await page.getByLabel('Username').fill(username)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible() // the app bar: signed in
 }
