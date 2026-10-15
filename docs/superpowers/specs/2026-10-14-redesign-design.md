@@ -1,4 +1,4 @@
-# Redesign: forest green and orange, search everywhere, a timeline home page
+# Redesign: forest green and gold, search everywhere, a timeline home page
 
 David's notes (14 Oct, night, "Big changes to ACME Project Manager") asked for these, "mostly
 frontend". Built on branch `David3`; the deployed `545f991` stays the demo fallback. Where the
@@ -6,10 +6,14 @@ notes were ambiguous, the ruling is written here so it can be corrected.
 
 ## 1. Look and feel
 
-- **Colours.** Forest green and orange, styled like Float: calm, readable, plenty of space.
+- **Colours.** Forest green with gold-yellow highlights (David, 14 Oct night: gold yellow, not
+  orange), styled like Float: calm, readable, plenty of space.
   - **Light mode:** page background light grey with a faint graph-paper grid; cards white;
-    accent dark forest green; buttons forest green with white text; orange for highlights
-    (the logo's shine, the "today" line, focus accents), never for status.
+    accent dark forest green; buttons forest green with white text; gold yellow for highlights
+    (the logo's shine, the "today" line, focus accents), never for status and never as text
+    on a light background (it can't reach 4.5:1 there). On light backgrounds a highlight line
+    or marker uses a deep gold that reaches 3:1 against its surface, or a bright gold with a
+    dark green edge; in dark mode a bright gold, which reads well on dark green.
   - **Dark mode:** dark green background, the same faint grid; neutral grey accent; buttons
     white with forest green text.
   - **Header bar:** dark green in light mode, light grey in dark mode.
@@ -27,7 +31,7 @@ notes were ambiguous, the ruling is written here so it can be corrected.
   MVP" in `CLAUDE.md`.
 - **Logo.** `components/AcmeLogo.jsx`, inline SVG: the word ACME in dark green (light grey
   or white in dark mode), the **A** a little taller than the other letters, with a small
-  orange shine at its tip ("acme" means the high point). `role="img"`, `<title>ACME</title>`.
+  gold shine at its tip ("acme" means the high point). `role="img"`, `<title>ACME</title>`.
   Also the browser tab icon (`frontend/public/`, `index.html`).
 - **Sign-in page.** Desktop: the logo large on the left with one line under it ("Project
   tracker: status, people, deliverables and budget in one place"), the sign-in card on the
@@ -74,7 +78,7 @@ notes were ambiguous, the ruling is written here so it can be corrected.
     page size (no query per project).
   - **`components/ProjectTimelines.jsx`:** one row per project across weeks (Float-like):
     the project's span as a bar, deliverables as markers on their due dates (status by
-    icon and text, never colour alone), an orange "today" line, this week highlighted, the
+    icon and text, never colour alone), a gold "today" line, this week highlighted, the
     project name a link to it. Paginated with `Pager`; scrolls sideways inside its own box
     on phones (the page never does). Hover and keyboard focus show a tooltip.
   - **Managers and admins:** the Dashboard starts with "My projects this week"
