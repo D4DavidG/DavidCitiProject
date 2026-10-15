@@ -48,6 +48,13 @@ def test_search_box_reads_q_or_the_older_search_as_a_pattern():
     assert values.search({"q": "   "}) is None  # a blank box is no search, not a search for spaces
 
 
+def test_search_escapes_like_wildcards_so_they_match_themselves():
+    # Backslash is Postgres's LIKE escape: "%" typed in a box means a percent sign, not "anything".
+    assert values.search({"q": "%"}) == r"%\%%"
+    assert values.search({"q": "a_b"}) == r"%a\_b%"
+    assert values.search({"q": "c:\\x"}) == r"%c:\\x%"
+
+
 def test_search_longer_than_100_characters_is_refused_naming_q():
     with pytest.raises(ValidationError) as refused:
         values.search({"q": "x" * 101})

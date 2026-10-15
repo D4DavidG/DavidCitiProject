@@ -107,6 +107,20 @@ def test_archiving_a_deliverable_archives_its_tasks(conn, org):
     assert tasks.list_tasks(conn, org["bob"], org["design"]["milestone_id"]) == []
 
 
+def test_archive_and_reactivate_tell_each_assignee_of_the_deliverables_tasks_once(conn, org):
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"])
+    f.task(conn, org["bob"], org["build"], assignee=org["eve"])  # another deliverable's task: Eve isn't told
+
+    def unread():
+        return [notifications.unread_count(conn, org[who]) for who in ("alice", "eve")]
+    start = unread()
+    milestones.archive_milestone(conn, org["bob"], org["design"]["milestone_id"])
+    assert unread() == [start[0] + 1, start[1]]
+    milestones.reactivate_milestone(conn, org["bob"], org["design"]["milestone_id"])
+    assert unread() == [start[0] + 2, start[1]]
+
+
 # --- dependencies ---------------------------------------------------------------
 
 def test_dependency_loop_is_refused(conn, org):

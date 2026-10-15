@@ -257,6 +257,24 @@ def test_audit_log_search_actor_name_entity_type_and_action_ignoring_case(conn, 
     assert found("nothing like this") == set()
 
 
+def test_audit_log_search_finds_the_words_the_page_shows(conn, org):
+    apollo = f.project(conn, org["admin"], org["boss"], name="Apollo")
+    f.deliverable(conn, org["boss"], apollo, name="Design")
+    f.booking(conn, org["boss"], apollo, org["alice"])
+    users.reset_password(conn, org["admin"], org["loner"].user_id, NOW)
+
+    def found(q):
+        rows = audit.list_audit(conn, org["admin"], {"q": q}, page=1, page_size=50)["items"]
+        return {(r["entity_type"], r["action"]) for r in rows}
+    # The summary line names the project.
+    assert found("apollo") == {("projects", "CREATE"), ("milestones", "CREATE"), ("assignments", "CREATE")}
+    # Record types in the page's words (Person, Deliverable, Resource booking), and actions as words.
+    assert found("Resource booking") == {("assignments", "CREATE")}
+    assert {t for t, _ in found("Deliverable")} == {"milestones"}
+    assert {t for t, _ in found("person")} == {"users"} and ("users", "RESET_PASSWORD") in found("person")
+    assert found("reset password") == {("users", "RESET_PASSWORD")}
+
+
 def test_admin_filters_the_audit_log(conn, org):
     users.update_self(conn, org["alice"], {"first_name": "Alicia"})
     page = audit.list_audit(conn, org["admin"], {"actor_id": org["alice"].user_id}, page=1, page_size=10)

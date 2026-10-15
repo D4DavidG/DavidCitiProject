@@ -141,7 +141,7 @@ def archive_project(conn: psycopg.Connection, actor: Actor, project_id: int) -> 
                            " updated_at = now() WHERE project_id = %s RETURNING *",
                            (stamp, actor.user_id, project_id)).fetchone()
         audit.record_change(conn, actor, "ARCHIVE", "projects", project_id, project_view(before), project_view(row),
-                            f"{actor.name} archived project {row['name']}")
+                            f"{actor.name} archived project {row['name']}", also_notify=_booked(conn, project_id, None))
         for table in CHILDREN:
             _set_children(conn, actor, table, project_id, row["name"], archive=True, stamp=stamp)
     return row
@@ -158,10 +158,18 @@ def reactivate_project(conn: psycopg.Connection, actor: Actor, project_id: int) 
         row = conn.execute("UPDATE projects SET is_archived = FALSE, archived_at = NULL, archived_by = NULL,"
                            " updated_at = now() WHERE project_id = %s RETURNING *", (project_id,)).fetchone()
         audit.record_change(conn, actor, "REACTIVATE", "projects", project_id, project_view(before),
-                            project_view(row), f"{actor.name} reactivated project {row['name']}")
+                            project_view(row), f"{actor.name} reactivated project {row['name']}",
+                            also_notify=_booked(conn, project_id, before["archived_at"]))
         for table in CHILDREN:
             _set_children(conn, actor, table, project_id, row["name"], archive=False, stamp=before["archived_at"])
     return row
+
+
+def _booked(conn: psycopg.Connection, project_id: int, archived_at: dt.datetime | None) -> list[int]:
+    """Whose bookings go with the project: live ones (archived_at None) or those archived with it."""
+    return [r["user_id"] for r in conn.execute(
+        "SELECT DISTINCT user_id FROM assignments WHERE project_id = %s AND archived_at IS NOT DISTINCT FROM %s",
+        (project_id, archived_at)).fetchall()]
 
 
 def _set_children(conn: psycopg.Connection, actor: Actor, table: str, project_id: int, name: str,

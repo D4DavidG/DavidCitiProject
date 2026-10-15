@@ -11,9 +11,12 @@ Recipients come from the actor's role stored in the database now, never the toke
 
 Whatever the actor's role, the person the record is about is told too (_subjects):
 the account itself, the person booked, the task's assignee (old and new on a
-reassignment), the person whose time it is. A caller may name one more recipient
-(`also_notify`): the asker, when their request is decided. Never the actor; archived
-users receive nothing; one notification per person per change. A lone admin's change
+reassignment), the person whose time it is. A caller may name more recipients
+(`also_notify`): the asker, when their request is decided; the people booked on a
+project, or given tasks under a deliverable, when it is archived or reactivated (the
+rows archived with it name nobody, so each person is told once, not once per row).
+Never the actor; archived users receive nothing; one notification per person per
+change. A lone admin's change
 notifies nobody but is still recorded. Notification text is the one-line
 summary, never the before/after state, so no salary leaks through it.
 
@@ -33,8 +36,12 @@ from services.paging import paginate
 
 def record_change(conn: psycopg.Connection, actor: Actor | None, action: str, entity_type: str,
                   entity_id: int | None, before: dict | None, after: dict | None, summary: str,
-                  also_notify: int | None = None) -> int:
-    """Write one audit row plus its notifications; return the audit id."""
+                  also_notify: int | list[int] | None = None) -> int:
+    """Write one audit row plus its notifications; return the audit id.
+
+    `also_notify`: one more person (a request's asker) or several (the people under an archived project).
+    """
+    also = [also_notify] if isinstance(also_notify, int) else list(also_notify or [])
     role = None  # system actions (actor None) have no role
     if actor is not None:
         role = conn.execute("SELECT role FROM users WHERE user_id = %s", (actor.user_id,)).fetchone()["role"]
@@ -50,10 +57,10 @@ def record_change(conn: psycopg.Connection, actor: Actor | None, action: str, en
             "INSERT INTO notifications (recipient_user_id, audit_id)"
             " SELECT u.user_id, %(audit)s FROM users u, users me"
             " WHERE me.user_id = %(me)s AND u.user_id <> me.user_id AND NOT u.is_archived"
-            "   AND (u.role = 'ADMIN' OR u.user_id = %(also)s OR u.user_id = ANY(%(subjects)s)"
+            "   AND (u.role = 'ADMIN' OR u.user_id = ANY(%(subjects)s)"
             "        OR (me.role = 'EMPLOYEE' AND u.user_id IN (me.manager_id, %(pm)s)))",
-            {"audit": audit_id, "me": actor.user_id, "also": also_notify,
-             "subjects": _subjects(action, entity_type, entity_id, before, after),
+            {"audit": audit_id, "me": actor.user_id,
+             "subjects": _subjects(action, entity_type, entity_id, before, after) + also,
              "pm": _project_manager(conn, entity_type, entity_id)},
         )
     return audit_id
@@ -93,8 +100,19 @@ def _project_manager(conn: psycopg.Connection, entity_type: str, entity_id: int 
     return row["manager_id"] if row else None
 
 
+# Record types in the words the Audit log page shows (frontend/src/components/auditText.js),
+# so searching for "Person" or "Resource booking" finds those rows.
+ENTITY_LABELS = {"users": "Person", "projects": "Project", "assignments": "Resource booking",
+                 "milestones": "Deliverable", "milestone_dependencies": "Dependency", "tasks": "Task",
+                 "time_entries": "Time entry", "project_requests": "Project request"}
+
+
 def list_audit(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
-    """Admin only: the audit log, newest first, filtered by actor, entity and date, and searched (`q`)."""
+    """Admin only: the audit log, newest first, filtered by actor, entity and date, and searched (`q`).
+
+    `q` matches the summary line, the record type (its table name or the page's label), the
+    action (RESET_PASSWORD or "reset password") and the actor's current name.
+    """
     if not actor.is_admin:
         raise Forbidden("Only admins can read the audit log.")
     where, params = ["TRUE"], {}
@@ -107,10 +125,12 @@ def list_audit(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     if (entity_id := values.integer(filters, "entity_id", required=False)) is not None:
         where.append("entity_id = %(entity_id)s")
         params["entity_id"] = entity_id
-    if pattern := values.search(filters):  # the actor's name, the entity type or the action
-        where.append("(entity_type ILIKE %(q)s OR action ILIKE %(q)s OR actor_user_id IN"
-                     " (SELECT user_id FROM users WHERE first_name || ' ' || last_name ILIKE %(q)s))")
-        params["q"] = pattern
+    if pattern := values.search(filters):  # what the page shows: summary, record type, action, actor
+        where.append("(summary ILIKE %(q)s"
+                     " OR entity_type ILIKE %(q)s OR (%(labels)s ->> entity_type) ILIKE %(q)s"
+                     " OR action ILIKE %(q)s OR replace(action, '_', ' ') ILIKE %(q)s"
+                     " OR actor_user_id IN (SELECT user_id FROM users WHERE first_name || ' ' || last_name ILIKE %(q)s))")
+        params.update(q=pattern, labels=Jsonb(ENTITY_LABELS))
     _date_filters(filters, where, params)
     # The WHERE fragments are fixed strings from this function; every value is a parameter.
     query = sql.SQL("SELECT * FROM audit_log WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))

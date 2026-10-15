@@ -55,11 +55,15 @@ def text(data: dict, key: str, required: bool = True, max_length: int = 200) -> 
 def search(filters: dict) -> str | None:
     """A list's search box: `q` (or `search`, the older name a few lists took), as an ILIKE pattern.
 
-    None when blank. The pattern is always passed as a parameter, never written into the SQL.
+    None when blank. `%`, `_` and `\\` are escaped (backslash is Postgres's LIKE escape), so
+    they match themselves rather than anything. The pattern is always passed as a parameter,
+    never written into the SQL.
     """
     key = "q" if filters.get("q") is not None else "search"
     term = text(filters, key, required=False, max_length=100)
-    return f"%{term}%" if term else None
+    if not term:
+        return None
+    return "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
 def date(data: dict, key: str, required: bool = True) -> dt.date | None:

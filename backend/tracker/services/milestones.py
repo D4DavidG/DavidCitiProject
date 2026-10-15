@@ -166,7 +166,8 @@ def archive_milestone(conn: psycopg.Connection, actor: Actor, milestone_id: int)
                            " updated_at = now() WHERE milestone_id = %s RETURNING *",
                            (stamp, actor.user_id, milestone_id)).fetchone()
         audit.record_change(conn, actor, "ARCHIVE", "milestones", milestone_id, milestone_view(before),
-                            milestone_view(row), f"{actor.name} archived deliverable {row['name']}")
+                            milestone_view(row), f"{actor.name} archived deliverable {row['name']}",
+                            also_notify=_assignees(conn, milestone_id, None))
         for t in conn.execute("UPDATE tasks SET is_archived = TRUE, archived_at = %s, archived_by = %s,"
                               " updated_at = now() WHERE milestone_id = %s AND NOT is_archived RETURNING task_id, title",
                               (stamp, actor.user_id, milestone_id)).fetchall():
@@ -187,7 +188,8 @@ def reactivate_milestone(conn: psycopg.Connection, actor: Actor, milestone_id: i
         row = conn.execute("UPDATE milestones SET is_archived = FALSE, archived_at = NULL, archived_by = NULL,"
                            " updated_at = now() WHERE milestone_id = %s RETURNING *", (milestone_id,)).fetchone()
         audit.record_change(conn, actor, "REACTIVATE", "milestones", milestone_id, milestone_view(before),
-                            milestone_view(row), f"{actor.name} reactivated deliverable {row['name']}")
+                            milestone_view(row), f"{actor.name} reactivated deliverable {row['name']}",
+                            also_notify=_assignees(conn, milestone_id, before["archived_at"]))
         for t in conn.execute("UPDATE tasks SET is_archived = FALSE, archived_at = NULL, archived_by = NULL,"
                               " updated_at = now() WHERE milestone_id = %s AND archived_at = %s RETURNING task_id, title",
                               (milestone_id, before["archived_at"])).fetchall():
@@ -199,6 +201,13 @@ def reactivate_milestone(conn: psycopg.Connection, actor: Actor, milestone_id: i
 
 
 # --- sign-off ---
+
+def _assignees(conn: psycopg.Connection, milestone_id: int, archived_at: dt.datetime | None) -> list[int]:
+    """Whose tasks go with the deliverable: live ones (archived_at None) or those archived with it."""
+    return [r["assignee_user_id"] for r in conn.execute(
+        "SELECT DISTINCT assignee_user_id FROM tasks WHERE milestone_id = %s AND assignee_user_id IS NOT NULL"
+        " AND archived_at IS NOT DISTINCT FROM %s", (milestone_id, archived_at)).fetchall()]
+
 
 def sign_off(conn: psycopg.Connection, actor: Actor, milestone_id: int) -> dict:
     """The project's manager (or an admin) marks a deliverable done, once all its work is done."""
