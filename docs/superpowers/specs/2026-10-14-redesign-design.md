@@ -158,6 +158,85 @@ it, and look somewhere else to archive a project."
   same order of sections on every page. Checked by looking at real screenshots of every
   screen, light and dark, desktop and phone.
 
+## 5c. One design language: David's site and SimpleBank (David, 14 Oct night)
+
+"Make the website consistent: everything should rhyme. Don't make some buttons different
+shades of green, or use buttons sometimes and plain letters or links other times. Use the
+style of d4davidg.github.io and the SimpleBank app." Read from
+`https://d4davidg.github.io/styles.css` (14 Oct) and `private/WORKSHOP_PLAYBOOK.md`
+(SimpleBank's frontend section). Where these values differ from section 1, these win.
+
+**Tokens (light mode), taken from his site:**
+
+| Token | Value | Use | Measured (his comments) |
+| --- | --- | --- | --- |
+| page | `#e4e9e4` | page background | |
+| panel | `#ffffff` | cards, dialogs (solid; his site's glass, made opaque for data) | |
+| text | `#161a16` | body text | |
+| text-2 | `#2c332e` | supporting lines, captions, table meta | |
+| muted | `#4c5450` | the least important text only | |
+| hairline | `rgba(0,0,0,.14)` | borders and dividers | |
+| grid line | `rgba(0,0,0,.075)`, every 46 px, layer opacity .22 | the graph-paper background | |
+| green fill | `#1f7a3a` | the ONE green for every fill: header bar, primary buttons, selected menu item, focus glow | white on it 5.38:1 |
+| green ink | `#14602c` | green used as text: links, outlined buttons' label and border, headings' accent | 6.23:1 on `#e4e9e4` |
+| gold fill | `#8a6100` | highlight fills and lines (today line, the logo's shine edge) | white on it 5.54:1 |
+| gold ink | `#7a5600` | gold used as text, if ever | 5.41:1 on `#e4e9e4` |
+| error | a red like his `#b3261e` fill / `#a3201c` ink | field errors, destructive actions | 6.54:1 / 6.14:1 |
+
+**Dark mode:** his site's dark approach (near-black panels `rgba(10,12,10,.72)` /
+`#0b0e0b` solid, text `#d7d7d7`, text-2 `#c3c8c3`, grid line `rgba(255,255,255,.045)`)
+over a dark green page, as David asked; buttons white with `#14602c` lettering; header
+light grey (`#d7d7d7`) with dark lettering; gold `#ffd54a`. Every pair measured and
+commented, as in light mode.
+
+**Type:** Inter (400 to 800; Google Fonts link in `index.html`, system fallback), body line
+height about 1.6. Page and section titles (h1 to h3) in CAPITALS with positive tracking
+(`letter-spacing: .012em`), weight 600; h1 and h2 carry a faint accent glow
+(`text-shadow: 0 0 10px` of the faint accent). Usernames, ids and dates in tables may use
+the mono stack, "so it reads as data, not prose".
+
+**Corners:** 0 everywhere. No exceptions (his site's one rounded header button is not
+carried over: David asked for sharp angles).
+
+**Panels (cards):** 1 px border in the accent at about 34% strength, a soft resting glow
+(`0 0 12px` faint accent), a brighter glow on hover or focus-within, eased slowly
+(`.9s`) so a grid of cards doesn't flicker. A card inside a card is quiet: border only,
+no glow. Glows off under `prefers-reduced-motion` transitions (keep the static look).
+
+**Buttons: exactly three kinds, used the same way everywhere:**
+
+1. **Primary**, filled: green fill, white label (dark mode: white fill, green label),
+   weight 700 to 800, small glow at rest, bigger glow on hover and focus, pressed
+   `scale(.97)`. One per screen or dialog: the main thing you came to do (Create, Save,
+   Log time, Send request, Approve).
+2. **Secondary**, outlined: 1 to 2 px green-ink border, panel background, green-ink label,
+   glow on hover. Everything else you press: Edit, Take this, History, Request archive,
+   Cancel, Earlier/Later, row actions.
+3. **Danger**, outlined in the error red: only for actions that remove or refuse
+   (Archive, Reject, Revoke). Never filled red.
+
+Plus icon-only buttons (bell, menu, dark mode, collapse menu), each with a tooltip and an
+accessible name. **Links (plain text) only go somewhere** (a project's name, a notification's
+subject) and are green ink, no underline, underlined on hover and focus. **Anything that
+does something is a button,** never a bare word. No other button colours, sizes or shades:
+set them once in the theme (`MuiButton` variants and defaults) and use only those.
+
+**Disabled** (SimpleBank lesson): never a tinted brand colour, which reads as a second
+brand; a neutral grey fill or the same fill with a dimmed label that still clears contrast.
+
+**Focus:** a visible 2 px green-ink outline with a small offset on every control (his
+`:focus-visible` rule), in both modes.
+
+**One page shell** (SimpleBank: "share the form, not the page"): every screen is PageHeader
+(title, one-line subtitle, page actions top right) → the search and filter row → the
+content panels → the pager, in that order, with the same spacing. Lists show as tables on
+desktop and cards on phones, the same component everywhere. Empty, loading and error states
+always come from PageState. Status always from StatusChip (icon plus word plus colour).
+
+**Live search** (SimpleBank lesson): debounce AND ignore stale replies (a slow answer for
+"ben" must not overwrite the newer answer for "benjamin"); check `useApi`/`SearchField` do
+both, and add a test.
+
 ## 5. Not changing
 
 Routes, roles and rules other than the above; the API shapes; the database schema (no
