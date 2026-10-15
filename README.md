@@ -187,7 +187,8 @@ frontend/src/
   auth/                 session (both tokens in sessionStorage, probed with /auth/me on load),
                         RequireRole (signed-out -> login, must change password -> there first)
   components/           layout, DataTable (table on desktop, cards on phones), FormDialog,
-                        BudgetBar, StatusChip, PageState (loading / error with Retry / empty)
+                        BudgetBar, StatusChip, PageState (loading / error with Retry / empty,
+                        and Pager, the page numbers under every list)
   components/charts/    the timeline, budget and workload charts, and their shared figure,
                         row and legend
   theme/chartColours.js the only chart colours, checked with a colour-blindness validator
@@ -200,6 +201,10 @@ frontend/src/
   rule: the Hours and Minutes boxes check whole numbers and the server's own limits (24 h
   of logged time, 1,000 h of estimate) so the dialog can say which box is wrong; the server
   still enforces both.
+- **Each signed-in page is its own file**, downloaded on its first visit (`lazyPage` in
+  `App.jsx`): the first download is 560 kB (177 kB gzip) instead of 739 kB. The sign-in
+  page stays in it. If a page's file can't be downloaded (offline, or a deploy replaced
+  it), the page says so and offers **Reload** instead of going blank.
 - **Hash URLs** (`/#/projects/7`): the server only ever serves `index.html`, so CloudFront
   needs no rewrite rule (the one we removed also swallowed the API's 404s).
 - **Server errors are shown as written**, on the field they concern when there is one

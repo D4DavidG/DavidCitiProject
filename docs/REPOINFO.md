@@ -614,11 +614,21 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
     logged, so a later raise changes nothing. All in whole cents, computed on the server;
     the browser only formats. Pending time is shown separately and doesn't count as spent.
     *Point at: `services/dashboard.py:48-60` (the money query); `domain/money.py:9, 28-40`*
-14. **"Fewer lines of code, faster?"** Honest numbers: about 3,600 lines of backend Python
-    (not counting the vendored database driver) and 88 website source files. The website
-    ships as one JavaScript file of 728 kB (`frontend/dist/assets`, built 14 Oct, after the
-    charts). The server avoids one-query-per-row loops and every list is paginated.
-    **Queued, not built:** splitting the bundle per page and a cleanup pass. *Point at: `frontend/dist/assets/index-*.js`; `services/paging.py`*
+14. **"Fewer lines of code, faster?"** Honest numbers (14 Oct, `git ls-files`, tests left
+    out): 3,982 lines of backend Python in 34 files (not counting the vendored database
+    driver) and 5,030 lines of website code in 54 files. **Built 14 Oct (not on AWS until the
+    next deploy):** each signed-in page is its own file, downloaded on its first visit
+    (`lazyPage` in `App.jsx`). The first download fell from one 739 kB file (227 kB gzip) to
+    560 kB (177 kB gzip); the largest page file is the project page, 22 kB. A failed page
+    download (offline, or a deploy replaced the file) shows a Reload message, not a blank
+    screen. Vite still warns that the first file is over 500 kB: it holds react-dom (209 kB)
+    and the Material UI parts the sign-in page needs, and loading the sign-in page lazily too
+    would cost the first screen a second round trip. The cleanup folded ten copied page-number
+    blocks into one `Pager` and four copied "X is required." loops into `values.require`; the
+    two new safety pieces (Pager's contract, the Reload message) ate the saving, so the line
+    count barely moved. The server avoids one-query-per-row loops and every list is paginated.
+    *Point at: `frontend/src/App.jsx` (the `lazyPage` lines); `frontend/src/components/lazyPage.js`;
+    `backend/tracker/domain/values.py` (`require`); `services/paging.py`*
 15. **"Guardrails: how do you know the requirements are met?"** Three layers: Postgres
     refuses bad rows (47 CHECK rules, 27 foreign keys, one exclusion constraint, 10
     triggers); five integrity queries must return no rows and run after every database test
@@ -849,7 +859,8 @@ added" means David's commits. Line numbers are in the working tree on 14 Oct.
     tour fails on sideways scroll at 375 px. *`frontend/src/theme/responsive.js:4`;
     `frontend/e2e/tour.spec.js`*
 29a. **"Why no chart library?"** The bundle was already 711 kB before the charts (re-measured
-    14 Oct), and our three add about 18 kB (728 kB); a library would add more. No chart needed
+    14 Oct), and our three added about 18 kB (728 kB, before the later features; today's first
+    download is 560 kB, with each page in its own file); a library would add more. No chart needed
     one. Each is boxes sized in percent. The server sends every percentage, so the browser
     never touches cents. The project colours failed a colour-blindness validator on the first
     try, so I changed them. *`frontend/src/components/charts/`;

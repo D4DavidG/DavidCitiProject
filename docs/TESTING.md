@@ -226,6 +226,19 @@ cd ~/DavidCitiProject && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR8
 Not tried here: the extension is not installed, so these editor steps are from its
 documentation, not from a run.
 
+### The production build, locally
+
+The dev server never splits the website into page files; only `npm run build` does. To
+check the real split files before a deploy, serve the build on 4173 and run the read-only
+specs against it (14 Oct: `tour` and `history`, 7 passed, axe included):
+
+```sh
+cd ~/DavidCitiProject/frontend
+npm run build && (npx vite preview --port 4173 --strictPort > /dev/null 2>&1 &)
+E2E_BASE_URL=http://localhost:4173 E2E_API=http://localhost:3001/api/tracker E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test tour history
+pkill -f "vite preview --port 4173"
+```
+
 ## 4. Browser tests against AWS
 
 Point the tests at the deployed site with `E2E_BASE_URL`. The AWS usernames differ from

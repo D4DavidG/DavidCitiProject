@@ -36,6 +36,9 @@ local stack (section 7), but reaches AWS only after `./bin/deploy-backend.sh` an
 - dashboard counters: **Total projects** and **Total at risk** count every page, from the
   server's `atRiskTotal` (no migration). AWS today: **Projects shown** and an **At risk**
   that counts only the cards on the current page.
+- pages load on first visit: each signed-in screen downloads its own file the first time
+  you open it (first download 560 kB instead of 739 kB); a brief spinner under the app bar
+  is normal. AWS today: one file, every screen at once.
 
 Until you deploy, Path A on AWS has no charts in steps 1 and 5, no Board (so no "The
 pull-board moment"), and a slower bell with no pop-up in "The audit-log moment". Demo

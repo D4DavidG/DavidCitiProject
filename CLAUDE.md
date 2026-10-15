@@ -48,6 +48,11 @@ outdated it.
   Also not deployed: two accessibility fixes found by the axe scan (the menu's links each
   in a list item, `components/AppLayout.jsx`; empty weeks on the allocation grid in
   readable grey, `pages/allocation/AllocationPage.jsx`).
+  Also not deployed: **pages load on first visit** (spec
+  `docs/superpowers/specs/2026-10-14-speed-design.md`): each signed-in page is its own
+  file (`lazyPage`, `components/lazyPage.js`), first download 739 kB to 560 kB, with a
+  Reload message if a page's file can't be fetched; one `Pager` (in `PageState.jsx`) and
+  `values.require` replace copied code.
   Tests: 559 backend, 325 website, and 24 Playwright browser
   tests in 9 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
