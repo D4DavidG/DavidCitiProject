@@ -5,6 +5,7 @@ import { defineConfig, devices } from '@playwright/test'
  * stack first (./bin/start-dev.sh) and seed it (tools/demo.py seed), then:
  *   E2E_ADMIN_PASSWORD=... npm run e2e
  * E2E_BASE_URL / E2E_API point it elsewhere (e.g. the CloudFront URL after a deploy).
+ * tools/e2e.sh wraps all of this (usernames, local or AWS, --show, --report).
  */
 export default defineConfig({
   testDir: './e2e',
@@ -17,6 +18,7 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    launchOptions: { slowMo: Number(process.env.E2E_SLOWMO ?? 0) }, // ms between browser steps; tools/e2e.sh --show sets 500
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 })
