@@ -132,10 +132,11 @@ PGPASSWORD=postgres123 psql -h localhost -U postgres -d postgres -c "SELECT user
 - Every seeded person's password is `Demo-pass-2026` (`DEMO_PASSWORD` in
   [`tools/demo.py`](../tools/demo.py)).
 - The local admin is also `AD000001`. Its first password comes from Terraform, and must be
-  changed at the first sign-in:
+  changed at the first sign-in. Print it from the LocalStack state (a bare `terraform output`
+  could read the AWS state instead; [SETUP.md, section 4](SETUP.md#4-sign-in-locally-and-add-demo-data)):
 
   ```sh
-  terraform -chdir=infra output -raw bootstrap_admin_password
+  (export AWS_ENDPOINT_URL=http://localhost.localstack.cloud:4566 AWS_ENDPOINT_URL_S3=http://s3.localhost.localstack.cloud:4566 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_REGION=us-east-1; unset AWS_SESSION_TOKEN; terraform -chdir=infra output -raw bootstrap_admin_password; echo)
   ```
 
 ## 5. Swagger UI, step by step

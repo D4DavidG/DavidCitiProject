@@ -627,7 +627,8 @@ Demo against the running API (local proxy, or the deployed URL via `TRACKER_API`
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py seed   # once: users, projects, tasks, time
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then ten refusals
 K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tests/load/load.js   # k6 load test: reads + a login burst; LocalStack fails past ~15 users (its file limit)
-terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first password (per environment)
+(export AWS_ENDPOINT_URL=http://localhost.localstack.cloud:4566 AWS_ENDPOINT_URL_S3=http://s3.localhost.localstack.cloud:4566 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_REGION=us-east-1; unset AWS_SESSION_TOKEN; terraform -chdir=infra output -raw bootstrap_admin_password; echo)  # local AD000001's first password (docs/SETUP.md section 4)
+(set -a; source ENVIRONMENT.config; terraform -chdir=infra output -raw bootstrap_admin_password; echo)  # a new AWS environment's (section 6; a bare terraform output reads whichever state was last initialised)
 (set -a; source ENVIRONMENT.config; python3 tools/console.py logs)  # AWS console, signed in (lambda|logs|rds|cloudfront|s3)
 ```
 

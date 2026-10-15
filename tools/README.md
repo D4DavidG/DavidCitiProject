@@ -130,13 +130,15 @@ It talks to the API over HTTP only (Python's standard library), at `TRACKER_API`
 `TRACKER_ADMIN_PASSWORD`. Every person it creates gets the password `Demo-pass-2026`; `demo`
 prints their usernames.
 
-The very first time, the local admin still has the generated password, which must be changed.
+The very first time, the local admin still has the generated password, which must be changed
+([SETUP.md, section 4](../docs/SETUP.md#4-sign-in-locally-and-add-demo-data) prints it).
 Give both the generated one and the new one you choose (at least 8 characters); from then on,
 `TRACKER_ADMIN_PASSWORD` is your new one:
 
 ```sh
-TRACKER_ADMIN_PASSWORD="$(terraform -chdir=infra output -raw bootstrap_admin_password)" \
-TRACKER_NEW_ADMIN_PASSWORD="Pick-your-own-2026" python3 tools/demo.py seed
+read -rsp 'Admin password now: ' TRACKER_ADMIN_PASSWORD; echo; export TRACKER_ADMIN_PASSWORD
+read -rsp 'New admin password (first run only, 8+ characters): ' TRACKER_NEW_ADMIN_PASSWORD; echo; export TRACKER_NEW_ADMIN_PASSWORD
+python3 tools/demo.py seed
 ```
 
 - `seed` stops at once if the project Apollo already exists, so running it twice is harmless.
