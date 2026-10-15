@@ -130,7 +130,7 @@ export default function AppLayout({ children }) {
             </Tooltip>
           )}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexGrow: 1, minWidth: 0 }}>
-            <AcmeLogo size={isMobile ? 22 : 26} tone="inherit" />
+            <AcmeLogo size={isMobile ? 26 : 32} tone="inherit" />
             {!isMobile && <Typography component="span" sx={{ fontWeight: 600 }} noWrap>Project Tracker</Typography>}
           </Box>
           <ColorModeToggle color="inherit" />

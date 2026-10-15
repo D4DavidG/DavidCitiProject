@@ -62,10 +62,10 @@ describe('ConfirmDialog', () => {
     expect(confirm.getAttribute('aria-describedby')).toBe(message.id)
   })
 
-  it.each(['Archive project', 'Reject', 'Revoke access'])('draws "%s" as the danger kind: outlined in red, never filled', (label) => {
+  it.each(['Archive project', 'Reject', 'Revoke access'])('draws "%s" as the danger kind: filled red with white words (spec 6.2)', (label) => {
     renderConfirm({ onConfirm: vi.fn(), confirmLabel: label })
     const confirm = screen.getByRole('button', { name: label })
-    expect(confirm).toHaveClass('MuiButton-outlined')
+    expect(confirm).toHaveClass('MuiButton-contained')
     expect(confirm).toHaveClass('MuiButton-colorError')
   })
 

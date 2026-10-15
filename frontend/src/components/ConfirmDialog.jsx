@@ -4,7 +4,7 @@ import {
   Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography,
 } from '@mui/material'
 
-/** Actions that remove or refuse: their confirm button is the danger kind (outlined red), never filled. */
+/** Actions that remove or refuse: their confirm button is the danger kind, filled red (spec 6.2). */
 const DANGER = /^(Archive|Reject|Revoke)\b/
 
 /**
@@ -43,7 +43,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, onCo
       <DialogActions>
         <Button onClick={onClose} disabled={busy}>Cancel</Button>
         <Button
-          variant={danger ? 'outlined' : 'contained'}
+          variant="contained"
           color={danger ? 'error' : 'primary'}
           onClick={confirm}
           disabled={busy}
