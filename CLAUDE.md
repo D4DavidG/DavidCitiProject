@@ -4,105 +4,59 @@ Working notes for Claude Code: ACME Project Tracker, Citi coding workshop, Tue 1
 Thu 15 Oct 2026. A solo build by David. The product spec is `private/PROJECT_PLAN.md`
 (gitignored so later commits leave it out; earlier copies are still in the public
 repo's history), and section numbers below (§) refer to it. If
-that file is missing, ask David for it rather than reconstructing it. `MVP.md` is the
-short, public scope summary. This file holds what the spec does not: the stack, how this
-repo actually runs and deploys, the traps found by reading it, and how to work with
-David.
+that file is missing, ask David for it rather than reconstructing it.
+`docs/REQUIREMENTS.md` (until 15 Oct `MVP.md`) is the short, public scope summary. This
+file holds what the spec does not: the stack, how this repo actually runs and deploys, the
+traps found by reading it, and how to work with David.
+
+**Audience (from 15 Oct, after the demo):** the repo is now for David's employers (Citi),
+who must be able to do everything David does from the repo alone. They start at
+`README.md`; every guide is listed in `docs/README.md`, and each important folder has its
+own README. David chose to publish every AWS login, the admin's too, in `README.md`,
+although the GitHub repo is public. Never write David's own local admin password anywhere.
 
 **Rule:** if something here goes out of date, fix it in the same commit as the code that
 outdated it.
 
-### Where things stand (updated 14 Oct, night)
+### Where things stand (updated 15 Oct, afternoon)
 
-- **Built:** backend, database and every website screen in `MVP.md`, plus everything
-  below. **AWS was last checked at `a52da44`** (14 Oct, about 09:30). Everything
-  committed after it runs on the local stack but is **not on AWS** until David runs
-  `git push origin David`, then `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`
-  (both together; migrations 002 to 005 apply on the Lambda's first cold start). The
-  click-level list is at the top of `docs/DEMO-RUNBOOK.md`.
-  - **14 Oct, daytime (`a52da44` to `5e994e6`):** Hours and Minutes boxes, **Copy
-    username and password**, the login-timing fix (`services/users.py`), the pull board
-    (migration `002_task_limit.sql`), the bell's 10 s check with its pop-up, three charts
-    (plain MUI boxes, no chart library, the server sends every percentage: a deliverables
-    timeline on each project, a budget chart and this week's workload on the dashboard,
-    `components/charts/`), and an employee's project work notifying the project's manager
-    too (`services/audit.py`).
-  - **14 Oct, evening (everything since `5e994e6`, on branch `David`):**
-    - **requests for everyone** (migration `003_request_kinds.sql`; spec
-      `docs/superpowers/specs/2026-10-14-requests-design.md`): employees ask their line
-      manager for a higher task limit, overtime or anything else; managers ask the admins
-      for a new project, to archive one, or anything else; approving applies the change
-      and the asker's bell says so;
-    - **overtime is a warning, not a refusal** (migration `004_over_capacity.sql`; spec
-      `docs/superpowers/specs/2026-10-14-overtime-design.md`): logging past weekly
-      capacity without overtime answers 409 with `code: "OVER_CAPACITY"`, the website
-      asks **Log anyway**, and the resent entry is saved, marked "Over capacity" and the
-      manager is told;
-    - **15-minute access tokens and refresh tokens** (migration `005_sessions.sql`; spec
-      `docs/superpowers/specs/2026-10-14-tokens-design.md`): `POST /auth/refresh` rotates
-      the refresh token (reuse of an old one ends every session of that user),
-      `POST /auth/logout` revokes it, and a password change, reset or archive ends the
-      user's older sessions;
-    - **employee history** (no migration; spec
-      `docs/superpowers/specs/2026-10-14-history-design.md`): `GET /users/{id}/history`;
-      admins, the line manager and the person may read it (others get 404), and only
-      admins see the before/after state, so a salary never reaches a manager. **History**
-      on People, **My history** on Account;
-    - the dashboard's **Total projects** and **Total at risk**, counted by the server
-      across every page (`atRiskTotal` on `GET /dashboard/projects`);
-    - the OpenAPI file `docs/openapi.json` (69 operations, built from the route table);
-    - two accessibility fixes found by the axe scan (the menu's links each in a list
-      item, `components/AppLayout.jsx`; empty weeks on the allocation grid in readable
-      grey, `pages/allocation/AllocationPage.jsx`);
-    - **pages load on first visit** (spec `docs/superpowers/specs/2026-10-14-speed-design.md`):
-      each signed-in page is its own file (`components/lazyPage.js`), first download
-      739 kB to 560 kB, with a Reload message if a page's file can't be fetched; one
-      `Pager` (in `PageState.jsx`) and `values.require` replace copied code.
-  - **14 Oct, night (branch David2, merged in; none of it on AWS yet):**
-    - the **Schedule** screen (managers and admins; people by weeks, a bar per booking in
-      its project's colour, over weeks outlined; `pages/schedule/`);
-    - **forms locked while saving**: every field and button is disabled while a form,
-      confirm dialog, sign-in or change-password request is in flight, so one press sends one
-      request (`components/FormDialog.jsx`);
-    - a **"Saved"** message after every successful change (`components/AppLayout.jsx`);
-    - **refresh no longer signs you out on a network blip**: only an answer from
-      `/auth/refresh` that says the token is dead ends the session (`services/request.js`);
-    - the **k6 load test** `tools/k6/load.js`, replacing `tools/loadtest.py` (deleted);
-    - **template cleanup**: the Vite template's unused files and the workshop's other-track
-      guides and examples (`data/`, the Java and Node examples) removed;
-    - the browser specs `schedule.spec.js`, `timelog.spec.js` (log time, approve, spent
-      goes up) and `project-lifecycle.spec.js` (create, edit, archive, reactivate); the last
-      two write data, so local only;
-    - a **backend comments pass** (shorter docstrings, no code change).
-- **Tests (merged branch, 14 Oct night: `bash tools/test-all.sh` steps 1 to 5 PASS; the browser steps were run by hand against this branch's own site on port 3002, because the script's site on port 3000 served another folder's code):**
-  565 backend (97% of statements, 95% with branches; `api/` 100%), 404 website in 36
-  files (95.5% of statements, 97.04% of lines), lint, bandit and the production build
-  clean, and 30 Playwright browser tests in 12 files (29 passed, 1 skipped: the README
-  screenshots run only on request). `e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js`
-  takes and puts back a task; `e2e/requests.spec.js` asks and answers a request;
-  `e2e/history.spec.js` reads a person's history; `e2e/tour.spec.js` screenshots every
-  screen at desktop and phone width and runs axe on it (50 scans; serious or critical
-  WCAG A/AA problems fail); `timeline`, `budget` and `workload` specs check the charts; `schedule.spec.js` checks the
-  Schedule bars; `timelog.spec.js` and `project-lifecycle.spec.js` walk log-time-then-approve
-  and an admin's project life cycle.
+- **On AWS:** the 15 Oct deploy of `5ee66a5` (branch `David`; `main` at `4bbd9be`). After
+  it, 17 of 17 AWS-safe browser tests passed against https://d1gov8jpsxhwer.cloudfront.net.
+- **Committed but not on AWS** until David runs `./bin/deploy-backend.sh` and
+  `./bin/deploy-frontend.sh` (both together):
+  - the Swagger UI commit `4d8b949` (`docs/swagger.html`, `tools/swagger.sh`; its Lambda URL
+    CORS change in `infra/lambda.tf` needs the backend deploy);
+  - the post-demo changes: top-bar search (pages by role and projects; `/` or `Ctrl+K`); the
+    archive warning (409 `code: "ON_PROJECTS"` unless `confirmOnProjects: true`; new route
+    `GET /users/{id}/projects`); minimum pay of $20 an hour, $41,600 a year (400 on
+    `annualSalaryCents`); the dashboard's two columns, At risk and On track, 3 projects each
+    by latest activity (`atRisk`, `sort=updated` and `lastActivityAt` on
+    `GET /dashboard/projects`); the late tooltip; "Week of" on the timeline; the Allocation
+    note on why only some names open a menu; no grid background; `tools/e2e.sh` `--video`,
+    `--ui` and `--allow-writes`. One table of them: `docs/REQUIREMENTS.md`, "Changed after
+    the demo".
+- **Docs overhaul (15 Oct, branch `docs-overhaul`):** a README in each important folder, the
+  guides in `docs/` (indexed by `docs/README.md`), the k6 load test moved to
+  `tests/load/load.js`. Removed, with their content folded into the guides (old copies in git
+  history): the workshop template's guides and policies (`docs/full-stack.md`,
+  `docs/validation.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `DCO.md`, `SECURITY.md`) and
+  our demo-day notes (`docs/GUIDE.md`, `REPOINFO.md`, `DEMO-RUNBOOK.md`, `DEMO-TESTS.md`,
+  `MAP.md`, `OVERNIGHT-REPORT.md`, and the design specs and plans in `docs/superpowers/`).
+- **Tests (15 Oct, before the post-demo changes):** 648 backend (97% of statements), 846
+  website in 51 files (98.04% of lines), 33 browser tests passed and 1 skipped on request
+  (the README screenshots), 100 axe scans (light and dark), 70 API operations.
+  `./tools/test-all.sh` runs every local check. Where each suite lives: `tests/README.md`;
+  what each proves: `docs/TESTING.md`.
 - **Read these first:**
-  - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
-    evaluator Q&A);
-  - `docs/REPOINFO.md` (what to say, with every claim checked against the code,
-    and a "say this, not that" table) and `docs/DEMO-RUNBOOK.md` (what to run and click
-    live, the tests, Plan B); `tools/tracker.http` holds read-only API requests for VS
-    Code's REST Client; `docs/openapi.json` is the OpenAPI file for Swagger UI
-    (`./tools/swagger.sh`, then `http://localhost:8090/swagger.html`), Postman and
-    SwaggerHub (regenerate with `.venv/bin/python tools/openapi.py` after any route
-    change; `test_openapi.py` fails until you do);
-  - `docs/OVERNIGHT-REPORT.md`: what was built on the night of 13 to 14 Oct, every
-    decision made for David, and what isn't verified;
-  - `docs/superpowers/plans/2026-10-13-manual-verification.md`: the AWS checklist,
-    all steps done;
-  - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
-    email or texts (role and network), and the design for any future reset flow;
-  - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
-    a per-person task limit), built 14 Oct (69 routes; five migration files, 001 to 005).
+  - `README.md` (the front door: logins, the repo tree, Swagger) and `docs/README.md` (the
+    index);
+  - `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/TESTING.md`,
+    `docs/SETUP.md`, `docs/DECISIONS.md` (every decision and why; it replaces the 14 Oct
+    design specs) and `docs/AI-WORKFLOW.md` (how David works with Claude Code);
+  - `docs/openapi.json` is the OpenAPI file for Swagger UI (`./tools/swagger.sh`, then
+    `http://localhost:8090/swagger.html`), Postman and SwaggerHub (regenerate with
+    `.venv/bin/python tools/openapi.py` after any route change; `test_openapi.py` fails until
+    you do); `tools/tracker.http` holds read-only API requests for VS Code's REST Client.
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
   and cleanup scripts, and `terraform apply`/`destroy`. Every other shell command runs
@@ -113,10 +67,9 @@ outdated it.
     `*` (`infra/lambda.tf`, 15 Oct, for Swagger UI); on AWS after the next
     `./bin/deploy-backend.sh`. Swagger already works there in Chromium and Firefox today;
     Firefox warns that `*` will stop covering `Authorization`;
-  - deploy everything committed since `a52da44` (see **Built**): `git push origin David`,
-    `./bin/deploy-backend.sh` (migrations 002 to 005 on the first cold start),
-    `./bin/deploy-frontend.sh`; deploy both together (the old website knows no refresh and
-    would sign out after 15 min);
+  - deploy `4d8b949` and the post-demo commits (see **Where things stand**):
+    `git push origin David`, then `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`,
+    both together;
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
   - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8);
@@ -143,21 +96,22 @@ disagrees.
 | Tasks | Deliverables hold tasks (estimate, assignee, To Do / In Progress / Done). The manager creates; employees pull Ready tasks (Take this, up to their `task_limit`, default 2); managers can still assign. The assignee moves status and logs time. Deliverable status is **computed**; the manager signs off, refused until all tasks and dependencies are done |
 | Requests (14 Oct) | `project_requests` gains a `kind` (migration 003). Managers ask the admins (new project, archive a project, free text); employees ask their line manager or an admin (task limit, overtime, free text). Who may decide = who is notified when it is sent. Approving runs the existing service (`archive_project`, `set_capacity`) in the same transaction |
 | Invariant | `GET /admin/integrity-check`: 5 queries that must return no rows (no dependency loops; nothing live under an archived project; every record has its CREATE audit row; no time logged outside a booking; no signed-off deliverable with unfinished work). Runs after every database test |
-| Schema | `TEXT` + `CHECK` instead of `ENUM`; numbered migrations in `store/migrations/`. Full design: `docs/superpowers/specs/2026-10-13-database-design.md` |
+| Schema | `TEXT` + `CHECK` instead of `ENUM`; numbered migrations in `store/migrations/`. Full design: the SQL in `backend/tracker/store/migrations/`, explained in `docs/ARCHITECTURE.md` |
 | Wire naming (§2.4) | camelCase in JSON, snake_case in Python and Postgres, converted only in `api/http.py` (incoming keys, computed results) and `services/views.py` (each record's fields, by name) |
 | Removal | `POST /{thing}/{id}/archive` and `/reactivate`. No DELETE verb anywhere, and tests assert it. Explain in the README why this departs from the rubric's DELETE/204 |
 | Update verb | PATCH, with partial bodies. The server refuses fields the caller's role may not change |
 | Storage | **Postgres only, no in-memory store.** Tests run against their own database, `tracker_test`, with each test rolled back |
 | Tests | Backend: pytest with pytest-cov. Frontend: Vitest with React Testing Library (Jest-compatible API), plus `@vitest/coverage-v8`. End to end: Playwright |
 | Coverage | Evaluators will ask why coverage is what it is. Print the numbers, and list each uncovered area in the README with a reason |
-| Scope | Everything in `MVP.md` ships. Nothing is pre-cut; evenings absorb the overrun. Out of the MVP: dark mode, emailed password reset |
+| Scope | Everything in `docs/REQUIREMENTS.md` (then `MVP.md`) ships. Nothing is pre-cut; evenings absorb the overrun. Out of the MVP: dark mode, emailed password reset |
 | Product framing (13 Oct, evening) | Portfolio and resource management (Float, Harvest Forecast, Smartsheet RM), not task tracking (Jira, Trello). Screen order: dashboard (`GET /dashboard/projects`: status, risk, budget per project, at risk first), then the allocation grid, then a task board last and only if time |
 | Allocation grid | People x weeks, sorted by each person's worst week ("peak over by"); `?overOnly=true` keeps anyone over in any shown week; each cell lists the projects its hours come from; paginated by person |
 | "Resources" on screen | Means bookings (person x hours/week on a project), as in the brief's CRUD list. People stay "People" |
 | Rejected from the phone notes (13 Oct) | A `/admin/capacity-check` that must return zero: it contradicts question 5, where over-allocation is allowed and flagged. "No time entry, derive spend from elapsed weeks": consumed cost stays real approved time |
 
 The database design, with the full SQL, is in
-`docs/superpowers/specs/2026-10-13-database-design.md`. It overrides plan §5.
+`backend/tracker/store/migrations/` (explained in `docs/ARCHITECTURE.md`; the original
+design spec is in git history). It overrides plan §5.
 
 ### Where the files go
 
@@ -187,13 +141,14 @@ backend/tracker/                 # one Lambda; the URL segment is /api/tracker/.
     ├── handlers.py              # one function per route
     └── http.py                  # event parsing, camelCase <-> snake_case (record fields: services/views.py)
 tests/backend/                   # pytest; conftest rebuilds tracker_test, runs the integrity check on teardown
+tests/load/load.js               # the k6 load test (moved from tools/k6/ on 15 Oct); tests/README.md maps every suite
 requirements-dev.txt, pytest.ini  # repo root: test tooling (venv in .venv/)
 frontend/src/
 ├── services/request.js          # the one fetch wrapper; plus one file per resource
 ├── auth/                        # AuthContext, session probe, RequireRole
 ├── theme/                       # MUI theme
 ├── components/                  # shared: DataTable/CardList, BudgetBar, StatusChip, ...
-└── pages/                       # one folder per screen in MVP.md
+└── pages/                       # one folder per screen in docs/REQUIREMENTS.md
 frontend/src/**/*.test.jsx       # Vitest + RTL, beside the code they test
 ```
 
@@ -208,7 +163,7 @@ Folder names to avoid (trap 3): `lib`, `assets`, `build`, `dist`, `env`, `logs`,
 2. **Domain:** errors, money, models. Proof: unit tests for money parsing.
 3. **Store:** `postgres.py` with `atomic()`. Proof: round-trip tests against
    `tracker_test`.
-4. **Services:** every rule in `MVP.md`, plus `record_change`. Proof: rule tests that
+4. **Services:** every rule in `docs/REQUIREMENTS.md`, plus `record_change`. Proof: rule tests that
    never import `api`, with the integrity check run in teardown.
 5. **API:** route table, `authorise`, error map, serialisers, `function.py`. Proof: HTTP
    tests covering both path shapes and 404-not-403.
@@ -330,7 +285,7 @@ How it is built, so it can't be forgotten:
   record with no CREATE row. Add a route and forget `record_change`, and the suite fails.
 
 The `audit_log` and `notifications` tables are in the database spec
-(`docs/superpowers/specs/2026-10-13-database-design.md`).
+(`backend/tracker/store/migrations/001_init.sql`, explained in `docs/ARCHITECTURE.md`).
 
 Routes (add to the plan §7 table): `GET /notifications` (own only, paginated,
 `?unread=true`), `GET /notifications/unread-count`, `POST /notifications/{id}/read` (404
@@ -514,8 +469,8 @@ Fix each one when the work reaches it, not before.
 | 5 | `npm run lint` fails: the config imports `eslint-plugin-react-hooks` and `eslint-plugin-react-refresh`, which aren't in `package.json` | `frontend/eslint.config.js:3-4` | `npm i -D` both **Fixed 14 Oct** (both installed; `npm run lint` is clean). |
 | 6 | Vite silently moves to the next free port if 3000 is busy, so you can end up looking at a stale server | `frontend/vite.config.js` | Set `server.strictPort: true`, and keep exactly one listener per port (§11) **Fixed 14 Oct** (`strictPort: true`). |
 | 7 | CI runs `bandit -r ./backend`. It fails on `assert` in tests (B101), `random` used for passwords (B311), string-built SQL (B608) and hard-coded seed passwords (B105/B106), and the red X shows on every push | `.github/workflows/python.actions.yml:27` | Keep tests in `tests/`, use `secrets` for the six-character password, use parameterised SQL only |
-| 8 | The repo docs curl `https://localhost:3001`, but the proxy is plain HTTP | `docs/full-stack.md:121` | Use `http://` |
-| 9 | The docs' local log command picks up your `us-east-2` region, but the functions live in LocalStack's `us-east-1` | `docs/full-stack.md:131` | Use the command in §11 |
+| 8 | The repo docs curl `https://localhost:3001`, but the proxy is plain HTTP | the workshop's `docs/full-stack.md:121` (removed 15 Oct) | Use `http://` |
+| 9 | The docs' local log command picks up your `us-east-2` region, but the functions live in LocalStack's `us-east-1` | the workshop's `docs/full-stack.md:131` (removed 15 Oct) | Use the command in §11 |
 | 10 | React 19 ignores `propTypes` at runtime, but the org's instructions still require them | `.github/instructions/react.instructions.md` | Write them as documentation; don't rely on them for validation |
 | 11 | Postgres has no `CREATE TYPE ... IF NOT EXISTS`, and Aurora isn't publicly accessible, so the schema has to be applied from inside the Lambda | `infra/rds.tf` | Numbered migrations applied on cold start under an advisory lock, with `TEXT` + `CHECK` instead of enums (decided; see the spec) |
 | 12 | Local Postgres is a single shared `postgres` database | | Tests hard-code their own database name. Never point the app at it |
@@ -556,10 +511,11 @@ deployed URL:
 - **The §2 decisions are made** (13 Oct): see "The stack" at the top. Money (2.3) is
   integer cents.
 - **§10 lists `implementation.md`, `testing.md` and `evaluation.md` to read.** They don't
-  exist. That material is the three sections of `docs/full-stack.md`, which is the
+  exist. That material was the three sections of `docs/full-stack.md` (removed 15 Oct; in git
+  history), which is the
   rubric.
 - **The §11 ownership paths** become `backend/tracker/domain/` and so on (§5 above).
-- **The rubric expects DELETE.** `docs/full-stack.md` asks for DELETE with 204 and says
+- **The rubric expects DELETE.** The workshop's `docs/full-stack.md` (removed 15 Oct) asks for DELETE with 204 and says
   "deleted records are properly removed"; we archive instead (plan §4). Keep archiving,
   explain why in the README and the demo, and ask an evaluator early whether archive
   satisfies the D in CRUD.
@@ -571,7 +527,7 @@ deployed URL:
   notifications in §2 above are a different feature, and they are in scope.
 - **The rubric expects token refresh.** It lists "token expiration and refresh". Built
   14 Oct: a 15-minute access token and a rotating refresh token in the response body
-  (not a cookie; why is in `docs/superpowers/specs/2026-10-14-tokens-design.md` §2).
+  (not a cookie; why is in `docs/DECISIONS.md`).
 - **How scoring works.** Five technical scores (Implementation, Design, Code, Testing,
   Experience) and three soft-skill scores (Curious, Observant, Driven), each 1 to 10. The
   final score is the average of the two averages, and 9 or above is excellent.
@@ -670,7 +626,7 @@ Demo against the running API (local proxy, or the deployed URL via `TRACKER_API`
 ```sh
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py seed   # once: users, projects, tasks, time
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then ten refusals
-K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js   # k6 load test: reads + a login burst; LocalStack fails past ~15 users (its file limit)
+K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tests/load/load.js   # k6 load test: reads + a login burst; LocalStack fails past ~15 users (its file limit)
 terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first password (per environment)
 (set -a; source ENVIRONMENT.config; python3 tools/console.py logs)  # AWS console, signed in (lambda|logs|rds|cloudfront|s3)
 ```
@@ -678,6 +634,7 @@ terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first 
 ## 12. Safe to ignore
 
 - `infra/eks.tf`, `infra/helm/`, and `infra/documentdb.tf` (off by default).
-- Every guide in `docs/` except `full-stack.md` and `validation.md`.
+- `backend/_examples/`, the workshop template's example service (Terraform skips folders
+  that start with `_`).
 - Jupyter, Spark, Trino, kubectl and Helm, which `setup-environment.sh` installs for
   other tracks. Their install failures don't matter to us.
