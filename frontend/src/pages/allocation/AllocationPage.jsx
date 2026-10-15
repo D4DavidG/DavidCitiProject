@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, FormControlLabel, IconButton, Paper, Switch, Table,
+  Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, FormControlLabel, Paper, Switch, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
@@ -13,9 +13,12 @@ import PageHeader from '../../components/PageHeader'
 import PageState, { Pager } from '../../components/PageState'
 import PersonActions from '../../components/PersonActions'
 import SearchField from '../../components/SearchField'
+import { useAuth } from '../../auth/useAuth'
 import { addDays, formatDay, formatHours } from '../../services/format'
+import { mayActOn } from '../../services/personAccess'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useLastPage } from '../../services/useLastPage'
 
 const WEEKS = 6
 const PAGE_SIZE = 25
@@ -85,9 +88,11 @@ function emptyText(q, overOnly) {
  * Questions 3 and 5: who is booked on what, week by week, across every project.
  * A person is over-allocated when their bookings in a week add up past their own
  * weekly capacity; the server sorts the worst first and can return only those.
- * A person's name opens the same Actions menu as their row on People.
+ * A person's name opens the same Actions menu as their row on People, when you may act on
+ * them (admins: everyone; a manager: their own reports, by the row's managerId).
  */
 export default function AllocationPage() {
+  const { user } = useAuth()
   const [q, setQ] = useState('')
   const [weekFrom, setWeekFrom] = useState('')
   const [overOnly, setOverOnly] = useState(false)
@@ -97,6 +102,7 @@ export default function AllocationPage() {
     query: { q, weekFrom, weeks: WEEKS, overOnly: overOnly ? 'true' : undefined, page: pageNumber, pageSize: PAGE_SIZE },
   }), [q, weekFrom, overOnly, pageNumber])
   const { data, error, loading, reload } = useApi(load)
+  useLastPage(data, pageNumber, setPageNumber)
   const weeks = data?.weeks ?? []
   const people = data?.items ?? []
   const start = weekFrom || weeks[0]
@@ -136,12 +142,13 @@ export default function AllocationPage() {
         <SearchField id="allocation-search" label="Search people" placeholder="Name" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
       </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <IconButton aria-label="Previous week" onClick={() => move(-7)} disabled={!start}><PrevIcon /></IconButton>
+        {/* Earlier and Later move one week; filled buttons with words, as on the Schedule (spec 6.2). */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+          <Button size="small" variant="contained" startIcon={<PrevIcon />} onClick={() => move(-7)} disabled={!start}>Earlier</Button>
           <Typography sx={{ minWidth: 150, textAlign: 'center' }}>
             {weeks.length ? `${formatDay(weeks[0])} – ${formatDay(addDays(weeks.at(-1), 6))}` : '…'}
           </Typography>
-          <IconButton aria-label="Next week" onClick={() => move(7)} disabled={!start}><NextIcon /></IconButton>
+          <Button size="small" variant="contained" endIcon={<NextIcon />} onClick={() => move(7)} disabled={!start}>Later</Button>
           <Button size="small" variant="contained" onClick={() => setWeekFrom('')} disabled={!weekFrom}>This week</Button>
         </Box>
         <FormControlLabel
@@ -150,8 +157,9 @@ export default function AllocationPage() {
         />
       </Box>
 
+      {/* The spinner only before the first answer: a reload keeps the rows (and any dialog they opened) on screen. */}
       <PageState
-        loading={loading}
+        loading={loading && !data}
         error={error}
         onRetry={reload}
         empty={data && people.length === 0 ? emptyText(q, overOnly) : null}
@@ -173,7 +181,9 @@ export default function AllocationPage() {
               {people.map((person) => (
                 <TableRow key={person.userId}>
                   <TableCell sx={sticky}>
-                    <PersonActions userId={person.userId} name={person.name} label={person.name} onChanged={reload} />
+                    {mayActOn(user, person)
+                      ? <PersonActions userId={person.userId} name={person.name} label={person.name} onChanged={reload} />
+                      : <Typography variant="body2" sx={{ fontWeight: 600 }}>{person.name}</Typography>}
                     {person.jobTitle && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{person.jobTitle}</Typography>}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                       {person.status === 'OVER_ALLOCATED'

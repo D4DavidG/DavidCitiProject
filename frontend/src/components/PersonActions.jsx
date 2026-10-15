@@ -10,6 +10,7 @@ import HistoryPanel from './HistoryPanel'
 import PageState from './PageState'
 import { useAuth } from '../auth/useAuth'
 import { fullName } from '../services/people'
+import { mayActOn, personActions } from '../services/personAccess'
 import { request } from '../services/request'
 import { useApi } from '../services/useApi'
 import { useIsMobile } from '../theme/responsive'
@@ -41,26 +42,6 @@ const LABELS = {
   reset: 'Reset password',
   reactivate: 'Reactivate',
   archive: 'Archive',
-}
-
-/**
- * What the signed-in `user` may do to `person`, in menu order (Archive last). The server
- * checks every one again; this only hides what it would refuse. Admins: everything, but
- * never reset or archive themselves. A manager: capacity and history of their own reports.
- */
-function actionsFor(user, person) {
-  const isAdmin = user.role === 'ADMIN'
-  const theirManager = user.role === 'MANAGER' && person.managerId === user.userId
-  const self = person.userId === user.userId
-  const live = !person.isArchived
-  return [
-    (isAdmin || theirManager) && live && 'capacity',
-    (isAdmin || theirManager) && 'history',
-    isAdmin && live && 'edit',
-    isAdmin && live && !self && 'reset',
-    isAdmin && !self && !live && 'reactivate',
-    isAdmin && !self && live && 'archive',
-  ].filter(Boolean)
 }
 
 /** A menu line you can't press (loading, nothing to do), kept fully readable rather than faded. */
@@ -159,7 +140,8 @@ AccountDialog.propTypes = {
  *
  * Give it `person` (the full record from GET /users), or just `userId` and `name` when the
  * row doesn't have it: the record is then fetched (GET /users/{id}) each time the menu opens.
- * With `person`, it shows nothing at all when you may do nothing to them.
+ * With `person`, it shows nothing at all when you may do nothing to them; without it, the page
+ * checks mayActOn (services/personAccess.js) first, as Allocation does with each row's managerId.
  */
 export default function PersonActions({ person = null, userId, name, label = 'Actions', onChanged }) {
   const { user } = useAuth()
@@ -177,7 +159,7 @@ export default function PersonActions({ person = null, userId, name, label = 'Ac
 
   const record = person ?? (fetched.status === 'done' ? fetched.person : null)
   const shownName = person ? fullName(person) : name
-  if (person && actionsFor(user, person).length === 0) return null
+  if (person && !mayActOn(user, person)) return null
 
   async function fetchRecord() {
     asked.current += 1
@@ -229,7 +211,7 @@ export default function PersonActions({ person = null, userId, name, label = 'Ac
       return <MenuItem onClick={fetchRecord} sx={NOTE}>Couldn&apos;t load their details. Try again</MenuItem>
     }
     if (!record) return <MenuItem disabled sx={NOTE}>Loading…</MenuItem>
-    const actions = actionsFor(user, record)
+    const actions = personActions(user, record)
     if (actions.length === 0) {
       return <MenuItem disabled sx={NOTE}>No actions here: only their line manager or an admin can change this person.</MenuItem>
     }

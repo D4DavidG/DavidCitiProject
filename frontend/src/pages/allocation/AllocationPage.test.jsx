@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AllocationPage from './AllocationPage'
-import { holdOpen, page, renderAt, stubApi } from '../../test/utils'
+import { USERS, holdOpen, page, renderAt, session, stubApi } from '../../test/utils'
 
 const WEEKS = ['2026-10-12', '2026-10-19']
 function week(iso, booked, projects, extra = {}) {
@@ -11,8 +11,9 @@ function week(iso, booked, projects, extra = {}) {
     overByHours: Math.max(booked - 40, 0), projects, loggedMinutes: 0, loggedHours: 0, overtime: false, ...extra,
   }
 }
+// Ben is Maria's report (Maria, userId 2, is the default signed-in manager); Chloe is someone else's.
 const BEN = {
-  userId: 4, name: 'Ben Okafor', jobTitle: 'Developer', capacityHours: 40, overtimeAllowed: false,
+  userId: 4, name: 'Ben Okafor', jobTitle: 'Developer', managerId: 2, capacityHours: 40, overtimeAllowed: false,
   peakOverByHours: 5, status: 'OVER_ALLOCATED',
   weeks: [
     week('2026-10-12', 45, [{ projectId: 1, name: 'Apollo', hours: 25 }, { projectId: 2, name: 'Zeus', hours: 20 }]),
@@ -20,7 +21,7 @@ const BEN = {
   ],
 }
 const CHLOE = {
-  userId: 5, name: 'Chloe Kim', jobTitle: 'Analyst', capacityHours: 40, overtimeAllowed: true,
+  userId: 5, name: 'Chloe Kim', jobTitle: 'Analyst', managerId: 9, capacityHours: 40, overtimeAllowed: true,
   peakOverByHours: 0, status: 'OK',
   weeks: [
     week('2026-10-12', 30, [{ projectId: 2, name: 'Zeus', hours: 30 }], { loggedMinutes: 3000, loggedHours: 50, overtime: true }),
@@ -31,9 +32,9 @@ const CHLOE = {
 /** Ben's full account record, as GET /users/4 returns it; Maria (the default signed-in manager) is his line manager. */
 const BEN_RECORD = { userId: 4, username: 'BO435681', firstName: 'Ben', lastName: 'Okafor', email: 'ben.okafor@acme.test', role: 'EMPLOYEE', jobTitle: 'Developer', managerId: 2, weeklyCapacityHours: 40, overtimeAllowed: false, taskLimit: 2, isArchived: false }
 
-function renderGrid(answer = () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }], answers = {}) {
+function renderGrid(answer = () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }], answers = {}, user = USERS.manager) {
   const calls = stubApi({ 'GET /dashboard/allocation': answer, ...answers })
-  renderAt(<AllocationPage />, { path: '/allocation' })
+  renderAt(<AllocationPage />, { path: '/allocation', auth: session(user) })
   return calls
 }
 
@@ -95,12 +96,18 @@ describe('AllocationPage', () => {
     await waitFor(() => expect(calls.at(-1).query.overOnly).toBe('true'))
   })
 
-  it('moves a week at a time', async () => {
+  it('moves a week at a time with filled Earlier and Later buttons, like the Schedule', async () => {
     const calls = renderGrid()
     await screen.findByRole('row', { name: /Ben Okafor/ })
-    await userEvent.click(screen.getByRole('button', { name: /next week/i }))
+    const later = screen.getByRole('button', { name: 'Later' })
+    const earlier = screen.getByRole('button', { name: 'Earlier' })
+    for (const button of [earlier, later]) {
+      expect(button).toHaveClass('MuiButton-contained')
+      expect(button.querySelector('svg')).not.toBeNull()
+    }
+    await userEvent.click(later)
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-19'))
-    await userEvent.click(screen.getByRole('button', { name: /previous week/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Earlier' }))
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-12'))
   })
 
@@ -190,6 +197,60 @@ describe('AllocationPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ weeklyCapacityHours: 45 }))
     await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/allocation').length).toBeGreaterThan(gridsBefore))
+  })
+
+  it("makes a manager's own reports' names a button, and anyone else's name plain bold words", async () => {
+    renderGrid()
+    const ben = await screen.findByRole('row', { name: /Ben Okafor/ })
+    expect(within(ben).getByRole('button', { name: 'Actions for Ben Okafor' })).toHaveClass('MuiButton-contained')
+    const chloe = screen.getByRole('row', { name: /Chloe Kim/ })
+    expect(within(chloe).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(chloe).getByText('Chloe Kim')).toHaveStyle({ fontWeight: 600 })
+  })
+
+  it("gives an admin a button on every person's name", async () => {
+    renderGrid(undefined, {}, USERS.admin)
+    await screen.findByRole('row', { name: /Ben Okafor/ })
+    expect(screen.getByRole('button', { name: 'Actions for Ben Okafor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Actions for Chloe Kim' })).toBeInTheDocument()
+  })
+
+  it('keeps the grid on screen while it reloads after a change', async () => {
+    renderGrid(undefined, {
+      'GET /users/4': [200, BEN_RECORD],
+      'PATCH /users/4/capacity': [200, { ...BEN_RECORD, weeklyCapacityHours: 45 }],
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Actions for Ben Okafor' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Capacity, overtime and task limit' }))
+    const hours = await screen.findByLabelText(/weekly capacity/i)
+    await userEvent.clear(hours)
+    await userEvent.type(hours, '45')
+    const release = holdOpen('/dashboard/allocation')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('row', { name: /Ben Okafor/ })).toBeInTheDocument()
+    expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+    release()
+  })
+
+  it('steps back to the last page that exists when archiving empties the page you are on', async () => {
+    let archived = false
+    const calls = renderGrid(({ query }) => {
+      const onTwo = query.page === '2'
+      if (archived) return [200, { ...(onTwo ? page([], { page: 2, totalPages: 1 }) : page([CHLOE], { totalPages: 1 })), weeks: WEEKS }]
+      return [200, { ...page([onTwo ? BEN : CHLOE], { page: Number(query.page), totalPages: 2 }), weeks: WEEKS }]
+    }, {
+      'GET /users/4': [200, BEN_RECORD],
+      'POST /users/4/archive': () => { archived = true; return [200, { ...BEN_RECORD, isArchived: true }] },
+    }, USERS.admin)
+    await screen.findByRole('row', { name: /Chloe Kim/ })
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Actions for Ben Okafor' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Archive' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
+    await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/allocation').at(-1).query.page).toBe('1'))
+    expect(await screen.findByRole('row', { name: /Chloe Kim/ })).toBeInTheDocument()
+    expect(screen.queryByText('No employees to show.')).not.toBeInTheDocument()
   })
 
   it('marks an over-capacity week with an icon as well as red, and an ordinary week with none', async () => {
