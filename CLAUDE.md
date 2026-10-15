@@ -45,11 +45,15 @@ outdated it.
   a salary never reaches a manager. **History** on People, **My history** on Account.
   Also not deployed: the dashboard's **Total projects** and **Total at risk** counters,
   both from the server across every page (`atRiskTotal` on `GET /dashboard/projects`).
+  Also not deployed: two accessibility fixes found by the axe scan (the menu's links each
+  in a list item, `components/AppLayout.jsx`; empty weeks on the allocation grid in
+  readable grey, `pages/allocation/AllocationPage.jsx`).
   Tests: 549 backend, 324 website, and 24 Playwright browser
   tests in 9 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
   `e2e/history.spec.js` reads a person's history; `e2e/tour.spec.js` screenshots every
-  screen at desktop and phone width; `timeline`, `budget` and `workload` specs check the charts).
+  screen at desktop and phone width and runs axe on it (serious or critical WCAG A/AA
+  problems fail); `timeline`, `budget` and `workload` specs check the charts).
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);
@@ -584,7 +588,8 @@ The detail is in the plan:
   since the scaffold is JS.
 - **Frontend packages (installed 14 Oct):** MUI 9 (`@mui/material`, `@mui/icons-material`,
   emotion), React Router 8 (`HashRouter`), react-responsive, prop-types; Vitest 5, React
-  Testing Library, Playwright. CI fails on high-severity `npm audit` findings, so run it
+  Testing Library, Playwright, `@axe-core/playwright` (exact 4.13.0, the tour's
+  accessibility scan). CI fails on high-severity `npm audit` findings, so run it
   before adding anything else (0 on 14 Oct).
 - **Frontend rules in practice:** every API call goes through `src/services/request.js`;
   only `src/services/format.js` turns cents, minutes and dates into text (and typed

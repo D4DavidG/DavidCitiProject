@@ -18,7 +18,7 @@ checks one layer, from the database up to a real browser.
 | **"Writes really commit" test** | A change is actually saved, not left in a transaction that is never committed | Every other test rolls back on purpose, so only a test on its own database can catch "nothing is ever saved" | `tests/backend/test_store_commits.py` | `.venv/bin/pytest -q tests/backend/test_store_commits.py` | under 1 s | 2 |
 | **Race (concurrency) tests** | Two people pressing "Take this" at the same moment: only one wins, and nobody goes over their task limit | A race only shows up with two real database connections at once; the test waits until Postgres reports the second one blocked | `tests/backend/test_claim_race.py` | `.venv/bin/pytest -q tests/backend/test_claim_race.py` | under 1 s | 2 |
 | **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (32 files, beside the code they test) | `cd frontend && npm test` | 115 s | 324 |
-| **Browser tests** (Playwright) | A real Chrome against the real running app: the demo walk (the seven questions, plus the phone menu), the pull board (Ana takes a task and puts it back), requests (Ana asks, Maria rejects with a note, Ana reads it on a phone), the screen tour (every screen for a manager and an employee, desktop and phone, no sideways scrolling, a deep-link refresh), history (a manager reads a report's history without the before/after state; an employee sees My history), the three charts (timeline: Late words and icon, tooltips on hover, tap and focus, print stripes; budget: the Budget line's position, tooltips; workload: gridlines and bars line up, Tab opens the tooltip, print stripes, contrast), README screenshots (only when asked) | The only test that sees what David sees: real login, real API, real database, real layout | `frontend/e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `history.spec.js`, `tour.spec.js`, `timeline.spec.js`, `budget.spec.js`, `workload.spec.js`, `screenshots.spec.js` | `cd frontend && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_ZEUS_MANAGER_USERNAME=SP345715 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test` | 66 s | 24 tests in 9 files: 23 passed, 1 skipped (screenshots, on purpose) |
+| **Browser tests** (Playwright) | A real Chrome against the real running app: the demo walk (the seven questions, plus the phone menu), the pull board (Ana takes a task and puts it back), requests (Ana asks, Maria rejects with a note, Ana reads it on a phone), the screen tour (every screen for a manager and an employee, desktop and phone, no sideways scrolling, an axe accessibility scan of each, a deep-link refresh), history (a manager reads a report's history without the before/after state; an employee sees My history), the three charts (timeline: Late words and icon, tooltips on hover, tap and focus, print stripes; budget: the Budget line's position, tooltips; workload: gridlines and bars line up, Tab opens the tooltip, print stripes, contrast), README screenshots (only when asked) | The only test that sees what David sees: real login, real API, real database, real layout | `frontend/e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `history.spec.js`, `tour.spec.js`, `timeline.spec.js`, `budget.spec.js`, `workload.spec.js`, `screenshots.spec.js` | `cd frontend && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_ZEUS_MANAGER_USERNAME=SP345715 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test` | 66 s | 24 tests in 9 files: 23 passed, 1 skipped (screenshots, on purpose) |
 | **Load test** | How fast the API answers with many users at once, and whether anything fails | Speed and failures under load can't be seen one request at a time | `tools/loadtest.py` | AWS (asks for the AWS admin password, then runs): `read -rsp 'Admin password: ' TRACKER_ADMIN_PASSWORD && export TRACKER_ADMIN_PASSWORD && TRACKER_API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker python3 tools/loadtest.py --users 25 --seconds 60`. Locally, leave out `TRACKER_API` and keep to 10 users or fewer: LocalStack itself fails past about 15 (`README.md:296-303`) | 20 to 60 s | Last run on AWS, 13 Oct: 16,184 reads at 539 per second, 2 failed (`README.md:269-275`). Not rerun today |
 | **k6 load test (planned)** | The same as the load test, with the industry tool named in the meeting notes ("sk8", `notes.txt:6`) | Evaluators may expect a named tool; k6 also gives standard reports | not built yet | none yet; k6 is not installed on the VDI (`which k6` prints nothing) | | 0 |
 
@@ -45,6 +45,32 @@ after any route change; `test_openapi.py` fails if you forget).
 - **SwaggerHub:** Create New, Import and Document API, upload `docs/openapi.json`. Browse
   and share it there; "Try it out" may be blocked by CORS (a page on swaggerhub.com
   calling our server). Not tried.
+
+### Accessibility scan (axe)
+
+The screen tour (`frontend/e2e/tour.spec.js`, the `scan` helper) runs **axe**
+(`@axe-core/playwright` 4.13.0, the rule engine behind Lighthouse's accessibility score)
+on the sign-in page, on every screen it opens, and at phone width on the open menu: 48
+scans over the four role-by-width tests.
+
+- **What it checks:** the WCAG 2.0 to 2.2 A and AA rules a machine can decide: colour
+  contrast, names on buttons, links and fields, labels, list and table structure, valid
+  ARIA, page language.
+- **What fails the test:** a `serious` or `critical` problem. The test lists every one at
+  the end as `<screen>: <rule> (<impact>, N elements: <first selector>)`.
+- **What it found on its first run (14 Oct), both fixed:**
+  - `list` (serious) on every desktop screen and the phone menu: the side menu's `<ul>`
+    held `<a>` links directly, so a screen reader could not announce "list, 9 items".
+    Fixed with a `ListItem` around each link (`components/AppLayout.jsx`).
+  - `color-contrast` (serious, 10 cells) on `/allocation`: empty weeks ("0 / 40 h") were
+    `#9e9e9e` on white, 2.7:1 (AA needs 4.5:1). Now `text.secondary`, `#4B5563`, 7.6:1
+    (`pages/allocation/AllocationPage.jsx`).
+- **What it can't catch:** automated scanners find roughly a third to half of
+  accessibility problems. Screen readers (NVDA, VoiceOver) are untested; keyboard order
+  and focus are checked only where other tests press Tab; dialogs, tooltips and the admin
+  screens are not scanned (the tour opens none). axe's moderate, non-WCAG best-practice
+  items (`heading-order`, `region`, `empty-table-header`, `landmark-one-main` on the
+  sign-in page) are left as they are.
 
 ## 2. What coverage means for each kind of test
 
@@ -235,6 +261,11 @@ from `docs/DEMO-RUNBOOK.md:312-320`.
 - One API for Chromium, Firefox and WebKit (Safari's engine), and the browsers are
   installed with one command. Selenium needs a matching driver per browser.
 
+**Playwright plus axe, not Lighthouse.** Lighthouse's accessibility score runs the same
+axe rules, so a Lighthouse run would repeat checks the tour already makes. axe inside the
+tour scans every screen in its loaded state, signed in, at both widths, with no second
+walk through the app.
+
 **Vite and Vitest.** David chose Vite to build and serve the website: the dev server
 reloads the page on save, and the production build takes about 4 s here. **Vitest** is the test runner made for Vite: it reuses
 the same config (`frontend/vite.config.js`, the `test:` block), so tests see the code
@@ -251,7 +282,9 @@ cd ~/DavidCitiProject && ./tools/test-all.sh
 ```
 
 It runs, in order: backend tests with coverage, bandit, website tests with coverage, lint,
-the production build, then the browser tests if ports 3000 and 3001 are listening. It
+the production build, then the browser tests if ports 3000 and 3001 are listening, with
+their own "Accessibility" row for the axe scan inside the tour (PASS when all four tour
+tests pass, FAIL if any fails, SKIP when the tour did not run). It
 finds the local Maria and Ana usernames in the local database by itself (or uses
 `E2E_MANAGER_USERNAME` / `E2E_EMPLOYEE_USERNAME` if set). The browser tests always go
 to the local stack, even if `E2E_BASE_URL` is still set from an AWS run, because

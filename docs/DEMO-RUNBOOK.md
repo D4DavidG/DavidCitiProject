@@ -337,7 +337,7 @@ instead of failing.
 | --- | --- | --- |
 | `demo.spec.js` (2 tests) | Manager walks the seven questions: Apollo "At risk", Ben "Over-allocated" with "Apollo 25 h, Zeus 20 h", the Build deliverable, Launch "Blocked". Then at 375x812: no sideways scroll, **Open menu** shows Allocation | `E2E_MANAGER_USERNAME`, or `E2E_ADMIN_PASSWORD` to look Maria up |
 | `pull.spec.js` (1 test) | An employee takes a Ready task from the Board and puts it back. **Writes data** (makes and archives its own Ready task, plus audit rows and bell notifications), so **run it locally only, never against AWS**. "Go-live checklist" stays free for the live demo | `E2E_ADMIN_PASSWORD`, or `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME`. Ana must hold at most 1 task |
-| `tour.spec.js` (5 tests) | Every screen for manager and employee, desktop and phone, fails on sideways scroll, saves a screenshot of each. Plus: refreshing a deep link keeps the page. Read-only, safe on AWS | `E2E_TOUR_DIR`, `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME` |
+| `tour.spec.js` (5 tests) | Every screen for manager and employee, desktop and phone, fails on sideways scroll or a serious axe accessibility problem, saves a screenshot of each. Plus: refreshing a deep link keeps the page. Read-only, safe on AWS | `E2E_TOUR_DIR`, `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME` |
 | `timeline.spec.js` (4 tests) | Zeus's late Migration says **Late** with the icon; its tooltip opens on hover and on a phone tap with no sideways scroll; stripes only in print and forced colours; Apollo reads Design **Done**, Build **In progress 0%**, Launch **Blocked**. Read-only. Local only until the charts are deployed | `E2E_ZEUS_MANAGER_USERNAME` (Sam, `SP345715` locally), or `E2E_ADMIN_PASSWORD` |
 | `budget.spec.js` (3 tests) | The Budget line sits at 100 of 125 of the bar column, desktop and phone; a row's tooltip opens on hover and on Tab. Read-only. Local only until the charts are deployed | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
 | `workload.spec.js` (5 tests) | Gridlines, hour labels and Ben's bar line up, desktop and phone, no sideways scroll; Tab opens a row's tooltip (whose sentence includes "+5 h over"); the over segment is striped only in print and forced colours; words and marks clear contrast. Read-only. Local only until the charts are deployed | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
@@ -350,7 +350,10 @@ cd ~/DavidCitiProject/frontend
 E2E_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net E2E_MANAGER_USERNAME=ML662930 npx playwright test demo
 ```
 
-The full tour against AWS (5 tests, a screenshot of every screen; not run or timed on 14 Oct):
+The full tour against AWS (5 tests, a screenshot and an axe accessibility scan of every
+screen; not run or timed on 14 Oct). Run `./bin/deploy-frontend.sh` first: until then the
+deployed site lacks the two accessibility fixes, and the four screen tests fail on `list`
+and `color-contrast`:
 
 ```sh
 cd ~/DavidCitiProject/frontend

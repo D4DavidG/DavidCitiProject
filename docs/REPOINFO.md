@@ -647,11 +647,19 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 
     All three came with the workshop repo (first commit 13cf7a6). Putting our tests in CI
     needs a Postgres service in the workflow; not built. *Point at: `tools/test-all.sh`; `.github/workflows/`*
-19. **"Lighthouse or an accessibility scan?"** Not built. Today: the website tests find
-    things by role and label (so a missing label fails a test), fields are tied to their
-    errors with `aria-describedby`, and the tour test checks the phone layout. There is no
-    axe package in `frontend/package.json` and no scan in `frontend/e2e/`. An axe scan inside
-    Playwright is queued. *Point at: `frontend/e2e/tour.spec.js`; `frontend/package.json`*
+19. **"Lighthouse or an accessibility scan?"** An axe scan, built 14 Oct (the two fixes
+    not yet deployed). axe is the rule engine behind Lighthouse's accessibility score; the
+    screen tour runs it on the sign-in page, every screen a manager and an employee open,
+    and the open phone menu, at desktop and phone width (48 scans), against every WCAG 2.0
+    to 2.2 A and AA rule axe has. A serious or critical problem fails the test. Its first
+    run found two, both fixed: the side menu's `<ul>` held links with no `<li>` (a screen
+    reader could not say "list, 9 items"), and empty weeks on the allocation grid were grey
+    at 2.7:1 contrast (now 7.6:1; AA needs 4.5:1). What it can't catch: scanners find
+    roughly a third to half of problems; no screen reader was tried; dialogs, tooltips and
+    admin screens are not scanned. Lighthouse was dropped on purpose: it would run the same
+    axe rules again. Besides the scan, the website tests find things by role and label,
+    and fields are tied to their errors with `aria-describedby`.
+    *Point at: `frontend/e2e/tour.spec.js` (the `scan` helper); `frontend/src/components/AppLayout.jsx` (`ListItem`); `frontend/src/pages/allocation/AllocationPage.jsx` (the colour)*
 20. **"A schedule and project plan like Float?"** Partly built. The allocation grid is
     Float-style (people by weeks, over-booked weeks flagged), and the deliverables timeline
     shows each project's milestones against dates. Float has drag-to-schedule; we don't:
