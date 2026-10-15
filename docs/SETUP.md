@@ -186,7 +186,8 @@ Apollo already exists (`Already seeded`), so it never doubles the data. Every se
 password is `Demo-pass-2026` (`DEMO_PASSWORD` in [`tools/demo.py`](../tools/demo.py)).
 
 **Local usernames differ on every machine.** The server makes each one from the person's
-initials plus 6 random digits when the account is created. Two ways to list them:
+initials plus 6 digits when the account is created. Two ways to list them (run the first in
+the same terminal, so `TRACKER_ADMIN_PASSWORD` is still set):
 
 ```sh
 cd ~/DavidCitiProject
@@ -195,8 +196,8 @@ PGPASSWORD=postgres123 psql -h localhost -U postgres -d postgres -c "SELECT user
 ```
 
 `demo.py demo` prints the usernames first, then walks the seven client questions, then tries
-to break ten rules and prints `REFUSED as designed` for each. The AWS logins (fixed usernames,
-the same everywhere) are in the [README](../README.md).
+to break ten rules and prints `REFUSED as designed` for each. The AWS logins are fixed, and
+listed in the [README](../README.md).
 
 ## 5. Day-to-day work on the local copy
 
