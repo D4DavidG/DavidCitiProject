@@ -135,7 +135,10 @@ def _live_projects(conn: psycopg.Connection, actor: Actor, filters: dict) -> lis
 # --- Q1, Q2 and Q7: the manager's dashboard -------------------------------------------------------
 
 def project_cards(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
-    """One card per live project in scope: status, progress, risk and money. At-risk projects first."""
+    """One card per live project in scope: status, progress, risk and money. At-risk projects first.
+
+    at_risk_total counts every page, not just this one.
+    """
     _staff_only(actor, "the project dashboard")
     today = clock.today()
     rows = _live_projects(conn, actor, filters)
@@ -150,7 +153,7 @@ def project_cards(conn: psycopg.Connection, actor: Actor, filters: dict, page: i
         **_figures(r, money[r["project_id"]], today),
     } for r in rows]
     cards.sort(key=lambda c: not c["at_risk"])  # stable: at-risk first, each group still by name
-    return page_of(cards, page, page_size)
+    return {**page_of(cards, page, page_size), "at_risk_total": sum(c["at_risk"] for c in cards)}
 
 
 # --- Q7: budget ---------------------------------------------------------------------

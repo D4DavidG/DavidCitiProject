@@ -117,6 +117,24 @@ def test_project_cards_can_be_searched_and_paginated(conn, org):
     assert (page["total"], page["total_pages"], [c["name"] for c in page["items"]]) == (2, 2, ["Zeus"])
 
 
+def test_at_risk_total_counts_every_page_not_just_this_one(conn, org):
+    f.project(conn, org["admin"], org["carol"], name="Old", start_date="2026-08-01", predicted_end_date="2026-10-01")
+    first = dashboard.project_cards(conn, org["admin"], {}, 1, 1)
+    assert ([c["name"] for c in first["items"]], first["total"], first["at_risk_total"]) == (["Apollo"], 3, 2)
+    last = dashboard.project_cards(conn, org["admin"], {}, 3, 1)
+    assert ([c["name"] for c in last["items"]], last["at_risk_total"]) == (["Zeus"], 2)  # healthy page, still 2
+    zeus = dashboard.project_cards(conn, org["admin"], {"search": "zeu"}, 1, 1)
+    assert (zeus["total"], zeus["at_risk_total"]) == (1, 0)
+    assert dashboard.project_cards(conn, org["admin"], {"search": "old"}, 1, 1)["at_risk_total"] == 1
+
+
+def test_at_risk_total_follows_the_managers_scope(conn, org):
+    f.project(conn, org["admin"], org["carol"], name="Old", start_date="2026-08-01", predicted_end_date="2026-10-01")
+    for who, expected in (("bob", (1, 1)), ("carol", (2, 1))):
+        page = dashboard.project_cards(conn, org[who], {}, 1, 20)
+        assert (page["total"], page["at_risk_total"]) == expected, who
+
+
 def test_employees_do_not_get_project_cards(conn, org):
     with pytest.raises(Forbidden):
         dashboard.project_cards(conn, org["alice"], {}, 1, 20)
