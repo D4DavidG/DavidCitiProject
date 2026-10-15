@@ -23,8 +23,6 @@ BOOL_QUERY_KEYS = {"include_archived", "unread", "over_only"}
 
 @dataclass
 class Request:
-    """One parsed request; query and body keys are already snake_case."""
-
     method: str
     path: str
     headers: dict
@@ -33,12 +31,10 @@ class Request:
 
 
 def to_snake(name: str) -> str:
-    """pageSize -> page_size."""
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
 
 def to_camel(name: str) -> str:
-    """page_size -> pageSize."""
     head, *rest = name.split("_")
     return head + "".join(part.capitalize() for part in rest)
 
@@ -53,7 +49,6 @@ def camelize(value):
 
 
 def normalise_path(raw: str) -> str:
-    """Collapse //, drop a leading /api/tracker and any trailing slash."""
     path = re.sub(r"/{2,}", "/", raw or "/")
     if path == PREFIX or path.startswith(PREFIX + "/"):
         path = path[len(PREFIX):] or "/"
@@ -61,7 +56,6 @@ def normalise_path(raw: str) -> str:
 
 
 def _query(raw: dict | None) -> dict:
-    """snake_case the query keys; numbers and booleans are converted or refused (400), never guessed."""
     out = {}
     for key, value in (raw or {}).items():
         key = to_snake(key)
@@ -79,7 +73,6 @@ def _query(raw: dict | None) -> dict:
 
 
 def _body(event: dict) -> dict:
-    """The JSON object body with snake_case keys; empty if none (base64 when the event says so)."""
     raw = event.get("body")
     if not raw:
         return {}
@@ -106,7 +99,6 @@ def parse(event: dict) -> Request:
 
 
 def respond(status: int, payload) -> dict:
-    """The Lambda response as JSON; an empty body if the payload is None."""
     return {
         "statusCode": status,
         "headers": {"content-type": "application/json"},

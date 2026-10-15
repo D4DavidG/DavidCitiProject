@@ -9,14 +9,12 @@ import datetime as dt
 
 
 def _plain(value):
-    """Dates become ISO strings; everything else passes through."""
     if isinstance(value, (dt.date, dt.datetime)):
         return value.isoformat()
     return value
 
 
 def _pick(row: dict, fields: dict[str, str]) -> dict:
-    """Build {camelCase name: value} from {camelCase name: row column}."""
     return {out: _plain(row.get(src)) for out, src in fields.items()}
 
 
@@ -125,7 +123,6 @@ def request_view(row: dict) -> dict:
 
 
 def notification_view(row: dict) -> dict:
-    """One notification with its audit summary."""
     return _pick(row, {
         "notificationId": "notification_id", "auditId": "audit_id", "summary": "summary",
         "entityType": "entity_type", "entityId": "entity_id", "isRead": "is_read", "readAt": "read_at",
@@ -134,7 +131,6 @@ def notification_view(row: dict) -> dict:
 
 
 def audit_view(row: dict) -> dict:
-    """One audit row, including the before and after snapshots."""
     return _pick(row, {
         "auditId": "audit_id", "actorUserId": "actor_user_id", "actorRole": "actor_role", "action": "action",
         "entityType": "entity_type", "entityId": "entity_id", "beforeState": "before_state",

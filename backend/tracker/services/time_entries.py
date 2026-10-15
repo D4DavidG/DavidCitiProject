@@ -43,12 +43,10 @@ def _confirmed(data: dict) -> bool:
 
 
 def _over_text(over: int) -> str:
-    """The " (1 h over capacity)" suffix for a summary, or nothing."""
     return f" ({hours_text(over)} over capacity)" if over else ""
 
 
 def _clean(data: dict, partial: bool) -> dict:
-    """Validate the body; `partial` (edit) checks only the fields sent."""
     data = {k: v for k, v in data.items() if k != "confirm_over_capacity"}
     clean = {}
     if not partial or "work_date" in data:
@@ -64,12 +62,10 @@ def _clean(data: dict, partial: bool) -> dict:
 
 def _check_limits(conn: psycopg.Connection, user_id: int, project_id: int, work_date: dt.date,
                   minutes: int, ignore_entry: int | None, confirmed: bool) -> int:
-    """Check an entry against its booking, the 24 h day and the weekly capacity.
+    """No booking that day, or over 24 h, is always refused (409).
 
-    No booking that day, or over 24 h, is always refused (409). Past capacity
-    without overtime raises OverCapacity until `confirmed`; then it returns the
-    minutes past capacity (0 when within capacity or overtime is allowed).
-    Locks the person's row first. `ignore_entry` leaves an edited entry out of the sums.
+    Past capacity without overtime raises OverCapacity until `confirmed`; then
+    returns the minutes past capacity (else 0). `ignore_entry` leaves an edited entry out of the sums.
     """
     person = conn.execute("SELECT weekly_capacity_hours, overtime_allowed FROM users WHERE user_id = %s FOR UPDATE",
                           (user_id,)).fetchone()
@@ -98,7 +94,6 @@ def _check_limits(conn: psycopg.Connection, user_id: int, project_id: int, work_
 
 
 def log_time(conn: psycopg.Connection, actor: Actor, task_id: int, data: dict) -> dict:
-    """Log time on your own task; freezes your hourly rate on the entry."""
     values.only_allowed(data, _FIELDS)
     confirmed = _confirmed(data)
     clean = _clean(data, partial=False)

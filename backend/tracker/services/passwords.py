@@ -49,7 +49,6 @@ def generate_password() -> str:
 
 
 def _initial(name: str) -> str:
-    """First A-Z letter of a name, accents dropped; "X" if it has none."""
     ascii_only = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     letters = re.sub(r"[^A-Za-z]", "", ascii_only)
     return letters[0].upper() if letters else "X"

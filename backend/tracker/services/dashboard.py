@@ -39,7 +39,6 @@ def _elapsed_percent(start: dt.date, end: dt.date, today: dt.date) -> float:
 
 
 def _staff_only(actor: Actor, what: str) -> None:
-    """Employees get 403 for manager-level screens."""
     if actor.is_employee:
         raise Forbidden(f"Only managers and admins see {what}.")
 
@@ -47,10 +46,9 @@ def _staff_only(actor: Actor, what: str) -> None:
 # --- money and risk, shared by every screen ---
 
 def _money(conn: psycopg.Connection, project_ids: list[int]) -> dict[int, dict]:
-    """Planned (bookings), consumed (approved time) and pending (unapproved time) cents per project, in one query.
+    """Planned (bookings), consumed (approved time) and pending cents per project, in one query.
 
-    The SQL repeats money.py's formulas (salary / 2080, then multiply) so the
-    database sums them; keep the two in step.
+    The SQL repeats money.py's formulas so the database can sum them; keep the two in step.
     """
     rows = conn.execute(
         "SELECT p.project_id,"
@@ -68,7 +66,6 @@ def _money(conn: psycopg.Connection, project_ids: list[int]) -> dict[int, dict]:
 
 
 def _figures(project: dict, money: dict, today: dt.date) -> dict:
-    """Budget numbers for one project. The server sends every percentage, so the browser does no money maths."""
     budget = project["budget_cents"]
     return {
         "budget_cents": budget,

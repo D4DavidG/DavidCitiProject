@@ -26,7 +26,6 @@ def list_notifications(conn: psycopg.Connection, actor: Actor, unread_only: bool
 
 
 def unread_count(conn: psycopg.Connection, actor: Actor) -> int:
-    """How many of your notifications are unread (the bell badge)."""
     return conn.execute("SELECT count(*) AS n FROM notifications WHERE recipient_user_id = %s AND NOT is_read",
                         (actor.user_id,)).fetchone()["n"]
 

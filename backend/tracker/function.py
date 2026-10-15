@@ -36,7 +36,6 @@ def reset() -> None:
 
 
 def _connection():
-    """The cached connection, reopened if it was closed or broke while the instance sat idle."""
     global _conn
     if _conn is None or _conn.closed or _conn.broken:
         _conn = connect()

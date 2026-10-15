@@ -33,7 +33,6 @@ _CAPACITY_FIELDS = {"weekly_capacity_hours", "overtime_allowed", "task_limit"}
 
 
 def _row(conn: psycopg.Connection, user_id: int) -> dict | None:
-    """The user row without password_hash, or None."""
     return conn.execute(sql.SQL("SELECT {} FROM users WHERE user_id = %s").format(COLUMNS), (user_id,)).fetchone()
 
 
@@ -91,12 +90,10 @@ def _check_line_manager(conn: psycopg.Connection, manager_id: int | None, user_i
 
 
 def _update(conn: psycopg.Connection, user_id: int, changes: dict) -> dict:
-    """UPDATE a user and return the row without password_hash."""
     return update(conn, "users", "user_id", user_id, changes, returning=COLUMNS)
 
 
 def _target(conn: psycopg.Connection, user_id: int) -> dict:
-    """The user row, or 404."""
     row = _row(conn, user_id)
     if row is None:
         raise NotFound("User not found.")
@@ -299,7 +296,6 @@ def list_users(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
 # --- archive ---
 
 def _manages_live_projects(conn: psycopg.Connection, user_id: int) -> bool:
-    """True if the person is the manager of any live project."""
     return bool(conn.execute("SELECT 1 FROM projects WHERE manager_id = %s AND NOT is_archived LIMIT 1",
                              (user_id,)).fetchone())
 

@@ -113,7 +113,6 @@ def get_request(conn: psycopg.Connection, actor: Actor, request_id: int) -> dict
 
 
 def _find(conn: psycopg.Connection, actor: Actor, request_id: int, condition: str, lock: bool = False) -> dict:
-    """The request if `condition` lets this actor at it; otherwise the one 404 (so ids can't be probed)."""
     query = _SELECT + " WHERE r.request_id = %(id)s AND " + condition + (" FOR UPDATE OF r" if lock else "")
     row = conn.execute(query, {"id": request_id, "me": actor.user_id, "admin": actor.is_admin}).fetchone()
     if row is None:

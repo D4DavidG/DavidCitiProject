@@ -40,7 +40,6 @@ def _clean(data: dict) -> dict:
 
 
 def _check_assignee(conn: psycopg.Connection, project_id: int, user_id: int | None) -> None:
-    """An assignee must have a live booking on the task's project (None means unassigned)."""
     if user_id is None:
         return
     booked = conn.execute("SELECT 1 FROM assignments a JOIN users u ON u.user_id = a.user_id"
@@ -51,7 +50,6 @@ def _check_assignee(conn: psycopg.Connection, project_id: int, user_id: int | No
 
 
 def _load(conn: psycopg.Connection, actor: Actor, task_id: int, manage: bool) -> tuple[dict, dict]:
-    """Lock the task row (FOR UPDATE) and check project access; a task you can't reach is the same 404 as a missing one."""
     row = conn.execute("SELECT * FROM tasks WHERE task_id = %s FOR UPDATE", (task_id,)).fetchone()
     if row is None:
         raise NotFound(NOT_FOUND)
@@ -63,13 +61,11 @@ def _load(conn: psycopg.Connection, actor: Actor, task_id: int, manage: bool) ->
 
 
 def _signed_off(conn: psycopg.Connection, milestone_id: int) -> bool:
-    """True if the deliverable has been signed off."""
     return conn.execute("SELECT completed_at IS NOT NULL AS done FROM milestones WHERE milestone_id = %s",
                         (milestone_id,)).fetchone()["done"]
 
 
 def create_task(conn: psycopg.Connection, actor: Actor, milestone_id: int, data: dict) -> dict:
-    """Add a task to a deliverable. The project's manager or an admin."""
     values.only_allowed(data, _FIELDS)
     for required in ("title", "estimate_minutes"):
         if required not in data:
@@ -138,7 +134,6 @@ def held_count(conn: psycopg.Connection, user_id: int) -> int:
 
 
 def _limit_message(held: int, limit: int) -> str:
-    """The refusal text for Take this; "over" when a manager assigned past the limit."""
     tail = " Finish one first, or ask your manager to raise it."
     if held > limit:
         return f"You already hold {held} unfinished tasks, over your limit of {limit}.{tail}"
@@ -192,7 +187,6 @@ def release_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
 
 
 def archive_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
-    """Archive a task. The project's manager or an admin."""
     with atomic(conn):
         before, project = _load(conn, actor, task_id, manage=True)
         if before["is_archived"]:
@@ -205,7 +199,6 @@ def archive_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
 
 
 def reactivate_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
-    """Restore a task (its deliverable must be live); reopens the sign-off if the task is unfinished."""
     with atomic(conn):
         before, project = _load(conn, actor, task_id, manage=True)
         if not before["is_archived"]:

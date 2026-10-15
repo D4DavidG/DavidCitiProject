@@ -27,7 +27,6 @@ def visible_project(conn: psycopg.Connection, actor: Actor, project_id: int, loc
 
 
 def can_see(conn: psycopg.Connection, actor: Actor, project: dict) -> bool:
-    """Apply the visibility rules in the module docstring to one project row."""
     if actor.is_admin:
         return True
     if project["is_archived"]:

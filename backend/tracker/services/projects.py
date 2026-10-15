@@ -168,7 +168,6 @@ def reactivate_project(conn: psycopg.Connection, actor: Actor, project_id: int) 
 
 def _set_children(conn: psycopg.Connection, actor: Actor, table: str, project_id: int, name: str,
                   archive: bool, stamp: dt.datetime) -> None:
-    """Archive (with `stamp`) or restore (rows carrying `stamp`) one table's rows for a project, one audit row each."""
     key = _CHILD_KEYS[table]
     names = (sql.Identifier(table), sql.Identifier(key))
     if archive:

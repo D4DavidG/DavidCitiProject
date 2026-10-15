@@ -101,10 +101,7 @@ def _check_dates(merged: dict) -> None:
 
 
 def _load(conn: psycopg.Connection, actor: Actor, milestone_id: int, manage: bool) -> tuple[dict, dict]:
-    """The deliverable and its project, if visible (or manageable, with the project row locked).
-
-    A deliverable in a project you can't see answers the same 404 as a missing one.
-    """
+    """The deliverable and its project if visible (manage=True: manageable, project row locked); else 404/403."""
     row = conn.execute("SELECT * FROM milestones WHERE milestone_id = %s", (milestone_id,)).fetchone()
     if row is None:
         raise NotFound(NOT_FOUND)
@@ -119,7 +116,6 @@ def _load(conn: psycopg.Connection, actor: Actor, milestone_id: int, manage: boo
 # --- create, read, update, archive ---
 
 def create_milestone(conn: psycopg.Connection, actor: Actor, project_id: int, data: dict) -> dict:
-    """Add a deliverable to a project. The project's manager or an admin."""
     values.only_allowed(data, _FIELDS)
     for required in ("name", "start_date", "due_date"):
         if required not in data:
@@ -136,7 +132,6 @@ def create_milestone(conn: psycopg.Connection, actor: Actor, project_id: int, da
 
 
 def get_milestone(conn: psycopg.Connection, actor: Actor, milestone_id: int) -> dict:
-    """One deliverable with status and progress, if the actor can see its project."""
     _load(conn, actor, milestone_id, manage=False)
     return decorated(conn, "m.milestone_id = %(id)s", {"id": milestone_id})[0]
 
@@ -148,7 +143,6 @@ def list_milestones(conn: psycopg.Connection, actor: Actor, project_id: int) -> 
 
 
 def update_milestone(conn: psycopg.Connection, actor: Actor, milestone_id: int, data: dict) -> dict:
-    """Change name, description, dates or order. Status is computed, so it is not an input."""
     values.only_allowed(data, _FIELDS)
     clean = _clean(data)
     if not clean:
@@ -315,7 +309,6 @@ def remove_dependency(conn: psycopg.Connection, actor: Actor, milestone_id: int,
 
 
 def _visible_to(conn: psycopg.Connection, actor: Actor, milestone: dict) -> bool:
-    """True if the actor can see the deliverable's project."""
     try:
         visible_project(conn, actor, milestone["project_id"])
         return True
