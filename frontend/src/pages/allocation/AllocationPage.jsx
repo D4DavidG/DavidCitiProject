@@ -102,7 +102,7 @@ export default function AllocationPage() {
       />
 
       <Paper component="section" variant="outlined" aria-labelledby="allocation-help" sx={{ p: 2, mb: 3 }}>
-        <Typography id="allocation-help" component="h2" variant="subtitle1" sx={{ fontWeight: 600 }}>How to read this</Typography>
+        <Typography id="allocation-help" component="h2" variant="h3">How to read this</Typography>
         <Typography variant="body2" sx={{ mt: 0.5 }}>
           Each row is a person and each column is a week. A cell shows the hours booked against that person&apos;s weekly
           capacity, for example 32 / 40 h. Red with a warning icon means they are over capacity. Use it to spot
@@ -122,7 +122,7 @@ export default function AllocationPage() {
             {weeks.length ? `${formatDay(weeks[0])} – ${formatDay(addDays(weeks.at(-1), 6))}` : '…'}
           </Typography>
           <IconButton aria-label="Next week" onClick={() => move(7)} disabled={!start}><NextIcon /></IconButton>
-          <Button size="small" onClick={() => setWeekFrom('')} disabled={!weekFrom}>This week</Button>
+          <Button size="small" variant="outlined" onClick={() => setWeekFrom('')} disabled={!weekFrom}>This week</Button>
         </Box>
         <FormControlLabel
           control={<Switch checked={overOnly} onChange={(e) => { setOverOnly(e.target.checked); setPageNumber(1) }} />}

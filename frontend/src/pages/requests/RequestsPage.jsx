@@ -109,7 +109,6 @@ export default function RequestsPage() {
           <MenuItem key={k} onClick={() => { setMenuAnchor(null); setDialog({ action: 'send', kind: k }) }}>{KIND_LABELS[k]}</MenuItem>
         ))}
       </Menu>
-      {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
       {scopes.length > 1 && (
         <Tabs value={scope} onChange={(_, value) => setTab(value)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
           {scopes.map((s) => <Tab key={s} value={s} label={TAB_LABELS[s]} id={`requests-tab-${s}`} aria-controls="requests-panel" />)}
@@ -122,6 +121,7 @@ export default function RequestsPage() {
           kinds={kindsOn(user.role, scope)}
           view={views[scope]}
           version={version}
+          notice={message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
           onView={(patch) => setViews((all) => ({ ...all, [scope]: { ...all[scope], ...patch } }))}
           onDecide={(action, found) => setDialog({ action, request: found })}
         />

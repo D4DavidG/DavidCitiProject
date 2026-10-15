@@ -81,9 +81,63 @@ describe('NotificationsPage', () => {
     expect(screen.getByRole('button', { name: /mark all as read/i })).toBeDisabled()
   })
 
-  it('explains to an employee what they will be notified about', async () => {
+  it('tells an employee what reaches them: changes other people made to their own work and account', async () => {
     stubApi({ 'GET /notifications': [200, page([])] })
     renderAt(<NotificationsPage />, { path: '/notifications', auth: session(USERS.employee) })
-    expect(await screen.findByText(/changes made by the people who report to you/i)).toBeInTheDocument()
+    expect(await screen.findByText('Changes other people made to your bookings, tasks, logged time or account.')).toBeInTheDocument()
+    expect(screen.queryByText(/people who report to you/i)).not.toBeInTheDocument() // an employee has no reports
+  })
+
+  it("tells a manager about their reports' changes and about changes others made to their own work", async () => {
+    stubApi({ 'GET /notifications': [200, page([])] })
+    renderAt(<NotificationsPage />, { path: '/notifications', auth: session(USERS.manager) })
+    expect(await screen.findByText('Changes made by the people who report to you, and changes others made to your own work or account.')).toBeInTheDocument()
+  })
+
+  it('draws "Mark as read" as a button of the secondary kind, not a bare word', async () => {
+    renderPage()
+    const unread = await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    expect(within(unread).getByRole('button', { name: /mark as read/i })).toHaveClass('MuiButton-outlined')
+  })
+
+  it('cannot mark everything as read while a search hides some of it, and can again once the search is cleared', async () => {
+    const calls = renderPage()
+    await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    expect(screen.getByRole('button', { name: /mark all as read/i })).toBeEnabled()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search notifications' }), 'ana')
+    await waitFor(() => expect(calls.at(-1).query.q).toBe('ana'))
+    expect(screen.getByRole('button', { name: /mark all as read/i })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /mark all as read/i })).toBeEnabled())
+  })
+
+  it('shows a failed mark-as-read below the search and the unread switch, just above the list', async () => {
+    renderPage({ 'POST /notifications/5/read': [404, { error: 'Notification not found.' }] })
+    const unread = await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    await userEvent.click(within(unread).getByRole('button', { name: /mark as read/i }))
+    const message = await screen.findByText('Notification not found.')
+    const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(screen.getByRole('textbox', { name: 'Search notifications' }), message)).toBe(true)
+    expect(follows(screen.getByLabelText(/unread only/i), message)).toBe(true)
+    expect(follows(message, screen.getByRole('listitem', { name: /ana ruiz logged 8 h/i }))).toBe(true)
+  })
+
+  it('steps back to the last page that exists when marking the last unread one empties an unread-only page', async () => {
+    let marked = false
+    const calls = renderPage({
+      'GET /notifications': ({ query }) => {
+        const onTwo = query.page === '2'
+        if (marked) return [200, onTwo ? page([], { page: 2, totalPages: 1 }) : page([READ], { totalPages: 1 })]
+        return [200, page([onTwo ? UNREAD : READ], { page: Number(query.page), totalPages: 2 })]
+      },
+      'POST /notifications/5/read': () => { marked = true; return [200, { ...UNREAD, isRead: true }] },
+    })
+    await screen.findByRole('listitem', { name: /changed their email/i })
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    const unread = await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    await userEvent.click(within(unread).getByRole('button', { name: /mark as read/i }))
+    expect(await screen.findByRole('listitem', { name: /changed their email/i })).toBeInTheDocument()
+    expect(screen.queryByText('No notifications.')).not.toBeInTheDocument()
+    expect(calls.at(-1).query.page).toBe('1')
   })
 })

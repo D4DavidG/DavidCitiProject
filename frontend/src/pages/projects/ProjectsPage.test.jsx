@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProjectsPage from './ProjectsPage'
 import { APOLLO, MARIA } from './fixtures'
@@ -51,14 +51,40 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(calls.at(-1).query.status).toBe('ON_HOLD'))
   })
 
-  it('makes the project name a button-style link you can reach with the keyboard', async () => {
+  it('makes the project name a real link you can reach with the keyboard (it only goes somewhere, so it is not a button)', async () => {
     renderList()
     const link = await screen.findByRole('link', { name: 'Apollo' })
     expect(link).toHaveAttribute('href', '/projects/1')
-    expect(link).toHaveClass('MuiButton-root') // drawn as a control, not as plain text
+    expect(link).toHaveClass('MuiLink-root')
+    expect(link).not.toHaveClass('MuiButton-root')
     expect(link).not.toHaveAttribute('tabindex', '-1')
     link.focus()
     expect(link).toHaveFocus()
+  })
+
+  it('shows the newest search even when an older, slower answer arrives last', async () => {
+    renderList()
+    await screen.findByRole('link', { name: 'Apollo' })
+    const stubbed = globalThis.fetch
+    const held = {} // q -> a function that lets that request answer
+    const answer = (q) => ({ ok: true, status: 200, text: () => Promise.resolve(JSON.stringify(page([{ ...APOLLO, projectId: 7, name: `Answer for ${q}` }]))) })
+    vi.stubGlobal('fetch', vi.fn((url, init) => {
+      const { pathname, searchParams } = new URL(url, 'http://localhost')
+      const q = searchParams.get('q')
+      if (!pathname.endsWith('/projects') || !['ben', 'benjamin'].includes(q)) return stubbed(url, init)
+      return new Promise((resolve) => { held[q] = () => resolve(answer(q)) })
+    }))
+    const box = screen.getByRole('textbox', { name: 'Search projects' })
+    await userEvent.type(box, 'ben')
+    await waitFor(() => expect(held.ben).toBeTypeOf('function'))
+    await userEvent.type(box, 'jamin')
+    await waitFor(() => expect(held.benjamin).toBeTypeOf('function'))
+    held.benjamin() // the newer search answers first ...
+    expect(await screen.findByRole('link', { name: 'Answer for benjamin' })).toBeInTheDocument()
+    held.ben() // ... and the older one limps in afterwards
+    await new Promise((resolve) => { setTimeout(resolve, 50) })
+    expect(screen.getByRole('link', { name: 'Answer for benjamin' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Answer for ben' })).not.toBeInTheDocument()
   })
 
   it('lets admins see archived projects too', async () => {
@@ -141,6 +167,49 @@ describe('ProjectsPage', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: /^archive project$/i }))
       await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/projects/1/archive')).toBe(true))
       await waitFor(() => expect(calls.filter((c) => c.method === 'GET' && c.path === '/projects').length).toBe(2)) // list reloaded
+    })
+
+    it('draws Archive as the danger kind and Request archive as the secondary kind, never a bare word', async () => {
+      renderList(USERS.admin, both)
+      const archive = await screen.findByRole('button', { name: 'Archive Apollo' })
+      expect(archive).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+      cleanup()
+      renderList(USERS.manager, both)
+      const request = await screen.findByRole('button', { name: 'Request archive for Apollo' })
+      expect(request).toHaveClass('MuiButton-outlined')
+      expect(request).not.toHaveClass('MuiButton-colorError')
+    })
+
+    it('shows the request-sent message below the search and filter rows, just above the list', async () => {
+      renderList(USERS.manager, { ...both, 'POST /project-requests': [201, { requestId: 4 }] })
+      await screen.findByRole('link', { name: 'Apollo' })
+      await userEvent.click(screen.getByRole('button', { name: 'Request archive for Apollo' }))
+      const dialog = await screen.findByRole('dialog', { name: /request archive of apollo/i })
+      await userEvent.click(within(dialog).getByRole('button', { name: /send request/i }))
+      const message = await screen.findByText(/request sent.*an admin will answer it/i)
+      const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(follows(screen.getByRole('textbox', { name: 'Search projects' }), message)).toBe(true)
+      expect(follows(screen.getByLabelText(/^status/i), message)).toBe(true)
+      expect(follows(message, screen.getByRole('table', { name: 'Projects' }))).toBe(true)
+    })
+
+    it('steps back to the last page that exists when archiving empties the page you are on', async () => {
+      let archived = false
+      const calls = renderList(USERS.admin, {
+        'GET /projects': (call) => {
+          const onTwo = call.query.page === '2'
+          if (archived) return [200, onTwo ? page([], { page: 2, totalPages: 1 }) : page([ZEUS], { totalPages: 1 })]
+          return [200, page([onTwo ? APOLLO : ZEUS], { page: Number(call.query.page), totalPages: 2 })]
+        },
+        'POST /projects/1/archive': () => { archived = true; return [200, { ...APOLLO, isArchived: true }] },
+      })
+      await screen.findByRole('link', { name: 'Zeus' })
+      await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Archive Apollo' }))
+      await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^archive project$/i }))
+      expect(await screen.findByRole('link', { name: 'Zeus' })).toBeInTheDocument()
+      expect(screen.queryByText('No projects match.')).not.toBeInTheDocument()
+      expect(calls.at(-1).query.page).toBe('1')
     })
 
     it('shows the same buttons on the phone cards', async () => {

@@ -190,6 +190,36 @@ describe('PeoplePage', () => {
     expect(calls.filter((c) => c.path === '/users/4/archive')).toHaveLength(1)
   })
 
+  it('draws row buttons as the secondary kind and Archive as the danger kind, with no bare words', async () => {
+    renderPeople()
+    const table = await screen.findByRole('table', { name: 'People' })
+    ;['Capacity for Ben Okafor', 'History for Ben Okafor', 'Edit Ben Okafor', 'Reset password for Ben Okafor'].forEach((name) => {
+      const button = within(table).getByRole('button', { name })
+      expect(button).toHaveClass('MuiButton-outlined')
+      expect(button).not.toHaveClass('MuiButton-colorError')
+    })
+    expect(within(table).getByRole('button', { name: 'Archive Ben Okafor' })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+  })
+
+  it('steps back to the last page that exists when archiving empties the page you are on', async () => {
+    let archived = false
+    const calls = renderPeople(USERS.admin, {
+      'GET /users': ({ query }) => {
+        const onTwo = query.page === '2'
+        if (archived) return [200, onTwo ? page([], { page: 2, totalPages: 1 }) : page([MARIA], { totalPages: 1 })]
+        return [200, page([onTwo ? BEN : MARIA], { page: Number(query.page), totalPages: 2 })]
+      },
+      'POST /users/4/archive': () => { archived = true; return [200, { ...BEN, isArchived: true }] },
+    })
+    await screen.findByText('Maria Lopez')
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Archive Ben Okafor' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
+    expect(await screen.findByText('Maria Lopez')).toBeInTheDocument()
+    expect(screen.queryByText('Nobody matches.')).not.toBeInTheDocument()
+    expect(calls.at(-1).query.page).toBe('1')
+  })
+
   describe('Reactivate on an archived person', () => {
     const ANA = { ...BEN, userId: 8, username: 'AR123456', firstName: 'Ana', lastName: 'Ruiz', isArchived: true }
 
@@ -227,6 +257,17 @@ describe('PeoplePage', () => {
       expect(await screen.findByText('Their line manager is archived: reactivate them first.')).toBeInTheDocument()
       expect(button).toBeEnabled()
       expect(calls.filter((c) => c.path === '/users/8/reactivate')).toHaveLength(1)
+    })
+
+    it('shows that refusal below the search and filter rows, just above the list', async () => {
+      const { release } = renderArchived([409, { error: 'Their line manager is archived: reactivate them first.' }])
+      fireEvent.click(await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' }))
+      release()
+      const message = await screen.findByText('Their line manager is archived: reactivate them first.')
+      const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(follows(screen.getByRole('textbox', { name: 'Search people' }), message)).toBe(true)
+      expect(follows(screen.getByLabelText(/^role/i), message)).toBe(true)
+      expect(follows(message, screen.getByRole('table', { name: 'People' }))).toBe(true)
     })
 
     it('reloads the list after it succeeds', async () => {

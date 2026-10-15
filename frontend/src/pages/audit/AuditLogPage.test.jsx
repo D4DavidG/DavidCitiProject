@@ -60,6 +60,20 @@ describe('AuditLogPage', () => {
     await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'ana', page: '1' }))
   })
 
+  it('says what the search looks through, which is what the server matches', async () => {
+    renderLog()
+    await screen.findByRole('table', { name: /audit log/i })
+    expect(screen.getByRole('textbox', { name: 'Search the audit log' })).toHaveAttribute('placeholder', 'Person, record type, action or summary')
+  })
+
+  it('draws Clear and Show changes as buttons of the secondary kind, and Apply as the one primary', async () => {
+    renderLog()
+    const table = await screen.findByRole('table', { name: /audit log/i })
+    expect(screen.getByRole('button', { name: 'Clear' })).toHaveClass('MuiButton-outlined')
+    expect(within(table).getAllByRole('button', { name: /show changes/i })[0]).toHaveClass('MuiButton-outlined')
+    expect(screen.getByRole('button', { name: 'Apply' })).toHaveClass('MuiButton-contained')
+  })
+
   it('keeps the search when filters are applied, and the filters when searching', async () => {
     const calls = renderLog()
     await screen.findByRole('table', { name: /audit log/i })

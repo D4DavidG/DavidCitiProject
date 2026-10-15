@@ -34,8 +34,8 @@ function Node({ node, needs, canManage, unlinking, onUnlink }) {
         )}
         {canManage && needs.map((dep) => (
           // Words, not just an icon: a phone has no hover to reveal a tooltip.
-          <Button key={dep.milestoneId} size="small" color="inherit" startIcon={<LinkOffIcon fontSize="small" />}
-            onClick={() => onUnlink(node, dep)} disabled={unlinking === dep.milestoneId} sx={{ justifySelf: 'start', color: 'text.secondary' }}>
+          <Button key={dep.milestoneId} size="small" variant="outlined" color="error" startIcon={<LinkOffIcon fontSize="small" />}
+            onClick={() => onUnlink(node, dep)} disabled={unlinking === dep.milestoneId} sx={{ justifySelf: 'start' }}>
             Remove link to {dep.name}
           </Button>
         ))}

@@ -53,8 +53,8 @@ export default function ResourcesTab({ projectId, bookings, canManage, onChanged
       align: 'right',
       render: (b) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button size="small" onClick={() => setEditing(b)}>Edit</Button>
-          <Button size="small" color="inherit" onClick={() => setArchiving(b)}>Archive</Button>
+          <Button size="small" variant="outlined" onClick={() => setEditing(b)}>Edit</Button>
+          <Button size="small" variant="outlined" color="error" onClick={() => setArchiving(b)}>Archive</Button>
         </Box>
       ),
     }] : []),

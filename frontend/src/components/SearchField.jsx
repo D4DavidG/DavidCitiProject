@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Box, IconButton, InputAdornment, TextField } from '@mui/material'
+import { Box, IconButton, InputAdornment, TextField, Tooltip } from '@mui/material'
 import ClearOutlined from '@mui/icons-material/ClearOutlined'
 import SearchOutlined from '@mui/icons-material/SearchOutlined'
 import { useIsMobile } from '../theme/responsive'
 
 /** How long typing must pause before the search is sent, in milliseconds. */
 const DELAY_MS = 300
+
+/** The longest search the server takes (`values.search`); longer would be refused, not shortened. */
+const MAX_LENGTH = 100
 
 /**
  * The search box at the top of a list. It filters as you type: 300 ms after you stop
@@ -72,12 +75,15 @@ export default function SearchField({ label, value = '', onSearch, placeholder, 
             ),
             endAdornment: text ? (
               <InputAdornment position="end">
-                <IconButton size="small" edge="end" aria-label="Clear search" onClick={clear}>
-                  <ClearOutlined fontSize="small" />
-                </IconButton>
+                <Tooltip title="Clear search">
+                  <IconButton size="small" edge="end" aria-label="Clear search" onClick={clear}>
+                    <ClearOutlined fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </InputAdornment>
             ) : undefined,
           },
+          htmlInput: { maxLength: MAX_LENGTH },
         }}
       />
     </Box>

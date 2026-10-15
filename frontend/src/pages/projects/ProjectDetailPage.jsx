@@ -114,8 +114,8 @@ export default function ProjectDetailPage() {
               <>
                 <Button component={Link} to={`/projects/${projectId}/dependencies`} variant="outlined">Dependency view</Button>
                 {canManage && <Button variant="outlined" onClick={() => setEditing(true)}>Edit project</Button>}
-                {archive === 'archive' && <Button color="inherit" onClick={() => setArchiving(true)}>Archive project</Button>}
-                {archive === 'request' && <Button color="inherit" onClick={() => setRequesting(true)}>Request archive</Button>}
+                {archive === 'archive' && <Button variant="outlined" color="error" onClick={() => setArchiving(true)}>Archive project</Button>}
+                {archive === 'request' && <Button variant="outlined" onClick={() => setRequesting(true)}>Request archive</Button>}
                 {isAdmin && p.isArchived && (
                   <Button variant="contained" onClick={reactivate} disabled={reactivating}>{reactivating ? 'Reactivating…' : 'Reactivate'}</Button>
                 )}

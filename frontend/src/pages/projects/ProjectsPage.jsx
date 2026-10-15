@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Link, useNavigate } from 'react-router'
-import { Alert, Box, Button, Chip, FormControlLabel, MenuItem, Switch, TextField } from '@mui/material'
+import { Link as RouterLink, useNavigate } from 'react-router'
+import { Alert, Box, Button, Chip, FormControlLabel, Link, MenuItem, Switch, TextField } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
@@ -15,6 +15,7 @@ import { formatCents, formatDate } from '../../services/format'
 import { usePeopleOptions } from '../../services/people'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useLastPage } from '../../services/useLastPage'
 import RequestArchiveDialog from './RequestArchiveDialog'
 import { archiveAction } from './archiveAction'
 import { PROJECT_STATUSES } from './constants'
@@ -47,7 +48,7 @@ NewProjectDialog.propTypes = { onClose: PropTypes.func.isRequired, onCreated: Pr
 
 /**
  * Every project you can see (admins: all, managers: theirs, employees: the ones
- * they're booked on), searchable and filterable on the server. Each name is a button
+ * they're booked on), searchable and filterable on the server. Each name is a link
  * that opens the project. Admins can archive from here; a manager can ask the admins
  * to archive a project they manage.
  */
@@ -68,16 +69,17 @@ export default function ProjectsPage() {
   }), [q, status, includeArchived, pageNumber])
   const { data, error, loading, reload } = useApi(load)
   const rows = data?.items ?? []
+  useLastPage(data, pageNumber, setPageNumber)
 
   const columns = [
     {
       key: 'name',
       label: 'Project',
-      // A bordered button that is a real link: obviously clickable and reachable by keyboard.
+      // A real link (it only goes somewhere, so it is a link, not a button): green, underlined on hover and focus.
       render: (p) => (
-        <Button component={Link} to={`/projects/${p.projectId}`} variant="outlined" size="small" sx={{ fontWeight: 600, textTransform: 'none', textAlign: 'left' }}>
+        <Link component={RouterLink} to={`/projects/${p.projectId}`} underline="hover" sx={{ fontWeight: 600 }}>
           {p.name}
-        </Button>
+        </Link>
       ),
     },
     {
@@ -103,8 +105,8 @@ export default function ProjectsPage() {
         const action = archiveAction(user, p)
         return (
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-            {action === 'archive' && <Button size="small" color="inherit" aria-label={`Archive ${p.name}`} onClick={() => setDialog({ kind: 'archive', project: p })}>Archive</Button>}
-            {action === 'request' && <Button size="small" color="inherit" aria-label={`Request archive for ${p.name}`} onClick={() => setDialog({ kind: 'request', project: p })}>Request archive</Button>}
+            {action === 'archive' && <Button size="small" variant="outlined" color="error" aria-label={`Archive ${p.name}`} onClick={() => setDialog({ kind: 'archive', project: p })}>Archive</Button>}
+            {action === 'request' && <Button size="small" variant="outlined" aria-label={`Request archive for ${p.name}`} onClick={() => setDialog({ kind: 'request', project: p })}>Request archive</Button>}
           </Box>
         )
       },
@@ -124,7 +126,6 @@ export default function ProjectsPage() {
       <Box sx={{ mb: 2 }}>
         <SearchField id="projects-search" label="Search projects" placeholder="Project name" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
       </Box>
-      {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, alignItems: 'center' }}>
         <TextField id="projects-status" select label="Status" size="small" value={status} onChange={(e) => { setStatus(e.target.value); setPageNumber(1) }} sx={{ minWidth: 160 }}>
           <MenuItem value="">All statuses</MenuItem>
@@ -138,6 +139,7 @@ export default function ProjectsPage() {
         )}
       </Box>
 
+      {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
       <PageState loading={loading} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={rows} rowKey="projectId" label="Projects" empty="No projects match." />
         <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />

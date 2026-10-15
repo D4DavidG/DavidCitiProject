@@ -72,6 +72,32 @@ describe('ApprovalsPage', () => {
     expect(screen.queryByText(/nothing waiting for approval/i)).not.toBeInTheDocument()
   })
 
+  it('draws Approve as the primary kind (no second green) and Reject as the danger kind', async () => {
+    renderQueue()
+    await screen.findByText('Ben Okafor')
+    const approve = screen.getByRole('button', { name: /approve 8 h by ben okafor/i })
+    expect(approve).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary')
+    expect(approve).not.toHaveClass('MuiButton-colorSuccess')
+    expect(screen.getByRole('button', { name: /reject 8 h by ben okafor/i })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+  })
+
+  it('steps back to the last page that exists when the last entry on the last page is decided', async () => {
+    let decided = false
+    const calls = renderQueue({
+      'GET /approvals/time-entries': ({ query }) => {
+        if (decided) return [200, query.page === '2' ? page([], { page: 2, totalPages: 1 }) : page([{ ...ENTRY, entryId: 31, personName: 'Cara Diaz' }], { totalPages: 1 })]
+        return [200, page([query.page === '2' ? ENTRY : { ...ENTRY, entryId: 31, personName: 'Cara Diaz' }], { page: Number(query.page), totalPages: 2 })]
+      },
+      'POST /time-entries/30/approve': () => { decided = true; return [200, { ...ENTRY, status: 'APPROVED' }] },
+    })
+    await screen.findByText('Cara Diaz')
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /approve 8 h by ben okafor/i }))
+    expect(await screen.findByText('Cara Diaz')).toBeInTheDocument()
+    expect(screen.queryByText(/nothing waiting for approval/i)).not.toBeInTheDocument()
+    expect(calls.at(-1).query.page).toBe('1')
+  })
+
   it("shows the server's refusal", async () => {
     renderQueue({ 'POST /time-entries/30/approve': [404, { error: 'Time entry not found.' }] })
     await screen.findByText('Ben Okafor')

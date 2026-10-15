@@ -112,6 +112,19 @@ describe('AllocationPage', () => {
     expect(within(panel).getByText(/spot overbooking before it happens/i)).toBeInTheDocument()
   })
 
+  it('titles the panel like every other section title (the h3 look on a level-2 heading)', async () => {
+    renderGrid()
+    await screen.findByRole('row', { name: /Ben Okafor/ })
+    const title = screen.getByRole('heading', { level: 2, name: 'How to read this' })
+    expect(title).toHaveClass('MuiTypography-h3')
+  })
+
+  it('draws "This week" as a button of the secondary kind', async () => {
+    renderGrid()
+    await screen.findByRole('row', { name: /Ben Okafor/ })
+    expect(screen.getByRole('button', { name: 'This week' })).toHaveClass('MuiButton-outlined')
+  })
+
   it('shows the panel and its legend while the grid is still loading', async () => {
     stubApi({ 'GET /dashboard/allocation': [200, { ...page([BEN]), weeks: WEEKS }] })
     const release = holdOpen('/dashboard/allocation')

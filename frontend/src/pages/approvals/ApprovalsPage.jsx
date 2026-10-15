@@ -8,6 +8,7 @@ import SearchField from '../../components/SearchField'
 import { formatDate, formatHours } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useLastPage } from '../../services/useLastPage'
 
 /**
  * Logged time waiting for a decision: a manager sees their direct reports' time, an
@@ -19,6 +20,7 @@ export default function ApprovalsPage() {
   const [pageNumber, setPageNumber] = useState(1)
   const load = useCallback(() => request('GET', '/approvals/time-entries', { query: { q, page: pageNumber, pageSize: 20 } }), [q, pageNumber])
   const { data, error, loading, reload } = useApi(load)
+  useLastPage(data, pageNumber, setPageNumber)
   const [message, setMessage] = useState(null)
   const [busy, setBusy] = useState(null)
 
@@ -51,8 +53,8 @@ export default function ApprovalsPage() {
       align: 'right',
       render: (e) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button size="small" variant="contained" color="success" disabled={busy === e.entryId} aria-label={`Approve ${describe(e)}`} onClick={() => decide(e, 'approve')}>Approve</Button>
-          <Button size="small" color="error" disabled={busy === e.entryId} aria-label={`Reject ${describe(e)}`} onClick={() => decide(e, 'reject')}>Reject</Button>
+          <Button size="small" variant="contained" disabled={busy === e.entryId} aria-label={`Approve ${describe(e)}`} onClick={() => decide(e, 'approve')}>Approve</Button>
+          <Button size="small" variant="outlined" color="error" disabled={busy === e.entryId} aria-label={`Reject ${describe(e)}`} onClick={() => decide(e, 'reject')}>Reject</Button>
         </Box>
       ),
     },

@@ -454,6 +454,12 @@ describe('FormDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith({ overtimeAllowed: true })
   })
 
+  it('has one primary button (Save) and Cancel as the secondary kind', () => {
+    renderForm({})
+    expect(screen.getByRole('button', { name: /save/i })).toHaveClass('MuiButton-contained')
+    expect(screen.getByRole('button', { name: /cancel/i })).toHaveClass('MuiButton-outlined')
+  })
+
   it('closes after a successful save', async () => {
     const onClose = vi.fn()
     renderForm({ onClose })

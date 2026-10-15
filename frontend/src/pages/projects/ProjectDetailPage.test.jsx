@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProjectDetailPage from './ProjectDetailPage'
 import { APOLLO, BOARD_PEOPLE, BOARD_TASKS, BOOKINGS, BUDGET, BUILD, BUILD_TASKS, DESIGN, MARIA } from './fixtures'
@@ -130,6 +130,18 @@ describe('ProjectDetailPage', () => {
     expect(screen.getByLabelText(/end date/i)).toHaveAccessibleDescription("End date can't be before start date.")
     expect(screen.getByLabelText(/hours per week/i)).toHaveFocus()
     expect(calls.some((c) => c.method === 'POST')).toBe(false)
+  })
+
+  it('draws row actions as the secondary kind and every Archive as the danger kind', async () => {
+    renderDetail(USERS.manager)
+    await screen.findByRole('heading', { name: 'Apollo' })
+    const card = await screen.findByRole('region', { name: 'Build' })
+    expect(within(card).getByRole('button', { name: 'Edit' })).toHaveClass('MuiButton-outlined')
+    expect(within(card).getByRole('button', { name: 'Archive' })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+    await userEvent.click(screen.getByRole('tab', { name: 'Resources' }))
+    const table = await screen.findByRole('table', { name: /people booked/i })
+    expect(within(table).getAllByRole('button', { name: 'Edit' })[0]).toHaveClass('MuiButton-outlined')
+    expect(within(table).getAllByRole('button', { name: 'Archive' })[0]).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
   })
 
   it('shows the budget figures', async () => {
@@ -343,6 +355,16 @@ describe('ProjectDetailPage', () => {
       expect(screen.queryByRole('button', { name: /request archive/i })).not.toBeInTheDocument()
     })
 
+    it('draws Archive project as the danger kind and Request archive as the secondary kind', async () => {
+      renderDetail(USERS.admin)
+      expect(await screen.findByRole('button', { name: /^archive project$/i })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+      cleanup()
+      renderDetail(USERS.manager)
+      const request = await screen.findByRole('button', { name: /^request archive$/i })
+      expect(request).toHaveClass('MuiButton-outlined')
+      expect(request).not.toHaveClass('MuiButton-colorError')
+    })
+
     it("gives another project's manager neither", async () => {
       renderDetail(USERS.manager, { 'GET /projects/1': [200, { ...APOLLO, managerId: 9 }] })
       await screen.findByRole('heading', { name: 'Apollo' })
@@ -404,6 +426,7 @@ describe('ProjectDetailPage', () => {
       const ready = await screen.findByRole('article', { name: 'Go-live checklist' })
       expect(screen.queryByRole('button', { name: 'Assign' })).not.toBeInTheDocument()
       expect(within(screen.getByRole('article', { name: 'Portal UI' })).queryByRole('button')).not.toBeInTheDocument()
+      expect(within(ready).getByRole('button', { name: 'Take this' })).toHaveClass('MuiButton-outlined') // a row action: secondary, not a second primary
       await userEvent.click(within(ready).getByRole('button', { name: 'Take this' }))
       await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toBe(true))
       await userEvent.click(within(screen.getByRole('article', { name: 'Portal API' })).getByRole('button', { name: 'Put back' }))

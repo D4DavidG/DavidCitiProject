@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
-import { Link } from 'react-router'
-import { Box, Button, MenuItem, TextField } from '@mui/material'
+import { Link as RouterLink } from 'react-router'
+import { Box, Button, Link, MenuItem, TextField } from '@mui/material'
 import DataTable from '../../components/DataTable'
 import PageState, { Pager } from '../../components/PageState'
 import SearchField from '../../components/SearchField'
 import StatusChip from '../../components/StatusChip'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useLastPage } from '../../services/useLastPage'
 import { KIND_LABELS } from './constants'
 
 /**
@@ -16,12 +17,13 @@ import { KIND_LABELS } from './constants'
  * Reject show). The page keeps `view` so each tab remembers its own search and page;
  * `version` goes up after a change so the list loads again.
  */
-export default function RequestList({ scope, kinds, view, version, onView, onDecide }) {
+export default function RequestList({ scope, kinds, view, version, notice = null, onView, onDecide }) {
   const { q, status, kind, page: pageNumber } = view
   const load = useCallback(() => request('GET', '/project-requests', {
     query: { scope, q, status, kind, page: pageNumber, pageSize: 20 },
   }), [scope, q, status, kind, pageNumber])
   const { data, error, loading, reload } = useApi(load)
+  useLastPage(data, pageNumber, (next) => onView({ page: next }))
 
   // A new version means a request was sent or decided: load again (not on the first render).
   const seenVersion = useRef(version)
@@ -44,11 +46,11 @@ export default function RequestList({ scope, kinds, view, version, onView, onDec
       align: 'right',
       render: (r) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          {r.createdProjectId && <Button size="small" component={Link} to={`/projects/${r.createdProjectId}`}>Open project</Button>}
+          {r.createdProjectId && <Link component={RouterLink} to={`/projects/${r.createdProjectId}`} underline="hover">Open project</Link>}
           {scope === 'decide' && r.status === 'PENDING' && (
             <>
-              <Button size="small" variant="contained" color="success" aria-label={`Approve ${r.name}`} onClick={() => onDecide('approve', r)}>Approve</Button>
-              <Button size="small" color="error" aria-label={`Reject ${r.name}`} onClick={() => onDecide('reject', r)}>Reject</Button>
+              <Button size="small" variant="contained" aria-label={`Approve ${r.name}`} onClick={() => onDecide('approve', r)}>Approve</Button>
+              <Button size="small" variant="outlined" color="error" aria-label={`Reject ${r.name}`} onClick={() => onDecide('reject', r)}>Reject</Button>
             </>
           )}
         </Box>
@@ -76,6 +78,7 @@ export default function RequestList({ scope, kinds, view, version, onView, onDec
         </TextField>
       </Box>
 
+      {notice}
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={data?.items ?? []} rowKey="requestId" label="Requests"
           empty={q || status || kind ? 'No requests match.' : 'No requests.'} />
@@ -99,6 +102,8 @@ RequestList.propTypes = {
   }).isRequired,
   /** Changes after every send or decision, to load the list again. */
   version: PropTypes.number.isRequired,
+  /** A message (an Alert) shown below the search and filters, just above the list. */
+  notice: PropTypes.node,
   /** Called with the fields to change in `view`. */
   onView: PropTypes.func.isRequired,
   /** Called with 'approve' or 'reject' and the request, from the Approve and Reject buttons. */

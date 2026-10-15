@@ -40,7 +40,7 @@ export default function AuditLogPage() {
       <PageHeader title="Audit log" subtitle="Every change, who made it and when. Nothing here can be edited or deleted." />
 
       <Box sx={{ mb: 2 }}>
-        <SearchField label="Search the audit log" placeholder="Person, record type or action" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
+        <SearchField label="Search the audit log" placeholder="Person, record type, action or summary" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
       </Box>
       <Box
         component="form"
@@ -60,7 +60,7 @@ export default function AuditLogPage() {
         <TextField id="audit-to" size="small" type="date" label="To" value={draft.dateTo} onChange={set('dateTo')} slotProps={{ inputLabel: { shrink: true } }} />
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button type="submit" variant="contained">Apply</Button>
-          <Button onClick={() => { setDraft(EMPTY_FILTERS); setFilters(EMPTY_FILTERS); setPageNumber(1) }}>Clear</Button>
+          <Button variant="outlined" onClick={() => { setDraft(EMPTY_FILTERS); setFilters(EMPTY_FILTERS); setPageNumber(1) }}>Clear</Button>
         </Box>
       </Box>
 
@@ -90,7 +90,7 @@ export default function AuditLogPage() {
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{ENTITY_LABELS[entry.entityType] ?? entry.entityType} #{entry.entityId}</TableCell>
                     <TableCell>{entry.summary}</TableCell>
                     <TableCell align="right">
-                      <Button size="small" onClick={() => setOpen(open === entry.auditId ? null : entry.auditId)}>
+                      <Button size="small" variant="outlined" onClick={() => setOpen(open === entry.auditId ? null : entry.auditId)}>
                         {open === entry.auditId ? 'Hide changes' : 'Show changes'}
                       </Button>
                     </TableCell>

@@ -169,6 +169,20 @@ describe('SearchField', () => {
     expect(box).toHaveAttribute('id', 'people-search')
   })
 
+  it('holds the text to 100 characters, which is the most the server takes', () => {
+    const { box } = setup()
+    expect(box).toHaveAttribute('maxlength', '100')
+  })
+
+  it('gives the clear button a tooltip as well as its accessible name', () => {
+    const { box } = setup()
+    fireEvent.change(box, { target: { value: 'x' } })
+    const clear = screen.getByRole('button', { name: 'Clear search' })
+    fireEvent.mouseOver(clear)
+    wait(300)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Clear search')
+  })
+
   describe('width', () => {
     it('is about 360 px wide on a desktop', () => {
       setup()

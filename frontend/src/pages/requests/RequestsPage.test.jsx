@@ -93,6 +93,37 @@ describe('RequestsPage', () => {
     expect(calls[0].query.scope).toBe('sent')
   })
 
+  it('draws Approve as the primary kind (no second green), Reject as the danger kind, and Open project as a link', async () => {
+    renderRequests()
+    const rows = await table()
+    const approve = within(rows).getByRole('button', { name: /approve allow overtime/i })
+    expect(approve).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary')
+    expect(approve).not.toHaveClass('MuiButton-colorSuccess')
+    expect(within(rows).getByRole('button', { name: /reject allow overtime/i })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+    const open = within(rows).getByRole('link', { name: /open project/i })
+    expect(open).toHaveClass('MuiLink-root') // it only goes somewhere
+    expect(open).not.toHaveClass('MuiButton-root')
+  })
+
+  it('steps back to the last page that exists when the last request on the last page is decided', async () => {
+    let decided = false
+    const calls = renderRequests(USERS.admin, {
+      'GET /project-requests': ({ query }) => {
+        const onTwo = query.page === '2'
+        if (decided) return [200, onTwo ? page([], { page: 2, totalPages: 1 }) : page([IRIS], { totalPages: 1 })]
+        return [200, page([onTwo ? OVERTIME : IRIS], { page: Number(query.page), totalPages: 2 })]
+      },
+      'POST /project-requests/7/approve': () => { decided = true; return [200, { request: { ...OVERTIME, status: 'APPROVED' }, project: null }] },
+    })
+    await table()
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /approve allow overtime/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^approve$/i }))
+    expect(await screen.findByText('Iris')).toBeInTheDocument()
+    expect(screen.queryByText('No requests.')).not.toBeInTheDocument()
+    expect(calls.at(-1).query.page).toBe('1')
+  })
+
   describe('search', () => {
     const box = () => screen.getByRole('textbox', { name: 'Search requests' })
 
@@ -165,6 +196,20 @@ describe('RequestsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /send request/i }))
     await waitFor(() => expect(posted(calls).body).toEqual({ kind: 'TASK_LIMIT', taskLimit: 4, justification: 'Two small tasks at once' }))
     expect(await screen.findByText(/your line manager will answer/i)).toBeInTheDocument()
+  })
+
+  it('shows the request-sent message below the search and filters, just above the list', async () => {
+    renderRequests(USERS.employee, { 'POST /project-requests': [201, OVERTIME] })
+    await table()
+    await userEvent.click(screen.getByRole('button', { name: /new request/i }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Allow overtime' }))
+    await userEvent.type(screen.getByLabelText(/why/i), 'Launch week')
+    await userEvent.click(screen.getByRole('button', { name: /send request/i }))
+    const message = await screen.findByText(/your line manager will answer/i)
+    const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(screen.getByRole('textbox', { name: 'Search requests' }), message)).toBe(true)
+    expect(follows(screen.getByLabelText(/^kind/i), message)).toBe(true)
+    expect(follows(message, screen.getByRole('table', { name: /requests/i }))).toBe(true)
   })
 
   it('asking to archive a project offers your projects', async () => {

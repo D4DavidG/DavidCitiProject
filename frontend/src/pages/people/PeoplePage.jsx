@@ -18,6 +18,7 @@ import { formatCents } from '../../services/format'
 import { fullName, usePeopleOptions } from '../../services/people'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useLastPage } from '../../services/useLastPage'
 import { useIsMobile } from '../../theme/responsive'
 
 const ROLE_OPTIONS = [['EMPLOYEE', 'Employee'], ['MANAGER', 'Manager'], ['ADMIN', 'Admin']]
@@ -68,7 +69,7 @@ function PasswordShown({ title, person, username, password, onClose }) {
         {copyState === 'failed' && <Alert severity="error">Couldn&apos;t copy. Select the username and password and copy them by hand.</Alert>}
       </DialogContent>
       <DialogActions>
-        <Button onClick={copy}>{copyState === 'copied' ? 'Copied' : 'Copy username and password'}</Button>
+        <Button variant="outlined" onClick={copy}>{copyState === 'copied' ? 'Copied' : 'Copy username and password'}</Button>
         <Button variant="contained" onClick={onClose}>Done</Button>
       </DialogActions>
     </Dialog>
@@ -108,6 +109,7 @@ export default function PeoplePage() {
     query: { q, role, includeArchived: includeArchived ? 'true' : undefined, page: pageNumber, pageSize: 20 },
   }), [q, role, includeArchived, pageNumber])
   const { data, error, loading, reload } = useApi(load)
+  useLastPage(data, pageNumber, setPageNumber)
   const rows = data?.items ?? []
   const showSalary = rows.some((p) => p.annualSalaryCents !== undefined)
 
@@ -151,17 +153,17 @@ export default function PeoplePage() {
         const name = fullName(p)
         return (
           <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            {canSetCapacity(p) && !p.isArchived && <Button size="small" aria-label={`Capacity for ${name}`} onClick={() => setDialog({ kind: 'capacity', person: p })}>Capacity</Button>}
-            {canSeeHistory(p) && <Button size="small" aria-label={`History for ${name}`} onClick={() => setDialog({ kind: 'history', person: p })}>History</Button>}
-            {isAdmin && !p.isArchived && <Button size="small" aria-label={`Edit ${name}`} onClick={() => setDialog({ kind: 'edit', person: p })}>Edit</Button>}
-            {isAdmin && !p.isArchived && p.userId !== user.userId && <Button size="small" aria-label={`Reset password for ${name}`} onClick={() => setDialog({ kind: 'reset', person: p })}>Reset password</Button>}
+            {canSetCapacity(p) && !p.isArchived && <Button size="small" variant="outlined" aria-label={`Capacity for ${name}`} onClick={() => setDialog({ kind: 'capacity', person: p })}>Capacity</Button>}
+            {canSeeHistory(p) && <Button size="small" variant="outlined" aria-label={`History for ${name}`} onClick={() => setDialog({ kind: 'history', person: p })}>History</Button>}
+            {isAdmin && !p.isArchived && <Button size="small" variant="outlined" aria-label={`Edit ${name}`} onClick={() => setDialog({ kind: 'edit', person: p })}>Edit</Button>}
+            {isAdmin && !p.isArchived && p.userId !== user.userId && <Button size="small" variant="outlined" aria-label={`Reset password for ${name}`} onClick={() => setDialog({ kind: 'reset', person: p })}>Reset password</Button>}
             {isAdmin && p.userId !== user.userId && (p.isArchived
               ? (
-                <Button size="small" aria-label={`Reactivate ${name}`} onClick={() => reactivate(p)} disabled={reactivatingId === p.userId}>
+                <Button size="small" variant="outlined" aria-label={`Reactivate ${name}`} onClick={() => reactivate(p)} disabled={reactivatingId === p.userId}>
                   {reactivatingId === p.userId ? 'Reactivating…' : 'Reactivate'}
                 </Button>
               )
-              : <Button size="small" color="inherit" aria-label={`Archive ${name}`} onClick={() => setDialog({ kind: 'archive', person: p })}>Archive</Button>)}
+              : <Button size="small" variant="outlined" color="error" aria-label={`Archive ${name}`} onClick={() => setDialog({ kind: 'archive', person: p })}>Archive</Button>)}
           </Box>
         )
       },
@@ -178,8 +180,6 @@ export default function PeoplePage() {
         subtitle="Everyone in the organisation, their role, capacity and line manager."
         actions={isAdmin && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ kind: 'create' })}>New person</Button>}
       />
-      {message && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
-
       <Box sx={{ mb: 2 }}>
         <SearchField id="people-search" label="Search people" placeholder="Name, username or email" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
       </Box>
@@ -195,6 +195,7 @@ export default function PeoplePage() {
         )}
       </Box>
 
+      {message && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={rows} rowKey="userId" label="People" empty="Nobody matches." />
         <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
@@ -239,7 +240,7 @@ export default function PeoplePage() {
         <Dialog open onClose={close} aria-labelledby="history-title" maxWidth="lg" fullWidth fullScreen={isMobile}>
           <DialogTitle id="history-title">{`History: ${fullName(person)}`}</DialogTitle>
           <DialogContent><HistoryPanel userId={person.userId} /></DialogContent>
-          <DialogActions><Button onClick={close}>Close</Button></DialogActions>
+          <DialogActions><Button variant="outlined" onClick={close}>Close</Button></DialogActions>
         </Dialog>
       )}
       {dialog?.kind === 'reset' && (
