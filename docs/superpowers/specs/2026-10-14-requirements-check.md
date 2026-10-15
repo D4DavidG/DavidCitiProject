@@ -81,7 +81,7 @@ failing test.
 | T4 | Component tests (Jest + RTL) | MET | Vitest + RTL, Jest-compatible (CLAUDE.md §8); `*.test.jsx` beside each screen | |
 | T5 | API service tests with mocked responses | MET | `services/request.test.js` (fetch stubbed) | |
 | T6 | End-to-end tests (Cypress or Selenium) | MET (Playwright) | `e2e/demo.spec.js:37`, `pull.spec.js:69`, `tour.spec.js:47,74`. Playwright fills the same role as Selenium | |
-| T7 | Load test (Artillery or JMeter) | MET (own tool) | `tools/loadtest.py`; on AWS, 25 users, 16,184 reads, 539 req/s, 2 failed (`README.md:269-275`) | **Queued:** k6 (notes.txt:6) |
+| T7 | Load test (Artillery or JMeter) | MET (k6) | `tools/k6/load.js` (`docs/TESTING.md` section 7); the earlier `tools/loadtest.py` was removed on 14 Oct because k6 covers the same reads and logins; on AWS 13 Oct, 25 users, 16,184 reads, 539 req/s, 2 failed (`README.md:269-275`) | Run k6 on AWS |
 | T8 | Performance monitoring | PARTLY | CloudWatch `REPORT` lines, 6 ms p50 inside Lambda (`README.md:276-277`); `tools/console.py logs`; no dashboard or alarm | Name the CloudWatch log command in the README (one line) |
 | T9 | Critical user paths 100% end to end | PARTLY | Covered: sign-in, the seven questions (`demo.spec.js:37`), phone layout (`:67`), pull board (`pull.spec.js:69`), every screen for every role (`tour.spec.js:47`), deep-link refresh (`:74`). **Not covered:** an employee logs time and the manager approves it (`README.md:253-254`); an admin creates, edits, archives and reactivates a project; the forced password change at first sign-in | One Playwright spec per missing journey (gaps 4 and 5 below) |
 

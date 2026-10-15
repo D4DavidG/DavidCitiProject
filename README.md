@@ -306,16 +306,20 @@ E2E_ADMIN_PASSWORD=... npm run e2e        # Playwright: a real browser against t
 
 ### Load test
 
-`tools/loadtest.py` (standard library, like the demo) runs N simulated managers
-looping over the dashboard's reads, then a burst of logins, and prints throughput,
-p50/p95/max per endpoint and failures by status. It exits 1 if anything failed.
+`tools/k6/load.js` (k6) runs N simulated managers looping over the dashboard's reads,
+then a burst of logins, and passes or fails on thresholds (under 1% failed, reads p95 under
+1 s, logins p95 under 3 s). Full numbers and the AWS command: `docs/TESTING.md` section 7.
+An earlier Python script, `tools/loadtest.py`, was removed on 14 Oct because k6 covers the
+same reads and the login burst.
 
 ```sh
-TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py                        # 10 users, 20 s
-TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py --users 25 --seconds 60
+K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js        # 10 users, local
+K6_PROFILE=aws K6_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net/api/tracker \
+K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js        # 25 users, AWS
 ```
 
-Results on AWS (CloudFront, Lambda at 512 MB, Aurora Serverless v2; 13 Oct, seeded data):
+Results on AWS (CloudFront, Lambda at 512 MB, Aurora Serverless v2; 13 Oct, seeded data,
+measured with the removed Python script):
 
 | Users | Reads | Throughput | p50 / p95 | Failed | Login p50 / p95 |
 | --- | --- | --- | --- | --- | --- |

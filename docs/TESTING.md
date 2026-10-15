@@ -19,7 +19,6 @@ checks one layer, from the database up to a real browser.
 | **Race (concurrency) tests** | Two people pressing "Take this" at the same moment: only one wins, and nobody goes over their task limit | A race only shows up with two real database connections at once; the test waits until Postgres reports the second one blocked | `tests/backend/test_claim_race.py` | `.venv/bin/pytest -q tests/backend/test_claim_race.py` | under 1 s | 2 |
 | **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (32 files, beside the code they test) | `cd frontend && npm test` | 115 s | 325 |
 | **Browser tests** (Playwright) | A real Chrome against the real running app: the demo walk (the seven questions, plus the phone menu), the pull board (Ana takes a task and puts it back), requests (Ana asks, Maria rejects with a note, Ana reads it on a phone), the screen tour (every screen for a manager and an employee, desktop and phone, no sideways scrolling, an axe accessibility scan of each, a deep-link refresh), history (a manager reads a report's history without the before/after state; an employee sees My history), the three charts (timeline: Late words and icon, tooltips on hover, tap and focus, print stripes; budget: the Budget line's position, tooltips; workload: gridlines and bars line up, Tab opens the tooltip, print stripes, contrast), README screenshots (only when asked) | The only test that sees what David sees: real login, real API, real database, real layout | `frontend/e2e/demo.spec.js`, `pull.spec.js`, `requests.spec.js`, `history.spec.js`, `tour.spec.js`, `timeline.spec.js`, `budget.spec.js`, `workload.spec.js`, `screenshots.spec.js` | `cd frontend && E2E_MANAGER_USERNAME=ML460428 E2E_EMPLOYEE_USERNAME=AR836183 E2E_ZEUS_MANAGER_USERNAME=SP345715 E2E_TOUR_DIR=$HOME/tour-shots npx playwright test` | 66 s | 24 tests in 9 files: 23 pass on freshly seeded data, 1 skipped (screenshots, on purpose); 2 fail after hand edits to Apollo (see "Last results" below) |
-| **Load test** | How fast the API answers with many users at once, and whether anything fails | Speed and failures under load can't be seen one request at a time | `tools/loadtest.py` | AWS (asks for the AWS admin password, then runs): `read -rsp 'Admin password: ' TRACKER_ADMIN_PASSWORD && export TRACKER_ADMIN_PASSWORD && TRACKER_API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker python3 tools/loadtest.py --users 25 --seconds 60`. Locally, leave out `TRACKER_API` and keep to 10 users or fewer: LocalStack itself fails past about 15 (`README.md:296-303`) | 20 to 60 s | Last run on AWS, 13 Oct: 16,184 reads at 539 per second, 2 failed (`README.md:269-275`). Not rerun today |
 | **k6 load test** | Managers reading the dashboard at once, then a burst of logins: every request answers, reads within 1 s and logins within 3 s for 95 in 100 | k6 is the industry's load-test tool (named in the meeting notes, "sk8", `notes.txt:6`); pass or fail comes from thresholds written in the script | `tools/k6/load.js` | `K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js` (section 7; AWS command there too) | 107 s | 4,038 requests, 0 failed, all 4 thresholds passed (local, 14 Oct) |
 
 Plus two checks that are not tests but run with them: **lint** (ESLint reads the website
@@ -359,7 +358,7 @@ turn flaky:
 K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
 ```
 
-**Run it on AWS** (David runs this; 25 users, as `tools/loadtest.py` did on 13 Oct; the
+**Run it on AWS** (David runs this; 25 users, as the removed Python load test did on 13 Oct; the
 thresholds are the same; about 4 minutes):
 
 ```sh
@@ -385,18 +384,9 @@ burst; 107 s in all). k6 exited 0:
 One read took 1.8 s while users were still being added; that is most likely LocalStack
 starting another Lambda container, but it was not checked in the logs.
 
-**How it differs from `tools/loadtest.py`.**
-
-| | `tools/loadtest.py` | `tools/k6/load.js` |
-| --- | --- | --- |
-| Tool | Python standard library, nothing to install | k6, the industry tool |
-| Signs in as | the admin (needs the admin password) | a manager (Maria) |
-| Reads | 6 endpoints, as fast as possible, no pause | the same 6 plus the projects list and one project's detail, 1 s between rounds |
-| Logins | a burst of 20, 10 at a time | the same burst, plus one login per virtual user |
-| Pass or fail | exit code 1 if any request failed | thresholds on failures, read time and login time |
-| Report | a table with p50, p95 and max per endpoint | totals per kind (read, login), checks per endpoint |
-
-So k6 covers everything the Python script does except its per-endpoint timing table
-(k6 can produce one with `--out json`, but not in its default summary). The Python script
-also hammers the API with no pause, so it measures peak throughput; k6's 1 s pause is
-closer to people clicking.
+**What happened to `tools/loadtest.py`.** It was our own Python load test (13 Oct: 25 users on
+AWS, 16,184 reads, 539 requests per second, 2 failed). It was removed on 14 Oct because k6
+covers the same reads and the login burst, and keeping two tests that do the same thing
+would only give two sets of numbers to explain. Two things were given up: its per-endpoint
+timing table (k6 can produce one with `--out json`, but not in its default summary) and its
+no-pause peak-throughput measure; k6's 1 s pause is closer to people clicking.

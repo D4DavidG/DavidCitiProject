@@ -3,7 +3,7 @@
  *
  *   Local (through the proxy on 3001; LocalStack itself fails past about 15 users, so 10 at most):
  *     K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
- *   AWS (David runs it; 25 users, as tools/loadtest.py did on 13 Oct):
+ *   AWS (David runs it; 25 users, as the removed Python load test did on 13 Oct):
  *     K6_PROFILE=aws K6_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net/api/tracker \
  *     K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
  *

@@ -448,7 +448,7 @@ endpoint's 95th percentile was 65 ms or less (13 Oct)."
 
 **The two caveats, say them before they ask:**
 
-1. **It was reads plus logins, no writes** (6 GET endpoints, `tools/loadtest.py:27-28`),
+1. **It was reads plus logins, no writes** (6 GET endpoints, in the removed `tools/loadtest.py`; k6 now does the same reads),
    on tiny seed data: 3 live projects and 6 people (`tools/demo.py:32-39`). The figures
    are recorded in the README.
    There are no raw logs in the repo, so the numbers can't be reproduced from it.
@@ -470,7 +470,7 @@ more Lambda memory.
 Also: **not every list is paginated in SQL.** Bookings, deliverables, tasks and My tasks
 return the whole list in a one-page envelope (`_whole`, `api/handlers.py:51-54`).
 
-**Point at:** `README.md:269-290`, `tools/loadtest.py`, `services/dashboard.py`.
+**Point at:** `README.md:269-290`, `tools/k6/load.js`, `services/dashboard.py`.
 
 ---
 
@@ -568,7 +568,8 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
    at a time. Thresholds in the script: under 1% failed, reads p95 under 1 s, logins p95 under
    3 s (PBKDF2 is slow on purpose). Local run, 10 users: 4,038 requests in 107 s, 0 failed,
    reads p95 67 ms, logins p95 1.3 s. Not yet run on AWS (`K6_PROFILE=aws`, 25 users). The
-   earlier Python script, `tools/loadtest.py`, measured AWS on 13 Oct: 25 users, 16,184
+   earlier Python script, `tools/loadtest.py`, was removed on 14 Oct because k6 covers the same
+   reads and the login burst; it measured AWS on 13 Oct: 25 users, 16,184
    reads, 539 requests per second, p95 57 to 65 ms, 2 failures.
    *Point at: `tools/k6/load.js`; `docs/TESTING.md` section 7*
 5. **"Why Vite?"** David chose it: the dev server reloads on save and the production build

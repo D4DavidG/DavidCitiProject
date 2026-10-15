@@ -145,7 +145,7 @@ the map). Good ones to have ready:
 | --- | --- | --- |
 | The code | This repo, branch `David` | VS Code on the VDI, or https://github.com/D4DavidG/DavidCitiProject/tree/David |
 | Tests | `tests/backend/`, `frontend/src/**/*.test.jsx`, `frontend/e2e/` | `.venv/bin/pytest -q` in the repo folder (local Postgres must be running); `cd frontend && npm test`; `E2E_ADMIN_PASSWORD=… npm run e2e` with the local stack running |
-| The live API (AWS) | CloudFront → Lambda → Aurora | `$TRACKER_API` (section 3), using `curl`, `tools/demo.py` or `tools/loadtest.py` |
+| The live API (AWS) | CloudFront → Lambda → Aurora | `$TRACKER_API` (section 3), using `curl`, `tools/demo.py` or `k6` |
 | The website | CloudFront (S3) on AWS; Vite on the VDI | `https://d1gov8jpsxhwer.cloudfront.net`; `http://localhost:3000` locally |
 | The raw API in a browser | Same as the API | Only `.../api/tracker/health` works in a browser tab. Everything else needs a login token, so use `curl` (or the website) |
 | The AWS console | AWS, us-east-2 | `(set -a; source ENVIRONMENT.config; python3 tools/console.py)`; section 5 |
@@ -287,7 +287,7 @@ frontend/src/                        the website (React + Material UI):
                                      approvals, people, requests, notifications, audit, account, login
 frontend/e2e/                        Playwright: a real browser walking the demo
 tools/demo.py                        seed + demo, over HTTP
-tools/loadtest.py                    load test
+tools/k6/load.js                     k6 load test
 tools/console.py                     opens the AWS console
 README.md                            the formal write-up: architecture, decisions, tests, gaps
 MVP.md                               short scope summary for teammates
@@ -420,7 +420,7 @@ affect each other, and the integrity check runs after each database test.
   uses. Two "walk" tests call every one of the 69 routes, and fail if someone adds a
   route without testing it. Real HTTP is exercised by `tools/demo.py` and Playwright.
 - **Database tests:** prove Postgres itself refuses each kind of bad row.
-- **Load test:** `tools/loadtest.py`, run on LocalStack and on AWS.
+- **Load test:** `tools/k6/load.js` (k6); the AWS command is in `docs/TESTING.md` section 7.
 
 **"What's your coverage, and why not 100%?"** 97% overall; 100% for the API layer (the
 rubric asks for 90%). The uncovered 3% is mostly repeat guard branches ("this id doesn't
@@ -519,7 +519,7 @@ Run from `~/DavidCitiProject` on the VDI.
 # Against AWS (set TRACKER_API and TRACKER_ADMIN_PASSWORD first: section 3)
 curl -s $TRACKER_API/health                           # wake it up / is it alive?
 python3 tools/demo.py demo                            # the seven answers + ten refusals
-python3 tools/loadtest.py | tail -20                  # load test, summary only
+K6_PROFILE=aws K6_BASE_URL=$TRACKER_API K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js   # load test
 
 # AWS itself
 ./bin/setup-participant.sh                            # refresh the temporary AWS keys
