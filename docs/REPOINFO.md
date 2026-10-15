@@ -1118,6 +1118,30 @@ concurrent claims would count stale and pass the limit".
   read the spec before the change and still committed orange at 23:31 (`43fe274`); the
   planned polish round retunes it.
 
+### 15 Oct morning: working alongside the agents
+
+- **I reviewed the redesign live, on my own copy.** The tested version stayed on `David` in the
+  main folder (site on port 3000; `cac33d7`, pushed as `origin/David`). The tweaks were built on
+  `David-tweaks` in a second worktree, `.worktrees/tweaks`, with its own site on port 3002
+  (`frontend/vite.3002.config.js`, local only). I clicked through it and asked for changes; they
+  became spec section 6 (`docs/superpowers/specs/2026-10-14-redesign-design.md:253-325`, `54a933e`, 08:30).
+- **Who built what.** The lead Claude session did the theme and the site frame itself (`39ede18`
+  theme, `1b99cac` top bar, `218c764` logo). Four agent lanes built the rest in parallel: backend
+  (`b676892`, `f83a0ed`); home pages (`143a03e`, `d8f3b41`); People and Allocation (`628dfa9`,
+  `18f41bc`, `3559f05`); Schedule and Approvals (`bafdd37`, `6926b4c`). An independent agent
+  reviewed each lane's work. 30 commits from 08:30 to 09:15 (`git log 54a933e^..d43d958`).
+- **The demo never waited on unfinished work.** `David` stayed deployable throughout; the tweaks
+  merge into it only after their own full run. Its last full `tools/test-all.sh` run (main folder,
+  `cac33d7`, 08:26 to 08:36): 610 backend, 761 website and 33 browser tests passed, 1 skipped on
+  purpose (the run's temp logs, VDI only).
+- **Lesson: two dev servers need two caches.** The worktree's `frontend/node_modules` is a link to
+  the main folder's, so the port-3002 server rewrote the pre-bundled library files (Vite's cache)
+  the port-3000 server was using. Fix: its own cache folder (`cacheDir`,
+  `frontend/vite.3002.config.js:4-7`).
+- **Lesson: don't message an agent inside a running workflow.** Sending one a message started a
+  duplicate copy of it, doing the same work again. Change the spec, which every lane reads first,
+  or wait for the lane to finish.
+
 ### Settings and guardrails
 
 `.claude/settings.local.json` (not in git, `.gitignore:266`). A deny rule beats an allow rule.
