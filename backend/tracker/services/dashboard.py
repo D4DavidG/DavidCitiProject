@@ -141,26 +141,56 @@ def _live_projects(conn: psycopg.Connection, actor: Actor, filters: dict) -> lis
 
 # --- Q1, Q2 and Q7: the manager's dashboard ---
 
-def project_cards(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
-    """One card per live project in scope: status, progress, risk and money. At-risk projects first.
+def _last_activity(conn: psycopg.Connection, project_ids: list[int]) -> dict[int, dt.datetime]:
+    """When each project or anything in it last changed (deliverables, tasks, bookings, logged time), in one query."""
+    rows = conn.execute(
+        "SELECT p.project_id, GREATEST(p.updated_at,"
+        " (SELECT max(updated_at) FROM milestones m WHERE m.project_id = p.project_id),"
+        " (SELECT max(updated_at) FROM tasks t WHERE t.project_id = p.project_id),"
+        " (SELECT max(updated_at) FROM assignments a WHERE a.project_id = p.project_id),"
+        " (SELECT max(updated_at) FROM time_entries e WHERE e.project_id = p.project_id)) AS last_activity_at"
+        " FROM projects p WHERE p.project_id = ANY(%s)", (project_ids,)).fetchall()
+    return {r["project_id"]: r["last_activity_at"] for r in rows}
 
-    at_risk_total counts every page, not just this one.
+
+CARD_SORTS = {"risk", "updated"}
+
+
+def project_cards(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
+    """One card per live project in scope: status, progress, risk, money and its latest change.
+
+    at_risk True keeps only at-risk projects, False only on-track ones (the dashboard's two
+    columns). sort "risk" (the default) puts at-risk first, then by name; "updated" puts the
+    latest change to the project or anything in it first, ties by name. total counts the
+    filtered list; at_risk_total counts every at-risk project matching q and status, whatever at_risk says.
     """
     _staff_only(actor, "the project dashboard")
+    at_risk = values.boolean(filters, "at_risk", required=False)
+    sort = values.choice(filters, "sort", CARD_SORTS, required=False) or "risk"
     today = clock.today()
     rows = _live_projects(conn, actor, filters)
-    money = _money(conn, [r["project_id"] for r in rows])
+    ids = [r["project_id"] for r in rows]
+    money = _money(conn, ids)
     reasons = _risk_reasons(conn, rows, money, today)
+    last = _last_activity(conn, ids)
     cards = [{
         "project_id": r["project_id"], "name": r["name"], "status": r["status"],
         "manager_id": r["manager_id"], "manager_name": r["manager_name"],
         "start_date": r["start_date"].isoformat(), "predicted_end_date": r["predicted_end_date"].isoformat(),
         "progress_percent": r["progress_percent"],
         "at_risk": bool(reasons[r["project_id"]]), "risk_reasons": reasons[r["project_id"]],
+        "last_activity_at": last[r["project_id"]].isoformat(),
         **_figures(r, money[r["project_id"]], today),
     } for r in rows]
-    cards.sort(key=lambda c: not c["at_risk"])  # stable: at-risk first, each group still by name
-    return {**page_of(cards, page, page_size), "at_risk_total": sum(c["at_risk"] for c in cards)}
+    at_risk_total = sum(c["at_risk"] for c in cards)
+    if at_risk is not None:
+        cards = [c for c in cards if c["at_risk"] == at_risk]
+    # Both sorts are stable, so each group keeps the name order _live_projects gave.
+    if sort == "updated":
+        cards.sort(key=lambda c: last[c["project_id"]], reverse=True)
+    else:
+        cards.sort(key=lambda c: not c["at_risk"])
+    return {**page_of(cards, page, page_size), "at_risk_total": at_risk_total}
 
 
 # --- Q7: budget ---

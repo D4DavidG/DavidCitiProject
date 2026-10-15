@@ -4,6 +4,7 @@ Today is frozen on Wednesday 14 Oct 2026.
 """
 
 import pytest
+from psycopg import sql
 
 import factories as f
 from domain.errors import Forbidden, NotFound, ValidationError
@@ -142,6 +143,87 @@ def test_at_risk_total_follows_the_managers_scope(conn, org):
 def test_employees_do_not_get_project_cards(conn, org):
     with pytest.raises(Forbidden):
         dashboard.project_cards(conn, org["alice"], {}, 1, 20)
+    with pytest.raises(Forbidden):
+        dashboard.project_cards(conn, org["alice"], {"at_risk": True, "sort": "updated"}, 1, 20)
+
+
+# --- the dashboard's two columns: at risk or on track, latest change first ---------------------
+
+def old_project(conn, org):
+    """Carol's project, past its end date: at risk."""
+    return f.project(conn, org["admin"], org["carol"], name="Old", start_date="2026-08-01",
+                     predicted_end_date="2026-10-01")
+
+
+def test_project_cards_keep_only_at_risk_or_only_on_track_projects(conn, org):
+    old_project(conn, org)
+    risky = dashboard.project_cards(conn, org["admin"], {"at_risk": True}, 1, 20)
+    calm = dashboard.project_cards(conn, org["admin"], {"at_risk": False}, 1, 20)
+    assert ([c["name"] for c in risky["items"]], risky["total"], risky["total_pages"]) == (["Apollo", "Old"], 2, 1)
+    assert ([c["name"] for c in calm["items"]], calm["total"], calm["total_pages"]) == (["Zeus"], 1, 1)
+    # atRiskTotal counts what matches q and status, whichever column is asked for.
+    assert risky["at_risk_total"] == calm["at_risk_total"] == 2
+    assert dashboard.project_cards(conn, org["admin"], {"at_risk": False, "q": "zeu"}, 1, 20)["at_risk_total"] == 0
+
+
+def touch(conn, table, key, row_id, minutes):
+    """Make a row look changed `minutes` later: inside a test's one transaction, now() never moves."""
+    conn.execute(sql.SQL("UPDATE {} SET updated_at = now() + make_interval(mins => %s) WHERE {} = %s").format(
+        sql.Identifier(table), sql.Identifier(key)), (minutes, row_id))
+
+
+def test_sort_updated_puts_the_latest_change_to_a_project_or_anything_in_it_first(conn, org):
+    old = old_project(conn, org)
+    old_work = f.deliverable(conn, org["carol"], old, start_date="2026-08-01", due_date="2026-09-30")
+    zeus_booking = f.booking(conn, org["carol"], org["zeus"], org["alice"], hours_per_week=5)
+    entry = log(conn, org["alice"], org["task"], "2026-10-13", 1)
+
+    def order(**filters):
+        return [c["name"] for c in cards(conn, org["admin"], {"sort": "updated", **filters})]
+
+    assert order() == ["Apollo", "Old", "Zeus"]  # one transaction, one moment: ties go by name
+    touch(conn, "projects", "project_id", org["zeus"]["project_id"], 1)
+    assert order() == ["Zeus", "Apollo", "Old"]
+    touch(conn, "tasks", "task_id", org["task"]["task_id"], 2)  # Apollo's task
+    assert order() == ["Apollo", "Zeus", "Old"]
+    touch(conn, "milestones", "milestone_id", old_work["milestone_id"], 3)
+    assert order() == ["Old", "Apollo", "Zeus"]
+    touch(conn, "assignments", "assignment_id", zeus_booking["assignment_id"], 4)
+    assert order() == ["Zeus", "Old", "Apollo"]
+    touch(conn, "time_entries", "entry_id", entry["entry_id"], 5)  # Apollo's logged time
+    assert order() == ["Apollo", "Zeus", "Old"]
+    assert order(at_risk=True) == ["Apollo", "Old"] and order(at_risk=False) == ["Zeus"]
+
+    latest = conn.execute("SELECT updated_at FROM time_entries WHERE entry_id = %s",
+                          (entry["entry_id"],)).fetchone()["updated_at"]
+    apollo = next(c for c in cards(conn, org["admin"]) if c["name"] == "Apollo")
+    assert apollo["last_activity_at"] == latest.isoformat()
+
+
+def test_sort_risk_is_the_default(conn, org):
+    old_project(conn, org)
+    assert cards(conn, org["admin"], {"sort": "risk"}) == cards(conn, org["admin"])
+    assert [c["name"] for c in cards(conn, org["admin"])] == ["Apollo", "Old", "Zeus"]
+
+
+def test_an_unknown_sort_is_refused_naming_the_field(conn, org):
+    with pytest.raises(ValidationError) as caught:
+        cards(conn, org["admin"], {"sort": "name"})
+    assert caught.value.field == "sort"
+
+
+def test_project_cards_run_the_same_queries_whatever_the_number_of_projects(conn, org):
+    from test_work import CountingConn
+
+    def queries():
+        counter = CountingConn(conn)
+        dashboard.project_cards(counter, org["admin"], {"sort": "updated"}, 1, 20)
+        return counter.count
+    before = queries()
+    for n in range(5):
+        f.booking(conn, org["bob"], f.project(conn, org["admin"], org["bob"], name=f"Extra {n}"), org["alice"],
+                  hours_per_week=1)
+    assert (before, queries()) == (4, 4)  # projects, money, risk, last activity
 
 
 # --- questions 1 and 4: status and progress -------------------------------------------------
