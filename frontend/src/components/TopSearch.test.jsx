@@ -172,6 +172,19 @@ describe('TopSearch', () => {
     expect(box()).toHaveFocus()
   })
 
+  it('ignores a keydown with no key (a browser filling in a saved password sends one)', () => {
+    renderSearch()
+    const keyless = new KeyboardEvent('keydown', { bubbles: true, ctrlKey: true })
+    Object.defineProperty(keyless, 'key', { value: undefined })
+    const errors = []
+    const onError = (event) => { errors.push(event.error); event.preventDefault() }
+    window.addEventListener('error', onError)
+    document.body.dispatchEvent(keyless)
+    window.removeEventListener('error', onError)
+    expect(errors).toEqual([])
+    expect(box()).not.toHaveFocus()
+  })
+
   it('is a white rounded field with dark words on the green bar', () => {
     renderSearch()
     const field = box().closest('.MuiOutlinedInput-root')

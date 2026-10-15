@@ -84,7 +84,8 @@ export default function TopSearch() {
   // "/" outside a field, or Ctrl+K / Cmd+K anywhere, jumps into the search.
   useEffect(() => {
     function onKey(event) {
-      const ctrlK = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k'
+      // A browser's autofill can send a keydown with no key at all.
+      const ctrlK = (event.ctrlKey || event.metaKey) && String(event.key ?? '').toLowerCase() === 'k'
       const slash = event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !isTyping(event.target)
       if (!ctrlK && !slash) return
       event.preventDefault()
