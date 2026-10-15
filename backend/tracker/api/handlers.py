@@ -336,7 +336,8 @@ def reject_request(ctx: Context) -> dict:
 # --- dashboard, admin, notifications --------------------------------------------------------
 
 def project_cards(ctx: Context) -> dict:
-    return _page(dashboard.project_cards(ctx.conn, ctx.actor, ctx.query, *ctx.page_args()), camelize)
+    result = dashboard.project_cards(ctx.conn, ctx.actor, ctx.query, *ctx.page_args())
+    return {**_page(result, camelize), "atRiskTotal": result["at_risk_total"]}
 
 
 def at_risk(ctx: Context) -> dict:

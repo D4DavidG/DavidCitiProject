@@ -84,6 +84,10 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert PAGE_KEYS <= board.keys() and [c["name"] for c in board["items"]] == ["Apollo"]
     assert {"atRisk", "riskReasons", "progressPercent", "budgetCents", "plannedCents", "consumedCents",
             "pendingCents", "managerName", "plannedPercent", "pendingPercent"} <= board["items"][0].keys()
+    one = get(a, "/dashboard/projects", "/dashboard/projects", {"pageSize": "1"})  # atRiskTotal counts every page
+    every = get(a, "/dashboard/projects", "/dashboard/projects")["items"]
+    assert PAGE_KEYS <= one.keys() and one["total"] >= 1
+    assert one["atRiskTotal"] == sum(c["atRisk"] for c in every)
     grid = get(b, "/dashboard/allocation", "/dashboard/allocation", {"weekFrom": "2026-10-12", "weeks": "2"})
     assert PAGE_KEYS <= grid.keys() and grid["weeks"] == ["2026-10-12", "2026-10-19"]
     alice_row = next(p for p in grid["items"] if p["userId"] == world["alice"].user_id)
