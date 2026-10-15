@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  ApiError, onWrite, request, setRefreshedHandler, setTokens, setUnauthorizedHandler,
+  ApiError, getRefreshToken, onWrite, request, setRefreshedHandler, setTokens, setUnauthorizedHandler,
 } from './request'
 
 function answer(status, payload) {
@@ -130,13 +130,18 @@ describe('request() after the 15-minute access token expires', () => {
   let fetchMock
   let calls
 
-  /** Answers by URL: each path gets its queue of [status, payload] answers, used in order. */
+  /**
+   * Answers by URL: each path gets its queue of [status, payload] answers, used in order.
+   * 'unreachable' in a queue stands for a network failure (fetch rejects).
+   */
   function serve(routes) {
     calls = []
     fetchMock = vi.fn((url, init) => {
       const path = url.replace('https://api.example.test/api/tracker', '')
       calls.push({ path, init })
-      const [status, payload] = routes[path].shift()
+      const next = routes[path].shift()
+      if (next === 'unreachable') return Promise.reject(new TypeError('Failed to fetch'))
+      const [status, payload] = next
       return answer(status, payload)
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -175,10 +180,10 @@ describe('request() after the 15-minute access token expires', () => {
     expect(pathsCalled().filter((p) => p === '/auth/refresh')).toHaveLength(1)
   })
 
-  it('signs out once when the refresh fails', async () => {
+  it.each([401, 400])('signs out once when the refresh answers %i (the refresh token is dead)', async (status) => {
     const handler = vi.fn()
     setUnauthorizedHandler(handler)
-    serve({ '/projects': [[401, { error: 'expired' }]], '/auth/refresh': [[401, { error: 'no' }]] })
+    serve({ '/projects': [[401, { error: 'expired' }]], '/auth/refresh': [[status, { error: 'no' }]] })
     await expect(request('GET', '/projects')).rejects.toMatchObject({ status: 401 })
     expect(handler).toHaveBeenCalledOnce()
   })
@@ -212,16 +217,39 @@ describe('request() after the 15-minute access token expires', () => {
     expect(refreshed).toHaveBeenCalledWith({ token: 'new', refreshToken: 'new-refresh' })
   })
 
-  it('signs out when the refresh cannot reach the server', async () => {
+  it('keeps the session when the refresh cannot reach the server, and says to try again', async () => {
     const handler = vi.fn()
     setUnauthorizedHandler(handler)
-    serve({ '/projects': [[401, {}]] })
-    const answering = fetchMock.getMockImplementation()
-    fetchMock.mockImplementation((url, init) => (url.endsWith('/auth/refresh')
-      ? Promise.reject(new TypeError('Failed to fetch'))
-      : answering(url, init)))
-    await expect(request('GET', '/projects')).rejects.toMatchObject({ status: 401 })
-    expect(handler).toHaveBeenCalledOnce()
+    serve({ '/projects': [[401, {}]], '/auth/refresh': ['unreachable'] })
+    await expect(request('GET', '/projects')).rejects.toMatchObject({
+      status: 0,
+      message: expect.stringContaining("Can't reach the server"),
+    })
+    expect(handler).not.toHaveBeenCalled()
+    expect(getRefreshToken()).toBe('old-refresh')
+  })
+
+  it('keeps the session when the refresh answers 503 (the database waking up)', async () => {
+    const handler = vi.fn()
+    setUnauthorizedHandler(handler)
+    serve({ '/projects': [[401, {}]], '/auth/refresh': [[503, { error: 'Service unavailable.' }]] })
+    await expect(request('GET', '/projects')).rejects.toMatchObject({
+      status: 503,
+      message: expect.stringContaining("Can't reach the server"),
+    })
+    expect(handler).not.toHaveBeenCalled()
+    expect(getRefreshToken()).toBe('old-refresh')
+  })
+
+  it('tries the refresh again on the next request after one could not get through', async () => {
+    serve({
+      '/projects': [[401, {}], [401, {}], [200, { items: [] }]],
+      '/auth/refresh': ['unreachable', [200, { token: 'new', refreshToken: 'new-refresh' }]],
+    })
+    await expect(request('GET', '/projects')).rejects.toMatchObject({ status: 0 })
+    await expect(request('GET', '/projects')).resolves.toEqual({ items: [] })
+    expect(pathsCalled()).toEqual(['/projects', '/auth/refresh', '/projects', '/auth/refresh', '/projects'])
+    expect(JSON.parse(calls[3].init.body)).toEqual({ refreshToken: 'old-refresh' })
   })
 
   it('signs out without calling the server when there is no refresh token', async () => {

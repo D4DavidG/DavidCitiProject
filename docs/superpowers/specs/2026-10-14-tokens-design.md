@@ -99,7 +99,10 @@ POST /users/{id}/reset-password, /users/{id}/archive -> also sets/revokes as abo
   `/auth/login`, `/auth/refresh` and `/auth/logout`, it calls one shared
   `refreshSession()` (a single in-flight promise, so ten polling calls make one refresh),
   then retries the original request **once** with the new token. Only if the refresh
-  fails, or the retry is 401 again, does it call the unauthorized handler (sign out).
+  is refused (401 or 400), or the retry is 401 again, does it call the unauthorized
+  handler (sign out). If the refresh can't get through (network error, or a 5xx while
+  Aurora wakes up), the original call fails with "Can't reach the server... try again",
+  both tokens stay, and the next request refreshes again (changed 14 Oct, evening).
   The refresh call uses `fetch` directly, not `request()`, so it can't recurse.
 - After a successful refresh it calls a registered `onRefreshed(tokens)` so
   `AuthContext` writes the new pair to `sessionStorage` at once. (If the old refresh
@@ -121,6 +124,7 @@ POST /users/{id}/reset-password, /users/{id}/archive -> also sets/revokes as abo
 | Refresh token revoked without rotation (sign out, password change, reset, archive) | 401, nothing else revoked, so a tab still holding a pre-change token can't sign out the tab that changed the password |
 | Logout with any token, or none | 204 |
 | Same tab, many calls 401 at once | one `/auth/refresh` request |
+| Refresh can't get through (network error or 5xx) | the call fails with "try again"; the session is kept and the next request refreshes again |
 | Duplicated browser tab (it copies `sessionStorage`) | whichever tab refreshes second is a reuse: both sign out. Rare; accepted, documented |
 | Old website against the new backend (deploy gap) | it knows no refresh: signs out after 15 min. Deploy both together |
 
@@ -142,7 +146,8 @@ Backend (pytest, frozen `NOW`):
   business records). `test_integrity.py` keeps passing unchanged.
 
 Website (Vitest): one 401 gives one refresh then a retry that succeeds; concurrent 401s
-share one refresh; a failed refresh signs out once; a second 401 after retry signs out
+share one refresh; a refused refresh (401 or 400) signs out once; a refresh that can't
+get through (network error, 503) keeps the session and the next request refreshes again; a second 401 after retry signs out
 without a second refresh; `/auth/login` 401 never refreshes; rotated tokens reach
 `onRefreshed`; login stores both; logout calls `/auth/logout`; change-password stores
 the new pair.

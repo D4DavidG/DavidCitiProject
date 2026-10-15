@@ -7,7 +7,9 @@
  *
  * The access token lasts 15 minutes. On a 401, request() swaps the refresh token
  * for a new pair once (POST /auth/refresh), then retries the call once. Only if
- * that fails does it call the handler AuthContext registers (sign out). The
+ * the server refuses the refresh token does it call the handler AuthContext
+ * registers (sign out); if the refresh can't get through, the call fails with
+ * "try again" and the session is kept. The
  * /auth/login, /auth/refresh and /auth/logout calls never refresh: there a 401
  * means "wrong username or password" or "this session is over".
  */
@@ -121,26 +123,31 @@ function parse(text) {
 /**
  * Swap the refresh token for a new pair. However many calls ask at once, one request
  * is sent. Uses fetch directly, not request(), so it can never loop.
- * @returns {Promise<boolean>} true when there is a new access token
+ * Only a 401 or 400 answer means the refresh token is dead (sign out). A network
+ * failure or a 5xx (Aurora waking up) says nothing about it: this throws a
+ * "try again" ApiError, the tokens stay, and the next request refreshes again.
+ * @returns {Promise<boolean>} true when there is a new access token, false when the session is over
  */
 function refreshSession() {
   if (!refreshing) {
     refreshing = (async () => {
       if (!refreshToken) return false
+      let response
       try {
-        const response = await fetch(`${apiBase()}/auth/refresh`, {
+        response = await fetch(`${apiBase()}/auth/refresh`, {
           method: 'POST',
           headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
         })
-        const result = parse(await response.text())
-        if (!response.ok || !result?.token) return false
-        setTokens(result.token, result.refreshToken)
-        onRefreshed?.({ token: result.token, refreshToken: result.refreshToken })
-        return true
       } catch {
-        return false
+        throw new ApiError(0, NETWORK_MESSAGE)
       }
+      if (response.status === 401 || response.status === 400) return false
+      const result = parse(await response.text())
+      if (!response.ok || !result?.token) throw new ApiError(response.status, NETWORK_MESSAGE)
+      setTokens(result.token, result.refreshToken)
+      onRefreshed?.({ token: result.token, refreshToken: result.refreshToken })
+      return true
     })().finally(() => {
       refreshing = null
     })
@@ -184,6 +191,7 @@ async function send(method, path, { body, query }, retried) {
 
   if (response.status === 401 && !NO_REFRESH.includes(path)) {
     // Another call may already have refreshed (the token changed): then just retry.
+    // If the refresh can't get through, its "try again" error leaves from here.
     if (!retried && (token !== sentToken || await refreshSession())) {
       return send(method, path, { body, query }, true)
     }
