@@ -116,6 +116,7 @@ ROUTES = [
     _r("GET", "/dashboard/projects", h.project_cards, STAFF),
     _r("GET", "/dashboard/at-risk", h.at_risk, STAFF),
     _r("GET", "/dashboard/allocation", h.allocation, STAFF),
+    _r("GET", "/dashboard/timeline", h.timeline),  # everyone's home page; the service picks the projects
     _r("GET", "/admin/integrity-check", h.integrity_check, {ADMIN}),
     _r("GET", "/admin/audit-log", h.audit_log, {ADMIN}),
 

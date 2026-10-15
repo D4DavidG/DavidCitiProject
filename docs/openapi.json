@@ -3698,6 +3698,56 @@
         }
       }
     },
+    "/dashboard/timeline": {
+      "get": {
+        "operationId": "timeline",
+        "summary": "Get a timeline of your projects: their dates, Deliverables and bookings.",
+        "description": "Any signed-in user.",
+        "tags": [
+          "dashboard"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/admin/integrity-check": {
       "get": {
         "operationId": "integrity_check",

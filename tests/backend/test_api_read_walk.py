@@ -100,6 +100,16 @@ def test_every_read_route_answers_in_shape(conn, world):
     status, one = b.call("GET", "/dashboard/allocation", query={"weekFrom": "2026-10-12", "weeks": "1", "pageSize": "1"})
     assert status == 200 and one["weeks"] == ["2026-10-12"] and len(one["items"]) == 1
     assert (one["pageSize"], one["total"]) == (1, grid["total"])
+    # The home pages' timeline: ten projects a page unless asked, field names exactly as the spec lists them.
+    home = get(e, "/dashboard/timeline", "/dashboard/timeline")
+    assert PAGE_KEYS <= home.keys() and (home["pageSize"], home["total"]) == (10, 1)
+    [row] = home["items"]
+    assert set(row) == {"projectId", "name", "status", "startDate", "endDate", "atRisk", "deliverables", "bookings"}
+    assert [d["name"] for d in row["deliverables"]] == ["Design", "Build"]
+    assert set(row["deliverables"][0]) == {"milestoneId", "name", "dueDate", "status"}
+    assert row["bookings"] == [{"userId": world["alice"].user_id, "name": "Alice Tester", "startDate": "2026-10-01",
+                                "endDate": "2026-12-31", "hoursPerWeek": 20}]
+    assert b.call("GET", "/dashboard/timeline", query={"pageSize": "1"})[1]["pageSize"] == 1
     check = get(a, "/admin/integrity-check", "/admin/integrity-check")
     assert check["checks"] == 5 and all(rows == [] for rows in check["violations"].values())
     assert get(a, "/admin/audit-log", "/admin/audit-log")["total"] > 0

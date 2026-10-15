@@ -39,8 +39,8 @@ class Context:
     def query(self) -> dict:
         return self.request.query
 
-    def page_args(self) -> tuple[int, int]:
-        return self.query.get("page", 1), self.query.get("page_size", 20)
+    def page_args(self, default_size: int = 20) -> tuple[int, int]:
+        return self.query.get("page", 1), self.query.get("page_size", default_size)
 
 
 def _page(result: dict, view) -> dict:
@@ -409,6 +409,11 @@ def allocation(ctx: Context) -> dict:
     """Get the allocation grid: people x weeks, flagged past capacity."""
     result = dashboard.allocation(ctx.conn, ctx.actor, ctx.query, *ctx.page_args())
     return {**_page(result, camelize), "weeks": result["weeks"]}
+
+
+def timeline(ctx: Context) -> dict:
+    """Get a timeline of your projects: their dates, Deliverables and bookings."""
+    return _page(dashboard.timeline(ctx.conn, ctx.actor, *ctx.page_args(default_size=10)), camelize)
 
 
 def integrity_check(ctx: Context) -> dict:

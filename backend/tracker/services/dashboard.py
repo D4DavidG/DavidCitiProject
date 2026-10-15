@@ -5,6 +5,8 @@
     Q3 Q5     allocation()      hours booked per person per week, which projects they come from,
                                 and who is over capacity (worst first)
     Q7        project_budget()  planned cost (bookings) vs consumed cost (approved time)
+    Q2 Q3 Q4  timeline()        the home pages: each of your projects across weeks, with
+                                its deliverables and bookings
               integrity_check() the five invariants, live
 
 Q4 (deliverables and completion) is on the deliverables list. Each figure is one
@@ -21,6 +23,7 @@ from psycopg import sql
 
 from domain import clock, values
 from domain.errors import Forbidden
+from services import milestones
 from services import projects as project_service
 from services.access import visible_project
 from services.actors import Actor
@@ -260,6 +263,50 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
         })
     week_list = [(week_from + dt.timedelta(weeks=i)).isoformat() for i in range(weeks)]
     return {**people, "items": [rows[i] for i in ids], "weeks": week_list}
+
+
+# --- home pages: a timeline of your projects ---
+
+def timeline(conn: psycopg.Connection, actor: Actor, page: int = 1, page_size: int = 10) -> dict:
+    """Your live projects for the home page's timeline: span, risk, deliverables and bookings.
+
+    Admins: every live project; managers: theirs; employees: those they have a live
+    booking or task on, with only their own bookings. Six queries whatever the page
+    size: the page and its count, then money, risk, deliverables and bookings for all
+    of its projects at once.
+    """
+    where = ["NOT p.is_archived"]
+    if actor.is_manager:
+        where.append("p.manager_id = %(me)s")
+    elif actor.is_employee:
+        where.append("(EXISTS (SELECT 1 FROM assignments a WHERE a.project_id = p.project_id"
+                     " AND a.user_id = %(me)s AND NOT a.is_archived)"
+                     " OR EXISTS (SELECT 1 FROM tasks t WHERE t.project_id = p.project_id"
+                     " AND t.assignee_user_id = %(me)s AND NOT t.is_archived))")
+    # WHERE fragments are fixed strings written above; every value is a parameter.
+    query = sql.SQL("SELECT p.* FROM projects p WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
+    result = paginate(conn, query, {"me": actor.user_id}, sql.SQL("p.start_date, p.name, p.project_id"),
+                      page, page_size)
+    ids = [p["project_id"] for p in result["items"]]
+    reasons = _risk_reasons(conn, result["items"], _money(conn, ids), clock.today())
+    deliverables = milestones.decorated(conn, "NOT m.is_archived AND m.project_id = ANY(%(ids)s)", {"ids": ids})
+    bookings = conn.execute(
+        "SELECT a.project_id, a.user_id, u.first_name || ' ' || u.last_name AS name, a.start_date, a.end_date,"
+        " a.hours_per_week FROM assignments a JOIN users u ON u.user_id = a.user_id"
+        " WHERE a.project_id = ANY(%(ids)s) AND NOT a.is_archived AND (NOT %(own)s OR a.user_id = %(me)s)"
+        " ORDER BY a.start_date, name, a.assignment_id",
+        {"ids": ids, "own": actor.is_employee, "me": actor.user_id}).fetchall()
+    rows = [{
+        "project_id": p["project_id"], "name": p["name"], "status": p["status"],
+        "start_date": p["start_date"].isoformat(), "end_date": p["predicted_end_date"].isoformat(),
+        "at_risk": bool(reasons[p["project_id"]]),
+        "deliverables": [{"milestone_id": d["milestone_id"], "name": d["name"], "due_date": d["due_date"].isoformat(),
+                          "status": d["status"]} for d in deliverables if d["project_id"] == p["project_id"]],
+        "bookings": [{"user_id": b["user_id"], "name": b["name"], "start_date": b["start_date"].isoformat(),
+                      "end_date": b["end_date"].isoformat(), "hours_per_week": b["hours_per_week"]}
+                     for b in bookings if b["project_id"] == p["project_id"]],
+    } for p in result["items"]]
+    return {**result, "items": rows}
 
 
 # --- the invariant ---

@@ -7,7 +7,7 @@ import pytest
 
 import factories as f
 from domain.errors import Forbidden, NotFound
-from services import dashboard, projects, tasks, time_entries, users
+from services import assignments, dashboard, milestones, projects, tasks, time_entries, users
 
 
 @pytest.fixture
@@ -283,6 +283,86 @@ def test_allocation_grid_flags_overtime_worked(conn, org):
 def test_employees_do_not_get_the_allocation_grid(conn, org):
     with pytest.raises(Forbidden):
         dashboard.allocation(conn, org["alice"], {})
+
+
+# --- home pages: a timeline of your projects (redesign spec, section 3) -----------------------------
+
+def timeline_names(conn, actor):
+    return [p["name"] for p in dashboard.timeline(conn, actor, 1, 10)["items"]]
+
+
+def test_timeline_row_holds_the_projects_span_deliverables_and_bookings(conn, org):
+    apollo = dashboard.timeline(conn, org["bob"], 1, 10)["items"][0]
+    assert apollo == {
+        "project_id": org["apollo"]["project_id"], "name": "Apollo", "status": "PLANNING",
+        "start_date": "2026-10-01", "end_date": "2026-12-31", "at_risk": True,  # Design: 21% of its time gone, 0% done
+        "deliverables": [{"milestone_id": org["design"]["milestone_id"], "name": "Design", "due_date": "2026-11-30",
+                          "status": "NOT_STARTED"}],
+        "bookings": [{"user_id": org["alice"].user_id, "name": "Alice Tester", "start_date": "2026-10-01",
+                      "end_date": "2026-12-31", "hours_per_week": 20}],
+    }
+
+
+def test_timeline_at_risk_is_the_dashboards_own_rule(conn, org):
+    f.project(conn, org["admin"], org["carol"], name="Old", start_date="2026-08-01", predicted_end_date="2026-10-01")
+    risk = {c["name"]: c["at_risk"] for c in cards(conn, org["admin"])}
+    timeline = {p["name"]: p["at_risk"] for p in dashboard.timeline(conn, org["admin"], 1, 10)["items"]}
+    assert timeline == risk == {"Apollo": True, "Old": True, "Zeus": False}
+
+
+def test_timeline_shows_each_role_its_own_projects(conn, org):
+    assert timeline_names(conn, org["admin"]) == ["Apollo", "Zeus"]
+    assert timeline_names(conn, org["bob"]) == ["Apollo"]
+    assert timeline_names(conn, org["carol"]) == ["Zeus"]
+    assert timeline_names(conn, org["alice"]) == ["Apollo"]  # booked on Apollo only
+
+
+def test_employee_timeline_has_projects_with_a_task_but_only_their_own_bookings(conn, org):
+    bea, _ = f.person(conn, org["admin"], manager=org["bob"], first_name="Bea")
+    f.booking(conn, org["bob"], org["apollo"], bea, hours_per_week=10)
+    # Alice keeps a task on Zeus after her booking there is archived.
+    zeus_booking = f.booking(conn, org["carol"], org["zeus"], org["alice"])
+    f.task(conn, org["carol"], f.deliverable(conn, org["carol"], org["zeus"]), assignee=org["alice"])
+    assignments.archive_booking(conn, org["carol"], zeus_booking["assignment_id"])
+    rows = {p["name"]: p for p in dashboard.timeline(conn, org["alice"], 1, 10)["items"]}
+    assert list(rows) == ["Apollo", "Zeus"]
+    assert [b["user_id"] for b in rows["Apollo"]["bookings"]] == [org["alice"].user_id]  # not Bea's
+    assert rows["Zeus"]["bookings"] == []
+    manager_view = dashboard.timeline(conn, org["bob"], 1, 10)["items"][0]
+    assert sorted(b["name"] for b in manager_view["bookings"]) == ["Alice Tester", "Bea Tester"]
+
+
+def test_timeline_leaves_out_archived_projects_deliverables_and_bookings(conn, org):
+    extra = f.deliverable(conn, org["bob"], org["apollo"], name="Dropped")
+    milestones.archive_milestone(conn, org["bob"], extra["milestone_id"])
+    bea, _ = f.person(conn, org["admin"], manager=org["bob"], first_name="Bea")
+    gone = f.booking(conn, org["bob"], org["apollo"], bea)
+    assignments.archive_booking(conn, org["bob"], gone["assignment_id"])
+    projects.archive_project(conn, org["admin"], org["zeus"]["project_id"])
+    [apollo] = dashboard.timeline(conn, org["admin"], 1, 10)["items"]
+    assert [d["name"] for d in apollo["deliverables"]] == ["Design"]
+    assert [b["name"] for b in apollo["bookings"]] == ["Alice Tester"]
+
+
+def test_timeline_is_paginated(conn, org):
+    page = dashboard.timeline(conn, org["admin"], 2, 1)
+    assert (page["total"], page["total_pages"], page["page_size"]) == (2, 2, 1)
+    assert [p["name"] for p in page["items"]] == ["Zeus"]
+
+
+def test_timeline_runs_the_same_queries_whatever_the_page_size(conn, org):
+    from test_work import CountingConn
+
+    def queries(page_size):
+        counter = CountingConn(conn)
+        dashboard.timeline(counter, org["admin"], 1, page_size)
+        return counter.count
+    before = queries(10)
+    for n in range(5):
+        proj = f.project(conn, org["admin"], org["bob"], name=f"Extra {n}")
+        f.deliverable(conn, org["bob"], proj)
+        f.booking(conn, org["bob"], proj, org["alice"], hours_per_week=1)
+    assert (before, queries(10), queries(1)) == (6, 6, 6)  # page + count, money, risk, deliverables, bookings
 
 
 # --- the invariant ------------------------------------------------------------------------------
