@@ -30,6 +30,14 @@ describe('DependencyPage', () => {
     expect(within(screen.getByRole('region', { name: 'Step 3' })).getByText('Launch')).toBeInTheDocument()
   })
 
+  it('heads each step with a normal-case heading that names its section (spec 6.1: no capitals)', async () => {
+    renderGraph()
+    const step1 = await screen.findByRole('region', { name: 'Step 1' })
+    const heading = within(step1).getByRole('heading', { level: 2, name: 'Step 1' })
+    expect(heading).not.toHaveClass('MuiTypography-overline')
+    expect(step1).toHaveAttribute('aria-labelledby', heading.id)
+  })
+
   it('shows each deliverable with its status and what it needs', async () => {
     renderGraph()
     const build = await screen.findByRole('article', { name: 'Build' })
