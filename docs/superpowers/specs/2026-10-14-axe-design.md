@@ -87,7 +87,7 @@ minor findings from axe's non-WCAG "best-practice" rules (`heading-order`, `regi
    `AllocationPage` component tests still pass; lint clean; `npm audit
    --audit-level=high` reports 0.
 5. **`tools/test-all.sh`:** run once; the summary shows "Accessibility (axe)  PASS  4 tour
-   tests, 48 scans, no serious or critical WCAG problems".
+   tests, 50 scans (48 before the Schedule screen joined the tour), no serious or critical WCAG problems".
 
 What the tests can't prove: what a screen-reader user actually hears, keyboard order, or
 anything axe has no rule for. That stays in "not verified".
