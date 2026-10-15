@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  beforeAll, beforeEach, describe, expect, it, vi,
+} from 'vitest'
 import {
   act, cleanup, screen, waitFor, within,
 } from '@testing-library/react'
@@ -21,6 +23,15 @@ function renderLayout(user, auth = session(user), theme = undefined) {
   stubApi({ 'GET /notifications/unread-count': [200, { count: 0 }] })
   return renderAt(<AppLayout><p>page body</p></AppLayout>, { path: '/dashboard', auth, theme })
 }
+
+// The first render in a file pays MUI's one-time style setup for the whole bar (search, bell, menu):
+// over 5 s on a busy 2-CPU machine with coverage on (15 Oct), which timed out whichever test came first.
+// Pay it once here, under the hook's own 10 s limit, so each test times only itself.
+beforeAll(() => {
+  renderLayout(USERS.manager)
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 beforeEach(() => {
   localStorage.clear()
