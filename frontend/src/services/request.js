@@ -42,8 +42,11 @@ const NO_REFRESH = ['/auth/login', '/auth/refresh', '/auth/logout']
 const writeListeners = new Set()
 
 /**
- * Be told after every successful change (any non-GET call). The notification bell
- * uses this to refresh its count straight away. Returns a function that stops listening.
+ * Be told after every successful change (any non-GET call), with the path called.
+ * The notification bell uses this to refresh its count straight away, and the layout
+ * to say "Saved". Returns a function that stops listening.
+ * @param {(path: string) => void} listener
+ * @returns {() => void}
  */
 export function onWrite(listener) {
   writeListeners.add(listener)
@@ -185,7 +188,7 @@ async function send(method, path, { body, query }, retried) {
 
   const payload = parse(await response.text())
   if (response.ok) {
-    if (method !== 'GET') writeListeners.forEach((listener) => listener())
+    if (method !== 'GET') writeListeners.forEach((listener) => listener(path))
     return payload ?? null
   }
 

@@ -1,16 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import { NavLink } from 'react-router'
 import {
-  AppBar, Box, Button, Chip, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography,
+  AppBar, Box, Button, Chip, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
+  Snackbar, SnackbarContent, Toolbar, Typography,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import { useAuth } from '../auth/useAuth'
 import { useIsMobile } from '../theme/responsive'
 import { NAV_ITEMS, ROLE_LABELS } from './navigation'
 import NotificationBell from './NotificationBell'
+import { onWrite } from '../services/request'
 
 const DRAWER_WIDTH = 240
+
+/** Successful writes that are not a change to the work: signing in or out, marking notifications read. */
+function isSavedChange(path) {
+  return !['/auth/login', '/auth/logout', '/auth/refresh'].includes(path) && !path.startsWith('/notifications/')
+}
 
 function NavList({ role, onNavigate }) {
   return (
@@ -43,11 +50,16 @@ NavList.propTypes = {
 /**
  * The frame around every signed-in page: a top bar (app name, bell, who you are,
  * sign out) and the menu, which is a fixed sidebar on desktop and a drawer on phones.
+ * After every successful change it says "Saved" for 3 seconds, bottom left (the
+ * bell's pop-up sits bottom centre).
  */
 export default function AppLayout({ children }) {
   const { user, logout } = useAuth()
   const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => onWrite((path) => { if (isSavedChange(path)) setSaved(true) }), [])
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -95,6 +107,16 @@ export default function AppLayout({ children }) {
         <Toolbar />
         {children}
       </Box>
+
+      <Snackbar
+        open={saved}
+        autoHideDuration={3000}
+        onClose={() => setSaved(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        {/* role="status" is polite; the default "alert" would interrupt a screen reader */}
+        <SnackbarContent role="status" message="Saved" />
+      </Snackbar>
     </Box>
   )
 }

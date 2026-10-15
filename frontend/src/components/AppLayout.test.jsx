@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AppLayout from './AppLayout'
+import { request } from '../services/request'
 import { USERS, renderAt, session, stubApi } from '../test/utils'
 
 vi.mock('../theme/responsive', () => ({ useIsMobile: vi.fn(() => false) }))
@@ -89,4 +90,39 @@ describe('AppLayout', () => {
     expect(screen.getByRole('navigation', { name: /main menu/i })).toBeInTheDocument()
     responsive.useIsMobile.mockReturnValue(false)
   })
+})
+
+describe('AppLayout "Saved" message', () => {
+  function renderWith(answers) {
+    stubApi({ 'GET /notifications/unread-count': [200, { count: 0 }], ...answers })
+    renderAt(<AppLayout><p>page body</p></AppLayout>, { path: '/dashboard', auth: session(USERS.manager) })
+  }
+
+  it('says "Saved" after a successful change', async () => {
+    renderWith({ 'POST /projects': [201, { projectId: 9 }] })
+    await act(() => request('POST', '/projects', { body: { name: 'Apollo' } }))
+    expect(await screen.findByText('Saved')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Saved')
+  })
+
+  it('says nothing when the change is refused', async () => {
+    renderWith({ 'PATCH /projects/1': [409, { error: 'No.' }] })
+    await act(() => request('PATCH', '/projects/1', { body: {} }).catch(() => {}))
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+  })
+
+  it('says nothing after a read', async () => {
+    renderWith({ 'GET /projects': [200, { items: [] }] })
+    await act(() => request('GET', '/projects'))
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+  })
+
+  it.each(['/auth/login', '/auth/logout', '/notifications/read-all', '/notifications/5/read'])(
+    'says nothing after POST %s (not a change to the work)',
+    async (path) => {
+      renderWith({ [`POST ${path}`]: [200, {}] })
+      await act(() => request('POST', path, { body: {} }))
+      expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+    },
+  )
 })
