@@ -56,7 +56,7 @@ test('an admin creates, edits, archives, reactivates and re-archives a project',
   await create.getByLabel('Start date').fill(isoIn(0))
   await create.getByLabel('End date').fill(isoIn(30))
   await create.getByLabel('Budget ($)').fill('1,000')
-  await create.getByRole('button', { name: 'Save' }).click()
+  await create.getByRole('button', { name: 'Create' }).click() // the New project dialog's button says Create, not Save
   await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible() // it opens the new project
   await expect(page.getByText('Managed by Maria Lopez')).toBeVisible()
 
