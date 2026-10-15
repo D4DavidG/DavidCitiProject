@@ -78,6 +78,21 @@ describe('contained buttons', () => {
   })
 })
 
+describe('a field in error', () => {
+  it.each(MODES)('glows red around a red border in %s mode', (mode) => {
+    const t = makeTheme(mode)
+    render(<ThemeProvider theme={t}><OutlinedInput error inputProps={{ 'aria-label': 'Minutes' }} /></ThemeProvider>)
+    const field = screen.getByRole('textbox', { name: 'Minutes' }).parentElement
+    expect(getComputedStyle(field).boxShadow).toMatch(/^0 0 0 3px rgba/)
+    expect(field.querySelector('fieldset')).toHaveStyle({ borderColor: t.palette.error.main, borderWidth: '2px' })
+  })
+
+  it('stays plain when there is no error', () => {
+    render(<ThemeProvider theme={theme}><OutlinedInput inputProps={{ 'aria-label': 'Minutes' }} /></ThemeProvider>)
+    expect(getComputedStyle(screen.getByRole('textbox', { name: 'Minutes' }).parentElement).boxShadow).toBe('')
+  })
+})
+
 describe('the default export', () => {
   it('is the light theme, so existing imports keep working', () => {
     expect(theme.palette.mode).toBe('light')

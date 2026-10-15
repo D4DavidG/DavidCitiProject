@@ -1,4 +1,4 @@
-import { createTheme } from '@mui/material/styles'
+import { alpha, createTheme } from '@mui/material/styles'
 
 /*
  * Forest green and orange, calm and easy to read (redesign spec section 1). Square corners.
@@ -102,7 +102,16 @@ export function makeTheme(mode) {
             : null),
         },
       },
-      MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 0 } } },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          // A field in error glows red around a 2 px red border (spec 5a); its message stays under it.
+          root: {
+            borderRadius: 0,
+            '&.Mui-error': { boxShadow: `0 0 0 3px ${alpha(t.error, 0.25)}` },
+            '&.Mui-error .MuiOutlinedInput-notchedOutline': { borderColor: t.error, borderWidth: 2 },
+          },
+        },
+      },
       MuiChip: { styleOverrides: { root: { borderRadius: 0 } } },
       MuiAlert: { styleOverrides: { root: { borderRadius: 0 } } },
       MuiDialog: { styleOverrides: { paper: { borderRadius: 0 } } },
