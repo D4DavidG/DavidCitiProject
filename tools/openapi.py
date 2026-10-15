@@ -28,6 +28,61 @@ SERVERS = [
 
 ERROR = {"$ref": "#/components/responses/Error"}
 
+# Field types, as each service validates them (values.integer, values.boolean, values.date, values.text).
+INT, BOOL, TEXT, DATE = {"type": "integer"}, {"type": "boolean"}, {"type": "string"}, {"type": "string", "format": "date"}
+
+_PROFILE = {"firstName": TEXT, "lastName": TEXT, "email": TEXT}
+_CAPACITY = {"weeklyCapacityHours": INT, "overtimeAllowed": BOOL, "taskLimit": INT}
+_USER = {**_PROFILE, "jobTitle": TEXT, "role": TEXT, "managerId": INT, "annualSalaryCents": INT, **_CAPACITY}
+_PROJECT = {"name": TEXT, "description": TEXT, "managerId": INT, "startDate": DATE, "predictedEndDate": DATE,
+            "budgetCents": INT, "status": TEXT}
+_BOOKING = {"hoursPerWeek": INT, "startDate": DATE, "endDate": DATE}
+_MILESTONE = {"name": TEXT, "description": TEXT, "startDate": DATE, "dueDate": DATE, "sortOrder": INT}
+_TASK = {"title": TEXT, "description": TEXT, "estimateMinutes": INT, "assigneeUserId": INT}
+_TIME = {"workDate": DATE, "minutes": INT, "note": TEXT, "confirmOverCapacity": BOOL}
+
+# Request bodies: handler name -> {camelCase field: type}. A test checks this list against
+# the handlers that read ctx.body and against the services' allow-lists.
+BODIES = {
+    "login": {"username": TEXT, "password": TEXT},
+    "refresh": {"refreshToken": TEXT},
+    "logout": {"refreshToken": TEXT},
+    "change_password": {"currentPassword": TEXT, "newPassword": TEXT},
+    "create_user": _USER,
+    "update_me": _PROFILE,
+    "admin_update_user": _USER,
+    "set_capacity": _CAPACITY,
+    "create_project": _PROJECT,
+    "update_project": _PROJECT,
+    "create_booking": {"userId": INT, **_BOOKING},
+    "update_booking": _BOOKING,
+    "create_milestone": _MILESTONE,
+    "update_milestone": _MILESTONE,
+    "add_dependency": {"dependsOnMilestoneId": INT},
+    "create_task": _TASK,
+    "update_task": _TASK,
+    "move_task": {"status": TEXT},
+    "log_time": _TIME,
+    "edit_time": _TIME,
+    "create_request": {"kind": TEXT, "name": TEXT, "description": TEXT, "justification": TEXT,
+                       "proposedStart": DATE, "proposedEnd": DATE, "projectId": INT, "taskLimit": INT},
+    "approve_request": {"startDate": DATE, "predictedEndDate": DATE, "budgetCents": INT, "decisionNote": TEXT},
+    "reject_request": {"decisionNote": TEXT},
+}
+
+# Query filters beyond page and pageSize: handler name -> {query name: type}.
+FILTERS = {
+    "list_users": {"search": TEXT, "role": TEXT, "includeArchived": BOOL},
+    "user_history": {"action": TEXT, "dateFrom": DATE, "dateTo": DATE},
+    "list_projects": {"search": TEXT, "status": TEXT, "includeArchived": BOOL},
+    "my_time": {"dateFrom": DATE, "dateTo": DATE},
+    "list_requests": {"scope": TEXT, "status": TEXT, "kind": TEXT},
+    "project_cards": {"search": TEXT, "status": TEXT},
+    "allocation": {"weekFrom": DATE, "weeks": INT, "overOnly": BOOL},
+    "audit_log": {"actorId": INT, "entityType": TEXT, "entityId": INT, "dateFrom": DATE, "dateTo": DATE},
+    "list_notifications": {"unread": BOOL},
+}
+
 COMPONENTS = {
     "schemas": {
         "Error": {
@@ -83,8 +138,9 @@ def _parameters(route) -> list:
     params = [{"name": name, "in": "path", "required": True, "schema": {"type": "integer"}}
               for name in re.findall(r"\{(\w+)\}", route.path)]
     if _is_paged(route.handler):
-        params += [{"name": "page", "in": "query", "schema": {"type": "integer"}},
-                   {"name": "pageSize", "in": "query", "schema": {"type": "integer"}}]
+        params += [{"name": "page", "in": "query", "schema": INT}, {"name": "pageSize", "in": "query", "schema": INT}]
+    for name, schema in FILTERS.get(route.handler.__name__, {}).items():
+        params.append({"name": name, "in": "query", "schema": schema})
     return params
 
 
@@ -116,6 +172,9 @@ def _operation(route) -> dict:
     params = _parameters(route)
     if params:
         op["parameters"] = params
+    if route.handler.__name__ in BODIES:
+        schema = {"type": "object", "properties": BODIES[route.handler.__name__]}
+        op["requestBody"] = {"required": True, "content": {"application/json": {"schema": schema}}}
     op["responses"] = _responses(route)
     return op
 
