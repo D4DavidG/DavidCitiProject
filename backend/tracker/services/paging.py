@@ -1,7 +1,7 @@
 """Paginated lists: every list answers { items, page, page_size, total, total_pages }.
 
-Paginating from day one keeps the response shape stable; adding it later would
-break every client that consumed a bare array.
+Always paginating keeps the shape stable; adding pages later would break clients
+that expect a bare array. (The API converts the keys to camelCase.)
 """
 
 import math
@@ -26,7 +26,7 @@ def paginate(conn: psycopg.Connection, query: sql.Composable, params: dict, orde
 
 
 def page_of(rows: list, page: int, page_size: int) -> dict:
-    """One page of a list already computed in Python (for orderings SQL can't do, like 'at risk first')."""
+    """One page of a list already built in Python (for orderings SQL can't do, like 'at risk first')."""
     page = max(page, 1)
     page_size = min(max(page_size, 1), MAX_PAGE_SIZE)
     return _envelope(rows[(page - 1) * page_size:page * page_size], page, page_size, len(rows))

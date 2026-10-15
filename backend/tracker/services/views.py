@@ -1,20 +1,22 @@
 """The outside shape of every record: camelCase, every field named explicitly.
 
-Used for API responses and for audit snapshots, so both always agree. Naming
-each field (never dumping a row) is what guarantees password_hash can't leak
-when someone adds a column later.
+Used for API responses and audit snapshots, so the two always agree. Each field
+is named (a row is never dumped whole), so a column added later, such as
+password_hash, can't leak.
 """
 
 import datetime as dt
 
 
 def _plain(value):
+    """Dates become ISO strings; everything else passes through."""
     if isinstance(value, (dt.date, dt.datetime)):
         return value.isoformat()
     return value
 
 
 def _pick(row: dict, fields: dict[str, str]) -> dict:
+    """Build {camelCase name: value} from {camelCase name: row column}."""
     return {out: _plain(row.get(src)) for out, src in fields.items()}
 
 
@@ -28,7 +30,7 @@ _USER = {
 
 
 def user_view(row: dict, include_salary: bool) -> dict:
-    """A person. Salary only for admins and the person themselves."""
+    """A person. The caller decides `include_salary` (admins and the person themselves only)."""
     view = _pick(row, _USER)
     if include_salary:
         view["annualSalaryCents"] = row.get("annual_salary_cents")
@@ -123,6 +125,7 @@ def request_view(row: dict) -> dict:
 
 
 def notification_view(row: dict) -> dict:
+    """One notification with its audit summary."""
     return _pick(row, {
         "notificationId": "notification_id", "auditId": "audit_id", "summary": "summary",
         "entityType": "entity_type", "entityId": "entity_id", "isRead": "is_read", "readAt": "read_at",
@@ -131,6 +134,7 @@ def notification_view(row: dict) -> dict:
 
 
 def audit_view(row: dict) -> dict:
+    """One audit row, including the before and after snapshots."""
     return _pick(row, {
         "auditId": "audit_id", "actorUserId": "actor_user_id", "actorRole": "actor_role", "action": "action",
         "entityType": "entity_type", "entityId": "entity_id", "beforeState": "before_state",

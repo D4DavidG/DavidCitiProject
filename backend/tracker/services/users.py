@@ -1,10 +1,10 @@
 """Accounts: creation, login, passwords, self-service, admin edits, capacity, archive.
 
 - Only admins create accounts. The server generates the username (initials plus
-  six digits, never changed) and a 12-character password shown once.
-- Login is by username. Every login failure gets the same 401.
-- A user edits only their own name and email. Nobody edits a username, and
-  nobody changes their own role or salary.
+  six digits, never changed) and a 12-character password, shown once.
+- Login is by username; every login failure gets the same 401.
+- A user edits only their own name and email. Nobody edits a username or
+  changes their own role or salary.
 """
 
 import datetime as dt
@@ -22,7 +22,7 @@ from store.postgres import atomic, columns, insert, update
 
 BAD_LOGIN = "Username or password is incorrect."
 ROLES = {ADMIN, MANAGER, EMPLOYEE}
-# Every column except password_hash, which never leaves the database layer.
+# Every column except password_hash, so a password hash can't leak by accident.
 COLUMNS = columns(["user_id", "username", "first_name", "last_name", "email", "job_title", "role", "manager_id",
                    "annual_salary_cents", "weekly_capacity_hours", "overtime_allowed", "task_limit", "must_change_password",
                    "is_archived", "archived_at", "archived_by", "created_at", "updated_at"])
@@ -33,11 +33,12 @@ _CAPACITY_FIELDS = {"weekly_capacity_hours", "overtime_allowed", "task_limit"}
 
 
 def _row(conn: psycopg.Connection, user_id: int) -> dict | None:
+    """The user row without password_hash, or None."""
     return conn.execute(sql.SQL("SELECT {} FROM users WHERE user_id = %s").format(COLUMNS), (user_id,)).fetchone()
 
 
 def _snapshot(row: dict) -> dict:
-    return user_view(row, include_salary=True)  # audit log is admin-only, and admins see salary
+    return user_view(row, include_salary=True)  # the audit log is admin-only, and admins may see salary
 
 
 def _name(row: dict) -> str:
@@ -90,24 +91,26 @@ def _check_line_manager(conn: psycopg.Connection, manager_id: int | None, user_i
 
 
 def _update(conn: psycopg.Connection, user_id: int, changes: dict) -> dict:
+    """UPDATE a user and return the row without password_hash."""
     return update(conn, "users", "user_id", user_id, changes, returning=COLUMNS)
 
 
 def _target(conn: psycopg.Connection, user_id: int) -> dict:
+    """The user row, or 404."""
     row = _row(conn, user_id)
     if row is None:
         raise NotFound("User not found.")
     return row
 
 
-# --- creation ---------------------------------------------------------------
+# --- creation ---
 
 def bootstrap_admin(conn: psycopg.Connection, password: str) -> None:
     """Create the first admin, AD000001, unless it exists. Run once by the migration step.
 
-    Every cold start calls this inside the migration lock, so the existence check comes
-    before the deliberately slow hash: otherwise simultaneous cold starts queue for
-    about a second each.
+    Every cold start calls this inside the migration lock, so the existence check
+    comes before the deliberately slow hash; otherwise simultaneous cold starts
+    would each wait about a second.
     """
     if conn.execute("SELECT 1 FROM users WHERE username = 'AD000001'").fetchone():
         return
@@ -129,7 +132,7 @@ def create_user(conn: psycopg.Connection, actor: Actor, data: dict) -> tuple[dic
         raise Forbidden("Only admins create accounts.")
     values.only_allowed(data, _ADMIN_FIELDS)
     for required in ("first_name", "last_name", "email", "role"):
-        values.text(data, required)  # presence check with the right field name
+        values.text(data, required)  # presence check; the error names the right field
     clean = _validate_fields(data)
     password = passwords.generate_password()
     with atomic(conn):
@@ -147,7 +150,7 @@ def create_user(conn: psycopg.Connection, actor: Actor, data: dict) -> tuple[dic
     return row, password
 
 
-# --- login and passwords ------------------------------------------------------
+# --- login and passwords ---
 
 def login(conn: psycopg.Connection, data: dict, secret: str, now: dt.datetime) -> dict:
     """Check username and password; return a token and the user. One 401 for every failure."""
@@ -157,9 +160,9 @@ def login(conn: psycopg.Connection, data: dict, secret: str, now: dt.datetime) -
                        .format(COLUMNS),
                        (username,)).fetchone()
     if row is None:
-        # Do the same hashing work as a real check (one PBKDF2 at the current round count),
-        # so the reply time doesn't reveal which usernames exist. Nothing is hashed at import:
-        # a 600k-round dummy there would slow every cold start by as long as a login takes.
+        # Unknown username: do the same PBKDF2 work as a real check, so the response
+        # time doesn't reveal which usernames exist. It runs here, not at import,
+        # because a 600k-round hash at import would slow every cold start.
         passwords.hash_password(password)
         raise AuthenticationError(BAD_LOGIN)
     if not passwords.verify_password(password, row["password_hash"]):
@@ -182,7 +185,7 @@ def change_password(conn: psycopg.Connection, actor: Actor, data: dict) -> dict:
         if new == current:
             raise ValidationError("New password must differ from the current one.", field="new_password")
         before = _row(conn, actor.user_id)
-        # bandit B105 mistakes the "must_change_password" flag for a hard-coded password.
+        # bandit B105 takes the "must_change_password" flag for a hard-coded password; it is not one.
         row = _update(conn, actor.user_id, {"password_hash": passwords.hash_password(new),
                                             "must_change_password": False})  # nosec B105
         audit.record_change(conn, actor, "UPDATE", "users", actor.user_id, _snapshot(before), _snapshot(row),
@@ -197,7 +200,7 @@ def reset_password(conn: psycopg.Connection, actor: Actor, user_id: int) -> str:
     password = passwords.generate_password()
     with atomic(conn):
         before = _target(conn, user_id)
-        # bandit B105 mistakes the "must_change_password" flag for a hard-coded password.
+        # bandit B105 takes the "must_change_password" flag for a hard-coded password; it is not one.
         row = _update(conn, user_id, {"password_hash": passwords.hash_password(password),
                                       "must_change_password": True})  # nosec B105
         audit.record_change(conn, actor, "RESET_PASSWORD", "users", user_id, _snapshot(before), _snapshot(row),
@@ -205,7 +208,7 @@ def reset_password(conn: psycopg.Connection, actor: Actor, user_id: int) -> str:
     return password
 
 
-# --- edits ----------------------------------------------------------------------
+# --- edits ---
 
 def update_self(conn: psycopg.Connection, actor: Actor, data: dict) -> dict:
     """Change your own first name, last name or email. Nothing else."""
@@ -253,7 +256,7 @@ def set_capacity(conn: psycopg.Connection, actor: Actor, user_id: int, data: dic
         raise ValidationError("Nothing to change.")
     with atomic(conn):
         before = _target(conn, user_id)
-        if actor.is_manager and before["manager_id"] != actor.user_id:
+        if actor.is_manager and before["manager_id"] != actor.user_id:  # not your report: same 404 as a missing user
             raise NotFound("User not found.")
         row = _update(conn, user_id, clean)
         audit.record_change(conn, actor, "UPDATE", "users", user_id, _snapshot(before), _snapshot(row),
@@ -261,7 +264,7 @@ def set_capacity(conn: psycopg.Connection, actor: Actor, user_id: int, data: dic
     return row
 
 
-# --- reading ----------------------------------------------------------------------
+# --- reading ---
 
 def get_user(conn: psycopg.Connection, actor: Actor, user_id: int) -> dict:
     """Admins and managers see anyone; an employee sees only themselves."""
@@ -288,14 +291,15 @@ def list_users(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     if role := values.choice(filters, "role", ROLES, required=False):
         where.append("role = %(role)s")
         params["role"] = role
-    # The WHERE fragments are fixed strings from this function; every value is a parameter.
+    # WHERE fragments are fixed strings written above; every value is a parameter.
     query = sql.SQL("SELECT {} FROM users WHERE {}").format(COLUMNS, sql.SQL(" AND ").join(map(sql.SQL, where)))
     return paginate(conn, query, params, sql.SQL("last_name, first_name, user_id"), page, page_size)
 
 
-# --- archive ------------------------------------------------------------------------
+# --- archive ---
 
 def _manages_live_projects(conn: psycopg.Connection, user_id: int) -> bool:
+    """True if the person is the manager of any live project."""
     return bool(conn.execute("SELECT 1 FROM projects WHERE manager_id = %s AND NOT is_archived LIMIT 1",
                              (user_id,)).fetchone())
 

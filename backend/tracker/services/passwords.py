@@ -1,10 +1,9 @@
 """Password hashing and generated credentials.
 
-PBKDF2-HMAC-SHA256 with a random salt per user, stored as one self-describing
-string: algorithm$rounds$salt$key. Storing the round count inside the hash
-means it can be raised later without breaking existing users. A plain SHA-256
-would be fast, and fast is exactly what an attacker guessing billions of
-passwords wants; slow is the feature.
+PBKDF2-HMAC-SHA256 with a random salt per user, stored as one string:
+algorithm$rounds$salt$key. The round count lives inside the string, so it can be
+raised later without locking out existing users. Plain SHA-256 is fast, which is
+what an attacker guessing passwords wants; PBKDF2 is deliberately slow.
 """
 
 import base64
@@ -15,8 +14,8 @@ import secrets
 import string
 import unicodedata
 
-DEFAULT_ROUNDS = 600_000
-ROUNDS = DEFAULT_ROUNDS  # the test suite lowers this for speed; a test checks the default
+DEFAULT_ROUNDS = 600_000  # OWASP's advice for PBKDF2-SHA256; about 1 s per login on Lambda (512 MB)
+ROUNDS = DEFAULT_ROUNDS  # tests lower this for speed; one test checks the default
 ALPHABET = string.ascii_letters + string.digits
 
 
@@ -50,6 +49,7 @@ def generate_password() -> str:
 
 
 def _initial(name: str) -> str:
+    """First A-Z letter of a name, accents dropped; "X" if it has none."""
     ascii_only = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     letters = re.sub(r"[^A-Za-z]", "", ascii_only)
     return letters[0].upper() if letters else "X"

@@ -1,7 +1,7 @@
 """A person's in-app notifications (the bell).
 
-Marking one read changes only the reader's own inbox, not business data, so it
-is not audited; auditing it would notify people about notifications.
+Marking one read touches only the reader's own inbox, not business data, so it
+is not audited (that would notify people about notifications).
 """
 
 import psycopg
@@ -26,6 +26,7 @@ def list_notifications(conn: psycopg.Connection, actor: Actor, unread_only: bool
 
 
 def unread_count(conn: psycopg.Connection, actor: Actor) -> int:
+    """How many of your notifications are unread (the bell badge)."""
     return conn.execute("SELECT count(*) AS n FROM notifications WHERE recipient_user_id = %s AND NOT is_read",
                         (actor.user_id,)).fetchone()["n"]
 

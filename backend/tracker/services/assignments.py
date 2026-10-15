@@ -1,9 +1,9 @@
 """Bookings ("Resources" on screen): a person on a project for N hours a week.
 
-Bookings are the plan. They drive the allocation grid (question 3), the
-over-allocation flags (question 5) and planned cost (question 7). Only
-employees are booked. A booking may push someone past their weekly capacity:
-that is allowed and flagged, because a manager needs to see it to fix it.
+Bookings are the plan: they drive the allocation grid (question 3), the
+over-allocation flags (question 5) and planned cost (question 7). Only employees
+are booked. Booking past weekly capacity is allowed and flagged, not refused,
+because a manager has to see the problem to fix it.
 """
 
 import datetime as dt
@@ -90,7 +90,7 @@ def _booking_to_manage(conn: psycopg.Connection, actor: Actor, booking_id: int) 
 
 
 def update_booking(conn: psycopg.Connection, actor: Actor, booking_id: int, data: dict) -> dict:
-    """Change hours or dates. Refused if it would leave logged time outside the booking."""
+    """Change hours or dates; refused (409) if logged time would fall outside the booking."""
     values.only_allowed(data, _FIELDS - {"user_id"})
     clean = _clean(data)
     if not clean:
@@ -101,6 +101,7 @@ def update_booking(conn: psycopg.Connection, actor: Actor, booking_id: int, data
             raise Conflict("This booking is archived.")
         merged = {**before, **clean}
         _check_dates(merged)
+        # Time already logged on days the new dates no longer cover (and no other booking covers).
         stranded = conn.execute(
             "SELECT count(*) AS n FROM time_entries WHERE user_id = %s AND project_id = %s"
             " AND status <> 'REJECTED' AND work_date BETWEEN %s AND %s"

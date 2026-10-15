@@ -1,12 +1,10 @@
 """Signed session tokens (JWT, HS256), standard library only.
 
 The token says who you are; the database says what you may do. It carries only
-the user id and its times, never the role: the role is re-read from Postgres on
-every request, so a demoted user's old token can't keep admin powers.
+the user id and its times, never the role (re-read from Postgres on every request).
 
-Signed, not encrypted: anyone holding a token can read it, so nothing
-sensitive goes in. Every failure gets the same message, because telling an
-attacker which part of a forgery was wrong tells them what to fix.
+Signed, not encrypted: anyone can read a token, so nothing sensitive goes in.
+Every failure gets the same message, so a forger learns nothing about what was wrong.
 """
 
 import base64
