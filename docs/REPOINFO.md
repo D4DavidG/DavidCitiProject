@@ -17,7 +17,7 @@ points at a file and line you can open.
 [8 Performance](#8-performance) ·
 [9 Stories](#9-three-things-that-went-wrong) · [10 Question bank](#10-the-question-bank) (14 Oct meeting questions and the security table are at its top) ·
 [11 Say this, not that](#11-say-this-not-that) · [12 Gaps and AI](#12-honest-gaps-what-id-do-next-and-ai-use) ·
-[13 Cheat card](#13-cheat-card)
+[13 Cheat card](#13-cheat-card) · [14 AI agents](#14-how-i-used-ai-agents-to-build-this)
 
 ---
 
@@ -969,6 +969,8 @@ Also true, but only documented (`docs/OVERNIGHT-REPORT.md:277-296`): a separate 
 agent found four important issues (one was that the report itself was unfinished) and a
 minor one worth fixing, and all five were fixed. Don't say "rules are enforced twice" here (see [§11](#11-say-this-not-that)).
 
+The long version (roles, models, the pipeline, parallel lanes, settings, tools, lessons) is [§14](#14-how-i-used-ai-agents-to-build-this).
+
 ---
 
 ## 13. Cheat card
@@ -1019,3 +1021,183 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 | `store/migrations/001_init.sql` | Every constraint, the exclusion, the no-DELETE trigger |
 | `store/integrity.py` | The five integrity queries |
 | `tests/backend/conftest.py` | Rollback per test; integrity check after each |
+
+---
+
+## 14. How I used AI agents to build this
+
+Measured 15 Oct, about 00:05, on branch `David3`, unless a line says otherwise. Sources
+under `~/.claude/` and `.superpowers/` (transcripts, workflow scripts, ledgers, settings) are
+**on the VDI only**: they sit outside git on purpose (`.gitignore:266`, `.git/info/exclude`)
+and are wiped with the VDI, so quote them; don't promise a link. Times are Eastern.
+
+### The short answer
+
+> "I ran this like a small team, with me as product owner and tech lead. I made every
+> product and design decision, in interviews where Claude asked me one question at a time;
+> the answers are the decisions table in CLAUDE.md. Claude Code was my lead engineer: it
+> turned each decision into a spec and a plan, split the plan into tasks, and gave each task
+> to its own agent. A different agent reviewed every task, and a fresh one reviewed the
+> whole branch before merge. I trusted test output, not an agent saying 'done', and only I
+> could push or deploy."
+
+### Who did what
+
+"Opus", "Sonnet" and "Haiku" are Claude 5.5 models, from most to least capable (and costly).
+The rule: the strongest model where judgement matters (design, review, risky code), a
+cheaper one where the plan already says exactly what to type.
+
+| Role | Model, and why | A real example |
+| --- | --- | --- |
+| **Me (David)**: product owner, PM, tech lead | n/a | I turned task assignment from push to pull: "We don't want a push system, we want a pull system" (`superpowers/specs/2026-10-14-pull-board-design.md:5`). I push and deploy myself |
+| **Lead session** ("controller"): one Claude Code chat that plans, splits, dispatches, reads results | Opus, every turn (2,427 + 969 turns in the two long sessions) | Wrote each workflow script, kept a progress ledger per build, merged branches, ran the final checks |
+| **Implementers**: one fresh agent per task | Sonnet for well-specified tasks; Opus for risky ones | Pull board: Sonnet built 8 of 10 tasks; Opus built task 3 (Take this, with row locks) and task 4 (the two races) (`implModel`, line 73 of the `pull-board-sdd` script) |
+| **Task reviewers**: never the agent that built it | Sonnet; Opus on tasks 3 and 4 | Two verdicts per task (matches the spec? well built?); an Important finding opens a fix loop |
+| **Fixers and re-reviewers** | Builder's model; a fresh Opus from round 4; re-review on Sonnet | 90 findings fixed in task fix rounds (ledgers, below) |
+| **Final reviewer**: fresh, no memory of the build, reads the whole branch | Opus, effort high | Found a double click on Take this sent two claims; fixed test-first in `5de45ab` |
+| **Researchers and skeptics**: read-only, in parallel | Opus | `email-sms-feasibility`: 4 probes, a recommender, a skeptic. Verdict: the workshop account can't send email or texts (`superpowers/specs/2026-10-14-email-and-sms-findings.md`) |
+| **Visual reviewers**: read screenshots, then two skeptics per finding try to disprove it | Opus | 36 screenshots, 59 findings, 24 survived, 14 fixes (`b880af9`, `64b3671`; `docs/OVERNIGHT-REPORT.md:328-356`) |
+| **Bookkeepers**: append one line to the ledger | Haiku, effort low | 22 Haiku agents in the two big builds: the cheapest model for a job with no judgement |
+
+### How one feature went from idea to deploy: the pull board
+
+1. **Decide** (14 Oct, 10:15). I asked for pull, not push. Claude asked follow-up
+   questions one at a time (the `AskUserQuestion` tool): a per-person limit, set by the line
+   manager, built now.
+2. **Spec**: `superpowers/specs/2026-10-14-pull-board-design.md`. One agent wrote it; a
+   second checked every claim against the code.
+3. **Plan**: `superpowers/plans/2026-10-14-pull-board.md`, 10 numbered test-first tasks. One
+   agent drafted it; another attacked it against the code.
+4. **Preflight**: one agent checked that every name the plan relies on exists, and which
+   tasks share files.
+5. **Build** (13:05 to 14:22): workflow `pull-board-sdd`, 56 agents (36 Sonnet, 11 Haiku,
+   9 Opus). Per task: build test-first, review, fix (at most 5 rounds), then "review clean"
+   in the ledger.
+6. **Final review**: 1 Important finding, fixed (`5de45ab`). Its minor findings became the
+   first task of the next build rather than being dropped.
+7. **Verify**: 423 backend and 233 website tests, lint, build and bandit clean.
+8. **Ship**: I pushed (`origin/David` is `545f991`) and deployed that night
+   (`superpowers/specs/2026-10-14-redesign-design.md:3-4` calls `545f991` "the deployed" version).
+
+The ledger is `.superpowers/sdd/2026-10-14-pull-board/progress.md` (184 lines, VDI only).
+Its rulings record a decision, the reason and the cost if wrong. Line 87, quoted: keep
+`SELECT task_limit … FOR UPDATE` and the held count as two statements, because "under READ
+COMMITTED a combined statement's subquery keeps the pre-wait snapshot, so the second of two
+concurrent claims would count stale and pass the limit".
+
+### Running agents in parallel
+
+- **Worktrees.** A worktree is a second folder checked out on another branch of the same
+  repo (`git worktree`), so two builds never touch each other's files. Used for `pm-notify`
+  (cherry-picked onto `David` as `43970f4` and `7909ac8`), `David2` (Schedule, k6, cleanup;
+  merged as `2d869eb`), `merge-prep` (a merge copy, dry-run first with `git merge-tree`;
+  `David` fast-forwarded to `545f991` at 22:38) and `David3` (tonight's redesign).
+- **Limits.** The VDI has 2 CPU cores and 7 GB of memory (`nproc`, `free -g`), one local
+  stack, and five fixed test-database names. So by day at most two builds ran at once, and
+  Claude turned down one agent per item; tonight's five lanes rely on the locks below.
+- **Batched tests.** At my request (19:50), each step ran only its own tests; a checkpoint
+  agent ran every suite after the dashboard counts, the axe scan and k6 (`finish` ledger line 16).
+- **Tonight's five lanes** (backend, theme, pages, home, docs) shared one worktree. Each
+  lane owns named files and may not edit others; it lists "Needs from others" in its report
+  instead. Commits go through one lock: `flock <scratchpad>/git.lock sh -c 'git add <files> &&
+  git commit …'`. Tests go through `test.lock`, changed files only. No servers, no
+  Playwright, never stash, reset, rebase or amend. Each lane: build, independent review, fix.
+  Lane models (build/review): backend, theme and home Opus/Opus; pages Sonnet/Opus; docs
+  Sonnet/Sonnet (`redesign-lane` script, VDI only). Result: 39 commits on `David3` since
+  23:14 (`git log David..David3`).
+- **My mid-run requests** reached agents through the spec. Gold highlights (23:27), red
+  field errors (23:29) and one design language (23:35) each became a spec commit within
+  minutes (`5bfeac9`, `4ca8c27`, `771f12e`). Every lane is told "The spec is … Read it
+  first", and reviewers check against it, so agents that started later used the new text:
+  the home lane's `8315025` says "the spec moved from orange to gold". A lane that had
+  already committed (the theme, orange in `43fe274`) did not go back; the planned polish
+  round retunes it.
+
+### Settings and guardrails
+
+`.claude/settings.local.json` (not in git, `.gitignore:266`). A deny rule beats an allow rule.
+
+| Rule | What it does | Why |
+| --- | --- | --- |
+| allow `Bash` | Any other shell command runs without a prompt | So overnight and parallel agents don't stall on a click. I asked for it (13 Oct 23:16), had it removed (14 Oct 06:50) and re-added (09:38, `update-config` skill) |
+| allow 14 narrow rules (`npm`, `npx vitest`, `npx playwright`, `git add/commit/status/diff/log`, `.venv/bin/pytest`, `tools/demo.py`, `start-dev.sh`) | Pre-approved test and commit commands | The first overnight build; still there if the blanket line goes |
+| deny `git push` (two spellings) | Claude can't publish code | I review before anything reaches GitHub |
+| deny `bin/deploy-backend.sh`, `bin/deploy-frontend.sh` (`./` and `../`) | Claude can't deploy | The live site is the demo |
+| deny `bin/cleanup-environment.sh` (`./` and `../`) | Claude can't tear down AWS | Irreversible: it ends in `terraform destroy` |
+| deny `terraform apply`, `terraform destroy` | No AWS changes from Claude | Same reason |
+| deny `git -C` | Blocks git aimed at another folder | Closes a loophole around the push rule; agents write `cd <dir> && git` |
+
+- **Honest gap:** a denied command wrapped in `bash -c` was never tested against the list.
+- **`CLAUDE.md`** is the shared working notes, loaded into the lead session and every
+  agent (37 commits have touched it). Its rule (`:12`): fix anything stale in the same
+  commit. Who does what (`:105`), the decisions table (`:127`), and how to work with me
+  (`:219`): explain as you go, verify don't assert, end with "verified" and "not verified"
+  lists, every fix ships with a test that fails without it.
+- **Memory** (`~/.claude/projects/<project>/memory/`, VDI only): 4 notes: plain words and
+  exact commands; Claude never pushes or deploys; the approved work queue; my design language.
+- **Agent prompts** add: never print `ENVIRONMENT.config`, never stage `notes.txt`, stage
+  files by name, and no agents inside agents.
+
+### Tools and extensions
+
+- **Claude Code** 2.1.300, in VS Code (`anthropic.claude-code`), CLI 2.1.296 (`claude
+  --version`). Updated mid-build on 14 Oct; the running workflow resumed from its cache.
+- **Model and modes:** Opus 5.5 (`"model": "opus"`, `~/.claude/settings.json`). Effort
+  medium, high from 13 Oct 16:33, xhigh from 14 Oct 23:09. **Ultracode** (standing
+  permission to run multi-agent workflows) from 14 Oct 06:18. 25 `Workflow` calls. Fast mode
+  never used.
+- **superpowers** 6.4.2 plugin: the process. Brainstorming, writing plans, test-driven
+  development, subagent-driven development, code review, verification before completion,
+  git worktrees. `docs/superpowers/` is its folder layout.
+- **Other plugins:** context7 (current library docs; 1 call), Playwright MCP (lets an agent
+  drive a browser; 3 calls; not the repo's tests), skill-creator (installed, unused). No
+  other MCP server was called.
+- **Skills:** `/grill-me` (from `mattpocock/skills`; its target `grilling` wasn't installed,
+  so Claude ran the interview by hand); `dataviz` (its colour-blind check cut the chart
+  palette to 5 colours, `superpowers/specs/2026-10-14-dashboard-graphs-design.md:317`);
+  `workflow-authoring`; `loop` (the self-paced overnight build); `update-config`.
+- **VS Code:** PostgreSQL (`ms-ossdata.vscode-pgsql`), Playwright Test, Postman, Python
+  and Pylance, Containers. REST Client is not installed: say "install it", not "I used it".
+- **Test tools the agents ran:** pytest, Vitest with React Testing Library, Playwright
+  (`@playwright/test`) with `@axe-core/playwright` 4.13.0, bandit, `npm audit`, k6
+  (`tools/k6/load.js`), `tools/test-all.sh` and `tools/e2e.sh`.
+
+### What went wrong and what I learned
+
+1. **A cheap model wrote confident, wrong comments.** A Sonnet comments pass; two Opus
+   reviewers found 4 important and about 18 minor problems (one said `money.py` does all
+   the money maths; the dashboard repeats it in SQL). Fixed in `b3e9ed7`, with a syntax-tree
+   check that no code changed. Lesson: review comments like code.
+2. **Tests passed, bugs remained.** The Schedule reviewer broke a scratch copy on purpose:
+   3 breaks passed all 18 tests, because nothing checked where a bar is drawn. Nine fixes
+   followed. Lesson: a reviewer who tries to break the code finds what tests miss.
+3. **Reviewers also cry wolf.** Skeptics rejected 35 of 59 screenshot findings (one was a
+   tab underline caught mid-animation). Lesson: check a finding before fixing it.
+4. **The AWS backend vanished** (14 Oct, about 20:50): Lambda, its URL and the CloudFront
+   API route. No agent had run a writing Terraform command, and the workshop role can't
+   read CloudTrail, so the cause is unknown. Fix: a read-only `terraform plan` first (10 to
+   add, 0 to destroy), then I redeployed. Lesson: read the plan; the script doesn't ask.
+5. **One machine, many agents.** `pgrep -f` matched its own shell, so a queued test never
+   started. `tools/test-all.sh` tests port 3000, which served the main folder, not the merge
+   copy, so the browser steps ran by hand on 3002 (`docs/TESTING.md:893`). Lesson: give
+   each worktree its own port.
+6. **A hand commit swept up an agent's half-done files** (`1c93961`, "updates"). No harm;
+   since then, no hand commits on a branch an agent is building on.
+
+### The numbers
+
+| Number | What | How to re-check |
+| --- | --- | --- |
+| 304 / 239 / 230 | Commits on `David3` / under my git name (all since 13 Oct) / with the Claude co-author line | `git rev-list --count David3`; `git log David3 --author="David Gusmao" --oneline \| wc -l`; add `--grep="Co-Authored-By: Claude"` |
+| 17 / 12 | Design specs / implementation plans | `ls docs/superpowers/specs docs/superpowers/plans` |
+| 40 / 65 | Decision rounds / questions Claude asked me | `AskUserQuestion` calls in the transcripts (VDI only) |
+| 22 / 397 | Workflow runs / agents in them (1 failed: I stopped its permission prompt) | `journal.jsonl` per run (VDI only) |
+| 290 / 85 / 22 | Opus / Sonnet / Haiku agents among the 397 | each agent's transcript (VDI only) |
+| 5 | Agents dispatched directly (4 Opus, 1 Sonnet) | same |
+| 90 / 112 | Findings fixed in task fix rounds / minor ones logged for later (two big builds) | `grep` the two ledgers (VDI only) |
+| 14 / 5 / about 22 | Fixes from the screenshot review / the overnight review / the comments review | `docs/OVERNIGHT-REPORT.md:277-356`; `b3e9ed7` |
+
+All measured 15 Oct, about 00:05, before this section's own commit; commits keep rising while
+the redesign lanes run. Every
+commit says "Claude Opus 5.5", even one written by a Sonnet agent, because the scripts set
+that line: it shows Claude helped, not which model.
