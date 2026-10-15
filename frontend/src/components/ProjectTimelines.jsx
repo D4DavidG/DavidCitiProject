@@ -369,7 +369,12 @@ export default function ProjectTimelines({ title, today = todayIso(), headingVar
         <Box component="span" id={hintId} sx={visuallyHidden}>With a keyboard, Tab to a row and move along it with the arrow keys.</Box>
         <Box role="region" aria-label="Weeks, scrolls sideways" aria-describedby={hintId} tabIndex={0} sx={{ overflowX: 'auto', scrollPaddingLeft: NAME }}>
           <Box aria-hidden="true" sx={ROW}>
-            <Box sx={{ ...NAME_CELL, py: 0.5, borderRight: 'none' }} />
+            {/* "Week of" leads the row of dates (each date is a week's Monday), in the dates' own caption style. */}
+            <Box sx={{ ...NAME_CELL, py: 0, borderRight: 'none', textAlign: 'right' }}>
+              <Typography data-testid="week-of" variant="caption" sx={{ display: 'block', py: 0.5, color: 'text.secondary', fontWeight: 600 }}>
+                Week of
+              </Typography>
+            </Box>
             <Box sx={{ position: 'relative', pb: todayCentre === null ? 0 : 2.5 }}>
               <WeekColumns axis={axis} thisWeek={thisWeek} />
               <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${WINDOW_WEEKS}, 1fr)` }}>

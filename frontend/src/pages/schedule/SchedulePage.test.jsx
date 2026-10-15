@@ -93,6 +93,14 @@ describe('SchedulePage', () => {
     expect(screen.getByRole('link', { name: 'Chloe Kim, Zeus, 30 hours a week, Oct 12 to Oct 25' })).toBeInTheDocument()
   })
 
+  it('says "Week of" at the start of the row of week dates, in the dates\' caption style', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    const weekOf = screen.getByTestId('week-of')
+    expect(weekOf).toHaveTextContent(/^Week of$/)
+    expect(weekOf).toHaveClass('MuiTypography-caption')
+  })
+
   it("places each bar on its own weeks (grid columns) and its project's lane (grid row)", async () => {
     renderSchedule()
     const place = (link) => { const s = getComputedStyle(link); return [s.gridColumn, s.gridRow] }

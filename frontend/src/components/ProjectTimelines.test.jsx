@@ -195,6 +195,17 @@ describe('ProjectTimelines', () => {
     expect(screen.getByText('Sep 28 – Dec 20, 2026')).toBeInTheDocument()
   })
 
+  it('says "Week of" at the start of the row of week dates, in the dates\' caption style', async () => {
+    renderTimelines()
+    await projectBar('Apollo')
+    const weekOf = screen.getByTestId('week-of')
+    expect(weekOf).toHaveTextContent(/^Week of$/)
+    expect(weekOf).toHaveClass('MuiTypography-caption')
+    // It sits in the name column of the dates' row, before the first date.
+    const firstDate = document.querySelector('[data-testid="week-label"]')
+    expect(weekOf.compareDocumentPosition(firstDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('moves the window 4 weeks with Earlier and Later, without asking the server again', async () => {
     const calls = renderTimelines()
     await projectBar('Apollo')

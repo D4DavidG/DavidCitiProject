@@ -304,7 +304,10 @@ export default function SchedulePage() {
           legend={<ChartLegend items={legend} />}
           axis={(
             <Box aria-hidden="true" sx={{ ...rowGrid(weeks.length), mt: 1 }}>
-              <Box sx={{ ...nameCell(c.grid), gridRow: 1, borderRight: 'none' }} />
+              {/* "Week of" leads the row of dates (each date is a week's Monday), in the dates' own caption style. */}
+              <Box sx={{ ...nameCell(c.grid), gridRow: 1, borderRight: 'none', textAlign: 'right' }}>
+                <Typography data-testid="week-of" variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Week of</Typography>
+              </Box>
               {weeks.map((w) => (
                 <Typography key={w} variant="caption" sx={{ px: 0.75, color: 'text.secondary', fontWeight: 600 }}>{formatDay(w)}</Typography>
               ))}
