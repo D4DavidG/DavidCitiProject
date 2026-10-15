@@ -38,6 +38,32 @@ describe('ApprovalsPage', () => {
     expect(within(table).getAllByText('Over capacity')).toHaveLength(1)
   })
 
+  it("marks time that takes its task past the estimate: an icon, the words, and the hours against the estimate", async () => {
+    renderQueue({
+      'GET /approvals/time-entries': [200, page([
+        { ...ENTRY, overEstimate: true, taskEstimateMinutes: 360, taskLoggedMinutes: 540 },
+        { ...ENTRY, entryId: 31, personName: 'Cara Diaz', overEstimate: false, taskEstimateMinutes: 600, taskLoggedMinutes: 480 },
+      ])],
+    })
+    const table = await screen.findByRole('table', { name: /time waiting for approval/i })
+    const marks = within(table).getAllByText('Over estimate')
+    expect(marks).toHaveLength(1)
+    const ben = within(table).getByText('Ben Okafor').closest('tr')
+    expect(marks[0].closest('tr')).toBe(ben)
+    expect(within(marks[0].closest('.MuiChip-root')).getByTestId('MoreTimeOutlinedIcon')).toBeInTheDocument()
+    expect(within(ben).getByText('Task: 9 h logged of 6 h estimated')).toBeInTheDocument()
+    expect(within(table).queryByText(/logged of/)).toBe(within(ben).getByText(/logged of/))
+  })
+
+  it('shows Over estimate beside Over capacity when both apply, and the mark alone when the hours are missing', async () => {
+    renderQueue({ 'GET /approvals/time-entries': [200, page([{ ...ENTRY, overCapacity: true, overEstimate: true }])] })
+    const table = await screen.findByRole('table', { name: /time waiting for approval/i })
+    const row = within(table).getByText('Ben Okafor').closest('tr')
+    expect(within(row).getByText('Over capacity')).toBeInTheDocument()
+    expect(within(row).getByText('Over estimate')).toBeInTheDocument()
+    expect(within(row).queryByText(/logged of/)).not.toBeInTheDocument()
+  })
+
   it('approves an entry, which then leaves the queue', async () => {
     const calls = renderQueue()
     await screen.findByText('Ben Okafor')
@@ -72,13 +98,15 @@ describe('ApprovalsPage', () => {
     expect(screen.queryByText(/nothing waiting for approval/i)).not.toBeInTheDocument()
   })
 
-  it('draws Approve as the primary kind (no second green) and Reject as the danger kind', async () => {
+  it('draws Approve filled green (the one green, not a second) and Reject filled red (spec 6.2)', async () => {
     renderQueue()
     await screen.findByText('Ben Okafor')
     const approve = screen.getByRole('button', { name: /approve 8 h by ben okafor/i })
     expect(approve).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary')
     expect(approve).not.toHaveClass('MuiButton-colorSuccess')
-    expect(screen.getByRole('button', { name: /reject 8 h by ben okafor/i })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+    const reject = screen.getByRole('button', { name: /reject 8 h by ben okafor/i })
+    expect(reject).toHaveClass('MuiButton-contained', 'MuiButton-colorError')
+    expect(reject).not.toHaveClass('MuiButton-outlined')
   })
 
   it('steps back to the last page that exists when the last entry on the last page is decided', async () => {
