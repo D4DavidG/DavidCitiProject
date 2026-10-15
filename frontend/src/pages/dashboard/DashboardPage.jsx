@@ -11,6 +11,8 @@ import BudgetChart from '../../components/charts/BudgetChart'
 import WorkloadChart from '../../components/charts/WorkloadChart'
 import PageHeader from '../../components/PageHeader'
 import PageState, { Pager } from '../../components/PageState'
+import ProjectTimelines from '../../components/ProjectTimelines'
+import SearchField from '../../components/SearchField'
 import StatusChip from '../../components/StatusChip'
 import { useAuth } from '../../auth/useAuth'
 import { formatDate } from '../../services/format'
@@ -111,13 +113,14 @@ function WorkloadPanel() {
 }
 
 /**
- * The manager's landing screen: every live project they run (admins: all), each
- * with status, risk and budget. At-risk projects come first (the server orders them).
- * Both counters come from the server and cover every page: `total` and `atRiskTotal`.
+ * The manager's landing screen: their projects this week as a timeline first, then every live
+ * project they run (admins: all), each with status, risk and budget. At-risk projects come first
+ * (the server orders them). Both counters come from the server and cover every page: `total` and
+ * `atRiskTotal`. The timeline and the workload chart have their own requests, so searching or
+ * filtering the cards never reloads them.
  */
 export default function DashboardPage() {
   const { user } = useAuth()
-  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
@@ -136,11 +139,12 @@ export default function DashboardPage() {
         subtitle={`${user.role === 'ADMIN' ? "Every live project's" : 'The projects you manage:'} status, risk and budget. At-risk projects come first.`}
       />
 
+      <ProjectTimelines title="My projects this week" />
+
       <WorkloadPanel />
 
-      <Box component="form" onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); setPageNumber(1) }} sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
-        <TextField id="dashboard-search" label="Search projects" size="small" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} sx={{ flex: '1 1 220px' }} />
-        <Button type="submit" variant="outlined">Search</Button>
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 3 }}>
+        <SearchField id="dashboard-search" label="Search projects" value={search} onSearch={(q) => { setSearch(q); setPageNumber(1) }} />
         <TextField id="dashboard-status" select label="Status" size="small" value={status} onChange={(e) => { setStatus(e.target.value); setPageNumber(1) }} sx={{ minWidth: 180 }}>
           {STATUS_OPTIONS.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
         </TextField>
