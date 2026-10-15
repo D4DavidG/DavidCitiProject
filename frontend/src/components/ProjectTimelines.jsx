@@ -31,7 +31,7 @@ const BAND_TOP = 34
 const STATUS_WORDS = { PLANNING: 'Planning', ACTIVE: 'Active', ON_HOLD: 'On hold', COMPLETE: 'Complete' }
 const ICONS = { DONE: DoneIcon, IN_PROGRESS: InProgressIcon, NOT_STARTED: NotStartedIcon, BLOCKED: BlockedIcon, LATE: LateIcon }
 const LEGEND = [['DONE', 'Done'], ['IN_PROGRESS', 'In progress'], ['NOT_STARTED', 'Not started'], ['BLOCKED', 'Blocked'], ['LATE', 'Late']]
-/** This week's column: a light wash of the orange highlight (a theme token, so dark mode follows). */
+/** This week's column: a light wash of the highlight colour (palette.secondary, so dark mode follows). */
 const THIS_WEEK = (theme) => alpha(theme.palette.secondary.main, 0.12)
 
 /** The name, then the weeks; every row and the week header share it, so their columns line up. */
@@ -84,7 +84,7 @@ Mark.propTypes = {
   children: PropTypes.node,
 }
 
-/** The week columns behind a row (or the header): gridlines, with this week washed in orange. */
+/** The week columns behind a row (or the header): gridlines, with this week washed in the highlight colour. */
 function WeekColumns({ axis, thisWeek }) {
   return (
     <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${WINDOW_WEEKS}, 1fr)` }}>
@@ -104,7 +104,7 @@ WeekColumns.propTypes = {
   thisWeek: PropTypes.string.isRequired,
 }
 
-/** The orange Today line, over every row at the middle of today; nothing when today is off screen. */
+/** The Today line in the highlight colour (palette.secondary), over every row at the middle of today; nothing when today is off screen. */
 function TodayLine({ axis, today }) {
   const centre = dayCentre(axis, today)
   if (centre === null) return null
@@ -233,7 +233,7 @@ ProjectRow.propTypes = {
   userId: PropTypes.number,
 }
 
-/** What the icons, the orange line, the wash and (when drawn) the band mean. */
+/** What the icons, the Today line, the wash and (when drawn) the band mean. */
 function Legend({ withBand }) {
   const item = { display: 'flex', alignItems: 'center', gap: 0.75, typography: 'body2' }
   return (
@@ -270,7 +270,7 @@ Legend.propTypes = { withBand: PropTypes.bool.isRequired }
 /**
  * The home pages' timeline (Float-like): one row per project across 12 weeks, from the Monday two
  * weeks before this week. A bar for the project's span in its project colour, a mark per
- * deliverable on its due date (state by icon and words), the orange Today line, this week washed,
+ * deliverable on its due date (state by icon and words), the Today line, this week washed,
  * and your own bookings as thin bands. Earlier and Later move 4 weeks without asking the server
  * again (it sends every date); pages of 10 projects come from GET /dashboard/timeline.
  */
