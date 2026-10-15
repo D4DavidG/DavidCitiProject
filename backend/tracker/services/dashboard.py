@@ -271,18 +271,17 @@ def timeline(conn: psycopg.Connection, actor: Actor, page: int = 1, page_size: i
     """Your live projects for the home page's timeline: span, risk, deliverables and bookings.
 
     Admins: every live project; managers: theirs; employees: those they have a live
-    booking or task on, with only their own bookings. Six queries whatever the page
-    size: the page and its count, then money, risk, deliverables and bookings for all
-    of its projects at once.
+    booking on (the rule in services/access.py, so every name links to a project they
+    can open), with only their own bookings. Six queries whatever the page size: the
+    page and its count, then money, risk, deliverables and bookings for all of its
+    projects at once.
     """
     where = ["NOT p.is_archived"]
     if actor.is_manager:
         where.append("p.manager_id = %(me)s")
     elif actor.is_employee:
-        where.append("(EXISTS (SELECT 1 FROM assignments a WHERE a.project_id = p.project_id"
-                     " AND a.user_id = %(me)s AND NOT a.is_archived)"
-                     " OR EXISTS (SELECT 1 FROM tasks t WHERE t.project_id = p.project_id"
-                     " AND t.assignee_user_id = %(me)s AND NOT t.is_archived))")
+        where.append("EXISTS (SELECT 1 FROM assignments a WHERE a.project_id = p.project_id"
+                     " AND a.user_id = %(me)s AND NOT a.is_archived)")
     # WHERE fragments are fixed strings written above; every value is a parameter.
     query = sql.SQL("SELECT p.* FROM projects p WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
     result = paginate(conn, query, {"me": actor.user_id}, sql.SQL("p.start_date, p.name, p.project_id"),

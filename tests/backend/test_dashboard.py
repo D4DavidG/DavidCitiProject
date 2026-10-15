@@ -321,17 +321,18 @@ def test_timeline_shows_each_role_its_own_projects(conn, org):
     assert timeline_names(conn, org["alice"]) == ["Apollo"]  # booked on Apollo only
 
 
-def test_employee_timeline_has_projects_with_a_task_but_only_their_own_bookings(conn, org):
+def test_employee_timeline_has_only_projects_they_can_open_and_only_their_own_bookings(conn, org):
     bea, _ = f.person(conn, org["admin"], manager=org["bob"], first_name="Bea")
     f.booking(conn, org["bob"], org["apollo"], bea, hours_per_week=10)
-    # Alice keeps a task on Zeus after her booking there is archived.
+    # Alice keeps a task on Zeus after her booking there is archived: she can't open Zeus, so it isn't listed.
     zeus_booking = f.booking(conn, org["carol"], org["zeus"], org["alice"])
     f.task(conn, org["carol"], f.deliverable(conn, org["carol"], org["zeus"]), assignee=org["alice"])
     assignments.archive_booking(conn, org["carol"], zeus_booking["assignment_id"])
     rows = {p["name"]: p for p in dashboard.timeline(conn, org["alice"], 1, 10)["items"]}
-    assert list(rows) == ["Apollo", "Zeus"]
+    assert list(rows) == ["Apollo"]
+    with pytest.raises(NotFound):  # the same rule as opening the project
+        projects.get_project(conn, org["alice"], org["zeus"]["project_id"])
     assert [b["user_id"] for b in rows["Apollo"]["bookings"]] == [org["alice"].user_id]  # not Bea's
-    assert rows["Zeus"]["bookings"] == []
     manager_view = dashboard.timeline(conn, org["bob"], 1, 10)["items"][0]
     assert sorted(b["name"] for b in manager_view["bookings"]) == ["Alice Tester", "Bea Tester"]
 
