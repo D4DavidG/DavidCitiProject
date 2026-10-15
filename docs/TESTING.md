@@ -202,6 +202,9 @@ came back next to the one expected.
 operations) is called by the two walks. It can't catch real network problems, what CloudFront
 does to headers, or real-world speed.
 
+To call the API by hand instead, with Swagger UI on the local stack or on AWS, see
+[API.md](API.md).
+
 ### 2.4 Commit and race tests (pytest)
 
 Files: [`test_store_commits.py`](../tests/backend/test_store_commits.py) (2 tests),
