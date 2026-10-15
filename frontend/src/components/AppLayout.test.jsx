@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import {
+  act, cleanup, screen, waitFor, within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AppLayout from './AppLayout'
 import { request } from '../services/request'
@@ -101,6 +103,26 @@ describe('AppLayout', () => {
     },
   )
 
+  it.each([
+    [/^notifications, no unread$/i, 'Notifications, no unread'],
+    [/switch to dark mode/i, 'Switch to dark mode'],
+    [/collapse menu/i, 'Collapse menu'],
+  ])('gives the icon-only button %s a tooltip', async (name, tip) => {
+    renderLayout(USERS.manager)
+    const button = await screen.findByRole(name.source.startsWith('^notif') ? 'link' : 'button', { name })
+    expect(button.textContent).toMatch(/^\d*$/) // icon only (the bell's hidden badge holds its count)
+    await userEvent.hover(button)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(tip)
+  })
+
+  it('gives the phone menu button a tooltip', async () => {
+    responsive.useIsMobile.mockReturnValue(true)
+    renderLayout(USERS.manager)
+    await userEvent.hover(screen.getByRole('button', { name: 'Open menu' }))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Open menu')
+    responsive.useIsMobile.mockReturnValue(false)
+  })
+
   it('renders the page inside the layout', () => {
     renderLayout(USERS.manager)
     expect(screen.getByText('page body')).toBeInTheDocument()
@@ -128,7 +150,7 @@ describe('the collapsible menu (desktop)', () => {
     const projects = screen.getByRole('link', { name: 'Projects' })
     expect(projects.closest('li')).not.toBeNull() // still one list item per link
     await userEvent.hover(projects)
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Projects')
+    await waitFor(() => expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toContain('Projects'))
     await userEvent.click(screen.getByRole('button', { name: 'Expand menu' }))
     expect(paper()).toHaveStyle({ width: '240px' })
     expect(within(screen.getByRole('navigation', { name: 'Main menu' })).getByText('Projects')).toBeInTheDocument()

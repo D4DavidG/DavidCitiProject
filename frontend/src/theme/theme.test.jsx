@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import {
-  Alert, Button, Card, Chip, Dialog, OutlinedInput, Tooltip, Typography,
+  Alert, Button, Card, Chip, Dialog, Link, OutlinedInput, Tooltip, Typography,
 } from '@mui/material'
 import { ThemeProvider } from '@mui/material/styles'
 import theme, { makeTheme } from './theme'
@@ -100,6 +100,18 @@ describe('the three kinds of button (spec 5c)', () => {
   it('gives the primary kind a glow at rest', () => {
     render(<ThemeProvider theme={makeTheme('light')}><Button variant="contained">Save</Button></ThemeProvider>)
     expect(getComputedStyle(screen.getByRole('button', { name: 'Save' })).boxShadow).toMatch(/^0 0 6px rgba\(31, 122, 58/)
+  })
+})
+
+describe('links (spec 5c)', () => {
+  it('are green ink with no underline, underlined on hover and on keyboard focus', () => {
+    const t = makeTheme('light')
+    render(<ThemeProvider theme={t}><Link href="#/projects/1">Apollo</Link></ThemeProvider>)
+    const link = screen.getByRole('link', { name: 'Apollo' })
+    expect(link).toHaveClass('MuiLink-underlineHover')
+    expect(link).toHaveStyle({ color: 'rgb(20, 96, 44)', textDecoration: 'none' })
+    const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
+    expect(css).toMatch(/MuiLink-root:focus-visible\{(-webkit-)?text-decoration:underline/)
   })
 })
 

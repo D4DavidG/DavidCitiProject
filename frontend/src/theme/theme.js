@@ -152,7 +152,8 @@ export function makeTheme(mode) {
           },
         },
       },
-      MuiLink: { defaultProps: { underline: 'hover' } },
+      // Links only go somewhere: green ink, underlined on hover and on keyboard focus.
+      MuiLink: { defaultProps: { underline: 'hover' }, styleOverrides: { root: { '&:focus-visible': { textDecoration: 'underline' } } } },
       MuiOutlinedInput: {
         styleOverrides: {
           // A field in error glows red around a 2 px red border (spec 5a); its message stays under it.

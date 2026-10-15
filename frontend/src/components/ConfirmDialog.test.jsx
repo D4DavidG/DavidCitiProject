@@ -49,6 +49,31 @@ describe('ConfirmDialog', () => {
     buttons().forEach((button) => expect(button).toBeEnabled())
   })
 
+  it('shows an error as one line just above the buttons, tied to the confirm button, not at the top', async () => {
+    const action = heldAction()
+    renderConfirm({ onConfirm: action.onConfirm })
+    await userEvent.click(screen.getByRole('button', { name: 'Archive' }))
+    action.fail(new ApiError(409, 'Archive its deliverables first.'))
+    const message = await screen.findByText('Archive its deliverables first.')
+    const [cancel, confirm] = buttons()
+    const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(screen.getByText('It is hidden, not deleted.'), message)).toBe(true)
+    expect(follows(message, cancel)).toBe(true)
+    expect(confirm.getAttribute('aria-describedby')).toBe(message.id)
+  })
+
+  it.each(['Archive project', 'Reject', 'Revoke access'])('draws "%s" as the danger kind: outlined in red, never filled', (label) => {
+    renderConfirm({ onConfirm: vi.fn(), confirmLabel: label })
+    const confirm = screen.getByRole('button', { name: label })
+    expect(confirm).toHaveClass('MuiButton-outlined')
+    expect(confirm).toHaveClass('MuiButton-colorError')
+  })
+
+  it('draws any other confirm as the primary kind', () => {
+    renderConfirm({ onConfirm: vi.fn(), confirmLabel: 'Log anyway' })
+    expect(screen.getByRole('button', { name: 'Log anyway' })).toHaveClass('MuiButton-contained')
+  })
+
   it('acts once, however many times confirm is pressed', async () => {
     const action = heldAction()
     renderConfirm({ onConfirm: action.onConfirm })

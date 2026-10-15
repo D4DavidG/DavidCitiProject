@@ -121,9 +121,11 @@ export default function AppLayout({ children }) {
       >
         <Toolbar sx={{ gap: 1 }}>
           {isMobile && (
-            <IconButton edge="start" color="inherit" aria-label="Open menu" onClick={() => setOpen(true)}>
-              <MenuIcon />
-            </IconButton>
+            <Tooltip title="Open menu">
+              <IconButton edge="start" color="inherit" aria-label="Open menu" onClick={() => setOpen(true)}>
+                <MenuIcon />
+              </IconButton>
+            </Tooltip>
           )}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexGrow: 1, minWidth: 0 }}>
             <AcmeLogo size={isMobile ? 22 : 26} tone="inherit" />
@@ -163,14 +165,12 @@ export default function AppLayout({ children }) {
           <Toolbar />
           <NavList role={user.role} collapsed={collapsed} />
           <Divider />
-          <Box sx={{ p: 1, display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start' }}>
-            {collapsed ? (
-              <Tooltip title="Expand menu" placement="right">
-                <IconButton aria-label="Expand menu" onClick={toggleCollapsed}><ExpandIcon fontSize="small" /></IconButton>
-              </Tooltip>
-            ) : (
-              <Button onClick={toggleCollapsed} startIcon={<CollapseIcon />} sx={{ color: 'text.secondary' }}>Collapse menu</Button>
-            )}
+          <Box sx={{ p: 1, display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end' }}>
+            <Tooltip title={collapsed ? 'Expand menu' : 'Collapse menu'} placement="right">
+              <IconButton aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} onClick={toggleCollapsed}>
+                {collapsed ? <ExpandIcon fontSize="small" /> : <CollapseIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
           </Box>
         </Drawer>
       )}

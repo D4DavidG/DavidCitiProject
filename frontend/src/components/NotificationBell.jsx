@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { Badge, Button, IconButton, Snackbar, SnackbarContent } from '@mui/material'
+import {
+  Badge, Button, IconButton, Snackbar, SnackbarContent, Tooltip,
+} from '@mui/material'
 import BellIcon from '@mui/icons-material/NotificationsOutlined'
 import { announceUnreadChange, onWrite, request } from '../services/request'
 
@@ -83,11 +85,13 @@ export default function NotificationBell() {
   const close = () => setPopup(null)
   return (
     <>
-      <IconButton component={Link} to="/notifications" aria-label={label} color="inherit">
-        <Badge badgeContent={count ?? 0} color="error" max={99}>
-          <BellIcon />
-        </Badge>
-      </IconButton>
+      <Tooltip title={label}>
+        <IconButton component={Link} to="/notifications" aria-label={label} color="inherit">
+          <Badge badgeContent={count ?? 0} color="error" max={99}>
+            <BellIcon />
+          </Badge>
+        </IconButton>
+      </Tooltip>
       <Snackbar
         key={popup?.key}
         open={popup !== null}
