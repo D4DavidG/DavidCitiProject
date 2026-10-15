@@ -6,8 +6,8 @@ what is missing, and how it scales. Back to the [root README](../README.md).
 
 Paths start at the repo root. Inside the API, `services/...` is short for
 `backend/tracker/services/...` (the same for `api/`, `domain/`, `store/` and `function.py`).
-Line numbers were checked on 15 Oct 2026 at commit `4d8b949`; they drift as code changes, file
-names don't. No secret value is printed on this page, except the local database's throwaway
+Line numbers were checked on 15 Oct 2026 against branch `David` at `3783725`, with the
+post-demo changes; they drift as code changes, file names don't. No secret value is printed on this page, except the local database's throwaway
 development password, which is already public in the repo (`infra/locals.tf`).
 
 **Contents**
@@ -88,7 +88,7 @@ Example: Maria, a manager, opens the dashboard. The browser sends
 | 2 | CloudFront (`infra/cloudfront.tf`); locally `bin/proxy-server.js` | `/api/tracker*` goes to the Lambda's URL, never cached. The local proxy forwards a short list of named headers, `authorization` among them |
 | 3 | `backend/tracker/function.py` (`handler`, line 58) | Refuses with 503 if the token-signing key is missing or short. Reuses the warm copy's database connection. On a cold start it runs new migrations under a lock and creates the first admin, `AD000001`, if missing (`_prepare`, line 45). Then hands over to `api/app.py` |
 | 4 | `api/http.py` | Turns the Lambda event into a request: method, path (prefix dropped, `//` collapsed), lower-cased headers, query, JSON body. JSON keys are camelCase; Python and SQL use snake_case, and this file converts them |
-| 5 | `api/routes.py` | **The one route table:** 70 routes, each with its method, path, the roles allowed and its handler. An unknown address answers 404 |
+| 5 | `api/routes.py` | **The one route table:** 71 routes, each with its method, path, the roles allowed and its handler. An unknown address answers 404 |
 | 6 | `api/app.py` (`authorise`, line 22) | Checks the token's signature and expiry (`services/tokens.py`), then loads the person **from the database** (`services/actors.py`): role, archived or not, must they still change their first password. The token never carries the role. Then the route's role check |
 | 7 | `api/handlers.py` | One short function per route: read the parameters, call one service |
 | 8 | `services/*.py` | **The business rules,** one file per subject. Each checks whose record it is (`services/access.py`: not yours answers 404, the same as missing). Every write runs inside one transaction with `audit.record_change()` (section 5) |
@@ -180,8 +180,10 @@ check that none exists. Why this departs from the rubric's DELETE is in [DECISIO
    budget, a 41-hour booking, overlapping bookings, a task on another project's deliverable, a
    dependency across projects, someone approving their own time (`001_init.sql`).
 2. **The services** enforce what needs the clock, a sum or the caller: weekly capacity,
-   sign-off only when all work is done, dependency loops, ownership, the minimum pay, the
-   warning before archiving someone still on a project.
+   sign-off only when all work is done, dependency loops, ownership, the minimum pay, and the
+   warning before archiving someone still on a live project (a booking ending today or later,
+   or an open task): 409 `ON_PROJECTS`, naming the projects, until the request says
+   `confirmOnProjects: true` (`archive_user` and `live_projects` in `services/users.py`).
 3. **Five integrity queries** (`store/integrity.py`, also `GET /admin/integrity-check`) must
    always find nothing: no dependency loops; nothing live under an archived project; every
    record has its creation audit row; no time logged outside a booking; no signed-off
@@ -192,8 +194,11 @@ formulas, and the dashboard repeats them in SQL so Postgres can add them up
 (`services/dashboard.py`). The website never does money arithmetic; it only formats what the
 server sends (`frontend/src/services/format.js`). Time worked is whole minutes; bookings are
 whole hours a week. "Today" and weeks (Monday to Sunday) are Eastern time, although the servers
-run in UTC (`domain/clock.py:9`). The minimum pay is $20 an hour, checked as a yearly salary of
-at least $41,600 (2,080 working hours a year).
+run in UTC (`domain/clock.py:9`). The minimum pay is $20 an hour: a yearly salary of at least
+$41,600, for 2,080 working hours (`MIN_ANNUAL_SALARY_CENTS` in `domain/money.py`). The server
+checks it on every new account, where a salary is now required, and on every pay change
+(`services/users.py`). Older, lower salaries stay until someone changes them, and the first
+admin has none.
 
 The full design, with the SQL, is in `backend/tracker/store/migrations/`; the reasons are in
 [DECISIONS.md](DECISIONS.md).
@@ -229,7 +234,7 @@ Four keys, and nothing else: a search of `frontend/src` for `localStorage`, `ses
 | `sessionStorage` | `acme.token` | The access token | `frontend/src/auth/AuthContext.jsx:8` | Until the tab closes; the token itself dies after 15 minutes |
 | `sessionStorage` | `acme.refresh` | The refresh token, replaced each time it is used | `frontend/src/auth/AuthContext.jsx:9` | Until the tab closes; the server ends it 8 hours after sign-in |
 | `localStorage` | `acme.colorMode` | `light` or `dark` | `frontend/src/theme/colorMode.js:4` | Until the browser's data is cleared |
-| `localStorage` | `acme.menuCollapsed` | Whether the side menu is folded | `frontend/src/components/AppLayout.jsx:22` | Until the browser's data is cleared |
+| `localStorage` | `acme.menuCollapsed` | Whether the side menu is folded | `frontend/src/components/AppLayout.jsx:23` | Until the browser's data is cleared |
 
 - **No cookies.** The refresh token travels in the response body; why it isn't an HttpOnly
   cookie is in [DECISIONS.md](DECISIONS.md).
@@ -454,7 +459,7 @@ The request's path through the locks:
 | Measure | What it does | Where | Why | Origin |
 | --- | --- | --- | --- | --- |
 | Values never pasted into SQL | Values travel separately from the SQL text; table and column names that vary are built with `psycopg.sql` | `store/postgres.py` | Stops SQL injection. Bandit finds no issues | Added |
-| Input checks | Text trimmed and length-capped, numbers must be real numbers, dates `YYYY-MM-DD`, the body a JSON object, a salary at least $41,600 a year | `domain/values.py`, `api/http.py`, `services/users.py` | Refuse rather than guess | Added |
+| Input checks | Text trimmed and length-capped, numbers must be real numbers, dates `YYYY-MM-DD`, the body a JSON object, a salary at least $41,600 a year | `domain/values.py`, `api/http.py`, `domain/money.py`, `services/users.py` | Refuse rather than guess | Added |
 | Page size capped | At most 100 rows a page, whatever is asked | `services/paging.py:12` | No giant queries | Added |
 | Plain errors, no internals | A real bug answers only "Something went wrong on our side. Nothing was changed."; the details go to the log | `api/errors.py`, `api/app.py:50-54` | Attackers learn nothing about the inside | Added |
 | The database's own rules | Allowed values, foreign keys, no two overlapping live bookings of one person on one project | `001_init.sql` | A last line of defence, even under parallel requests | Added |
@@ -542,13 +547,18 @@ ACME may have hundreds of projects and people. What already copes, and where the
   at most 100 rows (`services/paging.py:12`). The website never downloads a whole table. The
   visibility rule is part of the same query, so paging counts only what you may see.
 - **The dashboard shows a short, useful slice.** For managers and admins it has two columns,
-  **At risk** and **On track**, each the 3 projects with the most recent activity, with **See
-  all** for the full, paged list. The server does the sorting and counting:
-  `GET /dashboard/projects` takes `atRisk` and `sort=updated` and returns each project's
-  `lastActivityAt`, and the totals (Total projects, Total at risk) are counted across every page
-  (`atRiskTotal`), not from the rows on screen.
-- **The top-bar search** finds a page (only the pages your role may open) or a project by name,
-  so nobody scrolls a long list to reach one; `/` or Ctrl+K puts the cursor in it.
+  **At risk** and **On track** (stacked on a phone, At risk first), each with its 3 most
+  recently updated projects and its count in the heading. Each column is one paged request:
+  `GET /dashboard/projects?atRisk=true&sort=updated&pageSize=3`, and the same with
+  `atRisk=false`. A card's "Updated" day is `lastActivityAt`: the latest change to the project
+  or its deliverables, tasks, bookings and logged time, worked out in one query for all the
+  cards. **See all** opens one whole group, 12 to a page. The totals (Total projects, Total at
+  risk) are counted by the server across every page (`total`, `atRiskTotal`), never from the
+  cards on screen.
+- **The top-bar search** finds a page (only the pages your role may open, by name or a word
+  such as "time" or "history") and up to 5 projects, from the same server-side search as the
+  Projects list (`GET /projects`, from 2 characters, 250 ms after typing pauses). Nobody scrolls
+  a long list to reach one project. `/` or Ctrl+K (Cmd+K on a Mac) puts the cursor in it.
 - **Indexes** sit on the columns lists and joins use: 16 in all (`001_init.sql`,
   `005_sessions.sql`). Nine cover only the rows that matter: live records
   (`WHERE NOT is_archived`), unread notifications (the bell's count) and unrevoked refresh
