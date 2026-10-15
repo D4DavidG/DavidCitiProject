@@ -38,6 +38,11 @@ outdated it.
   `docs/superpowers/specs/2026-10-14-tokens-design.md`): `POST /auth/refresh` rotates the
   refresh token (reuse of an old one ends every session of that user), `POST /auth/logout`
   revokes it, and a password change, reset or archive ends the user's older sessions.
+  Also not deployed: **employee history** (no migration; spec
+  `docs/superpowers/specs/2026-10-14-history-design.md`): `GET /users/{id}/history` lists
+  what a person did and what was done to their account; admins, their line manager and
+  the person may read it (others get 404), and only admins see the before/after state, so
+  a salary never reaches a manager. **History** on People, **My history** on Account.
   Tests: 537 backend, 314 website, and 22 Playwright browser
   tests in 8 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
   puts back a task; `e2e/requests.spec.js` asks and answers a request;
@@ -57,7 +62,7 @@ outdated it.
   - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
     email or texts (role and network), and the design for any future reset flow;
   - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
-    a per-person task limit), built 14 Oct (68 routes; five migration files since
+    a per-person task limit), built 14 Oct (69 routes; five migration files since
     `005_sessions.sql`).
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
@@ -288,6 +293,8 @@ Routes (add to the plan §7 table): `GET /notifications` (own only, paginated,
 `?unread=true`), `GET /notifications/unread-count`, `POST /notifications/{id}/read` (404
 if not yours), `POST /notifications/read-all`. All require any authenticated user.
 `GET /admin/audit-log` stays admin only, with filters by actor, entity and date.
+`GET /users/{id}/history` (14 Oct) is one person's trail (rows they made, rows about their
+account) for admins, their line manager and themselves; before/after state for admins only.
 
 UI: a bell with an MUI `Badge` unread count in the app bar, polled every 10 s while the tab is visible, at once on return, and after
 each write. Add a notifications page, and an admin audit-log page with filters. These

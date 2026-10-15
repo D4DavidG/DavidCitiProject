@@ -77,6 +77,13 @@ request -> function.py      Lambda entry: one connection per warm instance, migr
   the same people `record_change` notifies when the request is sent. Approving calls the
   existing service (`archive_project`, `set_capacity`) in the same transaction, so the
   same rules and audit rows apply, and the decision notifies the asker.
+- **History (`GET /users/{id}/history`, `audit.person_history`):** one person's trail from
+  the audit log: the changes they made and the changes to their account, newest first,
+  filtered by action and date. Admins read anyone's, a manager their direct reports', and
+  everyone their own (**History** on People, **My history** on Account); anyone else gets
+  the same 404 as a missing id. Only admins get the before/after state: a user snapshot
+  holds the salary, so for everyone else `views.audit_view` leaves both state keys out,
+  and the one-line summary never contains it (`test_history_never_shows_salary_to_a_manager`).
 
 ### Data model (`backend/tracker/store/migrations/001_init.sql` to `004_over_capacity.sql`)
 

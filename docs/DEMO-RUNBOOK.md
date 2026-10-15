@@ -29,7 +29,10 @@ local stack (section 7), but reaches AWS only after `./bin/deploy-backend.sh` an
   password ends every older session (two routes, `/auth/refresh` and `/auth/logout`, and
   migration `005_sessions.sql`, same cold start). Deploy backend and website together:
   today's AWS website knows no refresh, so against the new backend it would sign out
-  after 15 minutes. AWS today: one 8-hour token.
+  after 15 minutes. AWS today: one 8-hour token;
+- employee history: **History** on each People row (admins: everyone; managers: their
+  reports) and **My history** on Account (`GET /users/{id}/history`, no migration). A
+  manager sees what happened but no before/after state, so never a salary.
 
 Until you deploy, Path A on AWS has no charts in steps 1 and 5, no Board (so no "The
 pull-board moment"), and a slower bell with no pop-up in "The audit-log moment". Demo

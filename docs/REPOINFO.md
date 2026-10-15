@@ -169,7 +169,7 @@ All of it is built by Terraform (infra/).
 | Folder | What's in it |
 | --- | --- |
 | `function.py` | The entry point: the connection, and migrations on cold start under a lock |
-| `api/` | `routes.py` (all 68 routes and their roles), `app.py` (auth), `errors.py`, `handlers.py`, `http.py` |
+| `api/` | `routes.py` (all 69 routes and their roles), `app.py` (auth), `errors.py`, `handlers.py`, `http.py` |
 | `services/` | Every business rule, one file per subject |
 | `domain/` | Errors, money, clock, values: shared by every layer |
 | `store/` | `postgres.py` (connection and `atomic()`), `migrate.py`, `integrity.py`, `migrations/001_init.sql`, `migrations/002_task_limit.sql` |
@@ -374,7 +374,7 @@ statements, and 22 Playwright browser tests."
 | --- | --- | --- | --- |
 | 1. Database | Postgres refuses bad rows | One test per named constraint; a DELETE test for every application table | `tests/backend/test_schema.py`, `test_no_delete.py:31-46` |
 | 2. Rules | Each business rule behaves as specified | Calls the services directly; never imports `api` | e.g. `tests/backend/test_work.py` |
-| 3. API | All 68 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route is missed (the audit walk exempts only login, refresh, logout and marking notifications read) | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
+| 3. API | All 69 routes respond correctly | **In-process:** a Lambda-shaped event goes into `app.dispatch()`. Two walk tests fail if any route is missed (the audit walk exempts only login, refresh, logout and marking notifications read) | `test_api_read_walk.py:112-114`, `test_api_audit_walk.py` |
 | Website | Screens behave correctly | Vitest + React Testing Library, with `fetch` stubbed (no database) | `frontend/src/**/*.test.jsx` |
 | Browser | The demo works in a real browser | Playwright: 22 tests in 8 files (one only takes README screenshots) | `frontend/e2e/` |
 
@@ -883,6 +883,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "The browser checks nothing" | "The browser checks only that typed time is whole numbers within the server's own limits, to point at the wrong box; the server still refuses" | `parseDuration`, `frontend/src/services/format.js:75-88` |
 | "Only `money.py` does money maths" | "`money.py` holds the formulas; the dashboard repeats them in one SQL query" | `services/dashboard.py:52-58` |
 | "No N+1, proven" | "Each screen uses a fixed number of queries; no test counts them yet" | No query-count test |
+| "Managers can see everything in an employee's history" | "A manager sees what happened, never the salary: the before/after state is admin-only" | `audit_view(include_states=...)`; `test_history_never_shows_salary_to_a_manager` |
 | "Tests were written first" | "Every behavioural fix ships with the test that fails without it" | Test-first can't be shown from the code |
 
 ---
@@ -959,6 +960,8 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 - Pull board: built 14 Oct (66 routes, 2 migrations; answer 5a). Local only until the next deploy.
 - Tokens: 15-minute access token plus a rotating refresh token, built 14 Oct (68 routes,
   migration 005; answer 9). Local only until the next deploy; deploy backend and website together.
+- History: one person's trail from the audit log, built 14 Oct (69 routes, no migration).
+  Admins, the line manager and the person read it; state for admins only. Local only.
 
 **Ten files** (under `backend/tracker/` unless shown)
 

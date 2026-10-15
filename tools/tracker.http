@@ -100,6 +100,12 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/admin/audit-log?entityType=projects&dateFrom=2026-10-13
 Authorization: Bearer {{token}}
 
+### One person's history: what they did and what was done to their account, newest first.
+# Admins read anyone's (with before/after state); a manager reads their reports' and
+# anyone their own (no state). Anyone else gets 404. Filters: action, dateFrom, dateTo.
+GET {{baseUrl}}/users/1/history?page=1&pageSize=10
+Authorization: Bearer {{token}}
+
 ### Notifications for the signed-in user (the bell), unread only.
 GET {{baseUrl}}/notifications?unread=true
 Authorization: Bearer {{token}}
