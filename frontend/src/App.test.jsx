@@ -69,9 +69,9 @@ describe('colour mode', () => {
     localStorage.clear()
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: 'Switch to dark mode' }))
-    expect(getComputedStyle(document.body).backgroundColor).toBe('rgb(15, 29, 21)') // the dark green page
+    expect(getComputedStyle(document.body).backgroundColor).toBe('rgb(24, 34, 26)') // the warm dark green page
     await userEvent.click(screen.getByRole('button', { name: 'Switch to light mode' }))
-    expect(getComputedStyle(document.body).backgroundColor).toBe('rgb(228, 233, 228)') // the light grey-green page
+    expect(getComputedStyle(document.body).backgroundColor).toBe('rgb(232, 236, 220)') // the warm matcha page
     localStorage.clear()
   })
 })

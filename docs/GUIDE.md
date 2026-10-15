@@ -6,6 +6,8 @@ the formal write-up; this is the guide for presenting and explaining it.
 
 Numbers here were measured on 13 and 14 Oct 2026. Re-run the commands in section 9 before quoting them.
 
+**New on 15 Oct:** [`docs/MAP.md`](MAP.md) maps the repo, where every piece of data lives, and every security measure in plain words (it replaces section 7's older file map); [`docs/DEMO-TESTS.md`](DEMO-TESTS.md) shows how to run the tests live during the demo, slowed down.
+
 **Contents:**
 
 1. [The 30-second answer](#1-the-30-second-answer)

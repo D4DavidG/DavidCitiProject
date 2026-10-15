@@ -48,8 +48,8 @@ NewProjectDialog.propTypes = { onClose: PropTypes.func.isRequired, onCreated: Pr
 
 /**
  * Every project you can see (admins: all, managers: theirs, employees: the ones
- * they're booked on), searchable and filterable on the server. Each name is a secondary
- * button that opens the project. Admins can archive from here; a manager can ask the admins
+ * they're booked on), searchable and filterable on the server. Each name is a button
+ * that opens the project. Admins can archive from here; a manager can ask the admins
  * to archive a project they manage.
  */
 export default function ProjectsPage() {
@@ -75,9 +75,9 @@ export default function ProjectsPage() {
     {
       key: 'name',
       label: 'Project',
-      // A secondary button that is a real link (spec 5c): obviously clickable, left aligned, reachable by keyboard.
+      // A filled button that is a real link (spec 6.2): obviously clickable, left aligned, reachable by keyboard.
       render: (p) => (
-        <Button component={Link} to={`/projects/${p.projectId}`} variant="outlined" size="small" sx={{ fontWeight: 600, justifyContent: 'flex-start', textAlign: 'left' }}>
+        <Button component={Link} to={`/projects/${p.projectId}`} variant="contained" size="small" sx={{ fontWeight: 600, justifyContent: 'flex-start', textAlign: 'left' }}>
           {p.name}
         </Button>
       ),
@@ -106,8 +106,8 @@ export default function ProjectsPage() {
         return (
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
             {sentFor === p.projectId && <Typography variant="body2" role="status">Request sent. An admin will answer it.</Typography>}
-            {action === 'archive' && <Button size="small" variant="outlined" color="error" aria-label={`Archive ${p.name}`} onClick={() => setDialog({ kind: 'archive', project: p })}>Archive</Button>}
-            {action === 'request' && <Button size="small" variant="outlined" aria-label={`Request archive for ${p.name}`} onClick={() => setDialog({ kind: 'request', project: p })}>Request archive</Button>}
+            {action === 'archive' && <Button size="small" variant="contained" color="error" aria-label={`Archive ${p.name}`} onClick={() => setDialog({ kind: 'archive', project: p })}>Archive</Button>}
+            {action === 'request' && <Button size="small" variant="contained" aria-label={`Request archive for ${p.name}`} onClick={() => setDialog({ kind: 'request', project: p })}>Request archive</Button>}
           </Box>
         )
       },

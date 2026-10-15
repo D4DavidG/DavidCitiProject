@@ -46,11 +46,11 @@ export default function RequestList({ scope, kinds, view, version, onView, onDec
       align: 'right',
       render: (r) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          {r.createdProjectId && <Button size="small" variant="outlined" component={Link} to={`/projects/${r.createdProjectId}`}>Open project</Button>}
+          {r.createdProjectId && <Button size="small" variant="contained" component={Link} to={`/projects/${r.createdProjectId}`}>Open project</Button>}
           {scope === 'decide' && r.status === 'PENDING' && (
             <>
               <Button size="small" variant="contained" aria-label={`Approve ${r.name}`} onClick={() => onDecide('approve', r)}>Approve</Button>
-              <Button size="small" variant="outlined" color="error" aria-label={`Reject ${r.name}`} onClick={() => onDecide('reject', r)}>Reject</Button>
+              <Button size="small" variant="contained" color="error" aria-label={`Reject ${r.name}`} onClick={() => onDecide('reject', r)}>Reject</Button>
             </>
           )}
         </Box>

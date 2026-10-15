@@ -25,15 +25,19 @@ const TEXT_PAIRS = [
   ['header.contrastText', 'header.main'], // the top bar
   ['fill.contrastText', 'fill.main'], // primary buttons, the selected menu item
   ['fill.contrastText', 'fill.hover'],
+  ['danger.contrastText', 'danger.main'], // danger buttons, the New label
+  ['danger.contrastText', 'danger.hover'],
+  ['error.main', 'overWash'], // an over-capacity week on Allocation: red words on a red tint
+  ['text.primary', 'overWash'],
 ]
-// UI parts need 3:1: the gold Today line, the green-ink focus ring and button borders, a primary button's edge,
+// UI parts need 3:1: the gold Today line, the green focus ring, a button's edge,
 // and a field's resting border, which sits on a dialog, on the page or across a grid line.
 const UI_PAIRS = [
   ['secondary.main', 'background.paper'],
   ['secondary.main', 'background.default'],
   ['primary.main', 'background.default'],
-  ['fill.main', 'background.paper'],
-  ['fill.main', 'background.default'],
+  ['buttonEdge', 'background.paper'], // a button's edge: the green itself on light, white on dark
+  ['buttonEdge', 'background.default'],
   ...SURFACES.map((surface) => ['fieldLine', surface]),
 ]
 
@@ -72,52 +76,55 @@ describe.each(MODES)('the %s theme', (mode) => {
   })
 })
 
-describe('contained buttons', () => {
+describe('one kind of button (spec 6.2)', () => {
   it.each([
-    ['light', 'rgb(31, 122, 58)', 'rgb(255, 255, 255)'], // the fill green, white words
-    ['dark', 'rgb(255, 255, 255)', 'rgb(20, 96, 44)'], // white, green words
-  ])('are drawn per mode (%s)', (mode, background, color) => {
-    render(<ThemeProvider theme={makeTheme(mode)}><Button variant="contained">Save</Button></ThemeProvider>)
-    expect(screen.getByRole('button', { name: 'Save' })).toHaveStyle({ backgroundColor: background, color })
+    ['light', 'rgb(22, 94, 38)', 'rgb(22, 94, 38)'], // the one green, its own edge
+    ['dark', 'rgb(22, 94, 38)', 'rgb(255, 255, 255)'], // the same green, a thin white edge
+  ])('fills every button green with white words and rounded corners (%s)', (mode, background, edge) => {
+    render(<ThemeProvider theme={makeTheme(mode)}><Button>Edit</Button><Button variant="outlined">Later</Button></ThemeProvider>)
+    for (const name of ['Edit', 'Later']) {
+      expect(screen.getByRole('button', { name })).toHaveStyle({
+        backgroundColor: background, color: 'rgb(255, 255, 255)', borderColor: edge, borderRadius: '8px',
+      })
+    }
+  })
+
+  it.each([['light', 'rgb(194, 31, 31)'], ['dark', 'rgb(198, 40, 40)']])('fills the danger kind red with white words (%s)', (mode, red) => {
+    render(<ThemeProvider theme={makeTheme(mode)}><Button color="error">Archive</Button></ThemeProvider>)
+    expect(screen.getByRole('button', { name: 'Archive' })).toHaveStyle({ backgroundColor: red, color: 'rgb(255, 255, 255)' })
+  })
+
+  it('gives a button a small drop shadow, not a glow', () => {
+    render(<ThemeProvider theme={makeTheme('light')}><Button>Save</Button></ThemeProvider>)
+    expect(getComputedStyle(screen.getByRole('button', { name: 'Save' })).boxShadow).toMatch(/^0 1px 2px rgba/)
+  })
+
+  it('keeps a top-bar word bare: color inherit with variant text has no fill and no border', () => {
+    render(<ThemeProvider theme={makeTheme('light')}><Button color="inherit" variant="text">Sign out</Button></ThemeProvider>)
+    const out = screen.getByRole('button', { name: 'Sign out' })
+    expect(getComputedStyle(out).backgroundColor).not.toBe('rgb(22, 94, 38)')
+    expect(getComputedStyle(out).borderStyle).not.toBe('solid')
+  })
+
+  it('greys a disabled button out with a neutral, not a faded green (SimpleBank lesson)', () => {
+    render(<ThemeProvider theme={makeTheme('light')}><Button disabled>Save</Button></ThemeProvider>)
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveStyle({ backgroundColor: 'rgb(217, 221, 208)', color: 'rgb(76, 84, 80)' })
   })
 })
 
-describe('the three kinds of button (spec 5c)', () => {
-  it('makes a plain Button the secondary kind: outlined in green ink on the panel', () => {
-    const t = makeTheme('light')
-    render(<ThemeProvider theme={t}><Button>Edit</Button></ThemeProvider>)
-    const edit = screen.getByRole('button', { name: 'Edit' })
-    expect(edit).toHaveClass('MuiButton-outlined')
-    expect(edit).toHaveStyle({ borderColor: 'rgb(20, 96, 44)', backgroundColor: 'rgb(255, 255, 255)' })
-    expect(getComputedStyle(edit).getPropertyValue('--variant-outlinedColor')).toBe(t.palette.primary.main) // the label (a CSS variable)
-  })
-
-  it('draws the danger kind outlined in red, never filled', () => {
-    render(<ThemeProvider theme={makeTheme('light')}><Button color="error">Archive</Button></ThemeProvider>)
-    const archive = screen.getByRole('button', { name: 'Archive' })
-    expect(archive).toHaveClass('MuiButton-outlined')
-    expect(archive).toHaveStyle({ borderColor: 'rgb(179, 38, 30)', backgroundColor: 'rgb(255, 255, 255)' })
-  })
-
-  it('gives the primary kind a glow at rest', () => {
-    render(<ThemeProvider theme={makeTheme('light')}><Button variant="contained">Save</Button></ThemeProvider>)
-    expect(getComputedStyle(screen.getByRole('button', { name: 'Save' })).boxShadow).toMatch(/^0 0 6px rgba\(31, 122, 58/)
-  })
-})
-
-describe('links (spec 5c)', () => {
+describe('links', () => {
   it('are green ink with no underline, underlined on hover and on keyboard focus', () => {
     const t = makeTheme('light')
     render(<ThemeProvider theme={t}><Link href="#/projects/1">Apollo</Link></ThemeProvider>)
     const link = screen.getByRole('link', { name: 'Apollo' })
     expect(link).toHaveClass('MuiLink-underlineHover')
-    expect(link).toHaveStyle({ color: 'rgb(20, 96, 44)', textDecoration: 'none' })
+    expect(link).toHaveStyle({ color: 'rgb(22, 94, 38)', textDecoration: 'none' })
     const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
     expect(css).toMatch(/MuiLink-root:focus-visible\{(-webkit-)?text-decoration:underline/)
   })
 
-  // Green ink against body text is only 2.3:1 (1.4:1 in dark), under the 3:1 WCAG 1.4.1 asks of a
-  // link that differs by colour alone; axe's link-in-text-block rule accepts a change of weight.
+  // Green against body text is under the 3:1 WCAG 1.4.1 asks of a link that differs by colour alone;
+  // axe's link-in-text-block rule accepts a change of weight: bold links in 500-weight text.
   it('stand out from the sentence around them by weight, not by colour alone', () => {
     render(<ThemeProvider theme={makeTheme('light')}><Typography>See the <Link href="#/spec">spec</Link> for more.</Typography></ThemeProvider>)
     const link = screen.getByRole('link', { name: 'spec' })
@@ -125,19 +132,19 @@ describe('links (spec 5c)', () => {
     // (jsdom lets the shorthand win, so the rule is read rather than the computed weight).
     const scope = [...link.classList].find((name) => name.startsWith('css-'))
     const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
-    expect(css).toMatch(new RegExp(`\\.${scope}\\{[^}]*font:inherit;[^}]*font-weight:600;`))
-    expect(screen.getByText(/See the/)).toHaveStyle({ fontWeight: '400' })
+    expect(css).toMatch(new RegExp(`\\.${scope}\\{[^}]*font:inherit;[^}]*font-weight:700;`))
+    expect(screen.getByText(/See the/)).toHaveStyle({ fontWeight: '500' })
   })
 })
 
-describe('the keyboard focus ring (spec 5c)', () => {
+describe('the keyboard focus ring', () => {
   /** The page-wide rule that draws the ring: [selector, style]. */
   const ring = (t) => Object.entries(t.components.MuiCssBaseline.styleOverrides).find(([, style]) => style.outline)
   // jsdom reports :focus-visible only on the first Tab of a whole test file, so rather than tab to each
   // control, ask whether the ring's selector takes it in once it has keyboard focus.
   const ringed = (element) => element.matches(ring(theme)[0].replaceAll(':focus-visible', '').replaceAll('.Mui-focusVisible', ''))
 
-  it.each(MODES)('is 2 px green ink, just outside the control (%s)', (mode) => {
+  it.each(MODES)('is 2 px green, just outside the control (%s)', (mode) => {
     const t = makeTheme(mode)
     expect(ring(t)[1]).toEqual({ outline: `2px solid ${t.palette.primary.main}`, outlineOffset: 2 })
   })
@@ -171,34 +178,35 @@ describe('the keyboard focus ring (spec 5c)', () => {
 })
 
 describe('motion', () => {
-  it.each(MODES)('switches off the slow card glow and the button transitions under prefers-reduced-motion (%s)', (mode) => {
-    const { components } = makeTheme(mode)
-    const calm = { '@media (prefers-reduced-motion: reduce)': { transition: 'none' } }
-    expect(components.MuiCard.styleOverrides.root).toMatchObject(calm)
-    expect(components.MuiButton.styleOverrides.root).toMatchObject(calm)
+  it.each(MODES)('switches off the button transitions under prefers-reduced-motion (%s)', (mode) => {
+    render(<ThemeProvider theme={makeTheme(mode)}><Button>Save</Button></ThemeProvider>)
+    const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\{[^}]*transition:none/)
   })
 })
 
 describe('raised panels in dark mode', () => {
-  it('are the solid near-black panel: no white overlay on dialogs, menus or the phone drawer', () => {
+  it('are the solid card colour: no white overlay on dialogs, menus or the phone drawer', () => {
     render(<ThemeProvider theme={makeTheme('dark')}><Dialog open aria-label="Dialog"><p>body</p></Dialog></ThemeProvider>)
     const paper = screen.getByRole('dialog')
     expect(getComputedStyle(paper).backgroundImage).toBe('none')
-    expect(paper).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+    expect(paper).toHaveStyle({ backgroundColor: 'rgb(33, 45, 35)' })
   })
 })
 
-describe('panels and titles (spec 5c)', () => {
-  it('gives a card a soft glow, and a card inside it none', () => {
+describe('boxes and titles (spec 6.1)', () => {
+  it('gives a card a soft drop shadow (no glow), and a card inside it none', () => {
     render(<ThemeProvider theme={makeTheme('light')}><Card data-testid="outer"><Card data-testid="inner">x</Card></Card></ThemeProvider>)
-    expect(getComputedStyle(screen.getByTestId('outer')).boxShadow).toMatch(/^0 0 12px rgba/)
+    expect(getComputedStyle(screen.getByTestId('outer')).boxShadow).toMatch(/^0 1px 2px rgba/)
     expect(getComputedStyle(screen.getByTestId('inner')).boxShadow).toBe('none')
   })
 
-  it.each(MODES)('writes page titles in capitals with a little tracking (%s)', (mode) => {
+  it.each(MODES)('writes titles in Poppins, in normal case, with no glow (%s)', (mode) => {
     render(<ThemeProvider theme={makeTheme(mode)}><Typography variant="h1">Dashboard</Typography></ThemeProvider>)
-    // 0.012em of the 28 px title is 0.336 px.
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toHaveStyle({ textTransform: 'uppercase', letterSpacing: '0.336px' })
+    const title = screen.getByRole('heading', { name: 'Dashboard' })
+    expect(getComputedStyle(title).fontFamily).toMatch(/^"Poppins"/)
+    expect(getComputedStyle(title).textTransform).not.toBe('uppercase')
+    expect(getComputedStyle(title).textShadow).not.toMatch(/\dpx/) // no glow
   })
 })
 
@@ -218,7 +226,7 @@ describe('a field in error', () => {
 })
 
 describe('a field at rest', () => {
-  it.each([['light', 'rgb(118, 125, 120)'], ['dark', 'rgb(111, 121, 115)']])(
+  it.each([['light', 'rgb(118, 125, 120)'], ['dark', 'rgb(124, 135, 126)']])(
     'has a border that reaches 3:1 on any surface, not MUI\'s faint default (%s)',
     (mode, line) => {
       render(<ThemeProvider theme={makeTheme(mode)}><OutlinedInput inputProps={{ 'aria-label': 'Name' }} /></ThemeProvider>)
@@ -234,30 +242,35 @@ describe('the default export', () => {
   })
 })
 
-describe('square corners on screen', () => {
+describe('square boxes, rounded buttons (spec 6.1, 6.2)', () => {
   const square = (element) => expect(getComputedStyle(element).borderRadius).toMatch(/^0(px)?$/)
 
-  it.each(MODES)('draws cards, buttons, fields, chips, alerts and tooltips square in %s mode', async (mode) => {
+  it.each(MODES)('draws cards, fields and alerts square in %s mode', (mode) => {
     render(
       <ThemeProvider theme={makeTheme(mode)}>
         <Card data-testid="card">card</Card>
-        <Button variant="contained">Save</Button>
         <OutlinedInput inputProps={{ 'aria-label': 'Name' }} />
-        <Chip label="Active" color="primary" />
         <Alert severity="error">Refused</Alert>
-        <Tooltip title="Tip" open><span>hover me</span></Tooltip>
       </ThemeProvider>,
     )
     square(screen.getByTestId('card'))
-    square(screen.getByRole('button', { name: 'Save' }))
     square(screen.getByRole('textbox', { name: 'Name' }).parentElement)
-    square(screen.getByText('Active').parentElement)
     square(screen.getByRole('alert'))
-    square((await screen.findByRole('tooltip')).firstChild)
   })
 
   it.each(MODES)('draws dialogs square in %s mode', (mode) => {
     render(<ThemeProvider theme={makeTheme(mode)}><Dialog open aria-label="Dialog"><p>body</p></Dialog></ThemeProvider>)
     square(screen.getByRole('dialog'))
+  })
+
+  it('rounds buttons (8 px) and chips (6 px) a little, to feel less stiff', () => {
+    render(<ThemeProvider theme={theme}><Button>Save</Button><Chip label="Active" /></ThemeProvider>)
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveStyle({ borderRadius: '8px' })
+    expect(screen.getByText('Active').parentElement).toHaveStyle({ borderRadius: '6px' })
+  })
+
+  it('fills a red chip (the New label) with the danger red and white words', () => {
+    render(<ThemeProvider theme={theme}><Chip label="New" color="error" /></ThemeProvider>)
+    expect(screen.getByText('New').parentElement).toHaveStyle({ backgroundColor: 'rgb(194, 31, 31)', color: 'rgb(255, 255, 255)' })
   })
 })

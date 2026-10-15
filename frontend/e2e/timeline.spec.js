@@ -36,7 +36,7 @@ test.beforeAll(async ({ request }) => {
 async function openZeus(page) {
   await page.goto('/')
   await page.getByLabel('Username').fill(sam)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/projects')
@@ -74,7 +74,7 @@ test('a late row says Late with the icon, and its tooltip opens on hover', async
   // The warning icon sits on the same line as the words, just before them. Not found by MUI's
   // data-testid: MUI adds that only in development, so on the built site (AWS) it is not there.
   await expect(row.getByText('Late, 0%').locator('..').locator('svg')).toBeVisible()
-  await expect(row.getByText('Late, 0%')).toHaveCSS('color', 'rgb(179, 38, 30)') // the theme's error.main, #B3261E
+  await expect(row.getByText('Late, 0%')).toHaveCSS('color', 'rgb(194, 31, 31)') // the theme's error.main, #C21F1F (15 Oct)
   await expect(page.getByRole('tooltip')).toHaveCount(0)
   await row.hover()
   await expect(page.getByRole('tooltip')).toHaveText(/^0% done · Migration · Aug \d+ – Oct \d+, 2026 · Late$/)
@@ -108,13 +108,13 @@ test('the late bar and fill are striped only in print and forced colours', async
   expect(forced[0]).toMatch(STRIPES)
   expect(forced[1]).toMatch(STRIPES)
   // forced-color-adjust: none keeps the bar's own red track instead of a system colour.
-  expect(await row.getByTestId('bar').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(235, 180, 180)')
+  expect(await row.getByTestId('bar').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(237, 182, 182)') // LATE track, #EDB6B6
 })
 
 test("Apollo's timeline reads Design Done, Build In progress 0%, Launch Blocked, as the runbook says", async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('Username').fill(process.env.E2E_MANAGER_USERNAME ?? 'ML460428') // Maria manages Apollo
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/projects')

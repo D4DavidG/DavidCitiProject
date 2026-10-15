@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MyTasksPage from './MyTasksPage'
+import * as responsive from '../../theme/responsive'
 import { USERS, holdOpen, page, renderAt, session, stubApi } from '../../test/utils'
+
+vi.mock('../../theme/responsive', () => ({ useIsMobile: vi.fn(() => false) }))
 
 const PORTAL = {
   taskId: 20, milestoneId: 11, projectId: 1, title: 'Portal UI', description: 'Screens for the portal',
@@ -40,6 +43,28 @@ async function openLoggedTime() {
 }
 
 describe('MyTasksPage', () => {
+  afterEach(() => { responsive.useIsMobile.mockReturnValue(false) }) // a phone test must not leave the rest on a phone
+
+  it('puts My tasks and Ready to take side by side on desktop, in two equal columns, with My logged time below both', async () => {
+    renderPage()
+    const mine = await screen.findByRole('region', { name: 'My tasks' })
+    const ready = screen.getByRole('region', { name: 'Ready to take' })
+    const columns = mine.parentElement
+    expect(ready.parentElement).toBe(columns)
+    expect(getComputedStyle(columns).gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))')
+    const logged = await screen.findByRole('button', { name: /^My logged time/ })
+    expect(columns).not.toContainElement(logged)
+    expect(columns.compareDocumentPosition(logged) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('stacks My tasks above Ready to take on a phone', async () => {
+    responsive.useIsMobile.mockReturnValue(true)
+    renderPage()
+    const mine = await screen.findByRole('region', { name: 'My tasks' })
+    expect(getComputedStyle(mine.parentElement).gridTemplateColumns).toBe('1fr')
+    expect(mine.compareDocumentPosition(screen.getByRole('region', { name: 'Ready to take' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('is the employee\'s Dashboard: My projects, My tasks, Ready to take, then My logged time', async () => {
     renderPage()
     expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
@@ -120,14 +145,16 @@ describe('MyTasksPage', () => {
     expect(within(task).getByText('Estimate 10 h')).toBeInTheDocument()
   })
 
-  it('gives Log time, Take this and Edit the outlined look of every secondary button', async () => {
+  it('gives Log time, Take this and Edit the filled look of every button (spec 6.2), and draws no outlined or text button', async () => {
     renderPage({ 'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 1, limit: 2 })] })
     const task = await screen.findByRole('article', { name: 'Portal UI' })
-    expect(within(task).getByRole('button', { name: 'Log time' })).toHaveClass('MuiButton-outlined')
+    expect(within(task).getByRole('button', { name: 'Log time' })).toHaveClass('MuiButton-contained')
     const ready = await screen.findByRole('article', { name: 'Go-live checklist' })
-    expect(within(ready).getByRole('button', { name: 'Take this' })).toHaveClass('MuiButton-outlined')
+    expect(within(ready).getByRole('button', { name: 'Take this' })).toHaveClass('MuiButton-contained')
     const table = await openLoggedTime()
-    expect(within(table).getByRole('button', { name: 'Edit' })).toHaveClass('MuiButton-outlined')
+    expect(within(table).getByRole('button', { name: 'Edit' })).toHaveClass('MuiButton-contained')
+    await screen.findByRole('button', { name: 'Earlier' }) // the timeline's buttons too
+    document.querySelectorAll('.MuiButton-root').forEach((b) => expect(b.className, b.textContent).not.toMatch(/MuiButton-(outlined|text)\b/))
   })
 
   it('redraws my projects timeline after a task moves, since a deliverable may change state', async () => {

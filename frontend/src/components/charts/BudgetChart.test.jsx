@@ -40,9 +40,9 @@ describe('BudgetChart', () => {
   it('takes the dark set in dark mode', () => {
     draw([ZEUS, ARES], makeTheme('dark'))
     expect(within(row('Zeus')).getByTestId('spent')).toHaveStyle({ background: '#6DA7EC' })
-    expect(within(row('Ares')).getByTestId('spent')).toHaveStyle({ background: '#F28B82' })
-    expect(screen.getByTestId('budget-line')).toHaveStyle({ background: '#D7D7D7' })
-    expect(screen.getByText('Zeus')).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' }) // words sit on the dark panel
+    expect(within(row('Ares')).getByTestId('spent')).toHaveStyle({ background: '#FF5A5A' })
+    expect(screen.getByTestId('budget-line')).toHaveStyle({ background: '#ECEEE6' })
+    expect(screen.getByText('Zeus')).toHaveStyle({ backgroundColor: 'rgb(33, 45, 35)' }) // words sit on the dark card
   })
 
   it('draws a row per project, in the order the server sent them', () => {

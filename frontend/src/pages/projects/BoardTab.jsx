@@ -74,13 +74,13 @@ export default function BoardTab({ projectId, canManage }) {
                     <Typography variant="body2">{t.assigneeName ?? 'Unassigned'}</Typography>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       {isEmployee && column === 'Ready' && (
-                        <Button size="small" variant="outlined" disabled={pendingId === t.taskId} onClick={() => act(t.taskId, 'claim')}>Take this</Button>
+                        <Button size="small" variant="contained" disabled={pendingId === t.taskId} onClick={() => act(t.taskId, 'claim')}>Take this</Button>
                       )}
                       {isEmployee && column !== 'Done' && t.assigneeUserId === user.userId && (
-                        <Button size="small" variant="outlined" disabled={pendingId === t.taskId} onClick={() => act(t.taskId, 'release')}>Put back</Button>
+                        <Button size="small" variant="contained" disabled={pendingId === t.taskId} onClick={() => act(t.taskId, 'release')}>Put back</Button>
                       )}
                       {canManage && column !== 'Done' && (
-                        <Button size="small" variant="outlined" onClick={() => setAssigning(t)}>Assign</Button>
+                        <Button size="small" variant="contained" onClick={() => setAssigning(t)}>Assign</Button>
                       )}
                     </Box>
                     {failure?.taskId === t.taskId && <FormHelperText error role="alert" sx={{ m: 0 }}>{failure.text}</FormHelperText>}

@@ -30,6 +30,14 @@ describe('DependencyPage', () => {
     expect(within(screen.getByRole('region', { name: 'Step 3' })).getByText('Launch')).toBeInTheDocument()
   })
 
+  it('heads each step with a normal-case heading that names its section (spec 6.1: no capitals)', async () => {
+    renderGraph()
+    const step1 = await screen.findByRole('region', { name: 'Step 1' })
+    const heading = within(step1).getByRole('heading', { level: 2, name: 'Step 1' })
+    expect(heading).not.toHaveClass('MuiTypography-overline')
+    expect(step1).toHaveAttribute('aria-labelledby', heading.id)
+  })
+
   it('shows each deliverable with its status and what it needs', async () => {
     renderGraph()
     const build = await screen.findByRole('article', { name: 'Build' })
@@ -79,6 +87,9 @@ describe('DependencyPage', () => {
     const launch = await screen.findByRole('article', { name: 'Launch' })
     const remove = within(launch).getByRole('button', { name: /remove link to build/i })
     expect(remove).toHaveTextContent('Remove link to Build') // visible words, not only an icon
+    expect(remove).toHaveClass('MuiButton-contained', 'MuiButton-colorError') // it removes, so filled red (spec 6.2)
+    expect(screen.getByRole('link', { name: 'Back to project' })).toHaveClass('MuiButton-contained')
+    document.querySelectorAll('.MuiButton-root').forEach((b) => expect(b.className, b.textContent).not.toMatch(/MuiButton-(outlined|text)\b/))
     await userEvent.click(remove)
     await waitFor(() => expect(calls.some((c) => c.path === '/milestones/12/dependencies/11/archive')).toBe(true))
   })

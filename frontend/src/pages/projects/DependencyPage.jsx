@@ -34,7 +34,7 @@ function Node({ node, needs, canManage, unlinking, refusal = null, onUnlink }) {
         )}
         {canManage && needs.map((dep) => (
           // Words, not just an icon: a phone has no hover to reveal a tooltip.
-          <Button key={dep.milestoneId} size="small" variant="outlined" color="error" startIcon={<LinkOffIcon fontSize="small" />}
+          <Button key={dep.milestoneId} size="small" variant="contained" color="error" startIcon={<LinkOffIcon fontSize="small" />}
             onClick={() => onUnlink(node, dep)} disabled={unlinking === dep.milestoneId} sx={{ justifySelf: 'start' }}>
             Remove link to {dep.name}
           </Button>
@@ -106,7 +106,7 @@ export default function DependencyPage() {
         subtitle="Read left to right: each deliverable can only finish after the ones it needs."
         actions={(
           <>
-            <Button component={Link} to={`/projects/${projectId}`} variant="outlined">Back to project</Button>
+            <Button component={Link} to={`/projects/${projectId}`} variant="contained">Back to project</Button>
             {canManage && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>Add a link</Button>}
           </>
         )}
@@ -117,8 +117,9 @@ export default function DependencyPage() {
           {steps(nodes, edges).map((column, index) => (
             <Box key={column[0].milestoneId} sx={{ display: 'flex', gap: 2, alignItems: { xs: 'center', md: 'flex-start' }, flexDirection: { xs: 'column', md: 'row' } }}>
               {index > 0 && <ArrowIcon color="action" sx={{ transform: { xs: 'rotate(90deg)', md: 'none' }, mt: { md: 7 } }} aria-hidden />}
-              <Box component="section" aria-label={`Step ${index + 1}`} sx={{ display: 'grid', gap: 1.5, minWidth: 240, width: { xs: '100%', md: 260 } }}>
-                <Typography variant="overline" color="text.secondary">Step {index + 1}</Typography>
+              <Box component="section" aria-labelledby={`step-${index + 1}`} sx={{ display: 'grid', gap: 1.5, minWidth: 240, width: { xs: '100%', md: 260 } }}>
+                {/* A heading in normal case (spec 6.1), not the capitalised overline. */}
+                <Typography id={`step-${index + 1}`} variant="h4" component="h2" sx={{ color: 'text.secondary' }}>Step {index + 1}</Typography>
                 {column.map((node) => (
                   <Node key={node.milestoneId} node={node} needs={needsOf(node.milestoneId)} canManage={canManage} unlinking={unlinking?.from === node.milestoneId ? unlinking.to : undefined} refusal={refusal?.milestoneId === node.milestoneId ? refusal.text : undefined} onUnlink={unlink} />
                 ))}

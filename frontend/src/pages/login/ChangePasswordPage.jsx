@@ -4,6 +4,7 @@ import { Box, Button, TextField, Typography } from '@mui/material'
 import { homePath, useAuth } from '../../auth/useAuth'
 import { request } from '../../services/request'
 import AuthCard from './AuthCard'
+import PasswordField from '../../components/PasswordField'
 
 const FIELDS = [
   { name: 'currentPassword', label: 'Current password', autoComplete: 'current-password' },
@@ -69,11 +70,10 @@ export default function ChangePasswordPage() {
     >
       <Box component="form" onSubmit={submit} noValidate sx={{ display: 'grid', gap: 2 }}>
         {FIELDS.map(({ name, label, autoComplete, helper }) => (
-          <TextField
+          <PasswordField
             key={name}
             id={name}
             label={label}
-            type="password"
             value={values[name]}
             onChange={(e) => setValues({ ...values, [name]: e.target.value })}
             autoComplete={autoComplete}

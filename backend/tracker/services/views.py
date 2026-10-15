@@ -78,7 +78,7 @@ def milestone_view(row: dict) -> dict:
 
 
 def _with_names(view: dict, row: dict, names: dict[str, str]) -> dict:
-    """Add the display names a list query joined in (absent from plain rows and audit snapshots)."""
+    """Add what a list query joined in, such as display names (absent from plain rows and audit snapshots)."""
     for out, src in names.items():
         if src in row:
             view[out] = row[src]
@@ -99,7 +99,10 @@ def task_view(row: dict) -> dict:
 
 
 def entry_view(row: dict) -> dict:
-    """Logged time. The frozen hourly rate is left out: it would reveal salary."""
+    """Logged time. The frozen hourly rate is left out: it would reveal salary.
+
+    The approvals queue also carries how the entry's task stands against its estimate.
+    """
     view = _pick(row, {
         "entryId": "entry_id", "taskId": "task_id", "projectId": "project_id", "userId": "user_id",
         "workDate": "work_date", "minutes": "minutes", "note": "note", "status": "status",
@@ -107,7 +110,8 @@ def entry_view(row: dict) -> dict:
         "updatedAt": "updated_at",
     })
     return _with_names(view, row, {"taskTitle": "task_title", "projectName": "project_name",
-                                   "personName": "person_name"})
+                                   "personName": "person_name", "taskEstimateMinutes": "task_estimate_minutes",
+                                   "taskLoggedMinutes": "task_logged_minutes", "overEstimate": "over_estimate"})
 
 
 def request_view(row: dict) -> dict:

@@ -55,6 +55,18 @@ describe('FormDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith({ description: '' })
   })
 
+  it('makes the submit button the danger kind, filled red, when asked (Reject, Archive)', () => {
+    renderForm({ submitLabel: 'Reject', danger: true })
+    const reject = screen.getByRole('button', { name: 'Reject' })
+    expect(reject).toHaveClass('MuiButton-contained')
+    expect(reject).toHaveClass('MuiButton-colorError')
+  })
+
+  it('keeps the submit button the usual green otherwise', () => {
+    renderForm({})
+    expect(screen.getByRole('button', { name: /save/i })).toHaveClass('MuiButton-colorPrimary')
+  })
+
   it('shows a money input that is not an amount as a field error, without submitting', async () => {
     const onSubmit = renderForm({})
     await userEvent.type(screen.getByLabelText(/budget/i), 'lots')
@@ -471,10 +483,10 @@ describe('FormDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith({ overtimeAllowed: true })
   })
 
-  it('has one primary button (Save) and Cancel as the secondary kind', () => {
+  it('fills both Save and Cancel, like every button on the site (spec 6.2)', () => {
     renderForm({})
     expect(screen.getByRole('button', { name: /save/i })).toHaveClass('MuiButton-contained')
-    expect(screen.getByRole('button', { name: /cancel/i })).toHaveClass('MuiButton-outlined')
+    expect(screen.getByRole('button', { name: /cancel/i })).toHaveClass('MuiButton-contained')
   })
 
   it('closes after a successful save', async () => {

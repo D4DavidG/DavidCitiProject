@@ -112,10 +112,10 @@ export default function ProjectDetailPage() {
             subtitle={p.description}
             actions={(
               <>
-                <Button component={Link} to={`/projects/${projectId}/dependencies`} variant="outlined">Dependency view</Button>
-                {canManage && <Button variant="outlined" onClick={() => setEditing(true)}>Edit project</Button>}
-                {archive === 'archive' && <Button variant="outlined" color="error" onClick={() => setArchiving(true)}>Archive project</Button>}
-                {archive === 'request' && <Button variant="outlined" onClick={() => { setRequestSent(false); setRequesting(true) }}>Request archive</Button>}
+                <Button component={Link} to={`/projects/${projectId}/dependencies`} variant="contained">Dependency view</Button>
+                {canManage && <Button variant="contained" onClick={() => setEditing(true)}>Edit project</Button>}
+                {archive === 'archive' && <Button variant="contained" color="error" onClick={() => setArchiving(true)}>Archive project</Button>}
+                {archive === 'request' && <Button variant="contained" onClick={() => { setRequestSent(false); setRequesting(true) }}>Request archive</Button>}
                 {requestSent && <Typography variant="body2" role="status" sx={{ alignSelf: 'center' }}>Request sent. An admin will answer it.</Typography>}
                 {isAdmin && p.isArchived && (
                   <Button variant="contained" onClick={reactivate} disabled={reactivating}>{reactivating ? 'Reactivating…' : 'Reactivate'}</Button>

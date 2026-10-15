@@ -127,19 +127,54 @@ describe('DashboardPage', () => {
     expect(await screen.findByText(/counts are for the current search/i)).toBeInTheDocument()
   })
 
-  it('draws the budget chart between the counts and the cards', async () => {
+  it('orders the page: My projects this week, Workload this week, the search with its counts, the cards, then Budget by project last', async () => {
     renderDashboard()
     const chart = await screen.findByRole('figure', { name: 'Budget by project' })
-    expect(screen.getByLabelText('Total at risk').compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(chart.compareDocumentPosition(screen.getByRole('article', { name: 'Apollo' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const inOrder = [
+      screen.getByRole('region', { name: 'My projects this week' }),
+      await screen.findByRole('figure', { name: 'Workload this week · all projects' }),
+      screen.getByRole('textbox', { name: 'Search projects' }),
+      screen.getByLabelText('Total projects'),
+      screen.getByLabelText('Total at risk'),
+      screen.getByRole('article', { name: 'Apollo' }),
+      screen.getByRole('article', { name: 'Hermes' }),
+      chart,
+    ]
+    inOrder.slice(1).forEach((later, i) => {
+      expect(inOrder[i].compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING, later.textContent).toBeTruthy()
+    })
   })
 
-  it('opens each card\'s project with a secondary (outlined) button', async () => {
+  it('shows the two counts small, in one row with the project search, not as big boxes', async () => {
+    renderDashboard()
+    await screen.findByRole('article', { name: 'Apollo' })
+    const search = screen.getByRole('textbox', { name: 'Search projects' })
+    const row = screen.getByRole('group', { name: 'Project search and counts' })
+    expect(row).toContainElement(search)
+    for (const label of ['Total projects', 'Total at risk']) {
+      const count = screen.getByLabelText(label)
+      expect(row).toContainElement(count)
+      expect(count.closest('.MuiCard-root')).toBeNull()
+      expect(count.closest('h1, h2, h3, h4, h5, h6, [class*="MuiTypography-h"]')).toBeNull() // body-sized, not a heading size
+    }
+  })
+
+  it("opens each card's project with a filled button, like every button (spec 6.2)", async () => {
     renderDashboard()
     const card = await screen.findByRole('article', { name: 'Apollo' })
     const open = within(card).getByRole('link', { name: /open project/i })
     expect(open).toHaveAttribute('href', '/projects/1')
-    expect(open).toHaveClass('MuiButton-outlined')
+    expect(open).toHaveClass('MuiButton-contained')
+  })
+
+  it('draws no outlined or text buttons anywhere on the page', async () => {
+    renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO, HERMES], { total: 30, totalPages: 3, atRiskTotal: 1 })] })
+    await screen.findByRole('article', { name: 'Apollo' })
+    await screen.findByRole('figure', { name: 'Workload this week · all projects' })
+    await screen.findByRole('button', { name: 'Earlier' })
+    const buttons = [...document.querySelectorAll('.MuiButton-root')]
+    expect(buttons.length).toBeGreaterThan(5)
+    buttons.forEach((b) => expect(b.className, b.textContent).not.toMatch(/MuiButton-(outlined|text)\b/))
   })
 
   it('searches and filters on the server', async () => {
@@ -178,7 +213,7 @@ describe('DashboardPage', () => {
     expect(within(chart).getByText('Showing 1 of 12 people, most over first.')).toBeInTheDocument() // the panel passes the server's total
     const allocation = screen.getByRole('link', { name: 'All people and weeks in Allocation' })
     expect(allocation).toHaveAttribute('href', '/allocation')
-    expect(allocation).toHaveClass('MuiButton-outlined') // not in a sentence, so a button, not a text link
+    expect(allocation).toHaveClass('MuiButton-contained') // not in a sentence, so a button, not a text link
   })
 
   it('leaves the workload chart alone when searching projects', async () => {

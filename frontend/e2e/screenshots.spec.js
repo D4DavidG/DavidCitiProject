@@ -19,7 +19,7 @@ test('README screenshots', async ({ page, request }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await page.getByLabel('Username').fill(maria)
-  await page.getByLabel('Password').fill('Demo-pass-2026')
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill('Demo-pass-2026')
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('article', { name: 'Apollo' })).toBeVisible()
   await page.screenshot({ path: `${OUT}/dashboard.png` })

@@ -18,7 +18,7 @@ const DIR = process.env.E2E_TOUR_DIR
 async function openSchedule(page) {
   await page.goto('/')
   await page.getByLabel('Username').fill(USERNAME)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/schedule')
@@ -40,7 +40,7 @@ for (const [name, size] of [['desktop', { width: 1440, height: 900 }], ['phone',
     await expect(ben.getByText(/^\+\d+ h over$/).first()).toBeVisible()
     expect(await ben.locator('[data-state="over"]').count()).toBeGreaterThan(0)
     const outline = await ben.locator('[data-state="over"]').first().evaluate((el) => getComputedStyle(el).borderTopColor)
-    expect(outline).toBe('rgb(198, 40, 40)') // OVER, #C62828
+    expect(outline).toBe('rgb(194, 31, 31)') // the chart's over red, #C21F1F (chartColours.js, 15 Oct)
 
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     expect(sideways, 'the page itself never scrolls sideways').toBeLessThanOrEqual(0)

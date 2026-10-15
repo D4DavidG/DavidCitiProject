@@ -25,10 +25,10 @@ describe('TimelineChart', () => {
 
   it('takes the dark set in dark mode', () => {
     draw({ chosen: makeTheme('dark') })
-    expect(within(row('Design')).getByTestId('fill')).toHaveStyle({ background: '#6FCB8E' })
-    expect(within(row('Migration')).getByTestId('fill')).toHaveStyle({ background: '#F28B82' })
+    expect(within(row('Design')).getByTestId('fill')).toHaveStyle({ background: '#8FD3A0' })
+    expect(within(row('Migration')).getByTestId('fill')).toHaveStyle({ background: '#FF5A5A' })
     expect(screen.getByTestId('today')).toHaveStyle({ background: '#FFD54A' })
-    expect(within(row('Build')).getByText('Build · after Design')).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+    expect(within(row('Build')).getByText('Build · after Design')).toHaveStyle({ backgroundColor: 'rgb(33, 45, 35)' })
   })
 
   it('draws bars square', () => {
@@ -88,9 +88,9 @@ describe('TimelineChart', () => {
     expect(screen.getByText('Today is before the start')).toBeInTheDocument()
   })
 
-  it('paints names and words over the Today line, on a white backing, so the line never strikes through text', () => {
+  it("paints names and words over the Today line, on the card colour, so the line never strikes through text", () => {
     draw()
-    const onTop = { position: 'relative', zIndex: '1', backgroundColor: '#FFFFFF', width: 'fit-content' }
+    const onTop = { position: 'relative', zIndex: '1', backgroundColor: '#FAFBF5', width: 'fit-content' }
     expect(within(row('Build')).getByText('Build · after Design')).toHaveStyle(onTop)
     expect(within(row('Migration')).getByText('Outside project dates')).toHaveStyle(onTop)
     expect(within(row('Build')).getByText('In progress 0%').parentElement).toHaveStyle(onTop)

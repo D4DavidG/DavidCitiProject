@@ -51,11 +51,11 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(calls.at(-1).query.status).toBe('ON_HOLD'))
   })
 
-  it('makes the project name a secondary button that opens it, left aligned, reachable by keyboard', async () => {
+  it('makes the project name a filled button that opens it, left aligned, reachable by keyboard', async () => {
     renderList()
     const link = await screen.findByRole('link', { name: 'Apollo' })
     expect(link).toHaveAttribute('href', '/projects/1')
-    expect(link).toHaveClass('MuiButton-outlined') // spec 5c: a project's name in a list is a secondary button
+    expect(link).toHaveClass('MuiButton-contained') // spec 6.2: every button is filled, a project's name too
     expect(link).toHaveStyle({ justifyContent: 'flex-start' })
     expect(link).not.toHaveAttribute('tabindex', '-1')
     link.focus()
@@ -169,15 +169,17 @@ describe('ProjectsPage', () => {
       await waitFor(() => expect(calls.filter((c) => c.method === 'GET' && c.path === '/projects').length).toBe(2)) // list reloaded
     })
 
-    it('draws Archive as the danger kind and Request archive as the secondary kind, never a bare word', async () => {
+    it('draws Archive filled red and Request archive filled green (spec 6.2), never a bare word', async () => {
       renderList(USERS.admin, both)
       const archive = await screen.findByRole('button', { name: 'Archive Apollo' })
-      expect(archive).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+      expect(archive).toHaveClass('MuiButton-contained', 'MuiButton-colorError')
+      document.querySelectorAll('.MuiButton-root').forEach((b) => expect(b.className, b.textContent).not.toMatch(/MuiButton-(outlined|text)\b/))
       cleanup()
       renderList(USERS.manager, both)
       const request = await screen.findByRole('button', { name: 'Request archive for Apollo' })
-      expect(request).toHaveClass('MuiButton-outlined')
+      expect(request).toHaveClass('MuiButton-contained')
       expect(request).not.toHaveClass('MuiButton-colorError')
+      document.querySelectorAll('.MuiButton-root').forEach((b) => expect(b.className, b.textContent).not.toMatch(/MuiButton-(outlined|text)\b/))
     })
 
     it('says "Request sent" right next to the button that was pressed, not in a page-wide alert', async () => {

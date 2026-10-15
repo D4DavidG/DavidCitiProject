@@ -66,12 +66,13 @@ describe('AuditLogPage', () => {
     expect(screen.getByRole('textbox', { name: 'Search the audit log' })).toHaveAttribute('placeholder', 'Person, record type, action or summary')
   })
 
-  it('draws Clear and Show changes as buttons of the secondary kind, and Apply as the one primary', async () => {
+  it('draws Apply, Clear and Show changes as filled buttons, like every button (spec 6.2)', async () => {
     renderLog()
     const table = await screen.findByRole('table', { name: /audit log/i })
-    expect(screen.getByRole('button', { name: 'Clear' })).toHaveClass('MuiButton-outlined')
-    expect(within(table).getAllByRole('button', { name: /show changes/i })[0]).toHaveClass('MuiButton-outlined')
+    expect(screen.getByRole('button', { name: 'Clear' })).toHaveClass('MuiButton-contained')
+    expect(within(table).getAllByRole('button', { name: /show changes/i })[0]).toHaveClass('MuiButton-contained')
     expect(screen.getByRole('button', { name: 'Apply' })).toHaveClass('MuiButton-contained')
+    document.querySelectorAll('.MuiButton-root').forEach((b) => expect(b.className, b.textContent).not.toMatch(/MuiButton-(outlined|text)\b/))
   })
 
   it('keeps the search when filters are applied, and the filters when searching', async () => {

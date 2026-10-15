@@ -31,7 +31,7 @@ describe('BudgetBar', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
   })
 
-  it.each([['light', 'rgb(238, 238, 238)'], ['dark', 'rgb(28, 34, 28)']])(
+  it.each([['light', 'rgb(238, 238, 238)'], ['dark', 'rgb(42, 55, 44)']])(
     'draws the bar on the quiet track of the mode (%s), not a fixed light grey',
     (mode, track) => {
       render(<ThemeProvider theme={makeTheme(mode)}><BudgetBar {...apollo} consumedPercent={42} /></ThemeProvider>)

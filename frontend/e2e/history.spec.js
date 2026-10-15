@@ -17,7 +17,7 @@ test.skip(!MANAGER || !EMPLOYEE, 'Set E2E_MANAGER_USERNAME and E2E_EMPLOYEE_USER
 async function signIn(page, username) {
   await page.goto('/')
   await page.getByLabel('Username').fill(username)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible() // the app bar: signed in
 }
@@ -27,8 +27,10 @@ test("a manager reads a report's history, without the before/after state", async
   await page.goto('/#/people')
   await page.getByLabel('Search people').fill('ana.ruiz')
   // The search runs as you type (after a 300 ms pause): wait until the list is down to Ana.
-  await expect(page.getByRole('button', { name: /^History for / })).toHaveCount(1)
-  await page.getByRole('button', { name: 'History for Ana Ruiz' }).click()
+  // Each row's actions sit in one "Actions for <name>" menu (15 Oct); History is one of its items.
+  await expect(page.getByRole('button', { name: /^Actions for / })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Actions for Ana Ruiz' }).click()
+  await page.getByRole('menuitem', { name: 'History' }).click()
   const dialog = page.getByRole('dialog', { name: 'History: Ana Ruiz' })
   await expect(dialog.getByRole('table', { name: 'History' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Show changes' })).toHaveCount(0)

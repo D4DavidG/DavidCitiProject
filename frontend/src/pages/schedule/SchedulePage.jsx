@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import {
-  Box, Button, FormControlLabel, Pagination, Switch, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  Box, Button, FormControlLabel, MenuItem, Switch, TextField, Tooltip, Typography,
 } from '@mui/material'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
@@ -10,7 +10,8 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import { visuallyHidden } from '@mui/utils'
 import { ChartFigure, ChartLegend } from '../../components/charts/ChartParts'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
+import ProjectPicker from '../../components/ProjectPicker'
 import { addDays, formatDay, formatPerWeek } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -102,7 +103,9 @@ BookingBar.propTypes = {
 
 /**
  * One person's row: their name, a lane per project with its bars, and a last line with the words
- * for any week booked past their capacity (that week also gets a red outline).
+ * for any week booked past their capacity (that week also gets a red outline). Over capacity is
+ * always their whole week (bookedHours); with projects chosen the bars show only those, so when
+ * some hours are elsewhere the words also give the chosen projects' share (shownHours).
  */
 function PersonRow({ person, weeks, colours }) {
   const c = useChartColours()
@@ -148,13 +151,17 @@ function PersonRow({ person, weeks, colours }) {
         </Typography>
       )}
       {person.weeks.map((w, i) => w.overAllocated && (
+        // shownHours is below bookedHours only when projects are chosen and some hours are on others.
         <Typography
           key={w.week}
           data-testid="over-words"
           variant="caption"
           sx={{ gridColumn: i + 2, gridRow: laneCount + 1, px: 0.75, pb: 0.5, color: 'error.main', display: 'flex', alignItems: 'center', gap: 0.5 }}
         >
-          <Box component="span" sx={visuallyHidden}>{`Week of ${formatDay(w.week)}: ${w.bookedHours} of ${person.capacityHours} hours booked, `}</Box>
+          <Box component="span" sx={visuallyHidden}>
+            {`Week of ${formatDay(w.week)}: ${w.bookedHours} of ${person.capacityHours} hours booked`}
+            {w.shownHours < w.bookedHours ? ` in all, ${w.shownHours} on the chosen projects, ` : ', '}
+          </Box>
           <WarningAmberRoundedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
           <span>{`+${w.overByHours} h over`}</span>
         </Typography>
@@ -170,6 +177,8 @@ PersonRow.propTypes = {
     weeks: PropTypes.arrayOf(PropTypes.shape({
       week: PropTypes.string.isRequired,
       bookedHours: PropTypes.number.isRequired,
+      /** Hours on the chosen projects (every project when none is chosen). */
+      shownHours: PropTypes.number,
       overAllocated: PropTypes.bool.isRequired,
       overByHours: PropTypes.number.isRequired,
       projects: PropTypes.arrayOf(PropTypes.shape({
@@ -181,22 +190,36 @@ PersonRow.propTypes = {
   colours: PropTypes.instanceOf(Map).isRequired,
 }
 
+/** What to say when no one is left to show, given the switch and the project filter. */
+function emptyText(overOnly, filtered) {
+  if (overOnly) return filtered ? 'No one on the chosen projects is over capacity in these weeks.' : 'No one is over capacity in these weeks.'
+  return filtered ? 'No one is booked on the chosen projects in these weeks.' : 'No employees to show.'
+}
+
 /**
  * Questions 3 and 5 as a Float-style schedule: one row per person, weeks across, a bar per
  * booking in its project's colour, and a red outline plus words on any week past capacity.
- * It reads the same GET /dashboard/allocation as the Allocation grid; nothing new on the server.
+ * It reads the same GET /dashboard/allocation as the Allocation grid. With projects chosen in
+ * the picker it sends their ids (projectIds=1,2): the server lists only those bookings (the
+ * bars) and leaves out anyone with none of them, but still counts over capacity from every
+ * booking (b676892), so choosing projects never hides that someone is over. The summary says so.
  */
 export default function SchedulePage() {
   const [weekFrom, setWeekFrom] = useState('')
   const [span, setSpan] = useState(SPANS[0])
   const [overOnly, setOverOnly] = useState(false)
+  const [chosen, setChosen] = useState([])
   const [pageNumber, setPageNumber] = useState(1)
   const [known, setKnown] = useState(() => new Map())
   const c = useChartColours()
+  const projectIds = chosen.map((p) => p.projectId).join(',')
+  const filtered = projectIds !== ''
 
   const load = useCallback(() => request('GET', '/dashboard/allocation', {
-    query: { weekFrom, weeks: span, overOnly: overOnly ? 'true' : undefined, page: pageNumber, pageSize: PAGE_SIZE },
-  }), [weekFrom, span, overOnly, pageNumber])
+    query: {
+      weekFrom, weeks: span, overOnly: overOnly ? 'true' : undefined, projectIds: projectIds || undefined, page: pageNumber, pageSize: PAGE_SIZE,
+    },
+  }), [weekFrom, span, overOnly, projectIds, pageNumber])
   const { data, error, loading, reload } = useApi(load)
   const weeks = data?.weeks ?? []
   const people = data?.items ?? []
@@ -208,7 +231,7 @@ export default function SchedulePage() {
   if (slots !== known) setKnown(slots)
   const colours = slotColours(slots, c)
 
-  /** Any change to the weeks or the filter starts again at page 1: who is worst depends on the weeks shown. */
+  /** Any change to the weeks or the filters starts again at page 1: who is worst depends on what is shown. */
   function show(change) {
     change()
     setPageNumber(1)
@@ -224,9 +247,11 @@ export default function SchedulePage() {
     ...(otherCount ? [{ label: `Other (${otherCount})`, colour: c.other, kind: 'swatch' }] : []),
     ...(overCount ? [{ label: 'Over capacity', colour: c.over, kind: 'problem' }] : []),
   ]
+  // The bars may show only the chosen projects, but over capacity counts the person's whole week.
+  const counting = filtered ? ', counting all their projects, not only the chosen ones' : ''
   const summary = overCount
-    ? `${overCount} of ${people.length} people shown are booked past capacity in at least one of these weeks.`
-    : 'No one shown is booked past capacity in these weeks.'
+    ? `${overCount} of ${people.length} people shown are booked past capacity in at least one of these weeks${counting}.`
+    : `No one shown is booked past capacity in these weeks${counting}.`
 
   return (
     <>
@@ -236,24 +261,28 @@ export default function SchedulePage() {
       />
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-        {/* Earlier and Later move one week; secondary buttons with words, as on the home timeline (spec 5c). */}
+        <ProjectPicker value={chosen} onChange={(next) => show(() => setChosen(next))} />
+        {/* Earlier and Later move one week; filled buttons with words (spec 6.2). */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-          <Button size="small" startIcon={<PrevIcon />} onClick={() => show(() => setWeekFrom(addDays(start, -7)))} disabled={!start}>Earlier</Button>
+          <Button size="small" variant="contained" startIcon={<PrevIcon />} onClick={() => show(() => setWeekFrom(addDays(start, -7)))} disabled={!start}>Earlier</Button>
           <Typography sx={{ minWidth: 150, textAlign: 'center' }}>
             {weeks.length ? `${formatDay(weeks[0])} – ${formatDay(addDays(weeks.at(-1), 6))}` : '…'}
           </Typography>
-          <Button size="small" endIcon={<NextIcon />} onClick={() => show(() => setWeekFrom(addDays(start, 7)))} disabled={!start}>Later</Button>
-          <Button size="small" onClick={() => show(() => setWeekFrom(''))} disabled={!weekFrom}>This week</Button>
+          <Button size="small" variant="contained" endIcon={<NextIcon />} onClick={() => show(() => setWeekFrom(addDays(start, 7)))} disabled={!start}>Later</Button>
+          <Button size="small" variant="contained" onClick={() => show(() => setWeekFrom(''))} disabled={!weekFrom}>This week</Button>
         </Box>
-        <ToggleButtonGroup
+        {/* A field like the other filters, not a toggle group: spec 6.2 allows no outline-only buttons. */}
+        <TextField
+          id="schedule-weeks"
+          select
+          label="Weeks shown"
           size="small"
-          exclusive
           value={span}
-          onChange={(_, value) => value && show(() => setSpan(value))}
-          aria-label="Weeks shown"
+          onChange={(e) => show(() => setSpan(Number(e.target.value)))}
+          sx={{ minWidth: 140 }}
         >
-          {SPANS.map((n) => <ToggleButton key={n} value={n} sx={{ textTransform: 'none' }}>{`${n} wk`}</ToggleButton>)}
-        </ToggleButtonGroup>
+          {SPANS.map((n) => <MenuItem key={n} value={n}>{`${n} weeks`}</MenuItem>)}
+        </TextField>
         <FormControlLabel
           control={<Switch checked={overOnly} onChange={(e) => show(() => setOverOnly(e.target.checked))} />}
           label="Over capacity only"
@@ -264,7 +293,7 @@ export default function SchedulePage() {
         loading={loading}
         error={error}
         onRetry={reload}
-        empty={data && people.length === 0 ? (overOnly ? 'No one is over capacity in these weeks.' : 'No employees to show.') : null}
+        empty={data && people.length === 0 ? emptyText(overOnly, filtered) : null}
       >
         <ChartFigure
           title="Bookings, week by week"
@@ -284,11 +313,7 @@ export default function SchedulePage() {
         >
           {people.map((person) => <PersonRow key={person.userId} person={person} weeks={weeks} colours={colours} />)}
         </ChartFigure>
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>
   )

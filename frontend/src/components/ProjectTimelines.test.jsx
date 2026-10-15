@@ -58,12 +58,12 @@ describe('ProjectTimelines', () => {
     expect(calls[0]).toMatchObject({ path: '/dashboard/timeline', query: { page: '1', pageSize: '10' } })
   })
 
-  it('has a heading and one row per project, its name a secondary button that opens the project', async () => {
+  it('has a heading and one row per project, its name a filled button that opens the project', async () => {
     renderTimelines()
     const section = await screen.findByRole('region', { name: 'My projects this week' })
     const apollo = within(section).getByRole('link', { name: 'Apollo' })
     expect(apollo).toHaveAttribute('href', '/projects/1')
-    expect(apollo).toHaveClass('MuiButton-outlined')
+    expect(apollo).toHaveClass('MuiButton-contained')
     expect(within(section).getByRole('link', { name: 'Zeus' })).toHaveAttribute('href', '/projects/2')
   })
 
@@ -204,11 +204,21 @@ describe('ProjectTimelines', () => {
     expect(calls).toHaveLength(1)
   })
 
-  it('gives Earlier, Later and This week the outlined look of every secondary button', async () => {
+  it('gives Earlier, Later and This week the filled look of every button (spec 6.2)', async () => {
     renderTimelines()
     await projectBar('Apollo')
     const names = ['Earlier', 'Later', 'This week']
-    names.forEach((name) => expect(screen.getByRole('button', { name })).toHaveClass('MuiButton-outlined'))
+    names.forEach((name) => expect(screen.getByRole('button', { name })).toHaveClass('MuiButton-contained'))
+  })
+
+  it('keeps one short line under the title; the keyboard hint is spoken with the weeks, not printed', async () => {
+    renderTimelines()
+    await projectBar('Apollo')
+    const section = screen.getByRole('region', { name: 'My projects this week' })
+    expect(within(section).getByText('Hover or tap a mark for details.')).toBeVisible()
+    expect(within(section).queryByText(/One row per project/)).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Weeks, scrolls sideways' }))
+      .toHaveAccessibleDescription('With a keyboard, Tab to a row and move along it with the arrow keys.')
   })
 
   it('never disables This week, so focus stays on it; at this week it does nothing', async () => {

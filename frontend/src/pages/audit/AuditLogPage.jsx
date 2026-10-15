@@ -60,7 +60,7 @@ export default function AuditLogPage() {
         <TextField id="audit-to" size="small" type="date" label="To" value={draft.dateTo} onChange={set('dateTo')} slotProps={{ inputLabel: { shrink: true } }} />
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button type="submit" variant="contained">Apply</Button>
-          <Button variant="outlined" onClick={() => { setDraft(EMPTY_FILTERS); setFilters(EMPTY_FILTERS); setPageNumber(1) }}>Clear</Button>
+          <Button variant="contained" onClick={() => { setDraft(EMPTY_FILTERS); setFilters(EMPTY_FILTERS); setPageNumber(1) }}>Clear</Button>
         </Box>
       </Box>
 
@@ -90,7 +90,7 @@ export default function AuditLogPage() {
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{ENTITY_LABELS[entry.entityType] ?? entry.entityType} #{entry.entityId}</TableCell>
                     <TableCell>{entry.summary}</TableCell>
                     <TableCell align="right">
-                      <Button size="small" variant="outlined" onClick={() => setOpen(open === entry.auditId ? null : entry.auditId)}>
+                      <Button size="small" variant="contained" onClick={() => setOpen(open === entry.auditId ? null : entry.auditId)}>
                         {open === entry.auditId ? 'Hide changes' : 'Show changes'}
                       </Button>
                     </TableCell>

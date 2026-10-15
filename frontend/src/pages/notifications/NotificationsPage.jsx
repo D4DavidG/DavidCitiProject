@@ -61,7 +61,7 @@ export default function NotificationsPage() {
             {/* The server marks every notification, not just the ones a search shows, so it waits until the search is cleared. */}
             <Tooltip title={q ? 'Clear the search to mark every notification as read.' : ''}>
               <Box component="span">
-                <Button variant="outlined" disabled={nothingUnread || Boolean(q)} onClick={() => write('/notifications/read-all', 'all')}>Mark all as read</Button>
+                <Button variant="contained" disabled={nothingUnread || Boolean(q)} onClick={() => write('/notifications/read-all', 'all')}>Mark all as read</Button>
               </Box>
             </Tooltip>
             {refusal?.id === 'all' && <FormHelperText error role="alert">{refusal.text}</FormHelperText>}
@@ -91,8 +91,9 @@ export default function NotificationsPage() {
                   <Typography variant="caption" color="text.secondary">{formatDateTime(n.createdAt)}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  {!n.isRead && <Chip size="small" color="primary" label="New" />}
-                  {!n.isRead && <Button size="small" variant="outlined" onClick={() => write(`/notifications/${n.notificationId}/read`, n.notificationId)}>Mark as read</Button>}
+                  {/* Filled red with white words (spec 6.4), so a new one stands out from the green around it. */}
+                  {!n.isRead && <Chip size="small" color="error" variant="filled" label="New" />}
+                  {!n.isRead && <Button size="small" variant="contained" onClick={() => write(`/notifications/${n.notificationId}/read`, n.notificationId)}>Mark as read</Button>}
                 </Box>
                 {refusal?.id === n.notificationId && <FormHelperText error role="alert" sx={{ flexBasis: '100%', m: 0 }}>{refusal.text}</FormHelperText>}
               </CardContent>

@@ -150,7 +150,7 @@ export default function RequestsPage() {
           onSubmit={(body) => decide('approve', body)} onClose={close} />
       )}
       {dialog?.action === 'reject' && (
-        <FormDialog open title={`Reject ${r.name}`} submitLabel="Reject"
+        <FormDialog open danger title={`Reject ${r.name}`} submitLabel="Reject"
           fields={[{ name: 'decisionNote', label: `Note to ${r.requesterName}`, type: 'textarea' }]}
           onSubmit={(body) => decide('reject', body)} onClose={close} />
       )}

@@ -29,7 +29,7 @@ test.beforeAll(async ({ request }) => {
 async function signIn(page) {
   await page.goto('/')
   await page.getByLabel('Username').fill(maria)
-  await page.getByLabel('Password').fill(DEMO_PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(DEMO_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 }

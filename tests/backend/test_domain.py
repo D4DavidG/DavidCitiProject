@@ -61,6 +61,33 @@ def test_search_longer_than_100_characters_is_refused_naming_q():
     assert refused.value.field == "q"
 
 
+def test_id_list_reads_comma_separated_whole_numbers():
+    assert values.id_list({"project_ids": "3,7,12"}, "project_ids") == [3, 7, 12]
+    assert values.id_list({"project_ids": " 5 "}, "project_ids") == [5]
+    assert values.id_list({"project_ids": "4,4,2"}, "project_ids") == [4, 2]  # repeats dropped, order kept
+
+
+def test_id_list_blank_or_absent_is_no_list():
+    assert values.id_list({}, "project_ids", required=False) is None
+    assert values.id_list({"project_ids": "  "}, "project_ids", required=False) is None
+    for missing in ({}, {"project_ids": " "}):
+        with pytest.raises(ValidationError, match="required"):
+            values.id_list(missing, "project_ids")
+
+
+@pytest.mark.parametrize("raw", ["abc", "1,,2", "1,", ",1", "-3", "1.5", "1;2", "1, 2", "٣", "1" * 19, 7, [1, 2]])
+def test_id_list_refuses_anything_but_whole_numbers_and_commas(raw):
+    with pytest.raises(ValidationError) as refused:
+        values.id_list({"project_ids": raw}, "project_ids")
+    assert refused.value.field == "project_ids"
+
+
+def test_id_list_takes_at_most_100_ids():
+    assert len(values.id_list({"ids": ",".join(map(str, range(1, 101)))}, "ids")) == 100
+    with pytest.raises(ValidationError, match="100"):
+        values.id_list({"ids": ",".join(map(str, range(1, 102)))}, "ids")
+
+
 def test_date_parses_iso_format():
     assert values.date({"start_date": "2026-10-13"}, "start_date") == dt.date(2026, 10, 13)
 

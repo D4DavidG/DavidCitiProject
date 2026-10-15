@@ -167,9 +167,10 @@ def test_filters_are_documented():
 
     assert {"search", "status", "includeArchived"} <= set(query("GET", "/projects"))
     assert "unread" in query("GET", "/notifications")
-    assert {"overOnly", "weekFrom", "weeks"} <= set(query("GET", "/dashboard/allocation"))
+    assert {"overOnly", "weekFrom", "weeks", "projectIds"} <= set(query("GET", "/dashboard/allocation"))
+    assert query("GET", "/dashboard/allocation")["projectIds"]["pattern"] == "^[0-9]+(,[0-9]+)*$"
     for path in ("/me/tasks", "/me/ready-tasks", "/approvals/time-entries", "/project-requests", "/notifications",
-                 "/admin/audit-log", "/users", "/projects", "/dashboard/projects"):
+                 "/admin/audit-log", "/users", "/projects", "/dashboard/projects", "/dashboard/allocation"):
         assert query("GET", path)["q"] == {"type": "string"}, path  # the search box on every list
     assert query("GET", "/project-requests")["scope"] == {"type": "string", "enum": ["sent", "decide"]}
     # A query key api/http.py parses as a number or as true/false is documented with that type.

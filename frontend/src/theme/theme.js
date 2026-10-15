@@ -1,69 +1,87 @@
 import { alpha, createTheme } from '@mui/material/styles'
 
 /*
- * One design language (redesign spec 1 and 5c): David's site d4davidg.github.io and SimpleBank.
- * Forest green with gold highlights, square corners, a faint graph-paper page, solid glowing panels.
- * Gold only highlights (the logo's shine, the Today line), never a status and never text on light.
+ * The look (redesign spec section 6, David's tweaks of 15 Oct): welcoming rather than military.
+ * One forest green for everything green, a warm matcha page, square boxes, filled rounded buttons,
+ * soft drop shadows and no glows (the logo's peak is the one exception, in AcmeLogo).
+ * Gold only highlights (the logo, the Today line), never a status and never text on light.
  * Every ratio is WCAG contrast against the surface the colour is drawn on; text needs 4.5:1,
  * UI parts 3:1. theme.test.jsx recomputes each one and fails below the line.
  */
 const TOKENS = {
   light: {
-    page: '#E4E9E4', // his site's page grey-green
-    gridLine: '#E0E5E0', // his rgba(0,0,0,.075) line at layer opacity .22, flattened on the page: 1.04:1
+    page: '#E8ECDC', // a warm matcha toward white
+    gridLine: '#DEE3CF', // the faint graph-paper line: 1.06:1 on the page
     gridSize: 46,
-    paper: '#FFFFFF', // panels: solid white
-    divider: 'rgba(0, 0, 0, 0.14)', // his hairline
-    text: '#161A16', // 14.3:1 on the page
-    textSecondary: '#2C332E', // supporting lines; 10.5:1 on the page
-    textMuted: '#4C5450', // the least important text only; 6.1:1 on a grid line
-    fieldLine: '#767D78', // a field's resting border: 4.2:1 on a panel, 3.4:1 on the page, 3.3:1 on a grid line
-    ink: '#14602C', // green as text (links, outlined buttons, focus ring); 6.0:1 on a grid line, white on it 7.7:1
-    onInk: '#FFFFFF',
-    fill: '#1F7A3A', // the ONE green fill: top bar, primary buttons, selected menu item; white on it 5.4:1
-    onFill: '#FFFFFF',
-    fillHover: '#14602C', // white on it 7.7:1
-    glow: '#1F7A3A', // panels' and buttons' faint glow
-    gold: '#8A6100', // highlight lines (Today); 5.5:1 on white, 4.5:1 on the page; white on it 5.5:1
-    goldBright: '#FFD54A', // the logo's shine, edged in the deep gold on light
+    paper: '#FAFBF5', // cards: a warm white
+    divider: 'rgba(22, 26, 22, 0.14)',
+    cardBorder: 'rgba(22, 26, 22, 0.12)',
+    cardShadow: '0 1px 2px rgba(22, 26, 22, 0.08), 0 2px 8px rgba(22, 26, 22, 0.06)',
+    text: '#161A16', // 13.4:1 on a grid line
+    textSecondary: '#2C332E', // 9.9:1 on a grid line
+    textMuted: '#4C5450', // 5.9:1 on a grid line
+    fieldLine: '#767D78', // a field's resting border: 3.2:1 on a grid line, 4.1:1 on a card
+    green: '#165E26', // THE green: top bar, buttons, links, selected menu item; 6.0:1 on a grid line; white on it 7.9:1
+    greenText: '#165E26', // green as words: the same green in light mode
+    greenHover: '#0E4A1B', // white on it 10.4:1
+    onGreen: '#FFFFFF',
+    buttonEdge: '#165E26', // a button's edge: 6.6:1 on the page
+    buttonShadow: '0 1px 2px rgba(22, 26, 22, 0.22)',
+    buttonShadowHover: '0 2px 6px rgba(22, 26, 22, 0.24)',
+    gold: '#8A6100', // highlight lines (Today); 4.6:1 on the page; white on it 5.5:1
+    goldBright: '#FFD54A', // the logo's sparkles and the glow on its peak
     onGold: '#FFFFFF',
-    error: '#B3261E', // late, over, refused; 5.1:1 on a grid line; white on it 6.5:1
-    warning: '#9C4A00', // pending, on hold; 4.9:1 on a grid line; white on it 6.2:1
-    success: '#145DB2', // done, approved: blue, so it is never mistaken for the green brand; 5.1:1; white 6.5:1
+    error: '#C21F1F', // a true red for words and marks; 4.6:1 on a grid line
+    overWash: '#F4E5E0', // a red tint behind an over-capacity week (10% of the red on a card): red words 4.9:1
+    danger: '#C21F1F', // danger buttons and the New label: white on it 6.0:1
+    dangerHover: '#9A1818', // white on it 8.3:1
+    warning: '#9C4A00', // pending, on hold; 4.7:1 on a grid line; white on it 6.2:1
+    success: '#145DB2', // done, approved: blue, so it is never mistaken for the green; 4.9:1; white 6.5:1
     onStatus: '#FFFFFF',
-    header: '#1F7A3A', // the top bar: the fill green, white words 5.4:1
-    onHeader: '#FFFFFF',
+    disabledFill: '#D9DDD0', // a neutral, not a faded green (SimpleBank lesson)
+    disabledText: '#4C5450', // 5.7:1 on the disabled fill
   },
   dark: {
-    page: '#0F1D15', // dark green page
-    gridLine: '#1A2720', // his rgba(255,255,255,.045) line, flattened on the page: 1.12:1
+    page: '#18221A', // a warm dark green, not mint
+    gridLine: '#1F2A21', // 1.10:1 on the page
     gridSize: 46,
-    paper: '#0B0E0B', // his near-black panels
-    divider: 'rgba(255, 255, 255, 0.14)',
-    text: '#D7D7D7', // 13.5:1 on a panel, 10.8:1 on a grid line
-    textSecondary: '#C3C8C3', // 11.4:1 on a panel, 9.1:1 on a grid line
-    textMuted: '#A9B0AA', // 8.8:1 on a panel, 7.0:1 on a grid line
-    fieldLine: '#6F7973', // 4.3:1 on a panel, 3.9:1 on the page, 3.4:1 on a grid line
-    ink: '#7CC78F', // pale green links and outlined buttons; 9.6:1 on a panel; 16 apart from the grey
-    onInk: '#0B0E0B',
-    fill: '#FFFFFF', // primary buttons and the selected menu item: white, green words 7.7:1
-    onFill: '#14602C',
-    fillHover: '#E6E6E6', // green words 6.1:1
-    glow: '#D7D7D7', // the neutral grey accent
-    gold: '#FFD54A', // 13.7:1 on a panel; dark text on it 12.5:1
+    paper: '#212D23', // cards
+    divider: 'rgba(255, 255, 255, 0.12)',
+    cardBorder: 'rgba(255, 255, 255, 0.10)',
+    cardShadow: '0 1px 3px rgba(0, 0, 0, 0.45)',
+    text: '#ECEEE6', // a warm off-white; 12.3:1 on a card
+    textSecondary: '#CDD3C7', // 9.4:1 on a card
+    textMuted: '#AFB6A9', // 6.9:1 on a card
+    fieldLine: '#7C877E', // 3.8:1 on a card, 4.0:1 on a grid line
+    green: '#165E26', // the same green fills the top bar, buttons and the selected menu item; white on it 7.9:1
+    greenText: '#8FD3A0', // green as words needs to be lighter on a dark card: 8.2:1
+    greenHover: '#1E7A34', // white on it 5.4:1
+    onGreen: '#FFFFFF',
+    buttonEdge: '#FFFFFF', // dark-mode buttons wear a thin white outline: 14.3:1 on a card
+    buttonShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+    buttonShadowHover: '0 2px 6px rgba(0, 0, 0, 0.55)',
+    gold: '#FFD54A', // 10.2:1 on a card; dark words on it 12.5:1
     goldBright: '#FFD54A',
     onGold: '#161A16',
-    error: '#F28B82', // 8.1:1 on a panel, 6.5:1 on a grid line; dark text on it 8.1:1
-    warning: '#FF9E57', // 9.5:1 on a panel; dark text on it 9.5:1
-    success: '#8AB4F8', // 9.2:1 on a panel; dark text on it 9.2:1; 18 apart from the green ink
-    onStatus: '#0B0E0B',
-    header: '#D7D7D7', // the top bar: light grey, green words 5.3:1
-    onHeader: '#14602C',
+    error: '#FF5A5A', // a true red that reads on a dark card: 4.7:1
+    // A darker red tint behind an over-capacity week: red words 5.3:1. Not a see-through wash of the red,
+    // which lightens the card and dropped the red words to 4.2:1 (axe, 15 Oct).
+    overWash: '#2B1D1D',
+    danger: '#C62828', // danger buttons and the New label: white on it 5.6:1
+    dangerHover: '#A61F1F', // white on it 7.4:1
+    warning: '#FFA05C', // 7.1:1 on a card; dark words on it
+    success: '#8AB4F8', // 6.8:1 on a card; dark words on it
+    onStatus: '#161A16',
+    disabledFill: '#3A463C',
+    disabledText: '#CDD3C7', // 6.5:1 on the disabled fill
   },
 }
 
-/** The faint graph-paper grid behind the page (panels cover it): one line across and one down. */
+/** The faint graph-paper grid behind the page (cards cover it): one line across and one down. */
 const graphPaper = (line) => `linear-gradient(${line} 1px, transparent 1px), linear-gradient(90deg, ${line} 1px, transparent 1px)`
+
+/** Titles: a softer, thicker face than the body text, in normal case. */
+const HEADINGS = '"Poppins", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
 
 /**
  * The MUI theme for one colour mode.
@@ -72,14 +90,15 @@ const graphPaper = (line) => `linear-gradient(${line} 1px, transparent 1px), lin
 export function makeTheme(mode) {
   const t = TOKENS[mode]
   const status = (main) => ({ main, contrastText: t.onStatus })
-  const glow = (strength, blur = 12) => `0 0 ${blur}px ${alpha(t.glow, strength)}`
-  const calm = { '@media (prefers-reduced-motion: reduce)': { transition: 'none' } }
+  const calm = { '@media (prefers-reduced-motion: reduce)': { transition: 'none', transform: 'none' } }
+  const heading = (fontSize, fontWeight) => ({ fontFamily: HEADINGS, fontSize, fontWeight, lineHeight: 1.3 })
   return createTheme({
     palette: {
       mode,
-      primary: { main: t.ink, contrastText: t.onInk },
+      primary: { main: t.greenText, contrastText: mode === 'light' ? t.onGreen : t.onStatus },
       secondary: { main: t.gold, light: t.goldBright, contrastText: t.onGold },
       error: status(t.error),
+      overWash: t.overWash,
       warning: status(t.warning),
       success: status(t.success),
       background: { default: t.page, paper: t.paper },
@@ -87,18 +106,27 @@ export function makeTheme(mode) {
       divider: t.divider,
       gridLine: t.gridLine,
       fieldLine: t.fieldLine,
-      fill: { main: t.fill, contrastText: t.onFill, hover: t.fillHover },
-      header: { main: t.header, contrastText: t.onHeader },
+      fill: { main: t.green, contrastText: t.onGreen, hover: t.greenHover },
+      danger: { main: t.danger, contrastText: '#FFFFFF', hover: t.dangerHover },
+      header: { main: t.green, contrastText: t.onGreen },
+      buttonEdge: t.buttonEdge,
     },
     shape: { borderRadius: 0 },
     typography: {
       fontFamily: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      // Body text a little heavier than usual: easier to read.
+      fontWeightRegular: 500,
+      fontWeightMedium: 600,
+      fontWeightBold: 700,
       body1: { lineHeight: 1.6 },
       body2: { lineHeight: 1.6 },
-      // Titles in capitals with a little tracking; h1 and h2 carry a faint glow of the accent.
-      h1: { fontSize: '1.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.012em', textShadow: glow(0.25, 10) },
-      h2: { fontSize: '1.375rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.012em', textShadow: glow(0.25, 10) },
-      h3: { fontSize: '1.125rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.012em' },
+      h1: heading('1.75rem', 700),
+      h2: heading('1.3rem', 600),
+      h3: heading('1.1rem', 600),
+      h4: heading('1rem', 600),
+      h5: heading('1rem', 600),
+      h6: heading('1rem', 600),
+      button: { textTransform: 'none', fontWeight: 600 },
     },
     components: {
       MuiCssBaseline: {
@@ -108,64 +136,66 @@ export function makeTheme(mode) {
             backgroundImage: graphPaper(t.gridLine),
             backgroundSize: `${t.gridSize}px ${t.gridSize}px`,
           },
-          // The keyboard focus ring on every control: 2 px green ink, just outside it. Besides buttons and
+          // The keyboard focus ring on every control: 2 px green, just outside it. Besides buttons and
           // links, anything made a Tab stop on purpose (a chart row, a box that scrolls sideways), but not
           // the inside of a select field, which has its own focused border. :where() keeps that part weightless,
           // so a component can still refine its own ring.
           '.MuiButtonBase-root.Mui-focusVisible, a:focus-visible, :where([tabindex="0"]:not(.MuiInputBase-input)):focus-visible': {
-            outline: `2px solid ${t.ink}`,
+            outline: `2px solid ${t.greenText}`,
             outlineOffset: 2,
           },
         },
       },
       MuiCard: {
         defaultProps: { variant: 'outlined' },
+        // A box: square corners, a thin border and a soft drop shadow. A card inside a card stays flat.
         styleOverrides: {
-          // A panel: an accent hairline and a soft glow that brightens slowly on hover or focus.
-          // A card inside a card stays quiet: border only.
           root: {
             borderRadius: 0,
-            borderColor: alpha(t.glow, 0.34),
-            boxShadow: glow(0.12),
-            transition: 'box-shadow .9s ease',
-            ...calm,
-            '&:hover, &:focus-within': { boxShadow: glow(0.26, 18) },
-            '& .MuiCard-root, & .MuiCard-root:hover, & .MuiCard-root:focus-within': { boxShadow: 'none' },
+            borderColor: t.cardBorder,
+            boxShadow: t.cardShadow,
+            '& .MuiCard-root': { boxShadow: 'none' },
           },
         },
       },
       MuiButton: {
-        // Three kinds only: primary (contained), secondary (outlined, the default) and danger (outlined, color="error").
-        defaultProps: { variant: 'outlined', disableElevation: true },
+        // One kind of button, filled: green with white words, rounded, a small shadow. color="error" is the
+        // danger kind, filled red. The only exception is color="inherit" with variant="text": a bare word
+        // you can press, used in the top bar.
+        defaultProps: { variant: 'contained', disableElevation: true },
         styleOverrides: {
-          root: { textTransform: 'none', fontWeight: 600, borderRadius: 0, ...calm },
-          contained: ({ ownerState }) => (ownerState.color === 'primary'
-            ? {
-              backgroundColor: t.fill,
-              color: t.onFill,
-              fontWeight: 700,
-              boxShadow: glow(0.3, 6),
-              '&:hover, &.Mui-focusVisible': { backgroundColor: t.fillHover, boxShadow: glow(0.45, 14) },
-              '&:active': { transform: 'scale(.97)' },
+          root: ({ ownerState }) => {
+            if (ownerState.color === 'inherit' && ownerState.variant === 'text') {
+              return {
+                borderRadius: 8,
+                color: 'inherit',
+                '&:hover': { backgroundColor: alpha('#FFFFFF', 0.14), textDecoration: 'underline' },
+              }
             }
-            : null),
-          outlined: ({ ownerState }) => {
-            if (ownerState.color === 'inherit') return { borderColor: 'currentColor' }
-            const line = ownerState.color === 'error' ? t.error : t.ink
+            const danger = ownerState.color === 'error'
+            const fill = danger ? t.danger : t.green
+            const hover = danger ? t.dangerHover : t.greenHover
+            const edge = mode === 'dark' ? t.buttonEdge : fill
             return {
-              borderWidth: 1.5,
-              borderColor: line,
-              backgroundColor: t.paper,
-              '&:hover': { borderColor: line, backgroundColor: t.paper, boxShadow: `0 0 10px ${alpha(line, 0.3)}` },
+              borderRadius: 8,
+              border: `1px solid ${edge}`,
+              backgroundColor: fill,
+              color: t.onGreen,
+              boxShadow: t.buttonShadow,
+              transition: 'background-color .15s ease, box-shadow .15s ease, transform .1s ease',
+              '&:hover': { backgroundColor: hover, borderColor: mode === 'dark' ? edge : hover, boxShadow: t.buttonShadowHover },
+              '&:active': { transform: 'translateY(1px)' },
+              '&.Mui-disabled': { backgroundColor: t.disabledFill, borderColor: t.disabledFill, color: t.disabledText, boxShadow: 'none' },
+              ...calm,
             }
           },
         },
       },
-      // Links only go somewhere: green ink, underlined on hover and on keyboard focus. Weight 600 too, so a
-      // link inside a sentence differs from the words around it by more than colour (WCAG 1.4.1).
+      // Links only go somewhere: green, underlined on hover and on keyboard focus. Bold too, so a
+      // link inside a sentence (weight 500) differs from the words around it by more than colour (WCAG 1.4.1).
       MuiLink: {
         defaultProps: { underline: 'hover' },
-        styleOverrides: { root: { fontWeight: 600, '&:focus-visible': { textDecoration: 'underline' } } },
+        styleOverrides: { root: { fontWeight: 700, '&:focus-visible': { textDecoration: 'underline' } } },
       },
       // Dark mode: MUI lightens a raised panel (dialog, menu, phone drawer) with a white overlay; keep it solid.
       MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
@@ -181,12 +211,18 @@ export function makeTheme(mode) {
           notchedOutline: { borderColor: t.fieldLine },
         },
       },
-      MuiChip: { styleOverrides: { root: { borderRadius: 0 } } },
+      MuiChip: {
+        styleOverrides: {
+          root: { borderRadius: 6, fontWeight: 600 },
+          // A filled red label (New) is the danger red with white words in both modes.
+          filled: ({ ownerState }) => (ownerState.color === 'error' ? { backgroundColor: t.danger, color: '#FFFFFF' } : null),
+        },
+      },
       MuiAlert: { styleOverrides: { root: { borderRadius: 0 } } },
       MuiDialog: { styleOverrides: { paper: { borderRadius: 0 } } },
       MuiMenu: { styleOverrides: { paper: { borderRadius: 0 } } },
-      MuiTooltip: { styleOverrides: { tooltip: { borderRadius: 0 } } },
-      MuiPagination: { defaultProps: { shape: 'rounded' } }, // "rounded" follows shape.borderRadius, which is 0
+      MuiTooltip: { styleOverrides: { tooltip: { borderRadius: 4 } } },
+      MuiPagination: { defaultProps: { shape: 'rounded' } },
       MuiAppBar: { defaultProps: { elevation: 0 } },
       MuiTab: { styleOverrides: { root: { textTransform: 'none', fontWeight: 600 } } },
     },

@@ -135,9 +135,12 @@ DurationField.propTypes = {
  * they didn't touch. Server errors with a `field` show on that field (a duration's
  * under its Hours box); others show as one line just above the buttons. While it saves,
  * every field and button is disabled, Escape can't close it, and a second submit is
- * ignored; all of it comes back on success or error.
+ * ignored; all of it comes back on success or error. `danger` makes the submit button
+ * the filled red kind, for Reject and Archive.
  */
-export default function FormDialog({ open, title, fields, initial = null, defaults = null, submitLabel = 'Save', onSubmit, onClose }) {
+export default function FormDialog({
+  open, title, fields, initial = null, defaults = null, submitLabel = 'Save', danger = false, onSubmit, onClose,
+}) {
   const [values, setValues] = useState(() => Object.fromEntries(
     fields.map((f) => [f.name, toInput(f, initial?.[f.name] ?? defaults?.[f.name])]),
   ))
@@ -264,8 +267,8 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
         {/* An error that belongs to no field: one line next to the buttons just pressed. */}
         {error && <FormHelperText error role="alert" sx={{ mx: 3, mb: 1, fontSize: '0.875rem' }}>{error}</FormHelperText>}
         <DialogActions>
-          <Button variant="outlined" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={busy}>{busy ? 'Saving…' : submitLabel}</Button>
+          <Button variant="contained" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button type="submit" variant="contained" color={danger ? 'error' : 'primary'} disabled={busy}>{busy ? 'Saving…' : submitLabel}</Button>
         </DialogActions>
       </form>
     </Dialog>
@@ -297,6 +300,8 @@ FormDialog.propTypes = {
   /** Pre-filled values for a new record; sent like anything typed. */
   defaults: PropTypes.object,
   submitLabel: PropTypes.string,
+  /** The submit button is the danger kind (filled red): Reject, Archive. */
+  danger: PropTypes.bool,
   /** Receives the body to send; reject with an ApiError to show it. */
   onSubmit: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,

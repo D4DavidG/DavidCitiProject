@@ -19,7 +19,7 @@ async function openRequests(browser, username, size = { width: 1440, height: 900
   const page = await (await browser.newContext({ viewport: size })).newPage()
   await page.goto('/')
   await page.getByLabel('Username').fill(username)
-  await page.getByLabel('Password').fill(DEMO_PASSWORD)
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(DEMO_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await page.goto('/#/requests')

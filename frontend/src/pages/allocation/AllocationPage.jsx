@@ -1,18 +1,23 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Box, Button, Chip, FormControlLabel, IconButton, Paper, Switch, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Tooltip, Typography,
+  Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, FormControlLabel, Paper, Switch, Table,
+  TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
 } from '@mui/material'
-import { alpha } from '@mui/material/styles'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
+import ExpandIcon from '@mui/icons-material/ExpandMoreOutlined'
 import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined'
 import PageHeader from '../../components/PageHeader'
 import PageState, { Pager } from '../../components/PageState'
+import PersonActions from '../../components/PersonActions'
+import SearchField from '../../components/SearchField'
+import { useAuth } from '../../auth/useAuth'
 import { addDays, formatDay, formatHours } from '../../services/format'
+import { mayActOn } from '../../services/personAccess'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useLastPage } from '../../services/useLastPage'
 
 const WEEKS = 6
 const PAGE_SIZE = 25
@@ -33,11 +38,12 @@ function WeekCell({ week, capacity }) {
           tabIndex={0}
           data-over={String(week.overAllocated)}
           aria-label={label}
-          sx={(theme) => ({
+          sx={{
             px: 1, py: 0.75, minWidth: 96, cursor: 'default',
-            bgcolor: week.overAllocated ? alpha(theme.palette.error.main, 0.1) : 'transparent',
+            // The theme's red tint for each mode, chosen so the red words keep 4.5:1 on it.
+            bgcolor: week.overAllocated ? 'overWash' : 'transparent',
             border: 1, borderColor: week.overAllocated ? 'error.main' : 'transparent',
-          })}
+          }}
         >
           <Typography variant="body2" sx={{ fontWeight: 600, color: week.overAllocated ? 'error.main' : week.bookedHours ? 'text.primary' : 'text.secondary' }}>
             {week.bookedHours} / {capacity} h
@@ -72,20 +78,31 @@ WeekCell.propTypes = {
   capacity: PropTypes.number.isRequired,
 }
 
+/** What the grid says when it has nobody to show. */
+function emptyText(q, overOnly) {
+  if (q) return 'Nobody matches that search.'
+  return overOnly ? 'No one is over capacity in these weeks.' : 'No employees to show.'
+}
+
 /**
  * Questions 3 and 5: who is booked on what, week by week, across every project.
  * A person is over-allocated when their bookings in a week add up past their own
  * weekly capacity; the server sorts the worst first and can return only those.
+ * A person's name opens the same Actions menu as their row on People, when you may act on
+ * them (admins: everyone; a manager: their own reports, by the row's managerId).
  */
 export default function AllocationPage() {
+  const { user } = useAuth()
+  const [q, setQ] = useState('')
   const [weekFrom, setWeekFrom] = useState('')
   const [overOnly, setOverOnly] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
 
   const load = useCallback(() => request('GET', '/dashboard/allocation', {
-    query: { weekFrom, weeks: WEEKS, overOnly: overOnly ? 'true' : undefined, page: pageNumber, pageSize: PAGE_SIZE },
-  }), [weekFrom, overOnly, pageNumber])
+    query: { q, weekFrom, weeks: WEEKS, overOnly: overOnly ? 'true' : undefined, page: pageNumber, pageSize: PAGE_SIZE },
+  }), [q, weekFrom, overOnly, pageNumber])
   const { data, error, loading, reload } = useApi(load)
+  useLastPage(data, pageNumber, setPageNumber)
   const weeks = data?.weeks ?? []
   const people = data?.items ?? []
   const start = weekFrom || weeks[0]
@@ -101,28 +118,38 @@ export default function AllocationPage() {
         subtitle="Hours booked per person per week, across every project. Hover or tap a week to see which projects the hours come from."
       />
 
-      <Paper component="section" variant="outlined" aria-labelledby="allocation-help" sx={{ p: 2, mb: 3 }}>
-        <Typography id="allocation-help" component="h2" variant="h3">How to read this</Typography>
-        <Typography variant="body2" sx={{ mt: 0.5 }}>
-          Each row is a person and each column is a week. A cell shows the hours booked against that person&apos;s weekly
-          capacity, for example 32 / 40 h. Red with a warning icon means they are over capacity. Use it to spot
-          overbooking before it happens.
-        </Typography>
-        <Box role="group" aria-label="Legend" sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mt: 1.5 }}>
-          <Typography variant="caption" color="text.secondary">Legend</Typography>
-          <Chip size="small" variant="outlined" color="error" icon={<WarningAmberOutlined />} label="Booked past capacity" />
-          <Chip size="small" variant="outlined" color="warning" label="Logged past capacity (overtime)" />
-        </Box>
-      </Paper>
+      {/* Folded away by default (spec 6.4). MUI gives the region the id named in aria-controls,
+          so AccordionDetails must not repeat it. */}
+      <Accordion variant="outlined" disableGutters sx={{ mb: 3 }} slotProps={{ heading: { component: 'h2' }, transition: { unmountOnExit: true } }}>
+        <AccordionSummary expandIcon={<ExpandIcon />} id="allocation-help-summary" aria-controls="allocation-help-details">
+          <Typography variant="h3" component="span">How to read this</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Typography variant="body2">
+            Each row is a person and each column is a week. A cell shows the hours booked against that person&apos;s weekly
+            capacity, for example 32 / 40 h. Red with a warning icon means they are over capacity. Use it to spot
+            overbooking before it happens. Press a person&apos;s name for what you can change for them.
+          </Typography>
+          <Box role="group" aria-label="Legend" sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mt: 1.5 }}>
+            <Typography variant="caption" color="text.secondary">Legend</Typography>
+            <Chip size="small" variant="outlined" color="error" icon={<WarningAmberOutlined />} label="Booked past capacity" />
+            <Chip size="small" variant="outlined" color="warning" label="Logged past capacity (overtime)" />
+          </Box>
+        </AccordionDetails>
+      </Accordion>
 
+      <Box sx={{ mb: 2 }}>
+        <SearchField id="allocation-search" label="Search people" placeholder="Name" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
+      </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <IconButton aria-label="Previous week" onClick={() => move(-7)} disabled={!start}><PrevIcon /></IconButton>
+        {/* Earlier and Later move one week; filled buttons with words, as on the Schedule (spec 6.2). */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+          <Button size="small" variant="contained" startIcon={<PrevIcon />} onClick={() => move(-7)} disabled={!start}>Earlier</Button>
           <Typography sx={{ minWidth: 150, textAlign: 'center' }}>
             {weeks.length ? `${formatDay(weeks[0])} – ${formatDay(addDays(weeks.at(-1), 6))}` : '…'}
           </Typography>
-          <IconButton aria-label="Next week" onClick={() => move(7)} disabled={!start}><NextIcon /></IconButton>
-          <Button size="small" variant="outlined" onClick={() => setWeekFrom('')} disabled={!weekFrom}>This week</Button>
+          <Button size="small" variant="contained" endIcon={<NextIcon />} onClick={() => move(7)} disabled={!start}>Later</Button>
+          <Button size="small" variant="contained" onClick={() => setWeekFrom('')} disabled={!weekFrom}>This week</Button>
         </Box>
         <FormControlLabel
           control={<Switch checked={overOnly} onChange={(e) => { setOverOnly(e.target.checked); setPageNumber(1) }} />}
@@ -130,11 +157,12 @@ export default function AllocationPage() {
         />
       </Box>
 
+      {/* The spinner only before the first answer: a reload keeps the rows (and any dialog they opened) on screen. */}
       <PageState
-        loading={loading}
+        loading={loading && !data}
         error={error}
         onRetry={reload}
-        empty={data && people.length === 0 ? (overOnly ? 'No one is over capacity in these weeks.' : 'No employees to show.') : null}
+        empty={data && people.length === 0 ? emptyText(q, overOnly) : null}
       >
         <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
           <Table size="small" aria-label="Hours booked per person per week">
@@ -153,7 +181,9 @@ export default function AllocationPage() {
               {people.map((person) => (
                 <TableRow key={person.userId}>
                   <TableCell sx={sticky}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{person.name}</Typography>
+                    {mayActOn(user, person)
+                      ? <PersonActions userId={person.userId} name={person.name} label={person.name} onChanged={reload} />
+                      : <Typography variant="body2" sx={{ fontWeight: 600 }}>{person.name}</Typography>}
                     {person.jobTitle && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{person.jobTitle}</Typography>}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                       {person.status === 'OVER_ALLOCATED'

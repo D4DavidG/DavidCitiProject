@@ -249,3 +249,77 @@ both, and add a test.
 
 Routes, roles and rules other than the above; the API shapes; the database schema (no
 migration needed).
+
+## 6. David's tweaks after seeing it (15 Oct, morning)
+
+David looked at the merged redesign and asked for these. **Where this section disagrees with
+sections 1 to 5c, this section wins** (it replaces 5c's glows, outlined buttons and capital
+titles). The aim: **welcoming, not military**, easy to read, and everything consistent.
+
+### 6.1 Look
+
+- **Keep:** rectangular boxes (cards, panels, tables, inputs stay square-cornered).
+- **No glows anywhere** (no glowing borders, no text-shadow on titles). Depth comes from a soft
+  drop shadow only (cards: a thin border plus a small, soft shadow; buttons: a small shadow).
+- **One green for every green in light mode**, a vibrant forest green a little darker than the
+  old top bar `#1F7A3A`, toward (not as dark as) `#0A4D05`: use **`#165E26`** (white on it about
+  7.9:1) unless the contrast test says otherwise. Top bar, buttons, links, selected menu item,
+  timeline bars, chart lines that mean "ours": all this one green. No other greens (chart
+  categories use non-green hues; the brand green may be one of them).
+- **Light mode background:** not minty, not washed out. A light, warm matcha toward white, a
+  little more saturated: about **`#E8ECDC`** for the page (keep the faint graph-paper grid),
+  warm white **`#FAFBF5`** for cards. Text stays near-black.
+- **Dark mode background:** a warmer dark green, not mint: about **`#18221A`** for the page,
+  **`#1F2B21`** for cards, warm off-white text. **Top bar in dark mode: the brand green** (the
+  same as light mode), white words.
+- **Reds:** a true red, not salmon, in both modes: filled red with white text for danger
+  buttons (light about `#C62828`; dark about `#D32F2F`), and a red that reaches 4.5:1 for red
+  words on each background.
+- **Fonts:** titles and section headings in a softer, thicker, easy-to-read font,
+  **Poppins 600 to 700**, in normal case (no CAPITALS: they read as stiff and are harder to
+  read). Body text stays Inter, at **weight 500** everywhere (thicker, easier to read); names
+  in tables 600.
+
+### 6.2 Buttons (replaces 5c's three kinds)
+
+- **Every button is filled:** green fill, white words, **rounded corners (8 px)**, a small drop
+  shadow, no glow, no outline-only buttons anywhere. Like the Sign out button, but rounder.
+- **Danger buttons** (Archive, Reject, Revoke): **filled red, white words.** In menus, a danger
+  item is red words.
+- **Dark mode buttons:** the brand green fill, white words, a thin white outline.
+- **Top bar:** no button outlines or boxes. The person's name and role, the bell, dark mode
+  and Sign out are plain white words or icons you can press (underline or a light wash on hover
+  and focus, the focus ring still visible).
+- Icon-only buttons stay icon-only, with tooltips.
+
+### 6.3 Shell
+
+- **Logo:** a softer, still corporate, logo-like font (Poppins, bold). The A's tip is a
+  **sharp point** (not a rhombus), with **three gold sparkles**: one on top of the tip, one to
+  its left, one to its right. The peak has a **soft gold glow** (the one glow on the site, David's request).
+- **Side menu:** collapsed and expanded by a small **bookmark tab sticking out of the menu's
+  right edge near the top**, not a button at the bottom. Accessible name "Collapse menu" /
+  "Expand menu", keyboard reachable, remembered as before.
+
+### 6.4 Pages
+
+- **Dashboard (managers, admins):** "My projects this week" keeps at most one short line under
+  its title (or none). Order: My projects this week, then Workload this week, then the project
+  search with **small** Total projects / Total at risk counts beside it (not big boxes), then the
+  project cards, and **Budget by project last**.
+- **Employee Dashboard:** My tasks and Ready to take **side by side** on desktop (stacked on
+  phones), My logged time below them.
+- **Allocation:** the "How to read this" panel becomes a dropdown, **closed by default**. A
+  **search for people** (server side, `q` on `GET /dashboard/allocation`). A person's name opens
+  a menu of the same actions their People row has (capacity and overtime, history, and so on).
+- **People:** each row's buttons become **one "Actions" dropdown** per person; Archive is the
+  last item, in red words. Names in bold.
+- **Schedule:** a **project filter**: choose one or more projects (a searchable picker that asks
+  the server, so it works with hundreds of projects); `GET /dashboard/allocation` takes
+  `projectIds` and shows only bookings on those projects.
+- **Approvals:** every logged entry already needs approval (only approved time costs money),
+  and the employee is never blocked: they keep pulling tasks. Add an **"Over estimate"** mark
+  (icon plus words) on an entry whose task's logged time now passes its estimate, computed by
+  the server, so the approver sees "more than expected" next to "Over capacity".
+- **Notifications:** the "New" label is **red** (filled red, white words).
+- **Projects, Requests, Audit log, Account, Sign-in:** the new buttons and fonts only.

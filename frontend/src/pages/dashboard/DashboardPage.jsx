@@ -24,18 +24,23 @@ const PAGE_SIZE = 12
 const WORKLOAD_PEOPLE = 8
 const STATUS_OPTIONS = [['', 'All statuses'], ['PLANNING', 'Planning'], ['ACTIVE', 'Active'], ['ON_HOLD', 'On hold'], ['COMPLETE', 'Complete']]
 
-function Stat({ label, value, color }) {
+/** A small count beside the search (spec 6.4): its words, then the number in bold, on one line. */
+function Count({ label, value, color = 'text.primary' }) {
   return (
-    <Card sx={{ flex: '1 1 160px' }}>
-      <CardContent>
-        <Typography variant="body2" color="text.secondary">{label}</Typography>
-        <Typography variant="h2" component="p" color={color} aria-label={label}>{value}</Typography>
-      </CardContent>
-    </Card>
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, whiteSpace: 'nowrap' }}>
+      <Typography variant="body2" component="span" sx={{ color: 'text.secondary' }}>{label}</Typography>
+      {/* Colour in sx: MUI 9's Typography color prop ignores dotted paths such as 'error.main'. */}
+      <Typography component="span" aria-label={label} sx={{ fontWeight: 700, fontSize: '1.125rem', color }}>{value}</Typography>
+    </Box>
   )
 }
 
-Stat.propTypes = { label: PropTypes.string.isRequired, value: PropTypes.number.isRequired, color: PropTypes.string }
+Count.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.number.isRequired,
+  /** A theme colour path for the number. */
+  color: PropTypes.string,
+}
 
 /** One project: questions 1 (status), 2 (risk and why) and 7 (budget) on one card. */
 function ProjectCard({ project }) {
@@ -73,7 +78,7 @@ function ProjectCard({ project }) {
         <BudgetBar {...project} />
       </CardContent>
       <CardActions sx={{ px: 2, pb: 2 }}>
-        <Button component={Link} to={`/projects/${project.projectId}`} variant="outlined">Open project</Button>
+        <Button component={Link} to={`/projects/${project.projectId}`} variant="contained">Open project</Button>
       </CardActions>
     </Card>
   )
@@ -105,8 +110,8 @@ function WorkloadPanel() {
       <PageState loading={loading} error={error} onRetry={reload} empty={data && data.items.length === 0 ? 'No employees to show.' : null}>
         {data && <WorkloadChart people={data.items} total={data.total} />}
       </PageState>
-      {/* Not inside a sentence, so a secondary button rather than a text link (spec 5c). */}
-      <Button component={Link} to="/allocation" variant="outlined" sx={{ mt: 1 }}>
+      {/* Not inside a sentence, so a button rather than a text link; every button is filled (spec 6.2). */}
+      <Button component={Link} to="/allocation" variant="contained" sx={{ mt: 1 }}>
         All people and weeks in Allocation
       </Button>
     </Box>
@@ -114,11 +119,12 @@ function WorkloadPanel() {
 }
 
 /**
- * The manager's landing screen: their projects this week as a timeline first, then every live
- * project they run (admins: all), each with status, risk and budget. At-risk projects come first
- * (the server orders them). Both counters come from the server and cover every page: `total` and
- * `atRiskTotal`. The timeline and the workload chart have their own requests, so searching or
- * filtering the cards never reloads them.
+ * The manager's landing screen (spec 6.4): their projects this week as a timeline, this week's
+ * workload, the project search with two small counts beside it, every live project they run
+ * (admins: all) as a card with status, risk and budget, and Budget by project last. At-risk
+ * projects come first (the server orders them). Both counts come from the server and cover every
+ * page: `total` and `atRiskTotal`. The timeline and the workload chart have their own requests,
+ * so searching or filtering the cards never reloads them.
  */
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -144,27 +150,32 @@ export default function DashboardPage() {
 
       <WorkloadPanel />
 
-      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 3 }}>
+      {/* The search, its filter and two small counts on one line (they wrap on a phone). A new search
+          keeps the old counts until its answer arrives, as it keeps the cards. */}
+      <Box role="group" aria-label="Project search and counts" sx={{ display: 'flex', rowGap: 1.5, columnGap: 3, flexWrap: 'wrap', alignItems: 'center', mb: (search || status) ? 1 : 3 }}>
         <SearchField id="dashboard-search" label="Search projects" value={search} onSearch={(q) => { setSearch(q); setPageNumber(1) }} />
         <TextField id="dashboard-status" select label="Status" size="small" value={status} onChange={(e) => { setStatus(e.target.value); setPageNumber(1) }} sx={{ minWidth: 180 }}>
           {STATUS_OPTIONS.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
         </TextField>
+        {data && (
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            <Count label="Total projects" value={data.total ?? 0} />
+            <Count label="Total at risk" value={data.atRiskTotal ?? 0} color="error.main" />
+          </Box>
+        )}
       </Box>
+      {(search || status) && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Counts are for the current search and status.</Typography>
+      )}
 
       {/* Only the first load shows the spinner: a new search keeps the old counts and cards until it arrives. */}
       <PageState loading={loading && !data} error={error} onRetry={reload} empty={data && items.length === 0 ? 'No projects to show.' : null}>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
-          <Stat label="Total projects" value={data?.total ?? 0} />
-          <Stat label="Total at risk" value={data?.atRiskTotal ?? 0} color="error.main" />
-        </Box>
-        {(search || status) && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: -2, mb: 3 }}>Counts are for the current search and status.</Typography>
-        )}
-        <Box sx={{ mb: 3 }}><BudgetChart projects={items} /></Box>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' } }}>
           {items.map((project) => <ProjectCard key={project.projectId} project={project} />)}
         </Box>
         <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
+        {/* Last on the page (spec 6.4): the same page of projects as the cards above. */}
+        <Box sx={{ mt: 3 }}><BudgetChart projects={items} /></Box>
       </PageState>
     </>
   )

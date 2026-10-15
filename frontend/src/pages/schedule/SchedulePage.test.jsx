@@ -4,14 +4,36 @@ import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import SchedulePage from './SchedulePage'
 import { makeTheme } from '../../theme/theme'
+import { CHART_COLOURS } from '../../theme/chartColours'
 import { page, renderAt, stubApi } from '../../test/utils'
 
 const WEEKS = ['2026-10-12', '2026-10-19', '2026-10-26']
 const apollo = (hours) => ({ projectId: 1, name: 'Apollo', hours })
 const zeus = (hours) => ({ projectId: 2, name: 'Zeus', hours })
+const hoursOf = (projects) => projects.reduce((sum, p) => sum + p.hours, 0)
 function week(iso, projects) {
-  const booked = projects.reduce((sum, p) => sum + p.hours, 0)
-  return { week: iso, bookedHours: booked, overAllocated: booked > 40, overByHours: Math.max(booked - 40, 0), projects }
+  const booked = hoursOf(projects)
+  return { week: iso, bookedHours: booked, shownHours: booked, overAllocated: booked > 40, overByHours: Math.max(booked - 40, 0), projects }
+}
+/**
+ * A person as the server sends them with projectIds: each week lists only the chosen projects,
+ * with their hours as shownHours, while bookedHours, the over flag and over by still count every
+ * booking (b676892), so choosing projects never hides that someone is over.
+ */
+function onlyProjects(person, ids) {
+  return {
+    ...person,
+    weeks: person.weeks.map((w) => {
+      const projects = w.projects.filter((p) => ids.includes(p.projectId))
+      return { ...w, projects, shownHours: hoursOf(projects) }
+    }),
+  }
+}
+/** The server's answer for `people`, narrowed as above to the projectIds asked for; anyone with none of them drops out. */
+const narrowed = (people) => ({ query }) => {
+  const ids = query.projectIds?.split(',').map(Number)
+  const shown = ids ? people.map((p) => onlyProjects(p, ids)).filter((p) => p.weeks.some((w) => w.projects.length)) : people
+  return [200, { ...page(shown), weeks: WEEKS }]
 }
 // Ben: Apollo 25 h for two weeks then 10 h; Zeus 20 h for two weeks; 45 h (5 over) in each of the first two.
 const BEN = {
@@ -28,7 +50,10 @@ const DAN = {
 }
 
 function renderSchedule(answer = () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }], theme = undefined) {
-  const calls = stubApi({ 'GET /dashboard/allocation': answer })
+  const calls = stubApi({
+    'GET /dashboard/allocation': answer,
+    'GET /projects': [200, page([{ projectId: 1, name: 'Apollo' }, { projectId: 2, name: 'Zeus' }])],
+  })
   renderAt(<SchedulePage />, {
     path: '/schedule',
     theme,
@@ -45,6 +70,19 @@ async function tabTo(element) {
 
 const bar = (name) => screen.findByRole('link', { name })
 const colourOf = (link) => within(link).getByTestId('bar').style.backgroundColor
+/** A colour as the browser writes it back (hex to rgb), so a check follows the theme's value. */
+function asCss(colour) {
+  const probe = document.createElement('div')
+  probe.style.backgroundColor = colour
+  return probe.style.backgroundColor
+}
+/** The last question to GET /dashboard/allocation (the project picker asks GET /projects too). */
+const lastAllocation = (calls) => calls.filter((c) => c.path === '/dashboard/allocation').at(-1)
+/** Choose a project in the picker by its name. */
+async function choose(name) {
+  await userEvent.click(screen.getByRole('combobox', { name: 'Projects' }))
+  await userEvent.click(await screen.findByRole('option', { name }))
+}
 
 describe('SchedulePage', () => {
   it('draws a bar per project across the weeks it has hours, split where the hours change', async () => {
@@ -79,15 +117,15 @@ describe('SchedulePage', () => {
   it('colours a bar by its project, the same in every row', async () => {
     renderSchedule()
     const benZeus = await bar(/Ben Okafor, Zeus/)
-    expect(colourOf(screen.getByRole('link', { name: /Ben Okafor, Apollo, 25/ }))).toBe('rgb(28, 92, 171)') // PROJECT_COLOURS[0]
+    expect(colourOf(screen.getByRole('link', { name: /Ben Okafor, Apollo, 25/ }))).toBe(asCss(CHART_COLOURS.light.project[0]))
     expect(colourOf(benZeus)).toBe(colourOf(screen.getByRole('link', { name: /Chloe Kim, Zeus/ })))
   })
 
   it('takes the dark project colours in dark mode, and keeps the name column on the dark card', async () => {
     renderSchedule(undefined, makeTheme('dark'))
-    expect(colourOf(await bar(/Ben Okafor, Apollo, 25/))).toBe('rgb(57, 135, 229)') // dark PROJECT_COLOURS[0]
-    expect(colourOf(screen.getByRole('link', { name: /Ben Okafor, Zeus/ }))).toBe('rgb(25, 158, 112)')
-    expect(screen.getByText('Ben Okafor').parentElement).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+    expect(colourOf(await bar(/Ben Okafor, Apollo, 25/))).toBe(asCss(CHART_COLOURS.dark.project[0]))
+    expect(colourOf(screen.getByRole('link', { name: /Ben Okafor, Zeus/ }))).toBe(asCss(CHART_COLOURS.dark.project[1]))
+    expect(screen.getByText('Ben Okafor').parentElement).toHaveStyle({ backgroundColor: asCss(makeTheme('dark').palette.background.paper) })
   })
 
   it('draws bars square', async () => {
@@ -101,7 +139,7 @@ describe('SchedulePage', () => {
     await userEvent.click(screen.getByLabelText(/over capacity only/i))
     await waitFor(() => expect(screen.queryByText('Ben Okafor')).not.toBeInTheDocument())
     expect(colourOf(screen.getByRole('link', { name: /Chloe Kim, Zeus/ }))).toBe(before)
-    expect(before).not.toBe('rgb(28, 92, 171)') // Zeus alone would have taken the first colour
+    expect(before).not.toBe(asCss(CHART_COLOURS.light.project[0])) // Zeus alone would have taken the first colour
   })
 
   it('names the project colours in a legend, with over capacity', async () => {
@@ -118,14 +156,15 @@ describe('SchedulePage', () => {
     expect(within(legend).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Zeus'])
   })
 
-  it('names five project colours in the legend, then the grey Other with how many share it', async () => {
+  it('names a colour per project while the palette lasts, then the quiet Other with how many share it', async () => {
     const seven = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ projectId: id, name: `P${id}`, hours: 6 })) // 42 h: over
     const busy = { ...BEN, weeks: WEEKS.map((w) => week(w, seven)) }
     renderSchedule(() => [200, { ...page([busy]), weeks: WEEKS }])
     await bar(/Ben Okafor, P7/)
+    const named = CHART_COLOURS.light.project.length // 4 since spec 6.1 took the green out
     const legend = screen.getByRole('list', { name: 'Legend' })
     expect(within(legend).getAllByRole('listitem').map((li) => li.textContent))
-      .toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'Other (2)', 'Over capacity'])
+      .toEqual([...seven.slice(0, named).map((p) => p.name), `Other (${7 - named})`, 'Over capacity'])
   })
 
   it('marks an over-capacity week with words, the warning icon and a red outline', async () => {
@@ -193,12 +232,13 @@ describe('SchedulePage', () => {
     expect(await screen.findByText('Project page')).toBeInTheDocument()
   })
 
-  it('moves with Earlier and Later, secondary buttons with their arrows, as on the home timeline (spec 5c)', async () => {
+  it('moves with Earlier, Later and This week, filled buttons (spec 6.2), Earlier and Later with their arrows', async () => {
     renderSchedule()
     await bar(/Ben Okafor, Apollo, 25/)
     const earlier = screen.getByRole('button', { name: 'Earlier' })
     const later = screen.getByRole('button', { name: 'Later' })
-    for (const button of [earlier, later]) expect(button).toHaveClass('MuiButton-outlined')
+    const thisWeek = screen.getByRole('button', { name: 'This week' })
+    for (const button of [earlier, later, thisWeek]) expect(button).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary')
     expect(within(earlier).getByTestId('ChevronLeftIcon')).toBeInTheDocument()
     expect(within(later).getByTestId('ChevronRightIcon')).toBeInTheDocument()
   })
@@ -223,13 +263,27 @@ describe('SchedulePage', () => {
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBeUndefined())
   })
 
-  it('shows 8, 13 or 26 weeks', async () => {
+  it('shows 8, 13 or 26 weeks, chosen in a Weeks shown field like the other filters', async () => {
     const calls = renderSchedule()
     await bar(/Ben Okafor, Apollo, 25/)
-    await userEvent.click(screen.getByRole('button', { name: '13 wk' }))
-    await waitFor(() => expect(calls.at(-1).query.weeks).toBe('13'))
-    await userEvent.click(screen.getByRole('button', { name: '26 wk' }))
-    await waitFor(() => expect(calls.at(-1).query.weeks).toBe('26'))
+    const field = screen.getByRole('combobox', { name: 'Weeks shown' })
+    expect(field).toHaveTextContent('8 weeks')
+    await userEvent.click(field)
+    await userEvent.click(await screen.findByRole('option', { name: '13 weeks' }))
+    await waitFor(() => expect(lastAllocation(calls).query.weeks).toBe('13'))
+    expect(field).toHaveTextContent('13 weeks')
+    await userEvent.click(field)
+    await userEvent.click(await screen.findByRole('option', { name: '26 weeks' }))
+    await waitFor(() => expect(lastAllocation(calls).query.weeks).toBe('26'))
+  })
+
+  it('has no outline-only buttons: no toggle group, and every button with words is filled (spec 6.2)', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    expect(document.querySelector('.MuiToggleButton-root, .MuiToggleButtonGroup-root')).toBeNull()
+    const buttons = [...document.querySelectorAll('.MuiButton-root')]
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of buttons) expect(button).toHaveClass('MuiButton-contained')
   })
 
   it('asks the server for over-capacity people only when the switch is on', async () => {
@@ -254,6 +308,73 @@ describe('SchedulePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Later' }))
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-19'))
     expect(calls.at(-1).query.page).toBe('1')
+  })
+
+  it('filters by project: asks the server for only those projects\' bookings, from page 1', async () => {
+    const calls = renderSchedule(() => [200, { ...page([BEN], { total: 30, totalPages: 2 }), weeks: WEEKS }])
+    await bar(/Ben Okafor, Apollo, 25/)
+    expect(lastAllocation(calls).query.projectIds).toBeUndefined()
+    await userEvent.click(screen.getByRole('button', { name: /page 2/i }))
+    await waitFor(() => expect(lastAllocation(calls).query.page).toBe('2'))
+    await choose('Zeus')
+    await waitFor(() => expect(lastAllocation(calls).query).toMatchObject({ projectIds: '2', page: '1' }))
+    await choose('Apollo')
+    await waitFor(() => expect(lastAllocation(calls).query.projectIds).toBe('2,1'))
+  })
+
+  it('shows everyone again when the last chosen project is taken off', async () => {
+    const calls = renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    await choose('Zeus')
+    await waitFor(() => expect(lastAllocation(calls).query.projectIds).toBe('2'))
+    await userEvent.click(within(screen.getByRole('button', { name: 'Zeus' })).getByTestId('CancelIcon'))
+    await waitFor(() => expect(lastAllocation(calls).query.projectIds).toBeUndefined())
+  })
+
+  it('says when no one is booked on the chosen projects', async () => {
+    renderSchedule(({ query }) => [200, { ...page(query.projectIds ? [] : [CHLOE]), weeks: WEEKS }])
+    await bar(/Chloe Kim, Zeus/)
+    await choose('Apollo')
+    expect(await screen.findByText('No one is booked on the chosen projects in these weeks.')).toBeInTheDocument()
+  })
+
+  it('says, with projects chosen, that over capacity still counts all their projects (the server counts every booking)', async () => {
+    // Ben with Apollo chosen: one 25 h bar, yet 45 h booked in all (20 h on Zeus), so his weeks are still over.
+    renderSchedule(narrowed([BEN, CHLOE]))
+    await bar(/Ben Okafor, Apollo, 25/)
+    expect(screen.getByText('1 of 2 people shown are booked past capacity in at least one of these weeks.')).toBeInTheDocument()
+    await choose('Apollo')
+    expect(await screen.findByText('1 of 1 people shown are booked past capacity in at least one of these weeks, counting all their projects, not only the chosen ones.')).toBeInTheDocument()
+    expect(screen.queryByText(/chosen projects alone/)).not.toBeInTheDocument()
+  })
+
+  it('says no one shown is over, counting all their projects, when projects are chosen and no one is', async () => {
+    renderSchedule(narrowed([CHLOE]))
+    await bar(/Chloe Kim, Zeus/)
+    expect(screen.getByText('No one shown is booked past capacity in these weeks.')).toBeInTheDocument()
+    await choose('Zeus')
+    expect(await screen.findByText('No one shown is booked past capacity in these weeks, counting all their projects, not only the chosen ones.')).toBeInTheDocument()
+  })
+
+  it('with projects chosen, says in an over week the hours booked in all and the hours on the chosen projects', async () => {
+    renderSchedule(narrowed([BEN, CHLOE]))
+    await bar(/Ben Okafor, Zeus/)
+    await choose('Apollo')
+    await waitFor(() => expect(screen.queryByRole('link', { name: /Ben Okafor, Zeus/ })).not.toBeInTheDocument())
+    const words = screen.getAllByTestId('over-words')
+    expect(words).toHaveLength(2) // still over: the Zeus hours count though their bar is not drawn
+    expect(words[0]).toHaveTextContent('Week of Oct 12: 45 of 40 hours booked in all, 25 on the chosen projects, +5 h over')
+    expect(words[1]).toHaveTextContent('Week of Oct 19: 45 of 40 hours booked in all, 25 on the chosen projects, +5 h over')
+  })
+
+  it('leaves out the chosen-projects hours when every booked hour is on them', async () => {
+    const calls = renderSchedule(narrowed([BEN]))
+    await bar(/Ben Okafor, Zeus/)
+    await choose('Apollo')
+    await choose('Zeus')
+    await waitFor(() => expect(lastAllocation(calls).query.projectIds).toBe('1,2'))
+    expect(await bar(/Ben Okafor, Zeus/)).toBeInTheDocument()
+    expect(screen.getAllByTestId('over-words')[0]).toHaveTextContent(/^Week of Oct 12: 45 of 40 hours booked, \+5 h over$/)
   })
 
   it('says so when there is no one to show', async () => {

@@ -5,6 +5,7 @@ import {
 } from '@mui/material'
 import { homePath, useAuth } from '../../auth/useAuth'
 import AuthCard from './AuthCard'
+import PasswordField from '../../components/PasswordField'
 
 /**
  * Sign in with the generated username (initials + 6 digits) and password. A
@@ -74,10 +75,9 @@ export default function LoginPage() {
           error={wrong}
           slotProps={{ htmlInput: { 'aria-describedby': wrong ? 'password-helper-text' : undefined } }}
         />
-        <TextField
+        <PasswordField
           id="password"
           label="Password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"

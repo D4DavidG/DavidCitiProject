@@ -3,33 +3,35 @@ import PropTypes from 'prop-types'
 import Box from '@mui/material/Box'
 import { useTheme } from '@mui/material/styles'
 
-// The word ACME in sharp, straight strokes on a 154 x 58 grid. The A stands taller than
-// the other letters, and its tip is cut off and shines gold: "acme" means the high point.
-const VIEW = { width: 154, height: 58 }
-const A_BODY = 'M0 56 L12.16 18 L27.84 18 L40 56 L31 56 L27.16 44 L12.84 44 L9 56 Z M15.4 36 L24.6 36 L20 21.6 Z'
-const A_TIP = 'M16 6 L24 6 L27.2 16 L12.8 16 Z'
-const SPARK = 'M33 1 L34.3 5.7 L39 7 L34.3 8.3 L33 13 L31.7 8.3 L27 7 L31.7 5.7 Z'
-const CME = [
-  'M76 20 L54 20 L46 28 L46 48 L54 56 L76 56 L76 48 L57 48 L54 45 L54 31 L57 28 L76 28 Z', // C
-  'M82 56 L82 20 L90 20 L101 36 L112 20 L120 20 L120 56 L112 56 L112 33 L101 49 L90 33 L90 56 Z', // M
-  'M152 20 L126 20 L126 56 L152 56 L152 48 L134 48 L134 42 L148 42 L148 34 L134 34 L134 28 L152 28 Z', // E
-].join(' ')
+// The word ACME on a 152 x 62 grid (spec 6.3). The A is drawn: taller than the other letters, its
+// tip one sharp gold point with a soft gold glow, and three sparkles around it ("acme" means the
+// high point). CME is Poppins bold, a softer face that still reads as a logo; textLength keeps its
+// width fixed whichever font draws it.
+const VIEW = { width: 152, height: 62 }
+const A_BODY = 'M0 58 L15.83 20 L24.17 20 L40 58 L31 58 L26.8 48 L13.2 48 L9 58 Z M16.1 41 L23.9 41 L20 31.6 Z'
+const A_TIP = 'M20 10 L24.17 20 L15.83 20 Z'
 
-/** The brand tone: the green ink on light, the light grey text on dark. */
+/** A four-pointed sparkle centred on (x, y), r from its centre to each point. */
+function sparkle(x, y, r) {
+  const w = r * 0.28
+  return `M${x} ${y - r} L${x + w} ${y - w} L${x + r} ${y} L${x + w} ${y + w} L${x} ${y + r} L${x - w} ${y + w} L${x - r} ${y} L${x - w} ${y - w} Z`
+}
+const SPARKS = [sparkle(20, 4.5, 4.5), sparkle(8, 13, 3.5), sparkle(32, 13, 3.5)] // above the tip, left, right
+
+/** The brand tone: the forest green on light, the warm off-white text on dark. */
 const brand = (t) => (t.palette.mode === 'dark' ? t.palette.text.primary : t.palette.primary.main)
 
 /**
- * The ACME logo, one image named "ACME". Brand tone: forest green on light, light grey on
- * dark. The shine is bright gold edged in the deep gold. In the top bar, tone "inherit" takes
- * the bar's text colour, and so does the shine's edge, one screen pixel wide at any size: the
- * dark-mode bar is light grey, where the gold alone measures 1.02:1 and the A would lose its tip.
+ * The ACME logo, one image named "ACME". In the top bar, tone "inherit" takes the bar's white
+ * words. On a light page the bright gold is edged in deep gold, which it needs to be seen there.
  */
 export default function AcmeLogo({ size = 32, tone = 'brand' }) {
   const titleId = useId()
-  const { light: shine, main: deep } = useTheme().palette.secondary
-  const edge = (width) => (tone === 'inherit'
-    ? { stroke: 'currentColor', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' }
-    : { stroke: deep, strokeWidth: width })
+  const glowId = useId()
+  const theme = useTheme()
+  const { light: shine, main: deep } = theme.palette.secondary
+  const needsEdge = tone === 'brand' && theme.palette.mode === 'light'
+  const edge = needsEdge ? { stroke: deep, strokeWidth: 0.75 } : {}
   return (
     <Box
       component="svg"
@@ -38,13 +40,31 @@ export default function AcmeLogo({ size = 32, tone = 'brand' }) {
       viewBox={`0 0 ${VIEW.width} ${VIEW.height}`}
       height={size}
       width={Math.round((size * VIEW.width) / VIEW.height)}
-      sx={{ color: tone === 'inherit' ? 'inherit' : brand, display: 'block', flexShrink: 0 }}
+      sx={{ color: tone === 'inherit' ? 'inherit' : brand, display: 'block', flexShrink: 0, overflow: 'visible' }}
     >
       <title id={titleId}>ACME</title>
+      <defs>
+        <filter id={glowId} x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="2.5" />
+        </filter>
+      </defs>
+      <path data-part="glow" d={A_TIP} fill={shine} opacity={0.85} filter={`url(#${glowId})`} />
       <path data-part="a" d={A_BODY} fill="currentColor" fillRule="evenodd" />
-      <path data-part="tip" d={A_TIP} fill={shine} {...edge(1)} />
-      <path data-part="spark" d={SPARK} fill={shine} {...edge(0.75)} />
-      <path data-part="cme" d={CME} fill="currentColor" />
+      <path data-part="tip" d={A_TIP} fill={shine} {...edge} />
+      {SPARKS.map((d) => <path key={d} data-part="spark" d={d} fill={shine} {...edge} />)}
+      <text
+        data-part="cme"
+        x="45"
+        y="58"
+        fontFamily="Poppins, Inter, system-ui, sans-serif"
+        fontWeight="700"
+        fontSize="46"
+        textLength="105"
+        lengthAdjust="spacingAndGlyphs"
+        fill="currentColor"
+      >
+        CME
+      </text>
     </Box>
   )
 }
@@ -52,6 +72,6 @@ export default function AcmeLogo({ size = 32, tone = 'brand' }) {
 AcmeLogo.propTypes = {
   /** Height in pixels; the width follows. */
   size: PropTypes.number,
-  /** 'brand' (green ink, or light grey in dark mode) or 'inherit' (the surrounding text colour). */
+  /** 'brand' (forest green, or off-white in dark mode) or 'inherit' (the surrounding text colour). */
   tone: PropTypes.oneOf(['brand', 'inherit']),
 }
