@@ -5,7 +5,8 @@
 #
 # Steps: backend tests (+ coverage), bandit security scan, website tests (+ coverage),
 # lint, production build, then the Playwright browser tests if the local stack is up
-# (ports 3000 and 3001 listening; start it with ./bin/start-dev.sh).
+# (ports 3000 and 3001 listening; start it with ./bin/start-dev.sh), and the axe
+# accessibility scan inside the screen tour (its own row in the summary).
 #
 # Browser-test usernames: E2E_MANAGER_USERNAME / E2E_EMPLOYEE_USERNAME / E2E_ZEUS_MANAGER_USERNAME
 # if set, otherwise looked up in the local database (Maria Lopez, Ana Ruiz and Sam Patel
@@ -114,15 +115,23 @@ if listening 3000 && listening 3001; then
     skipped="$(grep -Eo '[0-9]+ skipped' "$LOGS/e2e.log" | tail -1)"
     if [ "$status" -eq 0 ]; then record "Browser tests" PASS "$passed${skipped:+, $skipped}; screenshots in $tour"
     else record "Browser tests" FAIL "see $LOGS/e2e.log"; fi
+    # The four tour tests end in "(axe)": count how many passed (✓) or failed (✘).
+    axe_ok="$(grep -c "✓.*(axe)" "$LOGS/e2e.log")"
+    axe_bad="$(grep -c "✘.*(axe)" "$LOGS/e2e.log")"
+    if [ "$axe_bad" -gt 0 ]; then record "Accessibility" FAIL "axe found serious problems; see $LOGS/e2e.log"
+    elif [ "$axe_ok" -eq 4 ]; then record "Accessibility" PASS "axe on every tour screen, 4 tests, 48 scans, WCAG A/AA"
+    else record "Accessibility" SKIP "tour did not run"; fi
   else
     echo "Seeded users not found in the local database. Run tools/demo.py seed, or set"
     echo "E2E_MANAGER_USERNAME and E2E_EMPLOYEE_USERNAME."
     record "Browser tests" FAIL "no seeded users"
+    record "Accessibility" FAIL "no seeded users"
   fi
 else
   echo "Skipped: the local stack is not running (need ports 3000 and 3001)."
   echo "Start it with ./bin/start-dev.sh in another terminal, then rerun this script."
   record "Browser tests" SKIP "local stack not running"
+  record "Accessibility" SKIP "local stack not running"
 fi
 
 # Summary.
