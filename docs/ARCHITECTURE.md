@@ -125,6 +125,7 @@ that box red) and `code` when the website should act on it (`api/errors.py`).
 | 401 | Not signed in, or the token expired | No `Authorization` header |
 | 403 | Your role may never call this, or you must change your first password | An employee calling `GET /admin/audit-log` |
 | 404 | Missing, **or not yours**, with word-for-word the same message | A manager opening another manager's project |
+| 405 | The address exists, but not with this method | `DELETE /projects/7`: there is no DELETE anywhere |
 | 409 | The current state refuses it | A dependency loop; `code: "OVER_CAPACITY"` (log anyway?); `code: "ON_PROJECTS"` (archive anyway?) |
 | 500 | A bug: "Something went wrong on our side. Nothing was changed." The details go to the log only | |
 | 503 | The database isn't ready, or the signing key is missing | The first request while Aurora wakes |
@@ -475,13 +476,13 @@ The request's path through the locks:
 | Logs kept 7 days; failed-call queue encrypted | CloudWatch drops Lambda logs after 7 days; the dead-letter queue is encrypted | `infra/lambda.tf` | Tidy and bounded | Template |
 | The local proxy passes named headers only | The local stand-in for CloudFront forwards a short list of headers | `bin/proxy-server.js` | Keeps the local path as narrow as AWS | Template; `authorization` and `content-length` added |
 
-### Checks on every push
+### Checks and guardrails
 
 | Measure | What it does | Where | Origin |
 | --- | --- | --- | --- |
-| Bandit | Scans the Python for known unsafe patterns | `.github/workflows/python.actions.yml` | Template |
-| npm audit | Fails if a website library has a known high-severity hole | `.github/workflows/react.actions.yml` | Template |
-| Checkov | Reports risky cloud settings (reports only, never blocks) | `.github/workflows/terraform.actions.yml` | Template |
+| Bandit on every push | Scans the Python for known unsafe patterns | `.github/workflows/python.actions.yml` | Template |
+| npm audit on every push | Fails if a website library has a known high-severity hole | `.github/workflows/react.actions.yml` | Template |
+| Checkov on every push | Reports risky cloud settings (reports only, never blocks) | `.github/workflows/terraform.actions.yml` | Template |
 | Secrets kept out of git | `.gitignore` drops env files, credentials, Terraform state and private notes | `.gitignore` | Both |
 
 ## 8. Known gaps
