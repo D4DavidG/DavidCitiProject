@@ -518,11 +518,15 @@ tests need Postgres and the browser tests need the whole stack, so they run on a
 
 ### 2.14 The live API walk (`tools/demo.py demo`)
 
-File: [`tools/demo.py`](../tools/demo.py). Not a test suite, but the one check of the business
-rules that runs against the real AWS system with no browser.
+File: [`tools/demo.py`](../tools/demo.py). Not a test suite, but a check of the business
+rules over real HTTP, with no browser and no test database.
 
-**Why we use it.** It shows the rules holding on the deployed system (CloudFront, the Lambda
-and Aurora), and it is the terminal half of the demo.
+**Why we use it.** It shows the rules holding on a running system (the proxy or CloudFront,
+the Lambda and the database), and it is the terminal half of the demo.
+
+**On AWS it now stops early.** It signs in as Ana Ruiz, who is archived on the live site, and
+a failed sign-in ends the script (`Login failed for AR553882`, `tools/demo.py:75-78`) right
+after it prints the accounts. Run it on the local stack.
 
 **What it does.** Signs in as the admin, Maria, Ana and Ben over HTTPS and prints the
 accounts, the answers to the seven questions, then ten requests that break a rule (logging
@@ -655,13 +659,8 @@ curl -s https://d1gov8jpsxhwer.cloudfront.net/api/tracker/health
 K6_PROFILE=aws K6_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net/api/tracker K6_USERNAME=ML662930 K6_PASSWORD=Demo-pass-2026 k6 run tests/load/load.js
 ```
 
-**The live API walk.** On AWS, as the published admin:
-
-```sh
-TRACKER_API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker TRACKER_ADMIN_PASSWORD=gusmao123 python3 tools/demo.py demo
-```
-
-Locally, the admin password is the one you chose at first sign-in. This asks for it without
+**The live API walk**, on the local stack (on AWS it stops at Ana's sign-in, section 2.14).
+The local admin password is the one you chose at first sign-in. This asks for it without
 showing it on screen:
 
 ```sh
@@ -680,7 +679,8 @@ if ports 3000 and 3001 are listening, with the axe scans as their own row. It lo
 local Maria, Ana and Sam by email (or uses `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME`
 and `E2E_ZEUS_MANAGER_USERNAME` if set). Its browser tests always go to the local stack,
 never AWS, even if an AWS address is still exported, because four of the files add data.
-About 10 minutes in all. It ends with a table, and exits 1 if any step failed:
+About 10 minutes in all. It ends with a table, and exits 1 if any step failed. A clean run looks like this (counts
+from 15 Oct):
 
 ```
 === Summary ===
