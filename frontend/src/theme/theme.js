@@ -10,41 +10,37 @@ import { alpha, createTheme } from '@mui/material/styles'
  */
 const TOKENS = {
   light: {
-    page: '#E8ECDC', // a warm matcha toward white
-    gridLine: '#DEE3CF', // the faint graph-paper line: 1.06:1 on the page
-    gridSize: 46,
+    page: '#E2EBD5', // a warm matcha toward white, a touch greener since 15 Oct; plain, no grid
     paper: '#FAFBF5', // cards: a warm white
     divider: 'rgba(22, 26, 22, 0.14)',
     cardBorder: 'rgba(22, 26, 22, 0.12)',
     cardShadow: '0 1px 2px rgba(22, 26, 22, 0.08), 0 2px 8px rgba(22, 26, 22, 0.06)',
-    text: '#161A16', // 13.4:1 on a grid line
-    textSecondary: '#2C332E', // 9.9:1 on a grid line
-    textMuted: '#4C5450', // 5.9:1 on a grid line
-    fieldLine: '#767D78', // a field's resting border: 3.2:1 on a grid line, 4.1:1 on a card
-    green: '#165E26', // THE green: top bar, buttons, links, selected menu item; 6.0:1 on a grid line; white on it 7.9:1
+    text: '#161A16', // 14.3:1 on the page
+    textSecondary: '#2C332E', // 10.5:1 on the page
+    textMuted: '#4C5450', // 6.3:1 on the page
+    fieldLine: '#767D78', // a field's resting border: 3.4:1 on the page, 4.1:1 on a card
+    green: '#165E26', // THE green: top bar, buttons, links, selected menu item; 6.4:1 on the page; white on it 7.9:1
     greenText: '#165E26', // green as words: the same green in light mode
     greenHover: '#0E4A1B', // white on it 10.4:1
     onGreen: '#FFFFFF',
-    buttonEdge: '#165E26', // a button's edge: 6.6:1 on the page
+    buttonEdge: '#165E26', // a button's edge: 6.4:1 on the page
     buttonShadow: '0 1px 2px rgba(22, 26, 22, 0.22)',
     buttonShadowHover: '0 2px 6px rgba(22, 26, 22, 0.24)',
-    gold: '#8A6100', // highlight lines (Today); 4.6:1 on the page; white on it 5.5:1
+    gold: '#8A6100', // highlight lines (Today); 4.5:1 on the page; white on it 5.5:1
     goldBright: '#FFD54A', // the logo's sparkles and the glow on its peak
     onGold: '#FFFFFF',
-    error: '#C21F1F', // a true red for words and marks; 4.6:1 on a grid line
+    error: '#C21F1F', // a true red for words and marks; 4.9:1 on the page
     overWash: '#F4E5E0', // a red tint behind an over-capacity week (10% of the red on a card): red words 4.9:1
     danger: '#C21F1F', // danger buttons and the New label: white on it 6.0:1
     dangerHover: '#9A1818', // white on it 8.3:1
-    warning: '#9C4A00', // pending, on hold; 4.7:1 on a grid line; white on it 6.2:1
-    success: '#145DB2', // done, approved: blue, so it is never mistaken for the green; 4.9:1; white 6.5:1
+    warning: '#9C4A00', // pending, on hold; 5.0:1 on the page; white on it 6.2:1
+    success: '#145DB2', // done, approved: blue, so it is never mistaken for the green; 5.3:1 on the page; white 6.5:1
     onStatus: '#FFFFFF',
     disabledFill: '#D9DDD0', // a neutral, not a faded green (SimpleBank lesson)
     disabledText: '#4C5450', // 5.7:1 on the disabled fill
   },
   dark: {
-    page: '#18221A', // a warm dark green, not mint
-    gridLine: '#1F2A21', // 1.10:1 on the page
-    gridSize: 46,
+    page: '#18221A', // a warm dark green, not mint; plain, no grid
     paper: '#212D23', // cards
     divider: 'rgba(255, 255, 255, 0.12)',
     cardBorder: 'rgba(255, 255, 255, 0.10)',
@@ -52,7 +48,7 @@ const TOKENS = {
     text: '#ECEEE6', // a warm off-white; 12.3:1 on a card
     textSecondary: '#CDD3C7', // 9.4:1 on a card
     textMuted: '#AFB6A9', // 6.9:1 on a card
-    fieldLine: '#7C877E', // 3.8:1 on a card, 4.0:1 on a grid line
+    fieldLine: '#7C877E', // 3.8:1 on a card, 4.4:1 on the page
     green: '#165E26', // the same green fills the top bar, buttons and the selected menu item; white on it 7.9:1
     greenText: '#8FD3A0', // green as words needs to be lighter on a dark card: 8.2:1
     greenHover: '#1E7A34', // white on it 5.4:1
@@ -76,9 +72,6 @@ const TOKENS = {
     disabledText: '#CDD3C7', // 6.5:1 on the disabled fill
   },
 }
-
-/** The faint graph-paper grid behind the page (cards cover it): one line across and one down. */
-const graphPaper = (line) => `linear-gradient(${line} 1px, transparent 1px), linear-gradient(90deg, ${line} 1px, transparent 1px)`
 
 /** Titles: a softer, thicker face than the body text, in normal case. */
 const HEADINGS = '"Poppins", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
@@ -104,7 +97,6 @@ export function makeTheme(mode) {
       background: { default: t.page, paper: t.paper },
       text: { primary: t.text, secondary: t.textSecondary, muted: t.textMuted },
       divider: t.divider,
-      gridLine: t.gridLine,
       fieldLine: t.fieldLine,
       fill: { main: t.green, contrastText: t.onGreen, hover: t.greenHover },
       danger: { main: t.danger, contrastText: '#FFFFFF', hover: t.dangerHover },
@@ -131,11 +123,8 @@ export function makeTheme(mode) {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
-          body: {
-            backgroundColor: t.page,
-            backgroundImage: graphPaper(t.gridLine),
-            backgroundSize: `${t.gridSize}px ${t.gridSize}px`,
-          },
+          // A plain page: the graph-paper grid was removed on 15 Oct at David's request.
+          body: { backgroundColor: t.page, backgroundImage: 'none' },
           // The keyboard focus ring on every control: 2 px green, just outside it. Besides buttons and
           // links, anything made a Tab stop on purpose (a chart row, a box that scrolls sideways), but not
           // the inside of a select field, which has its own focused border. :where() keeps that part weightless,

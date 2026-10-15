@@ -85,7 +85,7 @@ export function AppRoutes() {
   )
 }
 
-/** The whole app: light or dark theme (with the graph-paper page), session, router. */
+/** The whole app: light or dark theme (a plain page, no grid), session, router. */
 export default function App() {
   return (
     <ColorModeProvider>
