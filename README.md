@@ -199,9 +199,9 @@ checks every business rule, every route and that Postgres itself refuses bad row
 (Vitest and React Testing Library, 889 tests in 54 files, 98.11% of lines) checks what each
 screen shows and sends. **Browser** (Playwright, 37 passed and 1 skipped on request) clicks
 through the real app, takes screenshots of every screen and runs 100 accessibility scans in
-light and dark; 17 of them are safe to run against the live AWS site, and all 17 passed there
-after the 15 Oct deploy. A **load test** (k6) measures speed under many users. Numbers are from
-15 Oct, before the post-demo changes.
+light and dark; 20 of them are safe to run against the live AWS site, and all 20 passed there
+after the 15 Oct post-demo deploy. A **load test** (k6) measures speed under many users. Numbers
+are from 15 Oct, after the post-demo changes.
 
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt bandit   # once
@@ -333,9 +333,6 @@ is: [docs/DECISIONS.md](docs/DECISIONS.md).
 - **Untested corners:** the uncovered 3% of the backend and 2% of the website are mostly guard
   branches for records that don't exist or are already archived, and less-used People screen
   paths. The list, with reasons: [docs/TESTING.md](docs/TESTING.md).
-- **Not yet on AWS:** the Swagger CORS change and the 15 Oct post-demo features are committed but
-  reach the live site only after the next `./bin/deploy-backend.sh` and
-  `./bin/deploy-frontend.sh`.
 
 ## Licence
 
