@@ -33,7 +33,7 @@ function signOffBlocker(d) {
   return reasons.length ? reasons.join(' and ') : null
 }
 
-function Deliverable({ deliverable, canManage, people, onAction, onEdit, onArchive, onChanged }) {
+function Deliverable({ deliverable, canManage, people, busy = false, onAction, onEdit, onArchive, onChanged }) {
   const [open, setOpen] = useState(false)
   const titleId = `deliverable-${deliverable.milestoneId}`
   const notReady = signOffBlocker(deliverable)
@@ -60,10 +60,10 @@ function Deliverable({ deliverable, canManage, people, onAction, onEdit, onArchi
       <CardActions sx={{ flexWrap: 'wrap' }}>
         <Button size="small" onClick={() => setOpen(!open)}>{open ? 'Hide tasks' : 'Show tasks'}</Button>
         {canManage && (deliverable.completedAt
-          ? <Button size="small" onClick={() => onAction(deliverable, 'reopen')}>Reopen</Button>
-          : <Button size="small" disabled={Boolean(notReady)} onClick={() => onAction(deliverable, 'sign-off')}>Sign off</Button>)}
-        {canManage && <Button size="small" onClick={() => onEdit(deliverable)}>Edit</Button>}
-        {canManage && <Button size="small" color="inherit" onClick={() => onArchive(deliverable)}>Archive</Button>}
+          ? <Button size="small" disabled={busy} onClick={() => onAction(deliverable, 'reopen')}>Reopen</Button>
+          : <Button size="small" disabled={busy || Boolean(notReady)} onClick={() => onAction(deliverable, 'sign-off')}>Sign off</Button>)}
+        {canManage && <Button size="small" disabled={busy} onClick={() => onEdit(deliverable)}>Edit</Button>}
+        {canManage && <Button size="small" color="inherit" disabled={busy} onClick={() => onArchive(deliverable)}>Archive</Button>}
         {canManage && !deliverable.completedAt && notReady && (
           <Typography variant="caption" color="text.secondary">Sign-off opens when it&apos;s done: {notReady}.</Typography>
         )}
@@ -86,6 +86,8 @@ Deliverable.propTypes = {
   }).isRequired,
   canManage: PropTypes.bool.isRequired,
   people: PropTypes.arrayOf(PropTypes.array).isRequired,
+  /** True while a sign-off or reopen of this deliverable is on its way: its buttons are disabled. */
+  busy: PropTypes.bool,
   onAction: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onArchive: PropTypes.func.isRequired,
@@ -105,14 +107,18 @@ export default function DeliverablesTab({ projectId, canManage, people, startDat
   const [actionError, setActionError] = useState(null)
   const [dialog, setDialog] = useState(null) // null | { deliverable?: object }
   const [archiving, setArchiving] = useState(null)
+  const [actingId, setActingId] = useState(null)
 
   async function act(deliverable, action) {
     setActionError(null)
+    setActingId(deliverable.milestoneId) // its buttons are disabled until the answer, so one press sends one request
     try {
       await request('POST', `/milestones/${deliverable.milestoneId}/${action}`)
       reload()
     } catch (failure) {
       setActionError(failure.message)
+    } finally {
+      setActingId(null)
     }
   }
 
@@ -137,6 +143,7 @@ export default function DeliverablesTab({ projectId, canManage, people, startDat
             deliverable={d}
             canManage={canManage}
             people={people}
+            busy={actingId === d.milestoneId}
             onAction={act}
             onEdit={(deliverable) => setDialog({ deliverable })}
             onArchive={setArchiving}

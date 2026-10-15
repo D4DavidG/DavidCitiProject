@@ -62,6 +62,28 @@ describe('ProjectDetailPage', () => {
     expect(await screen.findByText('Design must be signed off first.')).toBeInTheDocument()
   })
 
+  it('sends one sign-off however often it is pressed, and disables the card\'s buttons until the answer', async () => {
+    const ready = { ...BUILD, status: 'IN_PROGRESS', doneTaskCount: 2, progressPercent: 100 }
+    const calls = renderDetail(USERS.manager, {
+      'GET /projects/1/dependency-graph': [200, { nodes: [ready], edges: [] }],
+      'POST /milestones/11/sign-off': [409, { error: 'Design must be signed off first.' }],
+    })
+    const release = holdOpen('/milestones/11/sign-off')
+    const build = await screen.findByRole('region', { name: 'Build' })
+    const signOff = within(build).getByRole('button', { name: /sign off/i })
+    fireEvent.click(signOff)
+    fireEvent.click(signOff)
+    for (const name of [/sign off/i, /^edit$/i, /^archive$/i]) {
+      expect(within(build).getByRole('button', { name })).toBeDisabled()
+    }
+    release()
+    expect(await screen.findByText('Design must be signed off first.')).toBeInTheDocument()
+    expect(calls.filter((c) => c.path === '/milestones/11/sign-off')).toHaveLength(1)
+    for (const name of [/sign off/i, /^edit$/i, /^archive$/i]) {
+      expect(within(build).getByRole('button', { name })).toBeEnabled()
+    }
+  })
+
   it('adds a deliverable', async () => {
     const calls = renderDetail(USERS.manager, { 'POST /projects/1/milestones': [201, { ...BUILD, milestoneId: 12, name: 'Launch' }] })
     await screen.findByRole('region', { name: 'Build' })
