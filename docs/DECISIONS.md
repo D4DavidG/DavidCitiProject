@@ -19,7 +19,7 @@ section numbers, so the numbers are kept here as labels:
 **Reading the tables:** *Decided*, then *Why* (the reason or the evidence), then *Turned
 down* (and why), then *Where*. Backend paths are under `backend/tracker/` and website paths
 under `frontend/src/` unless written in full. "Post-demo" marks what David asked for after
-his 15 Oct demo.
+the 15 Oct demo.
 
 **Contents:** [1 Product and scope](#1-product-framing-and-scope) ·
 [2 Accounts, sign-in, tokens](#2-accounts-sign-in-and-tokens) ·
@@ -302,7 +302,7 @@ somewhere else to archive a project." Common tasks happen on the row you are loo
 confirm step stays only where an action is hard to undo. One main button per screen in the
 same place, body text at least 14 px, spacing rather than lines.
 
-**§5c One design language** (from David's site d4davidg.github.io and his SimpleBank app):
+**§5c One design language** (from David's site d4davidg.github.io and the SimpleBank app David led):
 "everything should rhyme." Kept from it: every screen is the same shell (page header with
 actions top right, then search and filters, then content, then the pager); lists are tables
 on desktop and cards on phones from one component; empty, loading and error states from
@@ -410,7 +410,7 @@ at 899 px and below get cards instead of tables and a drawer instead of the side
 | **David pushes and deploys; Claude edits, tests and commits.** Claude's settings deny `git push`, the deploy and cleanup scripts, and `terraform apply`/`destroy` | Nothing reaches GitHub or AWS without David | | `.claude/settings.local.json` (on the VDI); [AI-WORKFLOW.md](AI-WORKFLOW.md) |
 | **Workshop traps fixed when the work reached them:** Vite `strictPort` (no silent move to another port); folder names the template's `.gitignore` drops (`lib`, `build`, `dist`, …) avoided; `backend/tracker/.gitignore` for the packages `start-dev.sh` vendors; tests outside `backend/` so CI's bandit doesn't flag test `assert`s | Each one was found by reading the template's code | | `frontend/vite.config.js`, `.gitignore` |
 | **Swagger UI** (15 Oct): `docs/swagger.html` loads Swagger UI 5.33.0 from jsDelivr, pinned with integrity hashes, served on this machine by `./tools/swagger.sh` (port 8090); signing in fills Authorize with the token | Evaluators can try every route on Local or AWS without Postman | | [API.md](API.md) |
-| **Every AWS login is published, the admin's too** (15 Oct), although the GitHub repo is public | The repo is for David's employers, who must be able to do everything he does from the repo alone. The site holds demo data only, and its accounts belong to the temporary workshop account | Keeping passwords out of the repo | [main README](../README.md) |
+| **Every AWS login is published, the admin's too** (15 Oct), although the GitHub repo is public | The repo is for David's employers, who must be able to do everything David does from the repo alone. The site holds demo data only, and its accounts belong to the temporary workshop account | Keeping passwords out of the repo | [main README](../README.md) |
 
 ## 13. Documentation and the repo
 

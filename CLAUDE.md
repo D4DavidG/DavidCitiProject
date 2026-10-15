@@ -61,7 +61,7 @@ outdated it.
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
   and cleanup scripts, and `terraform apply`/`destroy`. Every other shell command runs
   without a prompt (a blanket `"Bash"` allow, added 14 Oct at David's request; delete
-  that line to go back). Hand him the exact commands for the denied ones.
+  that line to go back). Hand David the exact commands for the denied ones.
 - **Open items:**
   - the Lambda URL's CORS headers now name `authorization` and `content-type` instead of
     `*` (`infra/lambda.tf`, 15 Oct, for Swagger UI); on AWS after the next
@@ -369,8 +369,8 @@ chat on 13 Oct.
 echo "export AWS_REGION='us-east-2'"           >> ~/.bashrc
 echo "export EVENT_ID='01a127f2'"              >> ~/.bashrc
 echo "export PARTICIPANT_ID='c7dabfc1'"        >> ~/.bashrc
-echo "export PARTICIPANT_CODE='<from email>'"  >> ~/.bashrc
-echo "export LOCALSTACK_AUTH_TOKEN='<token>'"  >> ~/.bashrc
+read -rsp 'Participant code: ' secret; echo; echo "export PARTICIPANT_CODE='$secret'" >> ~/.bashrc
+read -rsp 'LocalStack token: ' secret; echo; echo "export LOCALSTACK_AUTH_TOKEN='$secret'" >> ~/.bashrc; unset secret
 source ~/.bashrc
 ./bin/setup-participant.sh && aws sts get-caller-identity
 ./bin/setup-environment.sh -d     # sudo password = VDI password; takes a long time

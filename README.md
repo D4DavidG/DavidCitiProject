@@ -183,6 +183,14 @@ Each important folder has its own README:
 | `tools/` | [tools/README.md](tools/README.md): demo data, Swagger, the browser-test runner, the OpenAPI builder |
 | `docs/` | [docs/README.md](docs/README.md): the index of every guide |
 
+`.github/` has no README. Its [workflows](.github/workflows/) run three security checks on every
+push: bandit on `backend/` (`python.actions.yml`), `npm audit` at high severity on `frontend/`
+(`react.actions.yml`) and Checkov on the Terraform (`terraform.actions.yml`). Its instructions
+are the organisation's coding rules for AI assistants, one per language:
+[Python](.github/instructions/python.instructions.md),
+[React](.github/instructions/react.instructions.md) and
+[Terraform](.github/instructions/terraform.instructions.md).
+
 ## Tests
 
 About 1,500 automated tests, in four kinds. **Backend** (pytest, 648 tests, 97% of statements)
