@@ -44,6 +44,33 @@ describe('MyTasksPage', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ status: 'DONE' }))
   })
 
+  it('disables the card while its status change is saving, and enables it after', async () => {
+    renderPage({ 'POST /tasks/20/status': [200, { ...PORTAL, status: 'DONE' }] })
+    const release = holdOpen('/tasks/20/status')
+    const task = await screen.findByRole('article', { name: 'Portal UI' })
+    await userEvent.click(within(task).getByLabelText(/status/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Done' }))
+    const status = within(task).getByRole('combobox', { name: /status/i })
+    await waitFor(() => expect(status).toHaveAttribute('aria-disabled', 'true'))
+    expect(within(task).getByRole('button', { name: /log time/i })).toBeDisabled()
+    release()
+    await waitFor(() => expect(status).not.toHaveAttribute('aria-disabled'))
+    expect(within(task).getByRole('button', { name: /log time/i })).toBeEnabled()
+  })
+
+  it('enables the card again when a status change is refused, and says why', async () => {
+    renderPage({ 'POST /tasks/20/status': [409, { error: 'Only the assignee can move this task.' }] })
+    const release = holdOpen('/tasks/20/status')
+    const task = await screen.findByRole('article', { name: 'Portal UI' })
+    await userEvent.click(within(task).getByLabelText(/status/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Done' }))
+    await waitFor(() => expect(within(task).getByRole('button', { name: /log time/i })).toBeDisabled())
+    release()
+    expect(await screen.findByText('Only the assignee can move this task.')).toBeInTheDocument()
+    expect(within(task).getByRole('combobox', { name: /status/i })).not.toHaveAttribute('aria-disabled')
+    expect(within(task).getByRole('button', { name: /log time/i })).toBeEnabled()
+  })
+
   it('logs time, with the date defaulting to today', async () => {
     const calls = renderPage({ 'POST /tasks/20/time-entries': [201, ENTRY] })
     const task = await screen.findByRole('article', { name: 'Portal UI' })
