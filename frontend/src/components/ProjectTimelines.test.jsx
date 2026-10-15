@@ -173,6 +173,16 @@ describe('ProjectTimelines', () => {
     expect(screen.getByRole('region', { name: 'Weeks, scrolls sideways' })).toHaveAttribute('tabindex', '0')
   })
 
+  it('keeps the sticky project name above every mark that scrolls under it', async () => {
+    renderTimelines()
+    await projectBar('Apollo')
+    const row = screen.getByRole('link', { name: 'Apollo' }).closest('li')
+    const nameCell = within(row).getByRole('link', { name: 'Apollo' }).parentElement
+    const layers = [...row.querySelectorAll('[data-mark]')].map((mark) => Number(getComputedStyle(mark).zIndex) || 0)
+    expect(layers.length).toBeGreaterThan(3)
+    expect(Number(getComputedStyle(nameCell).zIndex)).toBeGreaterThan(Math.max(...layers))
+  })
+
   it('explains the marks in a legend', async () => {
     renderTimelines()
     await projectBar('Apollo')

@@ -39,9 +39,9 @@ const ROW = {
   display: 'grid',
   gridTemplateColumns: { xs: `${NAME.xs} minmax(calc(${WINDOW_WEEKS} * ${WEEK}), 1fr)`, md: `${NAME.md} minmax(calc(${WINDOW_WEEKS} * ${WEEK}), 1fr)` },
 }
-/** The name stays on screen while the weeks scroll sideways under it. */
+/** The name stays on screen while the weeks scroll sideways under it: above every mark (bar 1, deliverable 2). */
 const NAME_CELL = {
-  position: 'sticky', left: 0, zIndex: 2, bgcolor: 'background.paper', pr: 1, py: 1,
+  position: 'sticky', left: 0, zIndex: 3, bgcolor: 'background.paper', pr: 1, py: 1,
   borderRight: 1, borderColor: 'divider', overflowWrap: 'anywhere',
 }
 
