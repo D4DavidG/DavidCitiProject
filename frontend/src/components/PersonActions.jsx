@@ -22,6 +22,8 @@ const CAPACITY_FIELDS = [
   { name: 'taskLimit', label: 'Task limit', type: 'number', min: 1, max: 10, helper: 'The most unfinished tasks they can take from the board themselves, 1 to 10. Managers can still assign past it.' },
 ]
 
+const SALARY_HELPER = 'At least $41,600 a year ($20 an hour). The hourly rate used for project costs is salary ÷ 2,080.'
+
 function accountFields(managers) {
   return [
     { name: 'firstName', label: 'First name', required: true },
@@ -30,7 +32,10 @@ function accountFields(managers) {
     { name: 'role', label: 'Role', type: 'select', options: ROLE_OPTIONS, required: true },
     { name: 'jobTitle', label: 'Job title' },
     { name: 'managerId', label: 'Line manager', type: 'select', numeric: true, options: managers, helper: 'Approves their logged time.' },
-    { name: 'annualSalaryCents', label: 'Annual salary ($)', type: 'money', helper: 'Sets their hourly rate for project costs (salary ÷ 2,080).' },
+    // Required on a new account and on an edit (an unchanged empty box is never checked, so an
+    // account without a salary can still be edited). The $20-an-hour floor is the server's rule:
+    // its 400 shows on this box, and the browser does no money arithmetic.
+    { name: 'annualSalaryCents', label: 'Annual salary ($)', type: 'money', required: true, helper: SALARY_HELPER },
   ]
 }
 

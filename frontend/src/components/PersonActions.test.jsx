@@ -107,6 +107,20 @@ describe('PersonActions', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ jobTitle: 'Senior developer' }))
   })
 
+  it("won't clear a salary on edit: the box is required, with the $20-an-hour minimum under it", async () => {
+    const calls = renderActions({ person: { ...BEN, annualSalaryCents: 10_000_000 } })
+    await menuItems('Ben Okafor')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit details' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Ben Okafor' })
+    const salary = within(dialog).getByLabelText(/annual salary/i)
+    expect(salary).toBeRequired()
+    expect(salary).toHaveAccessibleDescription(/^At least \$41,600 a year \(\$20 an hour\)\./)
+    await userEvent.clear(salary)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(salary).toHaveAccessibleDescription('This field is required.'))
+    expect(calls.some((c) => c.method === 'PATCH')).toBe(false)
+  })
+
   it('archives after a confirm whose button is the red kind', async () => {
     const calls = renderActions({ person: BEN }, { answers: { 'POST /users/4/archive': [200, { ...BEN, isArchived: true }] } })
     await menuItems('Ben Okafor')
