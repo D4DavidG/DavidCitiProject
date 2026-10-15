@@ -1,30 +1,15 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Link } from 'react-router'
-import { Alert, Box, Button, Menu, MenuItem, Tab, Tabs, TextField } from '@mui/material'
+import { Alert, Box, Button, Menu, MenuItem, Tab, Tabs } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
-import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
 import PageHeader from '../../components/PageHeader'
-import PageState, { Pager } from '../../components/PageState'
-import StatusChip from '../../components/StatusChip'
 import { useAuth } from '../../auth/useAuth'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import RequestList from './RequestList'
+import { KIND_LABELS, SCOPES_BY_ROLE, SEND_KINDS, TAB_LABELS, kindsOn } from './constants'
 
-const KIND_LABELS = {
-  NEW_PROJECT: 'New project',
-  ARCHIVE_PROJECT: 'Archive a project',
-  TASK_LIMIT: 'Raise my task limit',
-  OVERTIME: 'Allow overtime',
-  OTHER: 'Something else',
-}
-/** The kinds each role may send (the server's SENDERS). Admins have nobody to ask. */
-const SEND_KINDS = {
-  MANAGER: ['NEW_PROJECT', 'ARCHIVE_PROJECT', 'OTHER'],
-  EMPLOYEE: ['TASK_LIMIT', 'OVERTIME', 'OTHER'],
-  ADMIN: [],
-}
 const NOTE = { name: 'justification', label: 'Why is it needed?', type: 'textarea', required: true }
 /** The form for each kind; ARCHIVE_PROJECT's project options are filled in when it opens. */
 const FIELDS_BY_KIND = {
@@ -55,7 +40,7 @@ const EFFECTS = {
 }
 const SUBTITLES = {
   EMPLOYEE: 'Ask your line manager for a higher task limit, overtime or anything else.',
-  MANAGER: 'Ask the admins for a project or to archive one. Your team\'s requests are under To decide.',
+  MANAGER: 'Ask the admins for a project or to archive one. Your team\'s requests are under Approve or deny.',
   ADMIN: 'Requests from managers and employees. Approving applies the change.',
 }
 
@@ -80,56 +65,31 @@ SendDialog.propTypes = {
   onClose: PropTypes.func.isRequired,
 }
 
+/** A list's starting search, filters and page. */
+const FRESH_VIEW = { q: '', status: '', kind: '', page: 1 }
+
 /**
- * Requests: employees ask their line manager, managers ask the admins. Employees see
- * their own (Mine), admins what they decide (To decide), managers both, as tabs.
- * Approve and Reject show only on To decide; the server re-checks every decision.
+ * Requests: employees ask their line manager, managers ask the admins. Two lists, each
+ * with its own search, filters and pages: "My requests" (what you sent; employees and
+ * managers) and "Approve or deny" (what waits for your decision; managers and admins).
+ * A manager has both as tabs; an employee or an admin has the one list that is theirs.
+ * Approve and Reject show only on "Approve or deny"; the server re-checks every decision.
  */
 export default function RequestsPage() {
   const { user } = useAuth()
   const sendKinds = SEND_KINDS[user.role]
-  const [tab, setTab] = useState('MINE')
-  const scope = { EMPLOYEE: 'MINE', ADMIN: 'TO_DECIDE' }[user.role] ?? tab
-  const [status, setStatus] = useState('')
-  const [kind, setKind] = useState('')
-  const [pageNumber, setPageNumber] = useState(1)
+  const scopes = SCOPES_BY_ROLE[user.role]
+  const [tab, setTab] = useState('sent')
+  const scope = scopes.includes(tab) ? tab : scopes[0]
+  const [views, setViews] = useState({ sent: FRESH_VIEW, decide: FRESH_VIEW }) // each tab keeps its own
+  const [version, setVersion] = useState(0)
   const [menuAnchor, setMenuAnchor] = useState(null)
   const [dialog, setDialog] = useState(null) // { action: 'send'|'approve'|'reject', kind?, request? }
   const [message, setMessage] = useState(null)
 
-  const load = useCallback(() => request('GET', '/project-requests', {
-    query: { scope, status, kind, page: pageNumber, pageSize: 20 },
-  }), [scope, status, kind, pageNumber])
-  const { data, error, loading, reload } = useApi(load)
-
-  const columns = [
-    { key: 'name', label: 'Request' },
-    { key: 'kind', label: 'Kind', render: (r) => KIND_LABELS[r.kind] },
-    { key: 'requesterName', label: 'Asked by' },
-    { key: 'justification', label: 'Why' },
-    { key: 'status', label: 'Status', render: (r) => <StatusChip status={r.status} /> },
-    { key: 'decisionNote', label: 'Decision note' },
-    {
-      key: 'actions',
-      label: '',
-      align: 'right',
-      render: (r) => (
-        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          {r.createdProjectId && <Button size="small" component={Link} to={`/projects/${r.createdProjectId}`}>Open project</Button>}
-          {scope === 'TO_DECIDE' && r.status === 'PENDING' && (
-            <>
-              <Button size="small" variant="contained" color="success" aria-label={`Approve ${r.name}`} onClick={() => setDialog({ action: 'approve', request: r })}>Approve</Button>
-              <Button size="small" color="error" aria-label={`Reject ${r.name}`} onClick={() => setDialog({ action: 'reject', request: r })}>Reject</Button>
-            </>
-          )}
-        </Box>
-      ),
-    },
-  ]
-
   const r = dialog?.request
   const close = () => setDialog(null)
-  const pick = (setter) => (e) => { setter(e.target.value); setPageNumber(1) }
+  const reload = () => setVersion((n) => n + 1)
   const decide = async (action, body) => {
     await request('POST', `/project-requests/${r.requestId}/${action}`, { body })
     setMessage(action === 'approve' && r.kind === 'NEW_PROJECT' ? `Approved: project ${r.name} created.` : `${action === 'approve' ? 'Approved' : 'Rejected'}: ${r.name}.`)
@@ -150,29 +110,22 @@ export default function RequestsPage() {
         ))}
       </Menu>
       {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
-      {user.role === 'MANAGER' && (
-        <Tabs value={tab} onChange={(_, value) => { setTab(value); setPageNumber(1) }} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Tab value="MINE" label="Mine" />
-          <Tab value="TO_DECIDE" label="To decide" />
+      {scopes.length > 1 && (
+        <Tabs value={scope} onChange={(_, value) => setTab(value)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+          {scopes.map((s) => <Tab key={s} value={s} label={TAB_LABELS[s]} id={`requests-tab-${s}`} aria-controls="requests-panel" />)}
         </Tabs>
       )}
-      <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <TextField id="requests-status" select size="small" label="Status" value={status} onChange={pick(setStatus)} sx={{ minWidth: 180 }}>
-          <MenuItem value="">All statuses</MenuItem>
-          <MenuItem value="PENDING">Pending</MenuItem>
-          <MenuItem value="APPROVED">Approved</MenuItem>
-          <MenuItem value="REJECTED">Rejected</MenuItem>
-        </TextField>
-        <TextField id="requests-kind" select size="small" label="Kind" value={kind} onChange={pick(setKind)} sx={{ minWidth: 200 }}>
-          <MenuItem value="">All kinds</MenuItem>
-          {(user.role === 'EMPLOYEE' ? sendKinds : Object.keys(KIND_LABELS)).map((k) => <MenuItem key={k} value={k}>{KIND_LABELS[k]}</MenuItem>)}
-        </TextField>
+      <Box role={scopes.length > 1 ? 'tabpanel' : undefined} id="requests-panel" aria-labelledby={scopes.length > 1 ? `requests-tab-${scope}` : undefined}>
+        <RequestList
+          key={scope}
+          scope={scope}
+          kinds={kindsOn(user.role, scope)}
+          view={views[scope]}
+          version={version}
+          onView={(patch) => setViews((all) => ({ ...all, [scope]: { ...all[scope], ...patch } }))}
+          onDecide={(action, found) => setDialog({ action, request: found })}
+        />
       </Box>
-
-      <PageState loading={loading && !data} error={error} onRetry={reload}>
-        <DataTable columns={columns} rows={data?.items ?? []} rowKey="requestId" label="Requests" empty="No requests." />
-        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
-      </PageState>
 
       {dialog?.action === 'send' && (
         <SendDialog

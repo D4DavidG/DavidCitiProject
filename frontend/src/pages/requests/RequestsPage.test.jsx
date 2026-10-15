@@ -64,30 +64,95 @@ describe('RequestsPage', () => {
     expect(await menuOf(USERS.manager)).toEqual(['New project', 'Archive a project', 'Something else'])
   })
 
-  it('admin has no New request button and decides from the To decide list', async () => {
+  it('admin has no New request button and goes straight to the requests waiting for a decision', async () => {
     const calls = renderRequests(USERS.admin)
     await table()
     expect(screen.queryByRole('button', { name: /new request/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
-    expect(calls[0].query.scope).toBe('TO_DECIDE')
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument() // admins send nothing, so "My requests" would always be empty
+    expect(calls[0].query.scope).toBe('decide')
+    expect(screen.getByRole('button', { name: /approve allow overtime/i })).toBeInTheDocument()
   })
 
-  it('manager sees Mine and To decide tabs; To decide asks for scope=TO_DECIDE', async () => {
+  it('manager sees My requests and Approve or deny tabs; the second asks for scope=decide', async () => {
     const calls = renderRequests(USERS.manager)
     await table()
-    expect(calls.at(-1).query.scope).toBe('MINE')
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['My requests', 'Approve or deny'])
+    expect(screen.getByRole('tab', { name: 'My requests' })).toHaveAttribute('aria-selected', 'true')
+    expect(calls.at(-1).query.scope).toBe('sent')
     expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('tab', { name: /to decide/i }))
-    await waitFor(() => expect(calls.at(-1).query.scope).toBe('TO_DECIDE'))
+    await userEvent.click(screen.getByRole('tab', { name: 'Approve or deny' }))
+    await waitFor(() => expect(calls.at(-1).query.scope).toBe('decide'))
     expect(await screen.findByRole('button', { name: /approve allow overtime/i })).toBeInTheDocument()
   })
 
-  it('employee sees no tabs and no Approve button', async () => {
+  it('employee sees only their own requests: no tabs, no Approve button, scope=sent', async () => {
     const calls = renderRequests(USERS.employee)
     await table()
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument()
-    expect(calls[0].query.scope).toBe('MINE')
+    expect(calls[0].query.scope).toBe('sent')
+  })
+
+  describe('search', () => {
+    const box = () => screen.getByRole('textbox', { name: 'Search requests' })
+
+    it('searches the server from the box, back to page 1', async () => {
+      const calls = renderRequests(USERS.employee, { 'GET /project-requests': [200, page([IRIS], { totalPages: 3 })] })
+      await table()
+      expect(calls[0].query.q).toBeUndefined()
+      await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+      await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+      await userEvent.type(box(), 'iris')
+      await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'iris', scope: 'sent', page: '1' }))
+    })
+
+    it('gives each tab its own search and its own page', async () => {
+      const calls = renderRequests(USERS.manager, { 'GET /project-requests': [200, page([IRIS], { totalPages: 3 })] })
+      await table()
+      await userEvent.type(box(), 'iris')
+      await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'iris', scope: 'sent' }))
+      await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+      await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'iris', scope: 'sent', page: '2' }))
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Approve or deny' }))
+      await waitFor(() => expect(calls.at(-1).query.scope).toBe('decide'))
+      expect(calls.at(-1).query.q).toBeUndefined()
+      expect(calls.at(-1).query.page).toBe('1')
+      expect(box()).toHaveValue('')
+      await userEvent.type(box(), 'ben')
+      await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'ben', scope: 'decide', page: '1' }))
+
+      await userEvent.click(screen.getByRole('tab', { name: 'My requests' }))
+      await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'iris', scope: 'sent', page: '2' }))
+      expect(box()).toHaveValue('iris')
+    })
+
+    it('says so when a search or filter finds nothing', async () => {
+      renderRequests(USERS.employee, { 'GET /project-requests': ({ query }) => [200, page(query.q ? [] : [IRIS])] })
+      await table()
+      await userEvent.type(box(), 'zzz')
+      expect(await screen.findByText('No requests match.')).toBeInTheDocument()
+    })
+
+    it('says "No requests." when there are none at all', async () => {
+      renderRequests(USERS.employee, { 'GET /project-requests': [200, page([])] })
+      expect(await screen.findByText('No requests.')).toBeInTheDocument()
+    })
+  })
+
+  it('offers each tab the kinds that can be on it', async () => {
+    renderRequests(USERS.manager)
+    await table()
+    const kinds = async () => {
+      await userEvent.click(screen.getByLabelText(/^kind/i))
+      const names = within(await screen.findByRole('listbox')).getAllByRole('option').map((o) => o.textContent)
+      await userEvent.keyboard('{Escape}')
+      return names
+    }
+    expect(await kinds()).toEqual(['All kinds', 'New project', 'Archive a project', 'Something else']) // what a manager sends
+    await userEvent.click(screen.getByRole('tab', { name: 'Approve or deny' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /approve allow overtime/i })).toBeInTheDocument())
+    expect(await kinds()).toEqual(['All kinds', 'Raise my task limit', 'Allow overtime', 'Something else']) // what employees send
   })
 
   it('asking for a task limit sends kind and taskLimit', async () => {
@@ -134,6 +199,17 @@ describe('RequestsPage', () => {
     await waitFor(() => expect(posted(calls).body).toEqual({
       startDate: '2026-11-01', predictedEndDate: '2027-02-28', budgetCents: 6_000_000,
     }))
+  })
+
+  it('loads the list again, once, after a decision and after a send', async () => {
+    const calls = renderRequests(USERS.admin, { 'POST /project-requests/3/reject': [200, { ...IRIS, status: 'REJECTED' }] })
+    const listLoads = () => calls.filter((c) => c.method === 'GET' && c.path === '/project-requests').length
+    const rows = await table()
+    expect(listLoads()).toBe(1)
+    await userEvent.click(within(rows).getByRole('button', { name: /reject iris/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^reject$/i }))
+    expect(await screen.findByText('Rejected: Iris.')).toBeInTheDocument()
+    await waitFor(() => expect(listLoads()).toBe(2))
   })
 
   it('rejecting sends the note', async () => {
