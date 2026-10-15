@@ -11,7 +11,7 @@ traps found by reading it, and how to work with David.
 
 **Audience (from 15 Oct, after the demo):** the repo is now for David's employers (Citi),
 who must be able to do everything David does from the repo alone. They start at
-`README.md`; every guide is listed in `docs/README.md`, and each important folder has its
+[README.md](README.md); every guide is listed in [docs/README.md](docs/README.md), and each important folder has its
 own README. David chose to publish every AWS login, the admin's too, in `README.md`,
 although the GitHub repo is public. Never write David's own local admin password anywhere.
 
