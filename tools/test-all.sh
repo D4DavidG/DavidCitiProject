@@ -119,7 +119,7 @@ if listening 3000 && listening 3001; then
     axe_ok="$(grep -c "✓.*(axe)" "$LOGS/e2e.log")"
     axe_bad="$(grep -c "✘.*(axe)" "$LOGS/e2e.log")"
     if [ "$axe_bad" -gt 0 ]; then record "Accessibility" FAIL "axe found serious problems; see $LOGS/e2e.log"
-    elif [ "$axe_ok" -eq 4 ]; then record "Accessibility" PASS "axe on every tour screen, 4 tests, 48 scans, WCAG A/AA"
+    elif [ "$axe_ok" -eq 4 ]; then record "Accessibility" PASS "axe on every tour screen, 4 tests, 50 scans, WCAG A/AA"
     else record "Accessibility" SKIP "tour did not run"; fi
   else
     echo "Seeded users not found in the local database. Run tools/demo.py seed, or set"
