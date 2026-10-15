@@ -208,17 +208,17 @@ users ─┬─ manages ─► projects ─┬─► assignments (person × hour
 every change ──► audit_log ──► notifications (one per person told)
 ```
 
-**The rules Postgres holds** (counted from `pg_constraint` on 14 Oct):
+**The rules Postgres holds** (counted from `pg_constraint` on 14 Oct, evening, with all five migrations applied):
 
 | What | How many | Example |
 | --- | --- | --- |
-| CHECK rules | 47 | A booking is 1 to 40 h/week; a budget can't be negative; you can't approve your own time |
-| Foreign keys (links between tables) | 27 | A task must belong to a real deliverable |
-| Primary keys | 11 | One per table, `schema_migrations` included |
-| UNIQUE | 5, plus a unique index on `lower(email)` | A username is used once; two people can't share an email, whatever the capitals |
+| CHECK rules | 50 | A booking is 1 to 40 h/week; a budget can't be negative; you can't approve your own time |
+| Foreign keys (links between tables) | 29 | A task must belong to a real deliverable |
+| Primary keys | 12 | One per table, `schema_migrations` included |
+| UNIQUE | 6, plus a unique index on `lower(email)` | A username is used once; two people can't share an email, whatever the capitals |
 | Exclusion constraint | 1 (`assignments_no_overlap`) | The same person can't be booked twice on the same project for overlapping dates |
-| Triggers | 10 | DELETE is refused on 9 tables; `audit_log` refuses UPDATE and DELETE |
-| Migration files | 2 | `001_init.sql`, then `002_task_limit.sql` (adds `users.task_limit`, CHECK 1 to 10) |
+| Triggers | 11 | DELETE is refused on 10 tables; `audit_log` refuses UPDATE and DELETE |
+| Migration files | 5 | `001_init.sql`; `002_task_limit.sql` (`users.task_limit`, 1 to 10); `003_request_kinds.sql` (request kinds); `004_over_capacity.sql` (the over-capacity mark on logged time); `005_sessions.sql` (`refresh_tokens`, `users.password_changed_at`) |
 | Integrity queries | 5 | No dependency loops, no time logged outside a booking, ... (`store/integrity.py`) |
 
 **Questions they'll likely ask about the tables:**
