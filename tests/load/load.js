@@ -1,11 +1,15 @@
 /*
  * k6 load test for the tracker API: many managers reading the dashboard at once, plus a burst of logins.
  *
- *   Local (through the proxy on 3001; LocalStack itself fails past about 15 users, so 10 at most):
- *     K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
- *   AWS (David runs it; 25 users, as the removed Python load test did on 13 Oct):
+ * Run from the repo root. The full guide is docs/TESTING.md ("k6 load test").
+ *   Local (through the proxy on 3001; LocalStack itself fails past about 15 users, so 10 at most).
+ *   Maria Lopez's local username differs on every machine, so it is looked up in the local database:
+ *     K6_USERNAME=$(PGPASSWORD=postgres123 psql -h localhost -U postgres -d postgres -At \
+ *       -c "SELECT username FROM users WHERE email = 'maria.lopez@acme.test' AND NOT is_archived") \
+ *     K6_PASSWORD=Demo-pass-2026 k6 run tests/load/load.js
+ *   AWS (25 users, as the removed Python load test did on 13 Oct; ML662930 is Maria on the live site):
  *     K6_PROFILE=aws K6_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net/api/tracker \
- *     K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js
+ *     K6_USERNAME=ML662930 K6_PASSWORD=Demo-pass-2026 k6 run tests/load/load.js
  *
  * Two scenarios:
  *   reads  - each virtual user logs in once, then loops over the reads a manager's screens make

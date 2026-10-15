@@ -1,50 +1,47 @@
-# Coding Workshop - Main Guide
+# Documentation index
 
-> **Main Guide** | [Validation Guide](./validation.md) | [Full Stack Guide](./full-stack.md)
+> **For:** anyone looking for a guide. **Answers:** which document explains what, and where it
+> is. Back to the [project README](../README.md).
 
-> This folder is the workshop's guide. For the ACME Project Tracker itself (what it does, how to run and test it), start at the [project README](../README.md).
+## The guides
 
-This folder contains a comprehensive set of documentation to guide you through building a complete web application that meets all specifications and requirements. The goal is to evaluate your effectiveness in delivering a fully working application. Your implementation will be assessed against expected deliverables and milestones.
+Read them in this order if you are new: requirements, then architecture, then whichever you need.
 
-## Learning Objectives
+| Guide | Read it to learn |
+| --- | --- |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | What the workshop brief asked for and which screen meets each item; the seven client questions; who may do what; the rules the app enforces; how the money is worked out |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How a request travels from the browser to Postgres and back; the layers of the API; where every piece of data lives; the security measures, in plain words |
+| [API.md](API.md) | Every endpoint and who may call it; how to sign in and call the API from Swagger UI, Postman or curl, locally and on AWS; the error shapes and codes; how to watch the audit log and notifications |
+| [TESTING.md](TESTING.md) | What every test suite proves, where it lives and why it is there; how to run each one, locally and against AWS; coverage, its gaps and their reasons; the load test results |
+| [SETUP.md](SETUP.md) | How to set up a machine, run the app locally, sign in locally, load demo data, deploy to AWS, and fix what usually goes wrong |
+| [DECISIONS.md](DECISIONS.md) | Every design decision David made, why, and what was rejected (archive instead of delete, logged time instead of payroll, refresh tokens in the body, and more) |
+| [AI-WORKFLOW.md](AI-WORKFLOW.md) | How David built it with Claude Code: the instructions file, how work was split between agents, the orchestration, and how every claim was checked |
 
-By completing this workshop, you will:
+## The API files
 
-- [x] Create responsive React applications with Material UI components
-- [x] Understand microservices architecture (or services oriented architecture)
-- [x] Build RESTful APIs with Python (or similar language)
-- [x] Experience relational databases with PostgreSQL (or similar database)
-- [x] Write comprehensive tests
-- [x] Deploy applications to AWS Serverless
-- [x] Follow software engineering best practices
-- [x] Deliver a production-ready application
+| File | What it is |
+| --- | --- |
+| [openapi.json](openapi.json) | The API description (OpenAPI 3.0.3, 71 operations), built from the route table by `tools/openapi.py`; a test fails if it falls out of date. Import it into Postman or SwaggerHub |
+| [swagger.html](swagger.html) | Swagger UI, which reads `openapi.json`. Serve it with `./tools/swagger.sh` and open http://localhost:8090/swagger.html; pick the Local or AWS server. Steps: [API.md](API.md) |
 
-## Prerequisites
+## Pictures
 
-Before starting, ensure you have:
+[screenshots/](screenshots/) holds the screenshots the project README shows (dashboard,
+allocation grid, project, dependency view, phone). Playwright's `frontend/e2e/screenshots.spec.js`
+retakes them on request; see [TESTING.md](TESTING.md).
 
-- Access to your [GitHub](https://github.com) account.
-- Access to your [LocalStack](https://www.localstack.cloud) account.
-- Email from your workshop organizer(s) with details such as Registration Code, Event ID, Participant ID, and Participant Code.
-- Access to pre-installed AWS Serverless environment (you will need Event ID, Participant ID and Participant Code).
-- Access to pre-installed VDI (Virtual Desktop) instance (you will need Registration Code, Participant ID and Participant Code):
-  - Connect to VDI through [WorkSpaces WebUI](https://webclient.amazonworkspaces.com/), or
-  - Install VDI client through [WorkSpaces Client](https://clients.amazonworkspaces.com/) on your personal computer / laptop.
+## The folder READMEs
 
-## Next Steps
+| README | Answers |
+| --- | --- |
+| [../README.md](../README.md) | What the tool is, the live site and every login, how to navigate the repo |
+| [../backend/README.md](../backend/README.md) | The API's code: layers, route table, how a request is handled |
+| [../frontend/README.md](../frontend/README.md) | The website's code: screens, shared components, unit and browser tests |
+| [../tests/README.md](../tests/README.md) | Every test suite, where it lives and the command that runs it |
+| [../infra/README.md](../infra/README.md) | What Terraform builds on AWS and in LocalStack |
+| [../bin/README.md](../bin/README.md) | The shell scripts that set up, run, deploy and clean up |
+| [../tools/README.md](../tools/README.md) | Our helper scripts: demo data, Swagger, browser tests, OpenAPI |
+| [../CLAUDE.md](../CLAUDE.md) | The working notes Claude Code reads on every session: rules, decisions, traps, commands |
 
-1. Follow the [Validation Guide](./validation.md) to make sure your development environment includes all prerequisites and requirements.
-2. Review the [Full Stack Guide](./full-stack.md) to understand the full stack engineering specific expectations and guidelines.
-
-> [!NOTE]
-> This project is on the full stack track, so only the **Validation Guide** and the **Full Stack Guide** are kept here; the other tracks' guides were removed.
-
-## Navigation Links
-
-<nav aria-label="breadcrumb">
-  <ol>
-    <li aria-current="page">Main Guide</li>
-    <li><a href="./validation.md">Validation Guide</a></li>
-    <li><a href="./full-stack.md">Full Stack Guide</a></li>
-  </ol>
-</nav>
+Not here on purpose: the organisation's coding instructions for AI assistants live in
+`.github/instructions/`, beside the CI checks in `.github/workflows/`.
