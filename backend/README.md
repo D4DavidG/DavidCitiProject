@@ -47,7 +47,7 @@ backend/
     │   └── errors.py          the one table from domain errors to HTTP status codes
     ├── domain/                plain values and rules; no database
     │   ├── errors.py          the exceptions services raise: NotFound, Forbidden, Conflict, ...
-    │   ├── money.py           the money formulas, in whole cents
+    │   ├── money.py           the money formulas, in whole cents; the minimum pay ($20 an hour)
     │   ├── values.py          read and check one field of a request body; a bad field names itself
     │   └── clock.py           ACME's "today", in Eastern time (Lambda and Aurora run in UTC)
     ├── services/              the business rules, one file per subject; no HTTP
@@ -69,6 +69,8 @@ backend/
     │   ├── time_entries.py    logged time: its rules, over capacity, approve and reject
     │   ├── tokens.py          the 15-minute access token (JWT, HS256), standard library only
     │   ├── users.py           accounts: create, sign in, passwords, self-edit, capacity, archive
+    │   │                      (asks first if they are still on live projects); pay of at least
+    │   │                      $20 an hour ($41,600 a year)
     │   └── views.py           the outside shape of every record, field by field
     └── store/                 PostgreSQL
         ├── postgres.py        connections, atomic() transactions, driver errors -> domain errors

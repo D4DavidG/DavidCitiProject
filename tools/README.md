@@ -12,7 +12,7 @@ up and deploying are in `bin/` instead ([bin/README.md](../bin/README.md)).
 | [`e2e.sh`](e2e.sh) | Runs the Playwright browser tests on the local stack or the live AWS site; can show the browser, record videos, or open Playwright's UI | You want to watch the app being tested, or check the live site |
 | [`test-all.sh`](test-all.sh) | Every automated check in one go, then a PASS/FAIL table | Before a commit or a deploy |
 | [`swagger.sh`](swagger.sh) | Serves Swagger UI, a web page to try every API endpoint | You want to call the API by hand, locally or on AWS |
-| [`demo.py`](demo.py) | `seed` fills an empty database with demo data; `demo` walks the seven questions, then tries to break every rule | A fresh local database; a terminal demo of the rules |
+| [`demo.py`](demo.py) | `seed` fills an empty database with demo data; `demo` walks the seven questions, then tries to break ten rules, each refused | A fresh local database; a terminal demo of the rules |
 | [`openapi.py`](openapi.py) | Rebuilds `docs/openapi.json` (the API description Swagger and Postman read) from the route table | After adding or changing a route |
 | [`tracker.http`](tracker.http) | Read-only API requests for VS Code's REST Client extension | You prefer VS Code to a browser for API calls |
 | [`console.py`](console.py) | Opens the AWS web console, already signed in | You want the Lambda, its logs or the database in AWS |
@@ -39,11 +39,11 @@ appears. What each test file checks, and why, is in [docs/TESTING.md](../docs/TE
 | Watch the demo walk in a real window (about 20 seconds) | `./tools/e2e.sh --show demo` |
 | The same, slower | `E2E_SLOWMO=800 ./tools/e2e.sh --show demo` |
 | The live AWS site, in a window | `./tools/e2e.sh --aws --show demo` |
-| Every test that is safe on the live site, no window | `./tools/e2e.sh --aws` |
+| The live site's default set, no window: `demo`, `history`, `schedule` and `tour`, the read-only files seen passing there (name `timeline`, `budget` or `workload` to add them) | `./tools/e2e.sh --aws` |
 | Every browser test, local, no window | `./tools/e2e.sh` |
 | Record a video of every test, then open the report that plays them | `./tools/e2e.sh --video demo` |
 | The same on the live site | `./tools/e2e.sh --aws --video history` |
-| Playwright's UI mode: pick a test, watch it, replay each step | `./tools/e2e.sh --ui` |
+| Playwright's UI mode: pick a test, watch it, replay each step (not with `--list`, `--report` or `--video`) | `./tools/e2e.sh --ui` |
 | Open Playwright's HTML report afterwards | `./tools/e2e.sh --report demo` |
 | Pass any option straight to Playwright (everything after `--`) | `./tools/e2e.sh --aws demo -- --headed` |
 | List the tests without running anything | `./tools/e2e.sh --list` |
@@ -81,8 +81,8 @@ Every demo person's password is `Demo-pass-2026`. Locally the usernames differ o
 machine, so the script reads them from the local database.
 
 **What you get:** `PASSED` or `FAILED` with a count. A failed test keeps a trace (a step-by-step
-recording), and the script prints where the full log is. Videos are copied to `~/e2e-videos`
-(change it with `E2E_VIDEO_DIR`). Exit code 0: all passed; 1: a test failed or Playwright could
+recording), and the script prints where the full log is. Videos are copied into a new dated folder
+under `~/e2e-videos` (change it with `E2E_VIDEO_DIR`). Exit code 0: all passed; 1: a test failed or Playwright could
 not run; 2: a mistake in the command.
 
 ## test-all.sh: every check, one table

@@ -68,9 +68,11 @@ frontend/
     │   └── personAccess.js    what the signed-in person may do to someone (hides what the
     │                          server would refuse)
     ├── components/        pieces the pages share
-    │   ├── AppLayout.jsx      the frame of every signed-in page: top bar with the search, side menu
-    │   │                      (icons only when collapsed, a drawer on phones), the "Saved" message
+    │   ├── AppLayout.jsx      the frame of every signed-in page: top bar, side menu (icons only
+    │   │                      when collapsed, a drawer on phones), the "Saved" message
     │   ├── navigation.js      the menu: labels, icons, order, and which roles see each item
+    │   ├── TopSearch.jsx      the top bar's search: your pages, and projects by name (/ or Ctrl+K)
+    │   ├── searchPages.js     which pages the search finds for each role, and other words for them
     │   ├── NotificationBell.jsx   the bell: unread count every 10 s, a pop-up for new ones
     │   ├── DataTable.jsx      a table on a computer, cards on a phone
     │   ├── FormDialog.jsx     every form: errors tied to their field, locked while saving, an
@@ -156,7 +158,8 @@ Every colour works in light and dark mode, with its contrast ratio written besid
 | --- | --- |
 | A colour | [`src/theme/theme.js`](src/theme/theme.js): the `light` and `dark` sets at the top. Keep the contrast comment true: [`src/theme/theme.test.jsx`](src/theme/theme.test.jsx) checks the ratios |
 | A chart colour | [`src/theme/chartColours.js`](src/theme/chartColours.js) (project colours are never green) |
-| A menu label, its order or who sees it | [`src/components/navigation.js`](src/components/navigation.js) |
+| A menu label, its order or who sees it | [`src/components/navigation.js`](src/components/navigation.js) (the top-bar search finds pages from the same list) |
+| Other words the search accepts for a page | `src/components/searchPages.js` |
 | A page's words | That page's file in `src/pages/`, for example [`src/pages/dashboard/DashboardPage.jsx`](src/pages/dashboard/DashboardPage.jsx): the words are plain text in the file |
 | How money, hours and dates read | [`src/services/format.js`](src/services/format.js) |
 | The phone width | [`src/theme/responsive.js`](src/theme/responsive.js) |
