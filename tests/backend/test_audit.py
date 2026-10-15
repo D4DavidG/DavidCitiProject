@@ -5,8 +5,10 @@
 |                     | the project's manager for project work    |
 | Manager             | every admin                               |
 | Admin               | every other admin                         |
+Whatever the actor's role, the person the record is about is told too (their account,
+their booking, their task: old and new assignee, their logged time), never the actor.
 Edge cases: no line manager -> admins only; a lone admin -> nobody; archived users
-receive nothing.
+receive nothing; nobody is told twice about one change.
 """
 
 import datetime as dt
@@ -93,15 +95,74 @@ def test_project_manager_who_is_also_the_line_manager_is_notified_once(conn, org
     assert recipients_of_last_change(conn) == sorted([org["boss"].user_id, org["admin"].user_id, org["admin2"].user_id])
 
 
-def test_manager_project_change_notifies_admins_only(conn, org, work):
+def test_manager_project_change_notifies_admins_and_the_assignee(conn, org, work):
+    # Not Alice's line manager (Bob): a manager's change goes up to the admins, and to the person it is about.
     tasks.update_task(conn, work["pam"], work["task"]["task_id"], {"title": "Renamed"})
-    assert recipients_of_last_change(conn) == sorted([org["admin"].user_id, org["admin2"].user_id])
+    assert recipients_of_last_change(conn) == sorted([org["admin"].user_id, org["admin2"].user_id,
+                                                      org["alice"].user_id])
 
 
 def test_archived_users_receive_nothing(conn, org):
     users.archive_user(conn, org["admin"], org["admin2"].user_id, NOW)
     users.update_self(conn, org["alice"], {"first_name": "Alicia"})
     assert recipients_of_last_change(conn) == sorted([org["boss"].user_id, org["admin"].user_id])
+
+
+# --- the person a change is about (redesign spec, section 4) ----------------------------
+
+def admins_and(org, *people):
+    return sorted([org["admin"].user_id, org["admin2"].user_id, *(p.user_id for p in people)])
+
+
+def test_a_change_to_your_account_tells_you(conn, org):
+    users.set_capacity(conn, org["boss"], org["alice"].user_id, {"weekly_capacity_hours": 30})
+    assert recipients_of_last_change(conn) == admins_and(org, org["alice"])
+
+
+def test_a_new_account_is_not_told_it_was_created(conn, org):
+    # Creation isn't a change to someone who already exists, and it would leave a stray first bell.
+    newcomer, _ = f.person(conn, org["admin"], manager=org["boss"])
+    assert newcomer.user_id not in recipients_of_last_change(conn)
+
+
+def test_being_booked_on_a_project_tells_you(conn, org, work):
+    other = f.project(conn, org["admin"], work["pam"])
+    f.booking(conn, work["pam"], other, org["alice"])
+    assert recipients_of_last_change(conn) == admins_and(org, org["alice"])
+
+
+def test_being_given_a_task_tells_you(conn, org, work):
+    f.task(conn, work["pam"], f.deliverable(conn, work["pam"], work["proj"]), assignee=org["alice"])
+    assert recipients_of_last_change(conn) == admins_and(org, org["alice"])
+
+
+def test_a_reassignment_tells_the_old_and_the_new_assignee(conn, org, work):
+    bea, _ = f.person(conn, org["admin"], manager=org["boss"], first_name="Bea")
+    f.booking(conn, work["pam"], work["proj"], bea)
+    tasks.update_task(conn, work["pam"], work["task"]["task_id"], {"assignee_user_id": bea.user_id})
+    assert recipients_of_last_change(conn) == admins_and(org, org["alice"], bea)
+
+
+def test_a_decision_on_your_logged_time_tells_you(conn, org, work):
+    entry = time_entries.log_time(conn, org["alice"], work["task"]["task_id"], {"work_date": "2026-10-13", "minutes": 90})
+    time_entries.decide_entry(conn, org["boss"], entry["entry_id"], approve=True)
+    assert recipients_of_last_change(conn) == admins_and(org, org["alice"])
+
+
+def test_you_are_not_told_about_your_own_change(conn, org, work):
+    tasks.move_task(conn, org["alice"], work["task"]["task_id"], "IN_PROGRESS")
+    assert org["alice"].user_id not in recipients_of_last_change(conn)
+
+
+def test_an_archived_subject_is_told_nothing(conn, org, work):
+    users.archive_user(conn, org["admin"], org["alice"].user_id, NOW)  # her task stays assigned to her
+    tasks.update_task(conn, work["pam"], work["task"]["task_id"], {"title": "Renamed"})
+    assert recipients_of_last_change(conn) == admins_and(org)
+
+
+def test_a_subject_who_is_already_told_gets_one_notification(conn, org):
+    users.admin_update(conn, org["admin"], org["admin2"].user_id, {"job_title": "Head of Operations"})
+    assert recipients_of_last_change(conn) == [org["admin2"].user_id]
 
 
 def manager_change(conn, org, also_notify):

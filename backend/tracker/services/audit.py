@@ -9,8 +9,11 @@ Recipients come from the actor's role stored in the database now, never the toke
     Manager  -> every admin
     Admin    -> every other admin
 
-A caller may name one more recipient (`also_notify`): the asker, when their
-request is decided. Archived users receive nothing. A lone admin's change
+Whatever the actor's role, the person the record is about is told too (_subjects):
+the account itself, the person booked, the task's assignee (old and new on a
+reassignment), the person whose time it is. A caller may name one more recipient
+(`also_notify`): the asker, when their request is decided. Never the actor; archived
+users receive nothing; one notification per person per change. A lone admin's change
 notifies nobody but is still recorded. Notification text is the one-line
 summary, never the before/after state, so no salary leaks through it.
 
@@ -42,16 +45,34 @@ def record_change(conn: psycopg.Connection, actor: Actor | None, action: str, en
          Jsonb(before) if before is not None else None, Jsonb(after) if after is not None else None, summary),
     ).fetchone()["audit_id"]
     if actor is not None:
+        # One row per user at most: each user is tested once against the whole condition.
         conn.execute(
             "INSERT INTO notifications (recipient_user_id, audit_id)"
             " SELECT u.user_id, %(audit)s FROM users u, users me"
             " WHERE me.user_id = %(me)s AND u.user_id <> me.user_id AND NOT u.is_archived"
-            "   AND (u.role = 'ADMIN' OR u.user_id = %(also)s"
+            "   AND (u.role = 'ADMIN' OR u.user_id = %(also)s OR u.user_id = ANY(%(subjects)s)"
             "        OR (me.role = 'EMPLOYEE' AND u.user_id IN (me.manager_id, %(pm)s)))",
             {"audit": audit_id, "me": actor.user_id, "also": also_notify,
+             "subjects": _subjects(action, entity_type, entity_id, before, after),
              "pm": _project_manager(conn, entity_type, entity_id)},
         )
     return audit_id
+
+
+# The person a record is about, by its snapshot field (services/views.py). A users row is about
+# itself once it exists: a new account isn't told it was created.
+_SUBJECT_FIELDS = {"assignments": "userId", "tasks": "assigneeUserId", "time_entries": "userId"}
+
+
+def _subjects(action: str, entity_type: str, entity_id: int | None, before: dict | None,
+              after: dict | None) -> list[int]:
+    """Who a change is about. Both snapshots count, so a reassigned task names the old and the new assignee."""
+    if entity_type == "users":
+        return [entity_id] if entity_id is not None and action != "CREATE" else []
+    key = _SUBJECT_FIELDS.get(entity_type)
+    if key is None:
+        return []
+    return sorted({snap[key] for snap in (before, after) if snap and snap.get(key) is not None})
 
 
 # Tables whose rows belong to one project (entity_type -> key column); each has a project_id.
