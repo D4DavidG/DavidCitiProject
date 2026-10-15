@@ -242,13 +242,27 @@ describe('SchedulePage', () => {
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBeUndefined())
   })
 
-  it('shows 8, 13 or 26 weeks', async () => {
+  it('shows 8, 13 or 26 weeks, chosen in a Weeks shown field like the other filters', async () => {
     const calls = renderSchedule()
     await bar(/Ben Okafor, Apollo, 25/)
-    await userEvent.click(screen.getByRole('button', { name: '13 wk' }))
-    await waitFor(() => expect(calls.at(-1).query.weeks).toBe('13'))
-    await userEvent.click(screen.getByRole('button', { name: '26 wk' }))
-    await waitFor(() => expect(calls.at(-1).query.weeks).toBe('26'))
+    const field = screen.getByRole('combobox', { name: 'Weeks shown' })
+    expect(field).toHaveTextContent('8 weeks')
+    await userEvent.click(field)
+    await userEvent.click(await screen.findByRole('option', { name: '13 weeks' }))
+    await waitFor(() => expect(lastAllocation(calls).query.weeks).toBe('13'))
+    expect(field).toHaveTextContent('13 weeks')
+    await userEvent.click(field)
+    await userEvent.click(await screen.findByRole('option', { name: '26 weeks' }))
+    await waitFor(() => expect(lastAllocation(calls).query.weeks).toBe('26'))
+  })
+
+  it('has no outline-only buttons: no toggle group, and every button with words is filled (spec 6.2)', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    expect(document.querySelector('.MuiToggleButton-root, .MuiToggleButtonGroup-root')).toBeNull()
+    const buttons = [...document.querySelectorAll('.MuiButton-root')]
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of buttons) expect(button).toHaveClass('MuiButton-contained')
   })
 
   it('asks the server for over-capacity people only when the switch is on', async () => {

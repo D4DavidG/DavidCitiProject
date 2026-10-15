@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import {
-  Box, Button, FormControlLabel, Pagination, Switch, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  Box, Button, FormControlLabel, MenuItem, Pagination, Switch, TextField, Tooltip, Typography,
 } from '@mui/material'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
@@ -261,15 +261,18 @@ export default function SchedulePage() {
           <Button size="small" variant="contained" endIcon={<NextIcon />} onClick={() => show(() => setWeekFrom(addDays(start, 7)))} disabled={!start}>Later</Button>
           <Button size="small" variant="contained" onClick={() => show(() => setWeekFrom(''))} disabled={!weekFrom}>This week</Button>
         </Box>
-        <ToggleButtonGroup
+        {/* A field like the other filters, not a toggle group: spec 6.2 allows no outline-only buttons. */}
+        <TextField
+          id="schedule-weeks"
+          select
+          label="Weeks shown"
           size="small"
-          exclusive
           value={span}
-          onChange={(_, value) => value && show(() => setSpan(value))}
-          aria-label="Weeks shown"
+          onChange={(e) => show(() => setSpan(Number(e.target.value)))}
+          sx={{ minWidth: 140 }}
         >
-          {SPANS.map((n) => <ToggleButton key={n} value={n} sx={{ textTransform: 'none' }}>{`${n} wk`}</ToggleButton>)}
-        </ToggleButtonGroup>
+          {SPANS.map((n) => <MenuItem key={n} value={n}>{`${n} weeks`}</MenuItem>)}
+        </TextField>
         <FormControlLabel
           control={<Switch checked={overOnly} onChange={(e) => show(() => setOverOnly(e.target.checked))} />}
           label="Over capacity only"
