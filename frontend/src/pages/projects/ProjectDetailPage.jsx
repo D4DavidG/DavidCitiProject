@@ -62,6 +62,8 @@ export default function ProjectDetailPage() {
   const [tab, setTab] = useState('deliverables')
   const [editing, setEditing] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [reactivating, setReactivating] = useState(false)
+  const [actionError, setActionError] = useState(null)
 
   const loadProject = useCallback(() => request('GET', `/projects/${projectId}`), [projectId])
   const project = useApi(loadProject)
@@ -73,6 +75,20 @@ export default function ProjectDetailPage() {
     [managerId],
   )
   const manager = useApi(loadManager)
+
+  /** Reactivate an archived project; the button is disabled until the answer, so one press sends one request. */
+  async function reactivate() {
+    setActionError(null)
+    setReactivating(true)
+    try {
+      await request('POST', `/projects/${projectId}/reactivate`)
+      project.reload()
+    } catch (failure) {
+      setActionError(failure.message)
+    } finally {
+      setReactivating(false)
+    }
+  }
 
   const p = project.data
   const isAdmin = user.role === 'ADMIN'
@@ -93,11 +109,12 @@ export default function ProjectDetailPage() {
                 {canManage && <Button variant="outlined" onClick={() => setEditing(true)}>Edit project</Button>}
                 {isAdmin && !p.isArchived && <Button color="inherit" onClick={() => setArchiving(true)}>Archive project</Button>}
                 {isAdmin && p.isArchived && (
-                  <Button variant="contained" onClick={async () => { await request('POST', `/projects/${projectId}/reactivate`); project.reload() }}>Reactivate</Button>
+                  <Button variant="contained" onClick={reactivate} disabled={reactivating}>{reactivating ? 'Reactivating…' : 'Reactivate'}</Button>
                 )}
               </>
             )}
           />
+          {actionError && <Alert severity="error" sx={{ mb: 2 }}>{actionError}</Alert>}
           {p.isArchived && <Alert severity="warning" sx={{ mb: 2 }}>This project is archived: hidden from lists and read-only, but kept with its history.</Alert>}
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>

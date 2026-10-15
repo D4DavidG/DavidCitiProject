@@ -180,6 +180,22 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/projects/1/archive')).toBe(true))
   })
 
+  it('reactivates an archived project once, however often pressed, and shows a refusal', async () => {
+    const calls = renderDetail(USERS.admin, {
+      'GET /projects/1': [200, { ...APOLLO, isArchived: true }],
+      'POST /projects/1/reactivate': [409, { error: 'Its manager is archived: reactivate them first.' }],
+    })
+    const release = holdOpen('/projects/1/reactivate')
+    const reactivate = await screen.findByRole('button', { name: /^reactivate$/i })
+    fireEvent.click(reactivate)
+    fireEvent.click(reactivate)
+    expect(screen.getByRole('button', { name: /reactivat/i })).toBeDisabled()
+    release()
+    expect(await screen.findByText('Its manager is archived: reactivate them first.')).toBeInTheDocument()
+    expect(calls.filter((c) => c.path === '/projects/1/reactivate')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /^reactivate$/i })).toBeEnabled()
+  })
+
   it('adds a task to a deliverable, assigned to someone booked on the project', async () => {
     const calls = renderDetail(USERS.manager, { 'POST /milestones/11/tasks': [201, { ...BUILD_TASKS[0], taskId: 22, title: 'Docs' }] })
     const build = await screen.findByRole('region', { name: 'Build' })
