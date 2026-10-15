@@ -1,5 +1,12 @@
+import { createElement } from 'react'
 import { describe, expect, it } from 'vitest'
-import { GRID, INK, STATE_COLOURS, SURFACE, projectColours } from './chartColours'
+import { renderHook } from '@testing-library/react'
+import { ThemeProvider } from '@mui/material/styles'
+import {
+  CHART_COLOURS, GRID, INK, MARK, STATE_COLOURS, SURFACE, projectColours, useChartColours,
+} from './chartColours'
+import { makeTheme } from './theme'
+import { contrast } from '../test/contrast'
 
 describe('projectColours', () => {
   it('colours projects by id, lowest first, whatever order they arrive in', () => {
@@ -8,22 +15,16 @@ describe('projectColours', () => {
     expect(projectColours([9, 3, 7, 3])).toEqual(expected)
   })
 
+  it('takes the colours of the set it is given (dark mode)', () => {
+    expect(projectColours([7, 3], CHART_COLOURS.dark)).toEqual(new Map([[3, '#3987e5'], [7, '#199e70']]))
+  })
+
   it('folds the 6th project and later into Other', () => {
     const colours = projectColours([1, 2, 3, 4, 5, 6, 7])
     expect([colours.get(5), colours.get(6), colours.get(7)]).toEqual(['#eda100', '#D1D5DB', '#D1D5DB'])
   })
 })
 
-/** WCAG 2 contrast ratio between two #RRGGBB colours. */
-function contrast(a, b) {
-  const lum = (hex) => {
-    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
-    return 0.2126 * r + 0.7152 * g + 0.0722 * bl
-  }
-  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
-  return (hi + 0.05) / (lo + 0.05)
-}
 
 describe('timeline state colours', () => {
   it('are spec section 5\'s table, word for word', () => {
@@ -44,5 +45,62 @@ describe('timeline state colours', () => {
       expect(contrast(track, SURFACE)).toBeGreaterThan(contrast(GRID, SURFACE)) // a track never looks like a gridline
     }
     expect(contrast(INK, SURFACE)).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('the dark set', () => {
+  const dark = CHART_COLOURS.dark
+
+  it('is measured against the card it sits on: the theme\'s card colour, in both modes', () => {
+    for (const mode of ['light', 'dark']) {
+      expect(CHART_COLOURS[mode].surface).toBe(makeTheme(mode).palette.background.paper)
+    }
+  })
+
+  it('is the project palette the dataviz validator passed on the dark card (14 Oct)', () => {
+    expect(dark.project).toEqual(['#3987e5', '#199e70', '#9085e9', '#d55181', '#c98500'])
+  })
+
+  it('gives every mark, line and project at least 3:1 on the dark card, tracks quieter than fills, louder than gridlines', () => {
+    const marks = [
+      ...Object.values(dark.state).map((s) => s.fill), dark.budget.spent, dark.budget.over, dark.over, dark.ink, dark.today, ...dark.project,
+    ]
+    marks.forEach((colour) => expect(contrast(colour, dark.surface)).toBeGreaterThanOrEqual(3))
+    for (const { fill, track } of [...Object.values(dark.state), { fill: dark.budget.spent, track: dark.budget.waiting }]) {
+      expect(contrast(track, dark.surface)).toBeLessThan(contrast(fill, dark.surface))
+      expect(contrast(track, dark.surface)).toBeGreaterThan(contrast(dark.grid, dark.surface))
+    }
+  })
+
+  it('has the same keys as the light set, so a chart can take either', () => {
+    const shape = (set) => Object.keys(set).sort()
+    expect(shape(dark)).toEqual(shape(CHART_COLOURS.light))
+    expect(Object.keys(dark.state)).toEqual(Object.keys(CHART_COLOURS.light.state))
+  })
+})
+
+describe('the light set', () => {
+  it('keeps the old names working', () => {
+    expect(CHART_COLOURS.light.state).toBe(STATE_COLOURS)
+    expect([CHART_COLOURS.light.ink, CHART_COLOURS.light.surface]).toEqual([INK, SURFACE])
+  })
+
+  it('draws the Today line gold, at least 3:1 on the white card', () => {
+    expect(contrast(CHART_COLOURS.light.today, SURFACE)).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('useChartColours', () => {
+  const inMode = (mode) => ({ wrapper: ({ children }) => createElement(ThemeProvider, { theme: makeTheme(mode) }, children) })
+
+  it('picks the set for the colour mode', () => {
+    expect(renderHook(() => useChartColours(), inMode('light')).result.current).toBe(CHART_COLOURS.light)
+    expect(renderHook(() => useChartColours(), inMode('dark')).result.current).toBe(CHART_COLOURS.dark)
+  })
+})
+
+describe('mark sizes', () => {
+  it('draws bars square (sharp corners, as the rest of the site)', () => {
+    expect(MARK.radius).toBe(0)
   })
 })

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { ThemeProvider } from '@mui/material/styles'
-import theme from '../../theme/theme'
+import theme, { makeTheme } from '../../theme/theme'
 import { BUILD, DESIGN } from '../../pages/projects/fixtures'
 import TimelineChart from './TimelineChart'
 
 const MIGRATION = { ...BUILD, milestoneId: 13, name: 'Migration', startDate: '2026-08-14', dueDate: '2026-10-10' }
 
-function draw({ deliverables = [DESIGN, BUILD, MIGRATION], today = '2026-10-14' } = {}) {
+function draw({ deliverables = [DESIGN, BUILD, MIGRATION], today = '2026-10-14', chosen = theme } = {}) {
   return render(
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={chosen}>
       <TimelineChart deliverables={deliverables} edges={[{ from: 11, to: 10 }]} projectStart="2026-10-01" projectEnd="2026-12-31" today={today} />
     </ThemeProvider>,
   )
@@ -18,6 +18,24 @@ function draw({ deliverables = [DESIGN, BUILD, MIGRATION], today = '2026-10-14' 
 const row = (name) => screen.getByRole('img', { name: new RegExp(` · ${name} · `) })
 
 describe('TimelineChart', () => {
+  it('draws the Today line gold', () => {
+    draw()
+    expect(screen.getByTestId('today')).toHaveStyle({ background: '#8A6100' })
+  })
+
+  it('takes the dark set in dark mode', () => {
+    draw({ chosen: makeTheme('dark') })
+    expect(within(row('Design')).getByTestId('fill')).toHaveStyle({ background: '#6FCB8E' })
+    expect(within(row('Migration')).getByTestId('fill')).toHaveStyle({ background: '#F28B82' })
+    expect(screen.getByTestId('today')).toHaveStyle({ background: '#FFD54A' })
+    expect(within(row('Build')).getByText('Build · after Design')).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+  })
+
+  it('draws bars square', () => {
+    draw()
+    expect(within(row('Build')).getByTestId('bar').style.borderRadius).toBe('0px')
+  })
+
   it('draws a row per deliverable, value first in its sentence', () => {
     draw()
     expect(screen.getAllByRole('img').map((r) => r.getAttribute('aria-label'))).toEqual([

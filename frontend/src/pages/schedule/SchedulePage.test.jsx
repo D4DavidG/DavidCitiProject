@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import SchedulePage from './SchedulePage'
+import { makeTheme } from '../../theme/theme'
 import { page, renderAt, stubApi } from '../../test/utils'
 
 const WEEKS = ['2026-10-12', '2026-10-19', '2026-10-26']
@@ -26,10 +27,11 @@ const DAN = {
   weeks: WEEKS.map((w) => week(w, [])),
 }
 
-function renderSchedule(answer = () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }]) {
+function renderSchedule(answer = () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }], theme = undefined) {
   const calls = stubApi({ 'GET /dashboard/allocation': answer })
   renderAt(<SchedulePage />, {
     path: '/schedule',
+    theme,
     extraRoutes: <Route path="/projects/:id" element={<p>Project page</p>} />,
   })
   return calls
@@ -79,6 +81,18 @@ describe('SchedulePage', () => {
     const benZeus = await bar(/Ben Okafor, Zeus/)
     expect(colourOf(screen.getByRole('link', { name: /Ben Okafor, Apollo, 25/ }))).toBe('rgb(28, 92, 171)') // PROJECT_COLOURS[0]
     expect(colourOf(benZeus)).toBe(colourOf(screen.getByRole('link', { name: /Chloe Kim, Zeus/ })))
+  })
+
+  it('takes the dark project colours in dark mode, and keeps the name column on the dark card', async () => {
+    renderSchedule(undefined, makeTheme('dark'))
+    expect(colourOf(await bar(/Ben Okafor, Apollo, 25/))).toBe('rgb(57, 135, 229)') // dark PROJECT_COLOURS[0]
+    expect(colourOf(screen.getByRole('link', { name: /Ben Okafor, Zeus/ }))).toBe('rgb(25, 158, 112)')
+    expect(screen.getByText('Ben Okafor').parentElement).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+  })
+
+  it('draws bars square', async () => {
+    renderSchedule()
+    expect(within(await bar(/Ben Okafor, Apollo, 25/)).getByTestId('bar').style.borderRadius).toBe('0px')
   })
 
   it('keeps a project\'s colour when a filter or page leaves only other projects in view', async () => {

@@ -5,12 +5,11 @@ import Card from '@mui/material/Card'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
-import { INK, MARK, STRIPE, SURFACE } from '../../theme/chartColours'
-
-const STRIPES = `repeating-linear-gradient(45deg, ${STRIPE} 0 2px, transparent 2px 6px)`
+import { MARK, useChartColours } from '../../theme/chartColours'
 
 /**
  * A chart's frame: a figure named by its heading, a one-line summary, then axis, rows, legend and note.
+ * The card is the theme's card colour (white, or dark green in dark mode).
  * Marks carry data-mark; problem marks carry data-state="late" or "over" and get stripes only in
  * print and high-contrast mode, so colour is never the only signal.
  * `scroll` (the box's name) puts the axis and rows in a box that scrolls sideways (the Schedule's
@@ -23,6 +22,8 @@ export function ChartFigure({
   title, summary, axis, legend, note, scroll, scrollPaddingLeft, legendFirst = false, children,
 }) {
   const headingId = useId()
+  const { stripe } = useChartColours()
+  const stripes = `repeating-linear-gradient(45deg, ${stripe} 0 2px, transparent 2px 6px)`
   return (
     <Card
       component="figure"
@@ -30,10 +31,10 @@ export function ChartFigure({
       sx={{
         m: 0,
         p: 2,
-        bgcolor: SURFACE,
+        bgcolor: 'background.paper',
         '& [data-mark]': { forcedColorAdjust: 'none' },
         '@media print, (forced-colors: active)': {
-          '& [data-state="late"], & [data-state="over"]': { backgroundImage: `${STRIPES} !important` },
+          '& [data-state="late"], & [data-state="over"]': { backgroundImage: `${stripes} !important` },
         },
       }}
     >
@@ -96,6 +97,7 @@ ChartRow.propTypes = {
  * @param {object} props items: label, colour and kind ('swatch' | 'line' | 'problem'), and an id when labels can repeat
  */
 export function ChartLegend({ items }) {
+  const { ink } = useChartColours()
   return (
     <Box component="ul" aria-label="Legend" sx={{ listStyle: 'none', m: 0, mt: 1.5, p: 0, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
       {items.map(({ id, label, colour, kind }) => (
@@ -104,8 +106,8 @@ export function ChartLegend({ items }) {
             aria-hidden="true"
             data-mark
             style={kind === 'line'
-              ? { width: 20, height: MARK.line, background: INK }
-              : { width: 12, height: 12, borderRadius: 2, background: colour }}
+              ? { width: 20, height: MARK.line, background: ink }
+              : { width: 12, height: 12, borderRadius: MARK.radius, background: colour }}
           />
           {kind === 'problem' && <WarningAmberRoundedIcon aria-hidden="true" sx={{ fontSize: 16, color: colour }} />}
           {label}

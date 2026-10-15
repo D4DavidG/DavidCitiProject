@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { OTHER_COLOUR, PROJECT_COLOURS } from '../../theme/chartColours'
-import { keepColours, scheduleBars } from './schedule'
+import { CHART_COLOURS, OTHER_COLOUR, PROJECT_COLOURS } from '../../theme/chartColours'
+import {
+  keepColours, keepSlots, scheduleBars, slotColours,
+} from './schedule'
 
 const apollo = (hours) => ({ projectId: 1, name: 'Apollo', hours })
 const zeus = (hours) => ({ projectId: 2, name: 'Zeus', hours })
@@ -33,29 +35,51 @@ describe('scheduleBars', () => {
   })
 })
 
-describe('keepColours', () => {
-  it('gives new projects the next free colour, lowest id first', () => {
-    const colours = keepColours(new Map(), [7, 3])
-    expect(colours.get(3)).toBe(PROJECT_COLOURS[0])
-    expect(colours.get(7)).toBe(PROJECT_COLOURS[1])
+describe('keepSlots', () => {
+  it('gives new projects the next free colour slot, lowest id first', () => {
+    const slots = keepSlots(new Map(), [7, 3])
+    expect([slots.get(3), slots.get(7)]).toEqual([0, 1])
   })
 
-  it('never changes a colour already given, whatever comes later', () => {
-    const first = keepColours(new Map(), [7])
-    const later = keepColours(first, [3, 7])
-    expect(later.get(7)).toBe(PROJECT_COLOURS[0])
-    expect(later.get(3)).toBe(PROJECT_COLOURS[1])
-  })
-
-  it('gives the grey Other to every project past the last colour', () => {
-    const ids = PROJECT_COLOURS.map((_, i) => i + 1)
-    const colours = keepColours(new Map(), [...ids, 98, 99])
-    expect(colours.get(98)).toBe(OTHER_COLOUR)
-    expect(colours.get(99)).toBe(OTHER_COLOUR)
+  it('never changes a slot already given, whatever comes later', () => {
+    const first = keepSlots(new Map(), [7])
+    const later = keepSlots(first, [3, 7])
+    expect([later.get(7), later.get(3)]).toEqual([0, 1])
   })
 
   it('returns the same map when nothing is new, so the screen does not redraw for nothing', () => {
-    const known = keepColours(new Map(), [1, 2])
-    expect(keepColours(known, [2, 1])).toBe(known)
+    const known = keepSlots(new Map(), [1, 2])
+    expect(keepSlots(known, [2, 1])).toBe(known)
+  })
+})
+
+describe('keepColours (light colours, for ProjectTimelines)', () => {
+  it('gives new projects the next free colour, lowest id first, and never changes one already given', () => {
+    const first = keepColours(new Map(), [7])
+    const later = keepColours(first, [3, 7])
+    expect([later.get(7), later.get(3)]).toEqual([PROJECT_COLOURS[0], PROJECT_COLOURS[1]])
+  })
+
+  it('gives the grey Other past the last colour, and the same map when nothing is new', () => {
+    const ids = PROJECT_COLOURS.map((_, i) => i + 1)
+    const colours = keepColours(new Map(), [...ids, 98])
+    expect(colours.get(98)).toBe(OTHER_COLOUR)
+    expect(keepColours(colours, [98, 1])).toBe(colours)
+  })
+})
+
+describe('slotColours', () => {
+  const ids = PROJECT_COLOURS.map((_, i) => i + 1)
+  const slots = keepSlots(new Map(), [...ids, 98, 99])
+
+  it('colours each slot from the set for the mode, so light/dark repaints a project in its own colour', () => {
+    expect(slotColours(slots, CHART_COLOURS.light).get(1)).toBe(PROJECT_COLOURS[0])
+    expect(slotColours(slots, CHART_COLOURS.dark).get(1)).toBe(CHART_COLOURS.dark.project[0])
+  })
+
+  it('gives the grey Other to every project past the last colour', () => {
+    const colours = slotColours(slots, CHART_COLOURS.light)
+    expect([colours.get(98), colours.get(99)]).toEqual([OTHER_COLOUR, OTHER_COLOUR])
+    expect(slotColours(slots, CHART_COLOURS.dark).get(99)).toBe(CHART_COLOURS.dark.other)
   })
 })

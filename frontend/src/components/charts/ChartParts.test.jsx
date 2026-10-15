@@ -2,12 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ThemeProvider } from '@mui/material/styles'
-import theme from '../../theme/theme'
+import theme, { makeTheme } from '../../theme/theme'
 import { ChartFigure, ChartLegend, ChartRow } from './ChartParts'
 
 const inTheme = (ui) => render(<ThemeProvider theme={theme}>{ui}</ThemeProvider>)
 
 describe('chart parts', () => {
+  it('sits on the card colour of the mode, and keys colours with square swatches', () => {
+    render(
+      <ThemeProvider theme={makeTheme('dark')}>
+        <ChartFigure title="Dark" summary="S" legend={<ChartLegend items={[{ label: 'Spent', colour: '#6DA7EC', kind: 'swatch' }]} />}>
+          <li>row</li>
+        </ChartFigure>
+      </ThemeProvider>,
+    )
+    expect(screen.getByRole('figure', { name: 'Dark' })).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+    const swatch = within(screen.getByRole('list', { name: 'Legend' })).getByText('Spent').querySelector('[data-mark]')
+    expect(swatch.style.borderRadius).toBe('0px')
+  })
+
   it('is a figure named by its heading, with its summary', () => {
     inTheme(<ChartFigure title="Budget by project" summary="0 of 2 projects are over budget."><li>row</li></ChartFigure>)
     expect(screen.getByRole('figure', { name: 'Budget by project' })).toHaveTextContent('0 of 2 projects are over budget.')

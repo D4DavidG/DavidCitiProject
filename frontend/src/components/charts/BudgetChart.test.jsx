@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { ThemeProvider } from '@mui/material/styles'
-import theme from '../../theme/theme'
+import theme, { makeTheme } from '../../theme/theme'
 import BudgetChart from './BudgetChart'
 
 const APOLLO = {
@@ -30,13 +30,21 @@ const JUNO = {
   plannedCents: 0, plannedPercent: null, remainingCents: -137_000, plannedOverBudget: false,
 }
 
-function draw(projects) {
-  return render(<ThemeProvider theme={theme}><BudgetChart projects={projects} /></ThemeProvider>)
+function draw(projects, chosen = theme) {
+  return render(<ThemeProvider theme={chosen}><BudgetChart projects={projects} /></ThemeProvider>)
 }
 
 const row = (name) => screen.getByRole('img', { name: new RegExp(` · ${name}$`) })
 
 describe('BudgetChart', () => {
+  it('takes the dark set in dark mode', () => {
+    draw([ZEUS, ARES], makeTheme('dark'))
+    expect(within(row('Zeus')).getByTestId('spent')).toHaveStyle({ background: '#6DA7EC' })
+    expect(within(row('Ares')).getByTestId('spent')).toHaveStyle({ background: '#F28B82' })
+    expect(screen.getByTestId('budget-line')).toHaveStyle({ background: '#D7D7D7' })
+    expect(screen.getByText('Zeus')).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' }) // words sit on the dark panel
+  })
+
   it('draws a row per project, in the order the server sent them', () => {
     draw([APOLLO, ZEUS, HERMES])
     expect(screen.getAllByRole('img').map((r) => r.getAttribute('aria-label'))).toEqual([

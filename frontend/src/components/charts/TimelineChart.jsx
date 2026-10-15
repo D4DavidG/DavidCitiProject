@@ -4,7 +4,7 @@ import Typography from '@mui/material/Typography'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import { formatDate, formatDay, spentPercent, todayIso } from '../../services/format'
 import { useIsMobile } from '../../theme/responsive'
-import { GRID, INK, MARK, STATE_COLOURS, SURFACE } from '../../theme/chartColours'
+import { MARK, useChartColours } from '../../theme/chartColours'
 import { ChartFigure, ChartLegend, ChartRow } from './ChartParts'
 import { isLate, monthTicks, offset, span, timelineAxis } from './timeline'
 
@@ -16,18 +16,19 @@ const LAYER = { position: 'absolute', top: 0, bottom: 0, left: 0, right: { xs: 0
 
 /**
  * Text that the Today line may cross: painted above it (the line's layer comes after the rows),
- * on the card's white, and only as wide as the words, so the line breaks around them.
+ * on the card's colour, and only as wide as the words, so the line breaks around them.
  */
-const OVER_LINE = { position: 'relative', zIndex: 1, bgcolor: SURFACE, width: 'fit-content' }
+const OVER_LINE = { position: 'relative', zIndex: 1, bgcolor: 'background.paper', width: 'fit-content' }
 // Text colours go in sx: MUI 9's Typography `color` prop ignores dotted paths such as 'error.main'.
 
 const STATE_WORDS = { DONE: 'Done', IN_PROGRESS: 'In progress', NOT_STARTED: 'Not started', BLOCKED: 'Blocked' }
 
-const LEGEND = [
-  { label: 'Done', colour: STATE_COLOURS.DONE.fill, kind: 'swatch' },
-  { label: 'In progress', colour: STATE_COLOURS.IN_PROGRESS.fill, kind: 'swatch' },
-  { label: 'Not started or blocked', colour: STATE_COLOURS.NOT_STARTED.fill, kind: 'swatch' },
-  { label: 'Late', colour: STATE_COLOURS.LATE.fill, kind: 'problem' },
+/** The legend, in the colours of the mode. */
+const legend = ({ state }) => [
+  { label: 'Done', colour: state.DONE.fill, kind: 'swatch' },
+  { label: 'In progress', colour: state.IN_PROGRESS.fill, kind: 'swatch' },
+  { label: 'Not started or blocked', colour: state.NOT_STARTED.fill, kind: 'swatch' },
+  { label: 'Late', colour: state.LATE.fill, kind: 'problem' },
 ]
 
 /** A label on the axis at `left` percent, shifted by the same share of its own width so it never leaves the chart. */
@@ -52,11 +53,12 @@ AxisLabel.propTypes = {
 /**
  * Question 4 as a picture: one bar per deliverable on a date axis, from its start to its due day,
  * filled to its progress and coloured by its state. Late (past due, not signed off) wins, and
- * carries a word and the warning icon. Positions are day counts, never money.
+ * carries a word and the warning icon. The Today line is orange. Positions are day counts, never money.
  * @param {object} props deliverables and edges from GET /projects/{id}/dependency-graph, the project's dates, today
  */
 export default function TimelineChart({ deliverables, edges, projectStart, projectEnd, today = todayIso() }) {
   const isMobile = useIsMobile()
+  const c = useChartColours()
   const axis = timelineAxis(deliverables, projectStart, projectEnd)
   const ticks = monthTicks(axis.from, axis.to, isMobile ? 3 : 6)
   const names = new Map(deliverables.map((d) => [d.milestoneId, d.name]))
@@ -82,19 +84,19 @@ export default function TimelineChart({ deliverables, edges, projectStart, proje
           </Box>
         </Box>
       )}
-      legend={<ChartLegend items={LEGEND} />}
+      legend={<ChartLegend items={legend(c)} />}
       note={note && <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>{note}</Typography>}
     >
       <Box component="li" aria-hidden="true" sx={LAYER}>
         {ticks.map((t) => (
-          <Box key={t} sx={{ position: 'absolute', top: 0, bottom: 0 }} style={{ left: `${offset(axis, t)}%`, width: '1px', background: GRID }} />
+          <Box key={t} sx={{ position: 'absolute', top: 0, bottom: 0 }} style={{ left: `${offset(axis, t)}%`, width: '1px', background: c.grid }} />
         ))}
       </Box>
       {deliverables.map((d) => {
         const after = edges.filter((e) => e.from === d.milestoneId && names.has(e.to)).map((e) => names.get(e.to))
         const afterText = after.length ? ` · after ${after.join(', ')}` : ''
         const lateNow = isLate(d, today)
-        const colours = lateNow ? STATE_COLOURS.LATE : STATE_COLOURS[d.status]
+        const colours = lateNow ? c.state.LATE : c.state[d.status]
         const percent = spentPercent(d.progressPercent, d.doneEstimateMinutes)
         const stateWord = lateNow ? 'Late' : STATE_WORDS[d.status]
         let words = stateWord
@@ -141,7 +143,7 @@ export default function TimelineChart({ deliverables, edges, projectStart, proje
             data-testid="today"
             data-mark
             sx={{ position: 'absolute', top: 0, bottom: 0 }}
-            style={{ left: `${offset(axis, today)}%`, width: `${MARK.line}px`, background: INK }}
+            style={{ left: `${offset(axis, today)}%`, width: `${MARK.line}px`, background: c.today }}
           />
         </Box>
       )}

@@ -14,8 +14,8 @@ import PageState from '../../components/PageState'
 import { addDays, formatDay, formatPerWeek } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
-import { GRID, INK, MARK, OTHER_COLOUR, OVER, SURFACE } from '../../theme/chartColours'
-import { keepColours, scheduleBars } from './schedule'
+import { MARK, useChartColours } from '../../theme/chartColours'
+import { keepSlots, scheduleBars, slotColours } from './schedule'
 
 const SPANS = [8, 13, 26]
 const PAGE_SIZE = 25
@@ -34,11 +34,11 @@ function rowGrid(weekCount) {
   }
 }
 
-/** The name column stays on screen while the weeks scroll sideways (phones, 26 weeks). */
-const NAME_CELL = {
-  gridColumn: 1, gridRow: '1 / -1', position: 'sticky', left: 0, zIndex: 2, bgcolor: SURFACE, pr: 1, py: 0.5,
-  borderRight: `1px solid ${GRID}`, overflowWrap: 'anywhere',
-}
+/** The name column stays on screen while the weeks scroll sideways (phones, 26 weeks), on the card's colour. */
+const nameCell = (grid) => ({
+  gridColumn: 1, gridRow: '1 / -1', position: 'sticky', left: 0, zIndex: 2, bgcolor: 'background.paper', pr: 1, py: 0.5,
+  borderRight: `1px solid ${grid}`, overflowWrap: 'anywhere',
+})
 
 /**
  * One booking bar: the project's colour across the weeks it runs, its name and hours above.
@@ -46,6 +46,7 @@ const NAME_CELL = {
  * first tap only shows it (a tap is also a click) and the second opens the project.
  */
 function BookingBar({ person, bar, weeks, colour, lane }) {
+  const { ink } = useChartColours()
   const [open, setOpen] = useState(false)
   const tap = useRef(null) // during a tap: was the tooltip already open when it began?
   const from = formatDay(weeks[bar.first])
@@ -73,8 +74,8 @@ function BookingBar({ person, bar, weeks, colour, lane }) {
         }}
         sx={{
           gridColumn: `${bar.first + 2} / ${bar.last + 3}`, gridRow: lane + 1, position: 'relative', zIndex: 1,
-          display: 'block', minWidth: 0, minHeight: 24, mx: 0.5, py: 0.25, color: INK, textDecoration: 'none',
-          borderRadius: 1, '&:focus-visible': { outline: `2px solid ${INK}`, outlineOffset: 1 },
+          display: 'block', minWidth: 0, minHeight: 24, mx: 0.5, py: 0.25, color: 'text.primary', textDecoration: 'none',
+          '&:focus-visible': { outline: `2px solid ${ink}`, outlineOffset: 1 },
         }}
       >
         <Typography variant="caption" noWrap component="span" sx={{ display: 'block' }}>
@@ -105,14 +106,15 @@ BookingBar.propTypes = {
  * for any week booked past their capacity (that week also gets a red outline).
  */
 function PersonRow({ person, weeks, colours }) {
+  const c = useChartColours()
   const bars = scheduleBars(person.weeks)
   const lanes = [...new Set(bars.map((bar) => bar.projectId))].sort((x, y) => x - y)
   // Lane by lane, then week by week: the order Tab visits them, so focus never jumps between lanes.
   bars.sort((x, y) => lanes.indexOf(x.projectId) - lanes.indexOf(y.projectId) || x.first - y.first)
   const laneCount = Math.max(lanes.length, 1)
   return (
-    <Box component="li" sx={{ ...rowGrid(weeks.length), gridTemplateRows: `repeat(${laneCount + 1}, auto)`, borderTop: `1px solid ${GRID}` }}>
-      <Box sx={NAME_CELL}>
+    <Box component="li" sx={{ ...rowGrid(weeks.length), gridTemplateRows: `repeat(${laneCount + 1}, auto)`, borderTop: `1px solid ${c.grid}` }}>
+      <Box sx={nameCell(c.grid)}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{person.name}</Typography>
         <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
           {`${formatPerWeek(person.capacityHours)} capacity`}
@@ -126,8 +128,8 @@ function PersonRow({ person, weeks, colours }) {
           data-mark={w.overAllocated || undefined}
           data-state={w.overAllocated ? 'over' : undefined}
           sx={{
-            gridColumn: i + 2, gridRow: '1 / -1', borderLeft: `1px solid ${GRID}`,
-            ...(w.overAllocated && { border: `2px solid ${OVER}`, borderRadius: 1 }),
+            gridColumn: i + 2, gridRow: '1 / -1', borderLeft: `1px solid ${c.grid}`,
+            ...(w.overAllocated && { border: `2px solid ${c.over}` }),
           }}
         />
       ))}
@@ -191,6 +193,7 @@ export default function SchedulePage() {
   const [overOnly, setOverOnly] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
   const [known, setKnown] = useState(() => new Map())
+  const c = useChartColours()
 
   const load = useCallback(() => request('GET', '/dashboard/allocation', {
     query: { weekFrom, weeks: span, overOnly: overOnly ? 'true' : undefined, page: pageNumber, pageSize: PAGE_SIZE },
@@ -200,10 +203,11 @@ export default function SchedulePage() {
   const people = data?.items ?? []
   const start = weekFrom || weeks[0]
 
-  // A project keeps the colour it was first given while this screen is open (see keepColours).
+  // A project keeps the colour slot it was first given while this screen is open (see keepSlots).
   const projects = people.flatMap((p) => p.weeks.flatMap((w) => w.projects))
-  const colours = keepColours(known, projects.map((p) => p.projectId))
-  if (colours !== known) setKnown(colours)
+  const slots = keepSlots(known, projects.map((p) => p.projectId))
+  if (slots !== known) setKnown(slots)
+  const colours = slotColours(slots, c)
 
   /** Any change to the weeks or the filter starts again at page 1: who is worst depends on the weeks shown. */
   function show(change) {
@@ -212,14 +216,14 @@ export default function SchedulePage() {
   }
 
   const onPage = new Map(projects.map((p) => [p.projectId, p.name]))
-  const slotted = [...colours].filter(([id, colour]) => onPage.has(id) && colour !== OTHER_COLOUR)
-  const otherCount = [...onPage.keys()].filter((id) => colours.get(id) === OTHER_COLOUR).length
+  const slotted = [...colours].filter(([id, colour]) => onPage.has(id) && colour !== c.other)
+  const otherCount = [...onPage.keys()].filter((id) => colours.get(id) === c.other).length
   // People with a red-outlined week on screen; the legend explains the outline only when one is drawn.
   const overCount = people.filter((p) => p.weeks.some((w) => w.overAllocated)).length
   const legend = [
     ...slotted.map(([id, colour]) => ({ id, label: onPage.get(id), colour, kind: 'swatch' })),
-    ...(otherCount ? [{ label: `Other (${otherCount})`, colour: OTHER_COLOUR, kind: 'swatch' }] : []),
-    ...(overCount ? [{ label: 'Over capacity', colour: OVER, kind: 'problem' }] : []),
+    ...(otherCount ? [{ label: `Other (${otherCount})`, colour: c.other, kind: 'swatch' }] : []),
+    ...(overCount ? [{ label: 'Over capacity', colour: c.over, kind: 'problem' }] : []),
   ]
   const summary = overCount
     ? `${overCount} of ${people.length} people shown are booked past capacity in at least one of these weeks.`
@@ -271,7 +275,7 @@ export default function SchedulePage() {
           legend={<ChartLegend items={legend} />}
           axis={(
             <Box aria-hidden="true" sx={{ ...rowGrid(weeks.length), mt: 1 }}>
-              <Box sx={{ ...NAME_CELL, gridRow: 1, borderRight: 'none' }} />
+              <Box sx={{ ...nameCell(c.grid), gridRow: 1, borderRight: 'none' }} />
               {weeks.map((w) => (
                 <Typography key={w} variant="caption" sx={{ px: 0.75, color: 'text.secondary', fontWeight: 600 }}>{formatDay(w)}</Typography>
               ))}

@@ -2,9 +2,7 @@ import PropTypes from 'prop-types'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
-import {
-  GRID, INK, MARK, OTHER_COLOUR, OVER, SURFACE, projectColours,
-} from '../../theme/chartColours'
+import { MARK, projectColours, useChartColours } from '../../theme/chartColours'
 import { ChartFigure, ChartLegend, ChartRow } from './ChartParts'
 
 /** Ticks on the hour axis every 20 h; the axis ends on the next tick past the largest booking or capacity. */
@@ -14,8 +12,8 @@ const WORDS = '10rem'
 const COLUMNS = { xs: '1fr', md: `1fr ${WORDS}` }
 /** An aria-hidden layer over the plot column of every row: the gridlines, under the bars. */
 const LAYER = { position: 'absolute', top: 0, bottom: 0, left: 0, right: { xs: 0, md: WORDS }, pointerEvents: 'none' }
-/** Text a gridline may cross: painted above it, on the card's white, only as wide as the words. */
-const OVER_LINE = { position: 'relative', zIndex: 1, bgcolor: SURFACE, width: 'fit-content' }
+/** Text a gridline may cross: painted above it, on the card's colour, only as wide as the words. */
+const OVER_LINE = { position: 'relative', zIndex: 1, bgcolor: 'background.paper', width: 'fit-content' }
 // Text colours go in sx: MUI 9's Typography `color` prop ignores dotted paths such as 'error.main'.
 
 /** The one week the chart draws: the first (and, with weeks=1, only) week the server sent. */
@@ -25,12 +23,12 @@ const thisWeek = (person) => person.weeks[0]
  * A person's projects in slot order (lowest projectId first, as projectColours assigns them),
  * with every project past the 5th slot folded into one Other piece at the end.
  */
-function pieces(projects, colours) {
+function pieces(projects, colours, other) {
   const sorted = [...projects].sort((a, b) => a.projectId - b.projectId)
-  const named = sorted.filter((p) => colours.get(p.projectId) !== OTHER_COLOUR)
+  const named = sorted.filter((p) => colours.get(p.projectId) !== other)
     .map((p) => ({ key: p.projectId, colour: colours.get(p.projectId), hours: p.hours }))
-  const otherHours = sorted.filter((p) => colours.get(p.projectId) === OTHER_COLOUR).reduce((sum, p) => sum + p.hours, 0)
-  return otherHours > 0 ? [...named, { key: 'other', colour: OTHER_COLOUR, hours: otherHours }] : named
+  const otherHours = sorted.filter((p) => colours.get(p.projectId) === other).reduce((sum, p) => sum + p.hours, 0)
+  return otherHours > 0 ? [...named, { key: 'other', colour: other, hours: otherHours }] : named
 }
 
 /**
@@ -58,17 +56,18 @@ function overSummary(people) {
  * the hours past it, then the 2 px capacity line. `at` turns hours into a percent of the axis.
  */
 function WorkloadBar({ person, colours, at }) {
+  const c = useChartColours()
   const week = thisWeek(person)
   const capacity = person.capacityHours
   const marks = []
   let used = 0
-  pieces(week.projects, colours).forEach(({ key, colour, hours }) => {
+  pieces(week.projects, colours, c.other).forEach(({ key, colour, hours }) => {
     const fill = Math.min(hours, Math.max(capacity - used, 0))
     if (fill > 0) marks.push({ key, testId: 'segment', colour, left: at(used), width: at(fill) })
     used += fill
   })
   if (week.overAllocated && week.overByHours > 0) {
-    marks.push({ key: 'over', testId: 'over', colour: OVER, left: at(capacity), width: at(week.overByHours), state: 'over' })
+    marks.push({ key: 'over', testId: 'over', colour: c.over, left: at(capacity), width: at(week.overByHours), state: 'over' })
   }
   return (
     <Box sx={{ position: 'relative', height: MARK.bar }}>
@@ -83,7 +82,7 @@ function WorkloadBar({ person, colours, at }) {
             left: `${m.left}%`,
             width: `${m.width}%`,
             backgroundColor: m.colour,
-            borderLeft: i > 0 ? `${MARK.gap}px solid ${SURFACE}` : undefined,
+            borderLeft: i > 0 ? `${MARK.gap}px solid ${c.surface}` : undefined,
             borderRadius: i === marks.length - 1 ? `0 ${MARK.radius}px ${MARK.radius}px 0` : undefined,
           }}
         />
@@ -92,7 +91,7 @@ function WorkloadBar({ person, colours, at }) {
         data-testid="capacity"
         data-mark
         sx={{ position: 'absolute', transform: 'translateX(-50%)' }}
-        style={{ left: `${at(capacity)}%`, top: -4, width: `${MARK.line}px`, height: 20, background: INK }}
+        style={{ left: `${at(capacity)}%`, top: -4, width: `${MARK.line}px`, height: 20, background: c.ink }}
       />
     </Box>
   )
@@ -112,20 +111,21 @@ WorkloadBar.propTypes = {
  * @param {object} props people: GET /dashboard/allocation items (worst first); total: how many people the server has
  */
 export default function WorkloadChart({ people, total }) {
-  const colours = projectColours(people.flatMap((p) => thisWeek(p).projects.map((pr) => pr.projectId)))
+  const c = useChartColours()
+  const colours = projectColours(people.flatMap((p) => thisWeek(p).projects.map((pr) => pr.projectId)), c)
   const names = new Map(people.flatMap((p) => thisWeek(p).projects.map((pr) => [pr.projectId, pr.name])))
   const largest = Math.max(0, ...people.flatMap((p) => [thisWeek(p).bookedHours, p.capacityHours]))
   const axisEnd = Math.max(STEP, Math.ceil(largest / STEP) * STEP)
   const at = (hours) => hours * 100 / axisEnd
   const ticks = Array.from({ length: axisEnd / STEP + 1 }, (_, i) => i * STEP)
 
-  const slotted = [...colours].filter(([, colour]) => colour !== OTHER_COLOUR)
+  const slotted = [...colours].filter(([, colour]) => colour !== c.other)
   const otherCount = colours.size - slotted.length
   const legend = [
     ...slotted.map(([id, colour]) => ({ id, label: names.get(id), colour, kind: 'swatch' })),
-    ...(otherCount ? [{ label: `Other (${otherCount})`, colour: OTHER_COLOUR, kind: 'swatch' }] : []),
-    { label: 'Over capacity', colour: OVER, kind: 'problem' },
-    { label: 'Capacity', colour: INK, kind: 'line' },
+    ...(otherCount ? [{ label: `Other (${otherCount})`, colour: c.other, kind: 'swatch' }] : []),
+    { label: 'Over capacity', colour: c.over, kind: 'problem' },
+    { label: 'Capacity', colour: c.ink, kind: 'line' },
   ]
 
   return (
@@ -157,7 +157,7 @@ export default function WorkloadChart({ people, total }) {
     >
       <Box component="li" aria-hidden="true" sx={LAYER}>
         {ticks.map((h) => (
-          <Box key={h} sx={{ position: 'absolute', top: 0, bottom: 0 }} style={{ left: `${at(h)}%`, width: '1px', background: GRID }} />
+          <Box key={h} sx={{ position: 'absolute', top: 0, bottom: 0 }} style={{ left: `${at(h)}%`, width: '1px', background: c.grid }} />
         ))}
       </Box>
       {people.map((person) => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { ThemeProvider } from '@mui/material/styles'
-import theme from '../../theme/theme'
+import theme, { makeTheme } from '../../theme/theme'
 import WorkloadChart from './WorkloadChart'
 
 const week = (bookedHours, overByHours, projects) => ({
@@ -20,8 +20,8 @@ const DEV = {
   weeks: [week(0, 0, [])],
 }
 
-function draw(people, total = people.length) {
-  return render(<ThemeProvider theme={theme}><WorkloadChart people={people} total={total} /></ThemeProvider>)
+function draw(people, total = people.length, chosen = theme) {
+  return render(<ThemeProvider theme={chosen}><WorkloadChart people={people} total={total} /></ThemeProvider>)
 }
 
 const row = (name) => screen.getByRole('img', { name: new RegExp(` · ${name}$`) })
@@ -29,6 +29,17 @@ const width = (el) => parseFloat(el.style.width)
 const left = (el) => parseFloat(el.style.left)
 
 describe('WorkloadChart', () => {
+  it('takes the dark set in dark mode: project colours, red, the capacity line and the card', () => {
+    draw([BEN, ANA, DEV], 3, makeTheme('dark'))
+    const ben = row('Ben Okafor')
+    const [apollo, zeus] = within(ben).getAllByTestId('segment')
+    expect(apollo).toHaveStyle({ backgroundColor: '#3987e5' })
+    expect(zeus).toHaveStyle({ backgroundColor: '#199e70', borderLeft: '2px solid #0B0E0B' }) // the gap is the dark panel
+    expect(within(ben).getByTestId('over')).toHaveStyle({ backgroundColor: '#F28B82' })
+    expect(within(ben).getByTestId('capacity')).toHaveStyle({ background: '#D7D7D7' })
+    expect(screen.getByRole('figure')).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+  })
+
   it('draws a row per person, in server order, each with its sentence', () => {
     draw([BEN, ANA, DEV])
     expect(screen.getByRole('figure', { name: 'Workload this week · all projects' })).toBeInTheDocument()

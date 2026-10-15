@@ -3,7 +3,7 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import { formatCents, spentPercent } from '../../services/format'
-import { BUDGET_COLOURS, INK, MARK, SURFACE } from '../../theme/chartColours'
+import { MARK, useChartColours } from '../../theme/chartColours'
 import { ChartFigure, ChartLegend, ChartRow } from './ChartParts'
 
 /** Every row runs 0 to 125% of its own budget, so rows line up and "over" has room to show. */
@@ -14,17 +14,18 @@ const WORDS = '10rem'
 const COLUMNS = { xs: '1fr', md: `1fr ${WORDS}` }
 /** An aria-hidden layer over the plot column of every row: gridlines under the bars, the Budget line over them. */
 const LAYER = { position: 'absolute', top: 0, bottom: 0, left: 0, right: { xs: 0, md: WORDS }, pointerEvents: 'none' }
-/** Text that the Budget line may cross: painted above it, on the card's white, only as wide as the words. */
-const OVER_LINE = { position: 'relative', zIndex: 1, bgcolor: SURFACE, width: 'fit-content' }
+/** Text that the Budget line may cross: painted above it, on the card's colour, only as wide as the words. */
+const OVER_LINE = { position: 'relative', zIndex: 1, bgcolor: 'background.paper', width: 'fit-content' }
 // Text colours go in sx: MUI 9's Typography `color` prop ignores dotted paths such as 'error.main'.
 
 const AXIS = [['0%', 0], ['50%', 50], ['100% Budget', 100], ['125%', 125]]
 
-const LEGEND = [
-  { label: 'Spent', colour: BUDGET_COLOURS.spent, kind: 'swatch' },
-  { label: 'Waiting for approval', colour: BUDGET_COLOURS.waiting, kind: 'swatch' },
-  { label: 'Planned', colour: INK, kind: 'line' },
-  { label: 'Over budget', colour: BUDGET_COLOURS.over, kind: 'problem' },
+/** The legend, in the colours of the mode. */
+const legend = (c) => [
+  { label: 'Spent', colour: c.budget.spent, kind: 'swatch' },
+  { label: 'Waiting for approval', colour: c.budget.waiting, kind: 'swatch' },
+  { label: 'Planned', colour: c.ink, kind: 'line' },
+  { label: 'Over budget', colour: c.budget.over, kind: 'problem' },
 ]
 
 /** A server percentage as a position on the 0 to 125% row, in percent of the row. Percentages only, never cents. */
@@ -39,8 +40,9 @@ function drawn(percent, cents) {
 
 /** The arrow that says a mark was cut off at the edge of the scale; `outside` puts it just past the edge, for the Planned tick. */
 function Arrow({ outside }) {
+  const { ink } = useChartColours()
   return (
-    <Box component="span" aria-hidden="true" sx={{ position: 'absolute', right: outside ? -10 : 0, top: '50%', transform: 'translateY(-50%)', lineHeight: 1, fontSize: 12, color: INK, zIndex: 1 }}>
+    <Box component="span" aria-hidden="true" sx={{ position: 'absolute', right: outside ? -10 : 0, top: '50%', transform: 'translateY(-50%)', lineHeight: 1, fontSize: 12, color: ink, zIndex: 1 }}>
       ▸
     </Box>
   )
@@ -67,14 +69,15 @@ function rowTooltip(p, over) {
  * Arrows mark a bar or tick that runs past 125%.
  */
 function BudgetBars({ project: p, over }) {
+  const c = useChartColours()
   const spent = drawn(p.consumedPercent, p.consumedCents)
   const spentEnd = Math.min(spent, SCALE)
   const waiting = Math.min(drawn(p.pendingPercent, p.pendingCents), Math.max(SCALE - spentEnd, 0))
   const waitingCut = spentEnd + drawn(p.pendingPercent, p.pendingCents) > SCALE
-  const barColour = over ? BUDGET_COLOURS.over : BUDGET_COLOURS.spent
+  const barColour = over ? c.budget.over : c.budget.spent
   return (
     <Box sx={{ position: 'relative', height: MARK.bar }}>
-      <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0 }} style={{ background: BUDGET_COLOURS.track }} />
+      <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0 }} style={{ background: c.budget.track }} />
       <Box
         data-testid="spent"
         data-mark
@@ -90,8 +93,8 @@ function BudgetBars({ project: p, over }) {
           style={{
             left: `${place(spentEnd)}%`,
             width: `${place(waiting)}%`,
-            background: BUDGET_COLOURS.waiting,
-            borderLeft: spentEnd > 0 ? `${MARK.gap}px solid ${SURFACE}` : undefined,
+            background: c.budget.waiting,
+            borderLeft: spentEnd > 0 ? `${MARK.gap}px solid ${c.surface}` : undefined,
             borderRadius: `0 ${MARK.radius}px ${MARK.radius}px 0`,
           }}
         />
@@ -101,7 +104,7 @@ function BudgetBars({ project: p, over }) {
           data-testid="planned"
           data-mark
           sx={{ position: 'absolute', transform: 'translateX(-50%)' }}
-          style={{ left: `${place(p.plannedPercent ?? 0)}%`, top: -4, width: `${MARK.line}px`, height: 20, background: INK }}
+          style={{ left: `${place(p.plannedPercent ?? 0)}%`, top: -4, width: `${MARK.line}px`, height: 20, background: c.ink }}
         />
       )}
       {(spent > SCALE || waitingCut) && <Arrow />}
@@ -120,6 +123,7 @@ BudgetBars.propTypes = { project: PropTypes.object.isRequired, over: PropTypes.b
  * @param {object} props projects: the dashboard cards, in the order the server sent them
  */
 export default function BudgetChart({ projects }) {
+  const c = useChartColours()
   const isOver = (p) => p.budgetCents > 0 && p.remainingCents < 0
   const overCount = projects.filter(isOver).length
   return (
@@ -145,7 +149,7 @@ export default function BudgetChart({ projects }) {
           </Box>
         </Box>
       )}
-      legend={<ChartLegend items={LEGEND} />}
+      legend={<ChartLegend items={legend(c)} />}
     >
       {projects.map((p) => {
         const over = isOver(p)
@@ -183,7 +187,7 @@ export default function BudgetChart({ projects }) {
           data-testid="budget-line"
           data-mark
           sx={{ position: 'absolute', top: 0, bottom: 0 }}
-          style={{ left: `${BUDGET_AT}%`, width: `${MARK.line}px`, background: INK }}
+          style={{ left: `${BUDGET_AT}%`, width: `${MARK.line}px`, background: c.ink }}
         />
       </Box>
     </ChartFigure>
