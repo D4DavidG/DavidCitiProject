@@ -107,6 +107,24 @@ export function daysBetween(fromIso, toIso) {
   return Math.round((to - from) / DAY_MS)
 }
 
+const weekdayDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+
+/** "2026-10-12" -> "Mon, Oct 12": a day with its weekday. A date only, so read as UTC, like formatDay. */
+export function formatWeekdayDay(iso) {
+  if (!iso) return DASH
+  return weekdayDay.format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
+}
+
+/**
+ * Why a deliverable is late, from its due date and today (both ISO days, Eastern):
+ * "was due Mon, Oct 12 · today is Thu, Oct 15 · 3 days late"; spoken (aria-labels), the same with commas.
+ */
+export function formatLateness(dueIso, today, { spoken = false } = {}) {
+  const days = daysBetween(dueIso, today)
+  const parts = [`was due ${formatWeekdayDay(dueIso)}`, `today is ${formatWeekdayDay(today)}`, `${days} ${days === 1 ? 'day' : 'days'} late`]
+  return parts.join(spoken ? ', ' : ' · ')
+}
+
 /** A timestamp, shown in Eastern time: "Oct 13, 2026, 9:03 PM". */
 export function formatDateTime(iso) {
   if (!iso) return DASH

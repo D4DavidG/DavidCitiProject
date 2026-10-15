@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addDays, centsToDollarsInput, daysBetween, formatCents, formatDate, formatDateTime, formatDay, formatHours, formatPerWeek, parseDollars, splitMinutes, todayIso,
+  formatLateness, formatWeekdayDay,
 } from './format'
 
 describe('formatCents', () => {
@@ -101,6 +102,22 @@ describe('todayIso', () => {
 describe('formatDateTime', () => {
   it('formats a timestamp in Eastern time, like the server', () => {
     expect(formatDateTime('2026-10-14T01:03:25+00:00')).toBe('Oct 13, 2026, 9:03 PM')
+  })
+})
+
+describe('formatWeekdayDay and formatLateness', () => {
+  it('gives a day with its weekday', () => {
+    expect(formatWeekdayDay('2026-10-12')).toBe('Mon, Oct 12')
+    expect(formatWeekdayDay('2026-10-15')).toBe('Thu, Oct 15')
+  })
+
+  it('says why a deliverable is late: its due date, today, and how many days late', () => {
+    expect(formatLateness('2026-10-12', '2026-10-15')).toBe('was due Mon, Oct 12 · today is Thu, Oct 15 · 3 days late')
+    expect(formatLateness('2026-10-14', '2026-10-15')).toBe('was due Wed, Oct 14 · today is Thu, Oct 15 · 1 day late')
+  })
+
+  it('says the same with commas for a screen reader', () => {
+    expect(formatLateness('2026-10-12', '2026-10-15', { spoken: true })).toBe('was due Mon, Oct 12, today is Thu, Oct 15, 3 days late')
   })
 })
 

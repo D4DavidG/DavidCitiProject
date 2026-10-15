@@ -14,7 +14,7 @@ import LateIcon from '@mui/icons-material/WarningAmberRounded'
 import PageState, { Pager } from './PageState'
 import StatusChip from './StatusChip'
 import { useAuth } from '../auth/useAuth'
-import { formatDate, formatDay, formatPerWeek, todayIso } from '../services/format'
+import { formatDate, formatDay, formatLateness, formatPerWeek, todayIso } from '../services/format'
 import { request } from '../services/request'
 import { useApi } from '../services/useApi'
 import { MARK } from '../theme/chartColours'
@@ -185,10 +185,15 @@ function ProjectRow({ project, axis, today, thisWeek, userId }) {
     const state = deliverableState(d, today)
     const Icon = ICONS[state.key] ?? NotStartedIcon
     const late = state.key === 'LATE'
+    // A late mark says why: the day it was due, today, and how many days late (Eastern days, as the server counts).
     marks.push({
       key: `d${d.milestoneId}`,
-      label: `${project.name} deliverable ${d.name}, due ${formatDate(d.dueDate)}, ${state.word}`,
-      tooltip: `${d.name} · due ${formatDate(d.dueDate)} · ${state.word}`,
+      label: late
+        ? `${project.name} deliverable ${d.name}, ${state.word}, ${formatLateness(d.dueDate, today, { spoken: true })}`
+        : `${project.name} deliverable ${d.name}, due ${formatDate(d.dueDate)}, ${state.word}`,
+      tooltip: late
+        ? `${d.name} · ${state.word} · ${formatLateness(d.dueDate, today)}`
+        : `${d.name} · due ${formatDate(d.dueDate)} · ${state.word}`,
       state: late ? 'late' : undefined,
       style: { left: `${centre}%`, marginLeft: -MARK_SIZE / 2 },
       sx: {

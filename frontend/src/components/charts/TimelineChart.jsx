@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
-import { formatDate, formatDay, spentPercent, todayIso } from '../../services/format'
+import { formatDate, formatDay, formatLateness, spentPercent, todayIso } from '../../services/format'
 import { useIsMobile } from '../../theme/responsive'
 import { MARK, useChartColours } from '../../theme/chartColours'
 import { ChartFigure, ChartLegend, ChartRow } from './ChartParts'
@@ -107,7 +107,9 @@ export default function TimelineChart({ deliverables, edges, projectStart, proje
         const problem = lateNow ? 'late' : undefined
         // Every visible state word goes in the sentence: role="img" hides the row's own text from screen readers.
         const outsideText = outside ? ' · Outside project dates' : ''
-        const tooltip = `${percent} done · ${d.name} · ${formatDay(d.startDate)} – ${formatDate(d.dueDate)} · ${stateWord}${afterText}${outsideText}`
+        // A late row says why: the day it was due, today, and how many days late.
+        const lateText = lateNow ? ` · ${formatLateness(d.dueDate, today)}` : ''
+        const tooltip = `${percent} done · ${d.name} · ${formatDay(d.startDate)} – ${formatDate(d.dueDate)} · ${stateWord}${lateText}${afterText}${outsideText}`
         return (
           <ChartRow key={d.milestoneId} tooltip={tooltip}>
             <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: COLUMNS, alignItems: 'center' }}>

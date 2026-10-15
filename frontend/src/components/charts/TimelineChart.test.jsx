@@ -41,7 +41,7 @@ describe('TimelineChart', () => {
     expect(screen.getAllByRole('img').map((r) => r.getAttribute('aria-label'))).toEqual([
       '100% done · Design · Oct 1 – Oct 6, 2026 · Done',
       '0% done · Build · Oct 1 – Nov 12, 2026 · In progress · after Design',
-      '0% done · Migration · Aug 14 – Oct 10, 2026 · Late · Outside project dates',
+      '0% done · Migration · Aug 14 – Oct 10, 2026 · Late · was due Sat, Oct 10 · today is Wed, Oct 14 · 4 days late · Outside project dates',
     ])
     expect(within(row('Build')).getByText('Build · after Design')).toBeInTheDocument()
   })
