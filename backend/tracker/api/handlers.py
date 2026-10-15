@@ -111,6 +111,12 @@ def get_user(ctx: Context) -> dict:
     return _user(ctx, users.get_user(ctx.conn, ctx.actor, ctx.id))
 
 
+def user_history(ctx: Context) -> dict:
+    """One person's trail; only admins get the before/after state."""
+    return _page(audit.person_history(ctx.conn, ctx.actor, ctx.id, ctx.query, *ctx.page_args()),
+                 lambda r: audit_view(r, include_states=ctx.actor.is_admin))
+
+
 def update_me(ctx: Context) -> dict:
     return user_view(users.update_self(ctx.conn, ctx.actor, ctx.body), include_salary=True)
 

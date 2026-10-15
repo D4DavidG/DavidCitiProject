@@ -55,6 +55,7 @@ ROUTES = [
     _r("POST", "/users", h.create_user, {ADMIN}, status=201),
     _r("PATCH", "/users/me", h.update_me),
     _r("GET", "/users/{id}", h.get_user),
+    _r("GET", "/users/{id}/history", h.user_history),
     _r("PATCH", "/users/{id}", h.admin_update_user, {ADMIN}),
     _r("PATCH", "/users/{id}/capacity", h.set_capacity, STAFF),
     _r("POST", "/users/{id}/reset-password", h.reset_password, {ADMIN}),

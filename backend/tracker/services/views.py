@@ -130,12 +130,17 @@ def notification_view(row: dict) -> dict:
     })
 
 
-def audit_view(row: dict) -> dict:
-    return _pick(row, {
+def audit_view(row: dict, include_states: bool = True) -> dict:
+    """An audit row. The before/after state (which can hold a salary) only when include_states."""
+    view = _pick(row, {
         "auditId": "audit_id", "actorUserId": "actor_user_id", "actorRole": "actor_role", "action": "action",
-        "entityType": "entity_type", "entityId": "entity_id", "beforeState": "before_state",
-        "afterState": "after_state", "summary": "summary", "createdAt": "created_at",
+        "entityType": "entity_type", "entityId": "entity_id", "summary": "summary", "createdAt": "created_at",
     })
+    if include_states:
+        view["beforeState"], view["afterState"] = row.get("before_state"), row.get("after_state")
+    if "actor_name" in row:
+        view["actorName"] = row["actor_name"]
+    return view
 
 
 def holder_view(row: dict) -> dict:

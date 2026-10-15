@@ -399,3 +399,38 @@ def test_an_employee_not_booked_on_the_project_gets_the_same_404_for_its_board(c
     missing = alice.call("GET", "/projects/999999/board")
     assert other == missing and other[0] == 404
     assert alice.call("GET", f"/projects/{org['apollo']['project_id']}/board")[0] == 200
+
+
+# --- one person's history -----------------------------------------------------
+
+def test_history_never_shows_salary_to_a_manager(conn, org):
+    alice = org["alice"].user_id
+    admin = client_for(conn, org, "admin")
+    assert admin.call("PATCH", f"/users/{alice}", {"annualSalaryCents": 12_345_600})[0] == 200
+    status, payload = client_for(conn, org, "bob").call("GET", f"/users/{alice}/history")
+    assert status == 200
+    text = json.dumps(payload)
+    assert "12345600" not in text and "annualSalaryCents" not in text
+    assert not any("beforeState" in i or "afterState" in i for i in payload["items"])
+    assert payload["items"][0]["summary"] and payload["items"][0]["actorName"]
+    items = admin.call("GET", f"/users/{alice}/history")[1]["items"]
+    assert any((i["afterState"] or {}).get("annualSalaryCents") == 12_345_600 for i in items)
+
+
+def test_own_history_has_no_state(conn, org):
+    status, payload = client_for(conn, org, "alice").call("GET", f"/users/{org['alice'].user_id}/history")
+    assert status == 200 and payload["items"]
+    assert not any("beforeState" in i for i in payload["items"])
+
+
+def test_someone_elses_history_is_404_not_403(conn, org):
+    carol, alice = client_for(conn, org, "carol"), client_for(conn, org, "alice")
+    other = carol.call("GET", f"/users/{org['alice'].user_id}/history")
+    assert other == carol.call("GET", "/users/999999/history") and other[0] == 404
+    assert alice.call("GET", f"/users/{org['bob'].user_id}/history") == alice.call("GET", "/users/999999/history")
+
+
+def test_history_rejects_a_bad_date(conn, org):
+    status, payload = client_for(conn, org, "admin").call(
+        "GET", f"/users/{org['alice'].user_id}/history", query={"dateFrom": "nope"})
+    assert status == 400 and payload["field"] == "dateFrom"
