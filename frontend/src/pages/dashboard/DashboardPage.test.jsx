@@ -201,6 +201,8 @@ describe('DashboardPage', () => {
     it('opens a group straight from the address, as the browser Back button does', async () => {
       const calls = renderDashboard({}, { path: '/dashboard?group=on-track' })
       expect(await screen.findByRole('heading', { name: 'All on-track projects (1)' })).toBeInTheDocument()
+      expect(screen.getByText('The projects you manage: status, risk and budget.')).toBeInTheDocument() // no talk of two columns here
+      expect(screen.queryByText(/two columns/)).not.toBeInTheDocument()
       expect(await screen.findByRole('article', { name: 'Hermes' })).toBeInTheDocument()
       expect(screen.queryByRole('article', { name: 'Apollo' })).not.toBeInTheDocument()
       expect(calls.some((c) => c.query.atRisk === 'false' && c.query.pageSize === '12')).toBe(true)

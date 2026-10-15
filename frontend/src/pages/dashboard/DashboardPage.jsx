@@ -260,7 +260,9 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        subtitle={`${whose}: status, risk and budget, in two columns, at risk and on track, each showing the three most recently updated.`}
+        subtitle={groupKey
+          ? `${whose}: status, risk and budget.`
+          : `${whose}: status, risk and budget, in two columns, at risk and on track, each showing the three most recently updated.`}
       />
 
       {groupKey ? (
