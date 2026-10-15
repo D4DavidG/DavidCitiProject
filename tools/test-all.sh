@@ -103,7 +103,9 @@ if listening 3000 && listening 3001; then
   zeus="${E2E_ZEUS_MANAGER_USERNAME:-$(lookup sam.patel@acme.test)}"  # timeline.spec.js
   if [ -n "$manager" ] && [ -n "$employee" ]; then
     echo "Manager $manager, employee $employee"
-    tour="$(mktemp -d)"  # the screen tour's screenshots; outside the repo, never committed
+    # The screen tour's screenshots: E2E_TOUR_DIR if set, else a new temporary folder. Outside the repo, never committed.
+    tour="${E2E_TOUR_DIR:-$(mktemp -d)}"
+    mkdir -p "$tour"
     # Pin both URLs to the local stack: pull.spec.js and requests.spec.js write data, so an E2E_BASE_URL
     # left exported from an AWS run must never send it to the live site.
     (cd frontend && E2E_BASE_URL=http://localhost:3000 E2E_API=http://localhost:3001/api/tracker \
@@ -115,11 +117,12 @@ if listening 3000 && listening 3001; then
     skipped="$(grep -Eo '[0-9]+ skipped' "$LOGS/e2e.log" | tail -1)"
     if [ "$status" -eq 0 ]; then record "Browser tests" PASS "$passed${skipped:+, $skipped}; screenshots in $tour"
     else record "Browser tests" FAIL "see $LOGS/e2e.log"; fi
-    # The four tour tests end in "(axe)": count how many passed (✓) or failed (✘).
+    # The eight tour tests (light and dark, manager and employee, desktop and phone) end in "(axe)":
+    # count how many passed (✓) or failed (✘). 50 scans per colour mode.
     axe_ok="$(grep -c "✓.*(axe)" "$LOGS/e2e.log")"
     axe_bad="$(grep -c "✘.*(axe)" "$LOGS/e2e.log")"
     if [ "$axe_bad" -gt 0 ]; then record "Accessibility" FAIL "axe found serious problems; see $LOGS/e2e.log"
-    elif [ "$axe_ok" -eq 4 ]; then record "Accessibility" PASS "axe on every tour screen, 4 tests, 50 scans, WCAG A/AA"
+    elif [ "$axe_ok" -eq 8 ]; then record "Accessibility" PASS "axe on every tour screen, light and dark, 8 tests, 100 scans, WCAG A/AA"
     else record "Accessibility" SKIP "tour did not run"; fi
   else
     echo "Seeded users not found in the local database. Run tools/demo.py seed, or set"

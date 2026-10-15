@@ -1,9 +1,10 @@
 /*
  * A read-only tour of every screen a manager and an employee can reach, at desktop and
- * phone width: checks each page renders with no sideways scrolling, saves a screenshot
- * of each for review, and checks that refreshing a deep link works. Changes no data, so
- * it is safe against the deployed demo. Also runs axe on every screen: serious or critical
- * WCAG A/AA problems fail the test. Runs only when asked:
+ * phone width, in light and in dark mode: checks each page renders with no sideways scrolling,
+ * saves a screenshot of each for review (dark ones end in "-dark"), and checks that refreshing
+ * a deep link works. Changes no data, so it is safe against the deployed demo. Also runs axe on
+ * every screen in both modes: serious or critical WCAG A/AA problems fail the test.
+ * Runs only when asked:
  *
  *   E2E_TOUR_DIR=/some/folder E2E_MANAGER_USERNAME=ML662930 E2E_EMPLOYEE_USERNAME=AR553882 \
  *   E2E_BASE_URL=https://<cloudfront> npx playwright test tour
@@ -32,6 +33,20 @@ const FIGURES = {
   '/dashboard': ['Workload this week · all projects', 'Budget by project'],
   '/schedule': ['Bookings, week by week'],
   PROJECT: ['Deliverables timeline'],
+}
+
+// The home pages' project timelines (sections named by their titles), by screen key.
+const REGIONS = {
+  '/dashboard': ['My projects this week'],
+  '/my-tasks': ['My projects'],
+}
+
+// The colour mode is the site's own remembered choice (frontend/src/theme/colorMode.js, MODE_KEY),
+// set before the first page loads. The sun/moon button names the mode you would switch to.
+const MODE_KEY = 'acme.colorMode'
+const MODES = {
+  light: { button: 'Switch to dark mode', suffix: '' },
+  dark: { button: 'Switch to light mode', suffix: '-dark' },
 }
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] // every WCAG 2.0-2.2 A and AA rule axe has
@@ -63,54 +78,66 @@ async function projectId(page) {
   return page.url().split('/projects/')[1]
 }
 
-for (const [role, { username, screens }] of Object.entries(ROLES)) {
-  for (const [viewport, size] of Object.entries(VIEWPORTS)) {
-    test(`${role} at ${viewport} width: every screen renders without sideways scrolling or serious accessibility problems (axe)`, async ({ page }) => {
-      test.skip(!username, `Set E2E_${role.toUpperCase()}_USERNAME`)
-      await page.setViewportSize(size)
-      const problems = []
-      await page.goto('/')
-      await expect(page.getByLabel('Username')).toBeVisible()
-      await scan(page, 'sign-in page', problems)
-      await signIn(page, username)
-      const id = await projectId(page)
-      const overflowing = []
-      for (const screen of screens) {
-        const [route, tab] = screen.replace('PROJECT', `/projects/${id}`).split(':')
-        await page.goto(`/#${route}`)
-        await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+// One test per colour mode, role and width: 2 x 2 x 2 = 8 tests, each ending in "(axe)".
+const RUNS = Object.keys(MODES).flatMap((mode) => Object.keys(ROLES).flatMap(
+  (role) => Object.keys(VIEWPORTS).map((viewport) => ({ mode, role, viewport })),
+))
+
+for (const { mode, role, viewport } of RUNS) {
+  const { username, screens } = ROLES[role]
+  const size = VIEWPORTS[viewport]
+  const { button, suffix } = MODES[mode]
+  const where = mode === 'dark' ? `${viewport} width, dark mode` : `${viewport} width`
+  test(`${role} at ${where}: every screen renders without sideways scrolling or serious accessibility problems (axe)`, async ({ page }) => {
+    test.skip(!username, `Set E2E_${role.toUpperCase()}_USERNAME`)
+    await page.addInitScript(([key, value]) => window.localStorage.setItem(key, value), [MODE_KEY, mode])
+    await page.setViewportSize(size)
+    const problems = []
+    await page.goto('/')
+    await expect(page.getByLabel('Username')).toBeVisible()
+    await expect(page.getByRole('button', { name: button })).toBeVisible() // the mode really is on
+    await scan(page, 'sign-in page', problems)
+    await signIn(page, username)
+    const id = await projectId(page)
+    const overflowing = []
+    for (const screen of screens) {
+      const [route, tab] = screen.replace('PROJECT', `/projects/${id}`).split(':')
+      await page.goto(`/#${route}`)
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+      await expect(page.getByRole('progressbar', { name: /loading/i })).toHaveCount(0)
+      if (tab) {
+        await page.getByRole('tab', { name: tab }).click()
+        // A tab loads its own data: wait for that spinner too, or the shot and the overflow check see "Loading".
         await expect(page.getByRole('progressbar', { name: /loading/i })).toHaveCount(0)
-        if (tab) {
-          await page.getByRole('tab', { name: tab }).click()
-          // A tab loads its own data: wait for that spinner too, or the shot and the overflow check see "Loading".
-          await expect(page.getByRole('progressbar', { name: /loading/i })).toHaveCount(0)
-        }
-        for (const name of FIGURES[screen] ?? []) {
-          await expect(page.getByRole('figure', { name })).toBeVisible()
-        }
-        await page.waitForLoadState('networkidle')
-        // Park the pointer in a corner: after sign-in it rests where the button was, which can be over a chart row
-        // and leaves its tooltip open across the screenshot.
-        await page.mouse.move(0, 0)
-        await expect(page.getByRole('tooltip')).toHaveCount(0)
-        await scan(page, screen, problems)
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-        if (overflow > 1) overflowing.push(`${screen} (${overflow}px)`)
-        const name = screen.replace(/^\//, '').replace(/[/:]/g, '-').toLowerCase() || 'home'
-        await page.screenshot({ path: `${DIR}/${role}-${viewport}-${name}.png`, fullPage: true })
       }
-      if (viewport === 'phone') {
-        // The menu is closed on phones, so open it once and scan it too.
-        await page.goto(`/#${screens[0]}`)
-        await page.getByRole('button', { name: 'Open menu' }).click()
-        await expect(page.getByRole('navigation', { name: 'Main menu' })).toBeVisible()
-        await scan(page, 'phone menu', problems)
-        await page.keyboard.press('Escape')
+      for (const name of FIGURES[screen] ?? []) {
+        await expect(page.getByRole('figure', { name })).toBeVisible()
       }
-      expect(overflowing, 'pages that scroll sideways').toEqual([])
-      expect(problems, 'accessibility problems (axe, serious or critical)').toEqual([])
-    })
-  }
+      for (const name of REGIONS[screen] ?? []) {
+        await expect(page.getByRole('region', { name, exact: true })).toBeVisible()
+      }
+      await page.waitForLoadState('networkidle')
+      // Park the pointer in a corner: after sign-in it rests where the button was, which can be over a chart row
+      // and leaves its tooltip open across the screenshot.
+      await page.mouse.move(0, 0)
+      await expect(page.getByRole('tooltip')).toHaveCount(0)
+      await scan(page, screen, problems)
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+      if (overflow > 1) overflowing.push(`${screen} (${overflow}px)`)
+      const name = screen.replace(/^\//, '').replace(/[/:]/g, '-').toLowerCase() || 'home'
+      await page.screenshot({ path: `${DIR}/${role}-${viewport}-${name}${suffix}.png`, fullPage: true })
+    }
+    if (viewport === 'phone') {
+      // The menu is closed on phones, so open it once and scan it too.
+      await page.goto(`/#${screens[0]}`)
+      await page.getByRole('button', { name: 'Open menu' }).click()
+      await expect(page.getByRole('navigation', { name: 'Main menu' })).toBeVisible()
+      await scan(page, 'phone menu', problems)
+      await page.keyboard.press('Escape')
+    }
+    expect(overflowing, 'pages that scroll sideways').toEqual([])
+    expect(problems, 'accessibility problems (axe, serious or critical)').toEqual([])
+  })
 }
 
 test('refreshing a deep link keeps you on that page (checklist step 3.5)', async ({ page }) => {
