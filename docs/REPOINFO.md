@@ -5,12 +5,12 @@ say, not what to run: the demo steps are in [GUIDE.md §3](GUIDE.md#3-the-5-minu
 
 **Last checked:** 14 Oct 2026, evening, against branch `David` after the dashboard-graphs
 final fix wave, the project-manager notifications and requests for everyone, the overtime warning, and 15-minute
-tokens with refresh, employee history, the dashboard's total counts, the OpenAPI file and the accessibility scan: 559 backend tests, 325 website tests, 24 Playwright tests. AWS was last checked at `a52da44`. Everything built since is committed
+tokens with refresh, employee history, the dashboard's total counts, the OpenAPI file, the accessibility scan and pages loaded on first visit: 565 backend tests, 330 website tests, 24 Playwright tests (full `tools/test-all.sh` run, every row PASS). AWS was last checked at `a52da44`. Everything built since is committed
 but **not on AWS until the next deploy**: the login-timing fix, the Hours and Minutes boxes,
 the **Copy username and password** button, the pull board, the bell's 10 s check with its
 pop-up, the three charts, the project manager being notified of an employee's project
 work, requests for everyone (migration 003), the overtime warning (migration 004), and
-15-minute access tokens with refresh tokens (migration 005). Every number below says when it was measured. Every claim
+15-minute access tokens with refresh tokens (migration 005), employee history, the dashboard's total counts, the axe fixes and pages loaded on first visit. Everything since `5e994e6` (this evening's work) is in that list too. Every number below says when it was measured. Every claim
 points at a file and line you can open.
 
 **Contents:** [1 Pitch](#1-the-pitch) · [2 Seven questions](#2-the-seven-questions) ·
@@ -33,8 +33,8 @@ points at a file and line you can open.
 > risk, who is working where, deliverables, who is over-allocated, dependencies and
 > budget. Each answer is on a screen, backed by an endpoint. It's React and Material UI
 > on the front end, and one Python Lambda with Postgres behind it, all deployed to AWS
-> with Terraform. There are 559 backend tests running against a real Postgres database,
-> and 325 website tests."
+> with Terraform. There are 565 backend tests running against a real Postgres database,
+> and 330 website tests."
 
 ### 2 minutes
 
@@ -365,8 +365,8 @@ from the token."
 
 ## 7. Testing
 
-**Headline (fresh, 14 Oct 2026):** "559 backend tests against a real Postgres database, at
-97% coverage, with the API layer at 100%. Plus 325 website tests at 94.7% of
+**Headline (fresh, 14 Oct 2026):** "565 backend tests against a real Postgres database, at
+97% coverage, with the API layer at 100%. Plus 330 website tests at 94.58% of
 statements, and 24 Playwright browser tests."
 
 **What (three layers, plus the website):**
@@ -382,11 +382,12 @@ statements, and 24 Playwright browser tests."
 - Each database test runs inside a transaction that is rolled back. After each one, the
   integrity check runs, except in tests marked `no_integrity_check` and pure unit tests;
   schema tests skip the audit-row query (`tests/backend/conftest.py:44-62`).
-- **Fresh numbers, 14 Oct (after the accessibility scan):** backend `559 passed in 22.58s`;
-  coverage `2015 statements, 68 missed, 97%`. By folder: `api/` 100%, `function.py` 100%,
-  `domain/` 99%, `services/` 95.7%, `store/` 93.9%. Website: 32 files, `325 passed`, about
-  a minute and a half. Website coverage: 94.7% of statements, 95.86% of lines, 91.45% of
-  branches, 90.52% of functions. Lint: clean.
+- **Fresh numbers, 14 Oct evening (full `tools/test-all.sh` run, after pages loaded on
+  first visit):** backend `565 passed in 35.19s`; coverage `2011 statements, 64 missed,
+  97%`. By folder: `api/` 100%, `function.py` 100%, `domain/` 99%, `services/` 96.0%,
+  `store/` 93.9%. Website: 33 files, `330 passed`. Website coverage: 94.58% of statements,
+  96.47% of lines, 92.07% of branches, 90.11% of functions. Lint, bandit and build: clean.
+  Playwright: 23 passed, 1 skipped (README screenshots), axe clean on 48 scans.
 - **Against AWS, 14 Oct:** `demo.spec.js` gave 2 passed in 7.0 s (recorded in
   `docs/DEMO-RUNBOOK.md:308`; not rerun for this check). Playwright was not rerun after the
   later 14 Oct changes; none of its tests log time, type an estimate or click Copy.
@@ -552,12 +553,12 @@ David's meeting notes asked for these answers in one place. Each says plainly wh
 1. **"Which tests do you use, and why?"** Built. Five kinds, one per layer: database rule
    tests, business-rule tests, API tests (all pytest, against a real Postgres), website
    tests (Vitest with React Testing Library), and browser tests (Playwright). Today:
-   **559 backend, 325 website, 24 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
+   **565 backend, 330 website, 24 Playwright** (`.venv/bin/pytest -q`, `npx vitest run`,
    `npx playwright test --list`). *Point at: `docs/TESTING.md` section 1 (table of kinds, commands, counts)*
 2. **"What does each coverage number mean?"** Coverage is the share of our code the tests
    ran; it shows what ran, not what was checked. Backend **97% of statements** (95% with
-   branches), the API layer 100%. Website **94.7% statements, 95.86% lines, 91.45% branches,
-   90.52% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct after the accessibility scan). Browser tests
+   branches), the API layer 100%. Website **94.58% statements, 96.47% lines, 92.07% branches,
+   90.11% functions** (`docs/TESTING.md` figures, re-measured on 14 Oct evening in the full `tools/test-all.sh` run). Browser tests
    and load tests get no percentage, on purpose: their measure is journeys walked, and speed
    and failures. *Point at: `docs/TESTING.md` section 2*
 3. **"Selenium or Playwright?"** Playwright. It waits by itself for a button to be clickable
@@ -906,7 +907,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "Every API route is tested over HTTP" | "Every route is called in-process with a Lambda-shaped event; real HTTP is covered by the demo script and Playwright" | `test_api.py` calls `app.dispatch()` |
 | "The uncovered 3% is only repeat guards" | "Mostly repeat guards, but five real rules are untested, and I can name them" | `milestones.py:197, 268, 291`, `tasks.py:215`, `users.py:248` |
 | "The rule tests prove the layers are separate" | "The rule tests show services don't need HTTP; the import direction is what keeps them separate" | No test enforces imports |
-| "Real Postgres, not mocks" (right after "325 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
+| "Real Postgres, not mocks" (right after "330 website tests") | "The backend tests use real Postgres; the website tests stub `fetch`" | `README.md:230-231` |
 | "No overlapping bookings for one person" | "No overlapping bookings for one person on one project" | Across projects is allowed: that's over-allocation |
 | "The staircase went up to 11 s" | "Up to about 10 s in the logs (9.8 s)" | 7 to 11 s was the load-test client's `max` column |
 | "6 ms inside the Lambda" | "6 ms median, 13 ms at p95" | `README.md:278-279` |
@@ -957,7 +958,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 
 > "Yes, I used Claude Code throughout, and I say so plainly. I made the product and design
 > decisions; they're in the decisions table in CLAUDE.md. I don't trust the code because an
-> AI wrote it. I trust it because of evidence: 559 backend tests against real Postgres; an
+> AI wrote it. I trust it because of evidence: 565 backend tests against real Postgres; an
 > integrity check after every database test; bandit and npm audit in CI; and my own
 > checks on AWS, which is where the real bugs showed up. The real test is that I can open
 > any file and explain it, so ask me about any of them."
@@ -970,12 +971,13 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 
 ## 13. Cheat card
 
-**Thirteen numbers**
+**Fourteen numbers**
 
 | Number | What | Measured |
 | --- | --- | --- |
-| 559 / 97% | Backend tests / coverage (API layer 100%) | 14 Oct |
-| 325 / 94.7% | Website tests / statements (95.86% of lines) | 14 Oct |
+| 565 / 97% | Backend tests / coverage (API layer 100%) | 14 Oct, evening |
+| 330 / 94.58% | Website tests / statements (96.47% of lines) | 14 Oct, evening |
+| 24 / 48 | Playwright tests in 9 files (23 run, 1 README-screenshot test skipped) / axe scans, all clean | 14 Oct, evening |
 | 69 | Routes in the one route table | 14 Oct |
 | 5 | Integrity queries that must return no rows | code |
 | 11 + 1 | Tables: eleven for the app (with `refresh_tokens`), plus `schema_migrations` | 14 Oct, after migration 005 |
@@ -988,8 +990,11 @@ minor one worth fixing, and all five were fixed. Don't say "rules are enforced t
 | 9.8 s vs 10 s | Last staircase step vs the lock timeout; after the fix, 0.17 to 0.30 s | 13 Oct |
 | 15 points | "At risk" threshold; bookings 1 to 40 h/week | code |
 
-**Two one-liners**
+**One-liners**
 
+- AWS: last checked at `a52da44` (14 Oct, 09:30). Everything after it, including all of
+  this evening's work since `5e994e6`, is committed and green locally, and reaches AWS only
+  after `git push origin David`, `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`.
 - Email/SMS: blocked by role + VPC (no `ses:` permission, no way out of the network), so
   passwords are shown once instead (answer 22a).
 - Pull board: built 14 Oct (66 routes, 2 migrations; answer 5a). Local only until the next deploy.

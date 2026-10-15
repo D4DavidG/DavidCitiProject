@@ -14,51 +14,59 @@ outdated it.
 
 ### Where things stand (updated 14 Oct, evening)
 
-- **Built:** backend, database and every website screen in `MVP.md`. All of it is
-  deployed to AWS and checked there, except five 14 Oct changes that are committed but
-  not deployed (Hours and Minutes boxes, **Copy username and password**, the login-timing
-  fix at `services/users.py:159-164`, the pull board with migration
-  `002_task_limit.sql`, and the bell's 10 s check with its pop-up): on AWS after the next
-  `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. The full list is at the top of
-  `docs/DEMO-RUNBOOK.md`. Three charts, built 14 Oct and not yet deployed (plain MUI
-  boxes, no chart library; the server sends every percentage): a deliverables timeline on
-  each project, and a budget chart and this week's workload on the dashboard
-  (`components/charts/`). Also not deployed: an employee's project work now notifies the
-  project's manager too (`services/audit.py`). Also not deployed: **requests for
-  everyone** (migration `003_request_kinds.sql`; spec
-  `docs/superpowers/specs/2026-10-14-requests-design.md`): employees ask their line
-  manager for a higher task limit, overtime or anything else; managers ask the admins
-  for a new project, to archive one, or anything else; approving applies the change and
-  the asker's bell says so. Also not deployed: **overtime is a warning, not a refusal**
-  (migration `004_over_capacity.sql`; spec `docs/superpowers/specs/2026-10-14-overtime-design.md`):
-  logging past weekly capacity without overtime answers 409 with `code: "OVER_CAPACITY"`,
-  the website asks **Log anyway**, and the resent entry is saved, marked "Over capacity"
-  and the manager is told. Also not deployed: **15-minute access tokens and refresh
-  tokens** (migration `005_sessions.sql`; spec
-  `docs/superpowers/specs/2026-10-14-tokens-design.md`): `POST /auth/refresh` rotates the
-  refresh token (reuse of an old one ends every session of that user), `POST /auth/logout`
-  revokes it, and a password change, reset or archive ends the user's older sessions.
-  Also not deployed: **employee history** (no migration; spec
-  `docs/superpowers/specs/2026-10-14-history-design.md`): `GET /users/{id}/history` lists
-  what a person did and what was done to their account; admins, their line manager and
-  the person may read it (others get 404), and only admins see the before/after state, so
-  a salary never reaches a manager. **History** on People, **My history** on Account.
-  Also not deployed: the dashboard's **Total projects** and **Total at risk** counters,
-  both from the server across every page (`atRiskTotal` on `GET /dashboard/projects`).
-  Also not deployed: two accessibility fixes found by the axe scan (the menu's links each
-  in a list item, `components/AppLayout.jsx`; empty weeks on the allocation grid in
-  readable grey, `pages/allocation/AllocationPage.jsx`).
-  Also not deployed: **pages load on first visit** (spec
-  `docs/superpowers/specs/2026-10-14-speed-design.md`): each signed-in page is its own
-  file (`lazyPage`, `components/lazyPage.js`), first download 739 kB to 560 kB, with a
-  Reload message if a page's file can't be fetched; one `Pager` (in `PageState.jsx`) and
-  `values.require` replace copied code.
-  Tests: 559 backend, 325 website, and 24 Playwright browser
-  tests in 9 files (`e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js` takes and
-  puts back a task; `e2e/requests.spec.js` asks and answers a request;
+- **Built:** backend, database and every website screen in `MVP.md`, plus everything
+  below. **AWS was last checked at `a52da44`** (14 Oct, about 09:30). Everything
+  committed after it runs on the local stack but is **not on AWS** until David runs
+  `git push origin David`, then `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`
+  (both together; migrations 002 to 005 apply on the Lambda's first cold start). The
+  click-level list is at the top of `docs/DEMO-RUNBOOK.md`.
+  - **14 Oct, daytime (`a52da44` to `5e994e6`):** Hours and Minutes boxes, **Copy
+    username and password**, the login-timing fix (`services/users.py`), the pull board
+    (migration `002_task_limit.sql`), the bell's 10 s check with its pop-up, three charts
+    (plain MUI boxes, no chart library, the server sends every percentage: a deliverables
+    timeline on each project, a budget chart and this week's workload on the dashboard,
+    `components/charts/`), and an employee's project work notifying the project's manager
+    too (`services/audit.py`).
+  - **14 Oct, evening (everything since `5e994e6`):**
+    - **requests for everyone** (migration `003_request_kinds.sql`; spec
+      `docs/superpowers/specs/2026-10-14-requests-design.md`): employees ask their line
+      manager for a higher task limit, overtime or anything else; managers ask the admins
+      for a new project, to archive one, or anything else; approving applies the change
+      and the asker's bell says so;
+    - **overtime is a warning, not a refusal** (migration `004_over_capacity.sql`; spec
+      `docs/superpowers/specs/2026-10-14-overtime-design.md`): logging past weekly
+      capacity without overtime answers 409 with `code: "OVER_CAPACITY"`, the website
+      asks **Log anyway**, and the resent entry is saved, marked "Over capacity" and the
+      manager is told;
+    - **15-minute access tokens and refresh tokens** (migration `005_sessions.sql`; spec
+      `docs/superpowers/specs/2026-10-14-tokens-design.md`): `POST /auth/refresh` rotates
+      the refresh token (reuse of an old one ends every session of that user),
+      `POST /auth/logout` revokes it, and a password change, reset or archive ends the
+      user's older sessions;
+    - **employee history** (no migration; spec
+      `docs/superpowers/specs/2026-10-14-history-design.md`): `GET /users/{id}/history`;
+      admins, the line manager and the person may read it (others get 404), and only
+      admins see the before/after state, so a salary never reaches a manager. **History**
+      on People, **My history** on Account;
+    - the dashboard's **Total projects** and **Total at risk**, counted by the server
+      across every page (`atRiskTotal` on `GET /dashboard/projects`);
+    - the OpenAPI file `docs/openapi.json` (69 operations, built from the route table);
+    - two accessibility fixes found by the axe scan (the menu's links each in a list
+      item, `components/AppLayout.jsx`; empty weeks on the allocation grid in readable
+      grey, `pages/allocation/AllocationPage.jsx`);
+    - **pages load on first visit** (spec `docs/superpowers/specs/2026-10-14-speed-design.md`):
+      each signed-in page is its own file (`components/lazyPage.js`), first download
+      739 kB to 560 kB, with a Reload message if a page's file can't be fetched; one
+      `Pager` (in `PageState.jsx`) and `values.require` replace copied code.
+- **Tests (full run of `bash tools/test-all.sh`, 14 Oct evening, every row PASS):**
+  565 backend (97% of statements, 95% with branches; `api/` 100%), 330 website in 33
+  files (94.58% of statements, 96.47% of lines), lint, bandit and the production build
+  clean, and 24 Playwright browser tests in 9 files (23 passed, 1 skipped: the README
+  screenshots run only on request). `e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js`
+  takes and puts back a task; `e2e/requests.spec.js` asks and answers a request;
   `e2e/history.spec.js` reads a person's history; `e2e/tour.spec.js` screenshots every
-  screen at desktop and phone width and runs axe on it (serious or critical WCAG A/AA
-  problems fail); `timeline`, `budget` and `workload` specs check the charts).
+  screen at desktop and phone width and runs axe on it (48 scans; serious or critical
+  WCAG A/AA problems fail); `timeline`, `budget` and `workload` specs check the charts.
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);
@@ -75,7 +83,7 @@ outdated it.
   - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
     email or texts (role and network), and the design for any future reset flow;
   - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
-    a per-person task limit), built 14 Oct (69 routes; five migration files since
+    a per-person task limit), built 14 Oct (69 routes now; five migration files, the latest
     `005_sessions.sql`).
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
@@ -83,10 +91,10 @@ outdated it.
   without a prompt (a blanket `"Bash"` allow, added 14 Oct at David's request; delete
   that line to go back). Hand him the exact commands for the denied ones.
 - **Open items:**
-  - deploy the three charts and requests for everyone: `git push origin David`, then
-    `./bin/deploy-backend.sh` (the server's `plannedPercent` and `pendingPercent`, and
-    migrations 003 to 005 on the first cold start) and `./bin/deploy-frontend.sh`
-    (deploy both together: the old website knows no refresh and signs out after 15 min);
+  - deploy everything committed since `a52da44` (see **Built**): `git push origin David`,
+    then `./bin/deploy-backend.sh` (migrations 002 to 005 on the first cold start) and
+    `./bin/deploy-frontend.sh`, both together (the old website knows no refresh and
+    would sign out after 15 min);
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
   - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8);
