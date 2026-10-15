@@ -203,11 +203,15 @@ after the 15 Oct deploy. A **load test** (k6) measures speed under many users. N
 15 Oct, before the post-demo changes.
 
 ```sh
+python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt bandit   # once
+(cd frontend && npm install)                                                       # once
 ./tools/test-all.sh                     # every local check in order, then a PASS or FAIL table (about 2.5 min)
 ./tools/e2e.sh --aws --show demo        # watch the demo walk in a real browser, on the live site
 ./tools/e2e.sh --aws --video demo       # the same, recorded: opens the report with the videos
 ```
 
+The backend tests need the local Postgres (port 5432); the browser tests run in `test-all.sh`
+only while `./bin/start-dev.sh` is up ([setting up a machine for the tests](docs/TESTING.md#4-set-up-a-machine-to-run-the-tests)).
 Where each suite lives and how to run it: [tests/README.md](tests/README.md). What each test
 proves, the coverage, and why the gaps are there: [docs/TESTING.md](docs/TESTING.md).
 
