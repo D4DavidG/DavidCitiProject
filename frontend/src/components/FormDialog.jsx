@@ -3,7 +3,7 @@ import PropTypes from 'prop-types'
 import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, FormLabel, MenuItem, TextField,
 } from '@mui/material'
-import { centsToDollarsInput, parseDollars, parseDuration, splitMinutes } from '../services/format'
+import { centsToDollarsInput, formatHours, parseDollars, splitMinutes } from '../services/format'
 
 function toInput(field, value) {
   if (field.type === 'duration') return splitMinutes(value)
@@ -24,6 +24,34 @@ const YES_NO = [['true', 'Yes'], ['false', 'No']]
 
 /** Where a duration field's Minutes-box error is kept; its Hours-box error uses the field's own name. */
 const minutesKey = (name) => `${name}.minutes`
+
+const WHOLE = /^\d+$/
+
+/** Logged time is capped at a day by the database (`time_entries_minutes_range`); say so in its own words. */
+const ONE_DAY = 1440
+
+/**
+ * What was typed in a duration's Hours and Minutes boxes -> { minutes } in total, or
+ * { hours, minutes } holding the message for each box that is wrong (the total's own
+ * messages sit under Hours). An empty box counts as 0. The Hours box takes any whole
+ * number: only the total is held to `max` (minutes), so 99 h fails as "too much for one
+ * entry", not as a bad Hours box. A required field's total must be above 0.
+ */
+function checkDuration(hoursText, minutesText, { max, required }) {
+  const hours = hoursText.trim() || '0'
+  const minutes = minutesText.trim() || '0'
+  const errors = {}
+  if (!WHOLE.test(hours)) errors.hours = 'Hours must be a whole number, 0 or more.'
+  if (!WHOLE.test(minutes)) errors.minutes = 'Minutes must be a whole number from 0 to 59.'
+  else if (Number(minutes) > 59) errors.minutes = 'Minutes must be under 60'
+  if (errors.hours || errors.minutes) return { errors }
+  const total = Number(hours) * 60 + Number(minutes)
+  if (required && total === 0) return { errors: { hours: 'Enter some time: at least 1 minute.' } }
+  if (max === ONE_DAY && total > max) return { errors: { hours: 'One entry can hold at most 24 h.' } }
+  if (max !== undefined && total > max) return { errors: { hours: `That is more than ${formatHours(max)}.` } }
+  if (!Number.isSafeInteger(total)) return { errors: { hours: 'That is too many hours.' } }
+  return { minutes: total }
+}
 
 /**
  * A duration as two short boxes, Hours and Minutes, side by side on every screen
@@ -81,9 +109,10 @@ DurationField.propTypes = {
 /**
  * A create or edit form in a dialog. Fields: { name, label, type?, options?, required?, helper?, max? }
  * where type is text (default), textarea, number, money (typed in dollars, sent as
- * cents), duration (typed as whole Hours and Minutes, sent as minutes, at most `max`
- * minutes), date, select or boolean (Yes/No). Durations and money are checked before
- * anything is sent; a mistake shows under its box and nothing is sent. With `initial`,
+ * cents), duration (typed as whole Hours and Minutes, sent as minutes; Hours takes
+ * any whole number, Minutes 0 to 59, and the total at most `max` minutes), date, select
+ * or boolean (Yes/No). Durations and money are checked before anything is sent; a
+ * mistake shows under its box and nothing is sent. With `initial`,
  * only the fields that changed are sent, so a manager never sends an admin-only field
  * they didn't touch. Server errors with a `field` show on that field (a duration's
  * under its Hours box); others show above the form. While it saves, every field and
@@ -110,9 +139,11 @@ export default function FormDialog({ open, title, fields, initial = null, defaul
       if (field.type === 'duration') {
         const { hours, minutes } = values[field.name]
         if (!field.required && hours.trim() === '' && minutes.trim() === '') return
-        const parsed = parseDuration(hours, minutes, field.max)
-        if (parsed.error) problems[parsed.box === 'minutes' ? minutesKey(field.name) : field.name] = parsed.error
-        else if (!initial || parsed.minutes !== initial[field.name]) body[field.name] = parsed.minutes
+        const checked = checkDuration(hours, minutes, field)
+        if (checked.errors) {
+          if (checked.errors.hours) problems[field.name] = checked.errors.hours
+          if (checked.errors.minutes) problems[minutesKey(field.name)] = checked.errors.minutes
+        } else if (!initial || checked.minutes !== initial[field.name]) body[field.name] = checked.minutes
         return
       }
       const text = values[field.name].trim()
@@ -205,7 +236,7 @@ FormDialog.propTypes = {
     numeric: PropTypes.bool,
     required: PropTypes.bool,
     helper: PropTypes.node,
-    /** A duration's largest total in minutes, the server's own limit (1440 for logged time). */
+    /** A duration's largest total in minutes, the server's own limit (1440 for logged time). It holds the total only, never the Hours box. */
     max: PropTypes.number,
   })).isRequired,
   /** Current values when editing (API field names); omit when creating. */

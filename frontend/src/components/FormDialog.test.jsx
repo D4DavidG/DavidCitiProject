@@ -109,15 +109,45 @@ describe('FormDialog', () => {
     it('refuses 75 minutes under the Minutes box, tied to it, and sends nothing', async () => {
       const onSubmit = renderDuration(TIME)
       await enter('1', '75')
-      expect(screen.getByLabelText('Minutes')).toHaveAccessibleDescription('Minutes must be a whole number from 0 to 59.')
+      expect(screen.getByLabelText('Minutes')).toHaveAccessibleDescription('Minutes must be under 60')
       expect(screen.getByLabelText('Minutes')).toHaveAttribute('aria-invalid', 'true')
       expect(onSubmit).not.toHaveBeenCalled()
     })
 
-    it('refuses 2.5 minutes the same way', async () => {
+    it('takes 59 minutes but not 60', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('1', '60')
+      expect(screen.getByLabelText('Minutes')).toHaveAccessibleDescription('Minutes must be under 60')
+      expect(onSubmit).not.toHaveBeenCalled()
+      await userEvent.clear(screen.getByLabelText('Minutes'))
+      await userEvent.type(screen.getByLabelText('Minutes'), '59')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).toHaveBeenCalledWith({ minutes: 119 })
+    })
+
+    it('refuses 2.5 minutes, which is not a whole number', async () => {
       const onSubmit = renderDuration(TIME)
       await enter('', '2.5')
       expect(screen.getByLabelText('Minutes')).toHaveAccessibleDescription('Minutes must be a whole number from 0 to 59.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('refuses 2.5 hours and negative hours under the Hours box', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('2.5', '')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('Hours must be a whole number, 0 or more.')
+      await userEvent.clear(screen.getByLabelText('Hours'))
+      await userEvent.type(screen.getByLabelText('Hours'), '-1')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('Hours must be a whole number, 0 or more.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('shows a mistake in each box at once', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('x', '75')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('Hours must be a whole number, 0 or more.')
+      expect(screen.getByLabelText('Minutes')).toHaveAccessibleDescription('Minutes must be under 60')
       expect(onSubmit).not.toHaveBeenCalled()
     })
 
@@ -128,21 +158,85 @@ describe('FormDialog', () => {
       expect(onSubmit).not.toHaveBeenCalled()
     })
 
-    it('refuses more than its maximum: 24 h 30 min of logged time', async () => {
+    it('refuses 0 h 0 min when required: the total must be above 0', async () => {
       const onSubmit = renderDuration(TIME)
-      await enter('24', '30')
-      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('That is more than 24 h.')
+      await enter('0', '0')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('Enter some time: at least 1 minute.')
       expect(onSubmit).not.toHaveBeenCalled()
     })
 
-    it('takes an estimate of 100 h but not 1001 h', async () => {
+    it('refuses more than its maximum: 24 h 30 min of logged time', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('24', '30')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('One entry can hold at most 24 h.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('takes exactly 24 h of logged time', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('24', '0')
+      expect(onSubmit).toHaveBeenCalledWith({ minutes: 1440 })
+    })
+
+    it('lets the Hours box take any whole number, and the total decide: 99 h is too much for one entry', async () => {
+      const onSubmit = renderDuration(TIME)
+      await enter('99', '')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('One entry can hold at most 24 h.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('copes with an absurdly long number of hours', async () => {
+      const onSubmit = renderDuration(TIME)
+      fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '9'.repeat(400) } })
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('One entry can hold at most 24 h.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('words the limit for other fields as "more than" their maximum', async () => {
+      const onSubmit = renderDuration(ESTIMATE)
+      await enter('1000', '1')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('That is more than 1000 h.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('takes an estimate of 100 h and of 1000 h but not 1001 h', async () => {
       const onSubmit = renderDuration(ESTIMATE)
       await enter('1001', '')
-      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('Hours must be a whole number from 0 to 1000.')
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('That is more than 1000 h.')
       expect(onSubmit).not.toHaveBeenCalled()
       await userEvent.clear(screen.getByLabelText('Hours'))
       await enter('100', '')
       expect(onSubmit).toHaveBeenCalledWith({ estimateMinutes: 6000 })
+      await userEvent.clear(screen.getByLabelText('Hours'))
+      await enter('1000', '')
+      expect(onSubmit).toHaveBeenLastCalledWith({ estimateMinutes: 60000 })
+    })
+
+    it('with no maximum, any whole number of hours is sent as minutes', async () => {
+      const onSubmit = renderDuration({ name: 'span', label: 'Span', type: 'duration', required: true })
+      const group = screen.getByRole('group', { name: /span/i })
+      await userEvent.type(within(group).getByLabelText('Hours'), '5000')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).toHaveBeenCalledWith({ span: 300000 })
+    })
+
+    it('with no maximum, a number too big to count is refused instead of sent', async () => {
+      const onSubmit = renderDuration({ name: 'span', label: 'Span', type: 'duration', required: true })
+      fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '9'.repeat(400) } })
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('That is too many hours.')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('a field that is not required may be left empty (nothing sent) or set to 0', async () => {
+      const optional = { name: 'extra', label: 'Extra', type: 'duration', max: 1440 }
+      const onSubmit = renderDuration(optional)
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).toHaveBeenLastCalledWith({})
+      await userEvent.type(screen.getByLabelText('Hours'), '0')
+      await userEvent.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSubmit).toHaveBeenLastCalledWith({ extra: 0 })
     })
 
     it('pre-fills 420 as 7 h 0 min when editing, and sends a change as minutes', async () => {
