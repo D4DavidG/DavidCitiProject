@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { Box, Button, Card, CardContent, Typography } from '@mui/material'
 import FormDialog from '../../components/FormDialog'
+import HistoryPanel from '../../components/HistoryPanel'
 import PageHeader from '../../components/PageHeader'
 import { ROLE_LABELS } from '../../components/navigation'
 import { useAuth } from '../../auth/useAuth'
@@ -18,6 +19,7 @@ const PROFILE_FIELDS = [
  * Anyone's own account: they change their own name, email and password; everything
  * else (username, role, line manager, capacity, salary) is shown but set by others.
  * Changing your name is audited and notifies your line manager and the admins.
+ * My history lists what you changed and what others changed on your account.
  */
 export default function AccountPage() {
   const { user, refreshUser } = useAuth()
@@ -56,6 +58,13 @@ export default function AccountPage() {
             You can change your name, email and password. Your username never changes; your role,
             line manager, capacity and salary are set by your manager or an admin.
           </Typography>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Typography variant="h6" component="h2" sx={{ mb: 2 }}>My history</Typography>
+          <HistoryPanel userId={user.userId} />
         </CardContent>
       </Card>
 

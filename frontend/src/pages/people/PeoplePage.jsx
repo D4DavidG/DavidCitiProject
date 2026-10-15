@@ -8,6 +8,7 @@ import AddIcon from '@mui/icons-material/PersonAddAlt'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
+import HistoryPanel from '../../components/HistoryPanel'
 import PageHeader from '../../components/PageHeader'
 import PageState from '../../components/PageState'
 import { useAuth } from '../../auth/useAuth'
@@ -16,6 +17,7 @@ import { formatCents } from '../../services/format'
 import { fullName, usePeopleOptions } from '../../services/people'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useIsMobile } from '../../theme/responsive'
 
 const ROLE_OPTIONS = [['EMPLOYEE', 'Employee'], ['MANAGER', 'Manager'], ['ADMIN', 'Admin']]
 const CAPACITY_FIELDS = [
@@ -84,16 +86,19 @@ PasswordShown.propTypes = {
  * The people in the organisation. Admins create accounts (the server generates the
  * username and a one-time password), edit them, reset passwords and archive them.
  * Managers see everyone and set capacity and overtime for their own direct reports.
+ * History (what someone did and what was done to their account) is open to admins for
+ * everyone and to managers for their own reports.
  */
 export default function PeoplePage() {
   const { user } = useAuth()
+  const isMobile = useIsMobile()
   const isAdmin = user.role === 'ADMIN'
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [role, setRole] = useState('')
   const [includeArchived, setIncludeArchived] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
-  const [dialog, setDialog] = useState(null) // { kind: 'create'|'edit'|'capacity'|'reset'|'archive', person? }
+  const [dialog, setDialog] = useState(null) // { kind: 'create'|'edit'|'capacity'|'history'|'reset'|'archive', person? }
   const [shown, setShown] = useState(null)
   const [message, setMessage] = useState(null)
   const { options: managers } = usePeopleOptions('MANAGER')
@@ -106,6 +111,7 @@ export default function PeoplePage() {
   const showSalary = rows.some((p) => p.annualSalaryCents !== undefined)
 
   const canSetCapacity = (p) => isAdmin || (user.role === 'MANAGER' && p.managerId === user.userId)
+  const canSeeHistory = canSetCapacity // the same people: admins see everyone, managers their reports
   const columns = [
     { key: 'name', label: 'Name', render: (p) => fullName(p) },
     { key: 'username', label: 'Username' },
@@ -131,6 +137,7 @@ export default function PeoplePage() {
         return (
           <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             {canSetCapacity(p) && !p.isArchived && <Button size="small" aria-label={`Capacity for ${name}`} onClick={() => setDialog({ kind: 'capacity', person: p })}>Capacity</Button>}
+            {canSeeHistory(p) && <Button size="small" aria-label={`History for ${name}`} onClick={() => setDialog({ kind: 'history', person: p })}>History</Button>}
             {isAdmin && !p.isArchived && <Button size="small" aria-label={`Edit ${name}`} onClick={() => setDialog({ kind: 'edit', person: p })}>Edit</Button>}
             {isAdmin && !p.isArchived && p.userId !== user.userId && <Button size="small" aria-label={`Reset password for ${name}`} onClick={() => setDialog({ kind: 'reset', person: p })}>Reset password</Button>}
             {isAdmin && p.userId !== user.userId && (p.isArchived
@@ -211,6 +218,13 @@ export default function PeoplePage() {
           onSubmit={async (body) => { await request('PATCH', `/users/${person.userId}/capacity`, { body }); reload() }}
           onClose={close}
         />
+      )}
+      {dialog?.kind === 'history' && (
+        <Dialog open onClose={close} aria-labelledby="history-title" maxWidth="lg" fullWidth fullScreen={isMobile}>
+          <DialogTitle id="history-title">{`History: ${fullName(person)}`}</DialogTitle>
+          <DialogContent><HistoryPanel userId={person.userId} /></DialogContent>
+          <DialogActions><Button onClick={close}>Close</Button></DialogActions>
+        </Dialog>
       )}
       {dialog?.kind === 'reset' && (
         <ConfirmDialog

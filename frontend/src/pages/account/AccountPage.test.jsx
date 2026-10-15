@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AccountPage from './AccountPage'
-import { USERS, renderAt, session, stubApi } from '../../test/utils'
+import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
 
 const ANA = {
   ...USERS.employee, userId: 3, username: 'AR553882', firstName: 'Ana', lastName: 'Ruiz', email: 'ana.ruiz@acme.test',
@@ -10,7 +10,7 @@ const ANA = {
 }
 
 function renderAccount(answers = {}, auth = session(ANA, { refreshUser: vi.fn().mockResolvedValue(ANA) })) {
-  const calls = stubApi(answers)
+  const calls = stubApi({ 'GET /users/3/history': [200, page([])], ...answers })
   renderAt(<AccountPage />, { path: '/account', auth })
   return { calls, auth }
 }
@@ -54,5 +54,14 @@ describe('AccountPage', () => {
   it('explains what only an admin can change', () => {
     renderAccount()
     expect(screen.getByText(/your username never changes/i)).toBeInTheDocument()
+  })
+
+  it('shows my own history', async () => {
+    const { calls } = renderAccount({
+      'GET /users/3/history': [200, page([{ auditId: 8, actorUserId: 1, actorRole: 'ADMIN', action: 'RESET_PASSWORD', entityType: 'users', entityId: 3, summary: 'System Administrator reset the password of Ana Ruiz', createdAt: '2026-10-14T01:03:25+00:00', actorName: 'System Administrator' }])],
+    })
+    expect(screen.getByRole('heading', { name: 'My history' })).toBeInTheDocument()
+    expect(await screen.findByText('System Administrator reset the password of Ana Ruiz')).toBeInTheDocument()
+    expect(calls.some((c) => c.path === '/users/3/history')).toBe(true)
   })
 })

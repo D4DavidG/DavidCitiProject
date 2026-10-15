@@ -155,4 +155,28 @@ describe('PeoplePage', () => {
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
     await waitFor(() => expect(calls.some((c) => c.path === '/users/4/archive')).toBe(true))
   })
+
+  it('shows History to admins on every row', async () => {
+    renderPeople(USERS.admin)
+    await screen.findByRole('table', { name: 'People' })
+    expect(screen.getAllByRole('button', { name: /^history for/i })).toHaveLength(3)
+  })
+
+  it('shows a manager History only for their own reports', async () => {
+    renderPeople(USERS.manager)
+    await screen.findByRole('table', { name: 'People' })
+    const buttons = screen.getAllByRole('button', { name: /^history for/i })
+    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['History for Ben Okafor'])
+  })
+
+  it("opens a person's history", async () => {
+    const calls = renderPeople(USERS.admin, {
+      'GET /users/4/history': [200, page([{ auditId: 5, actorUserId: 4, actorRole: 'EMPLOYEE', action: 'UPDATE', entityType: 'users', entityId: 4, summary: 'Ben Okafor updated their profile', createdAt: '2026-10-14T01:03:25+00:00', actorName: 'Ben Okafor' }])],
+    })
+    await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(screen.getByRole('button', { name: 'History for Ben Okafor' }))
+    const dialog = await screen.findByRole('dialog', { name: 'History: Ben Okafor' })
+    expect(await within(dialog).findByText('Ben Okafor updated their profile')).toBeInTheDocument()
+    expect(calls.some((c) => c.path === '/users/4/history')).toBe(true)
+  })
 })
