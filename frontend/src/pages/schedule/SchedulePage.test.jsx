@@ -193,14 +193,31 @@ describe('SchedulePage', () => {
     expect(await screen.findByText('Project page')).toBeInTheDocument()
   })
 
+  it('moves with Earlier and Later, secondary buttons with their arrows, as on the home timeline (spec 5c)', async () => {
+    renderSchedule()
+    await bar(/Ben Okafor, Apollo, 25/)
+    const earlier = screen.getByRole('button', { name: 'Earlier' })
+    const later = screen.getByRole('button', { name: 'Later' })
+    for (const button of [earlier, later]) expect(button).toHaveClass('MuiButton-outlined')
+    expect(within(earlier).getByTestId('ChevronLeftIcon')).toBeInTheDocument()
+    expect(within(later).getByTestId('ChevronRightIcon')).toBeInTheDocument()
+  })
+
+  it('gives a bar the site\'s one focus ring (the theme\'s), not a ring of its own', async () => {
+    renderSchedule()
+    const scope = [...(await bar(/Ben Okafor, Apollo, 25/)).classList].find((name) => name.startsWith('css-'))
+    const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
+    expect(css).not.toContain(`.${scope}:focus-visible`)
+  })
+
   it('asks for 8 weeks from this week, then moves a week at a time', async () => {
     const calls = renderSchedule()
     await bar(/Ben Okafor, Apollo, 25/)
     expect(calls[0].query).toMatchObject({ weeks: '8', page: '1' })
     expect(calls[0].query.weekFrom).toBeUndefined()
-    await userEvent.click(screen.getByRole('button', { name: /next week/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-19'))
-    await userEvent.click(screen.getByRole('button', { name: /previous week/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Earlier' }))
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-12'))
     await userEvent.click(screen.getByRole('button', { name: /this week/i }))
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBeUndefined())
@@ -234,7 +251,7 @@ describe('SchedulePage', () => {
     await bar(/Ben Okafor, Apollo, 25/)
     await userEvent.click(screen.getByRole('button', { name: /page 2/i }))
     await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
-    await userEvent.click(screen.getByRole('button', { name: /next week/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
     await waitFor(() => expect(calls.at(-1).query.weekFrom).toBe('2026-10-19'))
     expect(calls.at(-1).query.page).toBe('1')
   })

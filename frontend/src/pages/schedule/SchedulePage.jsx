@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import {
-  Box, Button, FormControlLabel, IconButton, Pagination, Switch, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  Box, Button, FormControlLabel, Pagination, Switch, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
@@ -42,11 +42,11 @@ const nameCell = (grid) => ({
 
 /**
  * One booking bar: the project's colour across the weeks it runs, its name and hours above.
- * It is a link to the project. Hover, keyboard focus or a tap shows the tooltip; on a phone the
- * first tap only shows it (a tap is also a click) and the second opens the project.
+ * It is a link to the project, so keyboard focus draws the theme's one green-ink ring. Hover,
+ * keyboard focus or a tap shows the tooltip; on a phone the first tap only shows it (a tap is
+ * also a click) and the second opens the project.
  */
 function BookingBar({ person, bar, weeks, colour, lane }) {
-  const { ink } = useChartColours()
   const [open, setOpen] = useState(false)
   const tap = useRef(null) // during a tap: was the tooltip already open when it began?
   const from = formatDay(weeks[bar.first])
@@ -75,7 +75,6 @@ function BookingBar({ person, bar, weeks, colour, lane }) {
         sx={{
           gridColumn: `${bar.first + 2} / ${bar.last + 3}`, gridRow: lane + 1, position: 'relative', zIndex: 1,
           display: 'block', minWidth: 0, minHeight: 24, mx: 0.5, py: 0.25, color: 'text.primary', textDecoration: 'none',
-          '&:focus-visible': { outline: `2px solid ${ink}`, outlineOffset: 1 },
         }}
       >
         <Typography variant="caption" noWrap component="span" sx={{ display: 'block' }}>
@@ -237,12 +236,13 @@ export default function SchedulePage() {
       />
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <IconButton aria-label="Previous week" onClick={() => show(() => setWeekFrom(addDays(start, -7)))} disabled={!start}><PrevIcon /></IconButton>
+        {/* Earlier and Later move one week; secondary buttons with words, as on the home timeline (spec 5c). */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+          <Button size="small" startIcon={<PrevIcon />} onClick={() => show(() => setWeekFrom(addDays(start, -7)))} disabled={!start}>Earlier</Button>
           <Typography sx={{ minWidth: 150, textAlign: 'center' }}>
             {weeks.length ? `${formatDay(weeks[0])} – ${formatDay(addDays(weeks.at(-1), 6))}` : '…'}
           </Typography>
-          <IconButton aria-label="Next week" onClick={() => show(() => setWeekFrom(addDays(start, 7)))} disabled={!start}><NextIcon /></IconButton>
+          <Button size="small" endIcon={<NextIcon />} onClick={() => show(() => setWeekFrom(addDays(start, 7)))} disabled={!start}>Later</Button>
           <Button size="small" onClick={() => show(() => setWeekFrom(''))} disabled={!weekFrom}>This week</Button>
         </Box>
         <ToggleButtonGroup
