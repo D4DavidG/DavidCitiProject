@@ -29,6 +29,7 @@
 #   tour       every screen, desktop and phone, light and dark, axe  read-only
 #   history    a manager reads a person's history                   read-only
 #   schedule   the Schedule bars                                    read-only
+#   search     the top bar's search jumps to a page and a project   read-only
 #   timeline budget workload   the three charts                     read-only
 #   pull       the employee takes a task and puts it back           WRITES data
 #   requests   the employee asks, Maria rejects                     WRITES data
@@ -51,6 +52,8 @@
 #           workload 5 of 5 and timeline 3 of 4: its "Design Done" test fails there because the
 #           live data moved on (Apollo's Design is Late, 21% done), not because of the code. The
 #           tour passed 9 of 9 with Ben as the employee. They stay out of that default set.
+#           Those results were the old screens. demo, tour, timeline and search now check the
+#           15 Oct screens too, so they fail on the live site until the new website is deployed.
 #           The site is warmed first (the database sleeps when idle).
 # Screens:  the tour saves its screenshots in E2E_TOUR_DIR (default $HOME/tour-shots).
 # Guide:    docs/TESTING.md (what each test checks, where it runs and why).
@@ -70,7 +73,10 @@ AWS_ZEUS="SP918535"      # Sam Patel
 AWS_ADMIN_PASSWORD="gusmao123"  # AD000001 on the live site (David published it): E2E_ADMIN_PASSWORD's default with --aws
 
 # Which files only read. Anything not named here counts as one that writes.
-READ_ONLY="demo history schedule tour timeline budget workload"
+READ_ONLY="demo history schedule tour timeline budget workload search"
+# The read-only files that check the 15 Oct screens (the dashboard's two columns, the late mark's
+# reasons, the top-bar search): they fail on the live site until David deploys the new website.
+NEEDS_DEPLOY="demo tour timeline search"
 # What --aws runs when no file is named: the files seen passing on the live site (14 Oct night).
 # The three chart files run there only when named (timeline's "Design Done" test expects the seed's data).
 AWS_DEFAULT="demo history schedule tour"
@@ -202,7 +208,10 @@ if [ "$AWS" -eq 1 ]; then
   fi
   for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
     case "$name" in
-      timeline) echo "Note: on the live site timeline.spec.js's \"Design Done\" test fails: the live data moved on (Apollo's Design is no longer Done). The other three pass." ;;
+      timeline) echo "Note: on the live site timeline.spec.js's \"Design Done\" test fails: the live data moved on (Apollo's Design is no longer Done)." ;;
+    esac
+    case " $NEEDS_DEPLOY " in
+      *" $name "*) echo "Note: $name.spec.js checks the 15 Oct screens (dashboard columns, why a deliverable is late, the top-bar search): until the new website is deployed, the live site fails those tests." ;;
     esac
   done
 fi
