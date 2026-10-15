@@ -42,7 +42,7 @@ What's done and what isn't, honestly:
 | Database (11 tables plus schema_migrations, rules enforced by Postgres) | Done, tested, deployed to Aurora |
 | Backend API (66 routes, roles, audit log, notifications) | Done and tested. 62 of the routes are on Lambda; the 4 pull-board routes and migration `002_task_limit.sql` arrive with the next `./bin/deploy-backend.sh` |
 | Answers to all seven questions | Done, shown by `tools/demo.py` |
-| Tests | Backend: 565 passing, 97% coverage, 100% for the API layer. Frontend: 404 passing, 95.5% of statements and 97.04% of lines covered, plus 30 browser (Playwright) tests in 12 files (14 Oct, night; `bash tools/test-all.sh` steps 1 to 5 PASS, browser tests run by hand: 29 passed, 1 skipped) |
+| Tests | Backend: 565 passing, 97% coverage, 100% for the API layer. Frontend: 404 passing, 95.5% of statements and 97.04% of lines covered, plus 30 browser (Playwright) tests in 12 files (14 Oct, night, before the redesign, which adds tests: say "more than 600" and "more than 400" until the final run is printed here; `bash tools/test-all.sh` steps 1 to 5 PASS, browser tests run by hand: 29 passed, 1 skipped) |
 | AWS deployment | Verified 13 Oct: health, login, token, 404s, demo, load test |
 | Frontend (React, Material UI) | **Every screen built and tested**, live on AWS since 14 Oct (website deployed 11:35 UTC). The later 14 Oct changes (Hours and Minutes boxes, the Copy username and password button, the login-timing fix, the pull board, the bell's 10 s check with its pop-up, and the three charts: Workload and Budget on the Dashboard, the Deliverables timeline on each project) are local until the next `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`. See `docs/OVERNIGHT-REPORT.md` for the rest |
 
@@ -57,7 +57,7 @@ and JSON. Things you can show:
 | --- | --- | --- |
 | Click through the app as a manager: dashboard, allocation grid, a project, its dependencies | The CloudFront URL, or `http://localhost:3000` locally | 3 |
 | Run the whole story: the seven answers, then ten requests the rules refuse | `python3 tools/demo.py demo` | 3 |
-| Prove the code works | `.venv/bin/pytest -q` (565 backend tests, 20 to 40 s) and `cd frontend && npm test` (404, about two minutes) | 3, 9 |
+| Prove the code works | `.venv/bin/pytest -q` (more than 600 backend tests, 20 to 40 s) and `cd frontend && npm test` (more than 400, about two minutes) | 3, 9 |
 | Show it's live on AWS | `curl .../health`, the demo against AWS, the AWS console | 5 |
 | Show raw API answers (JSON) | `curl` with a login token | 4 |
 | Look inside the database | `psql` or DBeaver, on the local copy | 4 |
@@ -119,7 +119,7 @@ Maria: her username is printed by `python3 tools/demo.py demo`, and the password
 | 5 | Point at **4 and 6** | "Deliverables, with completion worked out from their tasks, and the dependency chain. Launch is blocked because Build isn't done." |
 | 6 | Point at **Trying to break the rules** | "Every one of these is a real request the server refused. Logging past 40 hours without confirming, a loop in the dependencies, someone else's project (404, not 403, so you can't tell it exists), deleting anything (there is no delete: records are archived)." |
 | 7 | Point at **5 integrity checks, 0 violations** | "Five database queries that must always return nothing: no dependency loops, no time logged outside a booking, and so on. They run after every database test, and here on live data." |
-| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "565 backend tests against a real Postgres database, not mocks. 404 website tests, which fake the API so they need no database. Plus a real browser test that walks this exact demo." |
+| 8 | Run `.venv/bin/pytest -q`, then `cd frontend && npm test` | "More than 600 backend tests against a real Postgres database, not mocks. More than 400 website tests, which fake the API so they need no database. Plus a real browser test that walks this exact demo." |
 | 9 | Optional: `(set -a; source ENVIRONMENT.config; python3 tools/console.py logs)` | "Here are those requests arriving in AWS's logs." |
 | 10 | Tell one story from section 8, "Things that went wrong" | Evaluators score curiosity and observation. These stories show both. |
 
@@ -276,7 +276,7 @@ backend/tracker/                     the whole backend: one Lambda
   domain/                            small shared pieces: errors, money (cents), clock (Eastern time), values
   store/                             the database: migrations/ (001_init.sql: all tables and rules; 002 to 004 add columns, 005 adds refresh_tokens),
                                      migrate.py, integrity.py (the 5 checks), postgres.py
-tests/backend/                       565 tests; conftest.py builds the test database
+tests/backend/                       more than 600 tests; conftest.py builds the test database
 frontend/src/                        the website (React + Material UI):
   services/request.js                the one module that calls the API (token, JSON, errors; on a 401 refresh once, then retry)
   services/format.js                 the only code that turns cents, minutes and dates into text
@@ -411,18 +411,18 @@ counted as the next day.
 
 ### Testing
 
-**"How did you test it?"** 565 backend tests with pytest, against a real PostgreSQL database,
+**"How did you test it?"** More than 600 backend tests with pytest, against a real PostgreSQL database,
 not mocks. Each test runs inside a transaction that's rolled back, so tests can't
 affect each other, and the integrity check runs after each database test.
 
 - **Unit and rule tests:** call the services directly (every business rule).
 - **API tests:** send Lambda-shaped events, in-process, through the same entry point AWS
-  uses. Two "walk" tests call every one of the 69 routes, and fail if someone adds a
+  uses. Two "walk" tests call every one of the 70 routes, and fail if someone adds a
   route without testing it. Real HTTP is exercised by `tools/demo.py` and Playwright.
 - **Database tests:** prove Postgres itself refuses each kind of bad row.
 - **Load test:** `tools/k6/load.js` (k6); the AWS command is in `docs/TESTING.md` section 7.
 
-**"What's your coverage, and why not 100%?"** 97% overall; 100% for the API layer (the
+**"What's your coverage, and why not 100%?"** 97% overall (measured 14 Oct night); 100% for the API layer (the
 rubric asks for 90%). The uncovered 3% is mostly repeat guard branches ("this id doesn't
 exist" on records where the same check is already tested elsewhere) and the
 database-down branch inside a request. But a handful of real rules are still untested:
@@ -435,8 +435,8 @@ demoted (`users.py:239`). The list is in the README under "Known gaps".
 broke the code (removed a sort, a filter, a check) and confirmed the right test failed.
 Every behavioural fix ships with the test that fails without it.
 
-**"And the frontend?"** 404 tests with Vitest and React Testing Library (Jest's API),
-95.5% of statements and 97.04% of lines covered. They render each screen with the API stubbed (no database) and check what a
+**"And the frontend?"** More than 400 tests with Vitest and React Testing Library (Jest's API),
+95.5% of statements and 97.04% of lines covered (measured 14 Oct night). They render each screen with the API stubbed (no database) and check what a
 person would see and what gets sent (cents, minutes from the Hours and Minutes boxes, only
 the changed fields). On top of that, Playwright drives a real browser against the real local API and database through the demo, and checks
 the phone layout doesn't scroll sideways.
@@ -510,17 +510,18 @@ Run from `~/DavidCitiProject` on the VDI.
 
 ```sh
 # Tests
-.venv/bin/pytest -q                                   # backend tests (expect 565 passed)
-(cd frontend && npm test)                             # website tests (expect 404 passed)
+.venv/bin/pytest -q                                   # backend tests (expect all passed; more than 600 of them)
+(cd frontend && npm test)                             # website tests (expect all passed; more than 400 of them)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)   # real browser, needs ./bin/start-dev.sh running
-./tools/e2e.sh --show demo                            # the easy way: browser tests, one file, visible window; --aws for the live site (docs/TESTING.md section 8)
+./tools/e2e.sh --show demo                            # the easy way: browser tests, one file, visible window (about 20 s)
+./tools/e2e.sh --aws                                  # the live site: the four read-only files seen passing there (docs/TESTING.md section 8)
 .venv/bin/pytest --cov --cov-report=term-missing      # with the coverage table
 .venv/bin/pytest -q -k capacity                       # only tests with "capacity" in the name
 
 # Against AWS (set TRACKER_API and TRACKER_ADMIN_PASSWORD first: section 3)
 curl -s $TRACKER_API/health                           # wake it up / is it alive?
 python3 tools/demo.py demo                            # the seven answers + ten refusals
-K6_PROFILE=aws K6_BASE_URL=$TRACKER_API K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js   # load test
+K6_PROFILE=aws K6_BASE_URL=$TRACKER_API K6_USERNAME=ML662930 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js   # load test (ML662930 is Maria's AWS username)
 
 # AWS itself
 ./bin/setup-participant.sh                            # refresh the temporary AWS keys

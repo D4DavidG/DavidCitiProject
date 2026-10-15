@@ -76,12 +76,14 @@ This file is only the "do this, see that" part.
 | --- | --- | --- | --- |
 | Maria Lopez | `ML662930` | `ML460428` | Manager (Apollo). Line manager of Ana and Ben |
 | Ana Ruiz | `AR553882` | `AR836183` | Employee, reports to Maria |
-| Ben Okafor | from `demo.py demo` | `BO547130` | Employee, reports to Maria. Booked 45 h against 40 |
-| Sam Patel | from `demo.py demo` | `SP345715` | Manager (Zeus) |
+| Ben Okafor | `BO435681` | `BO547130` | Employee, reports to Maria. Booked 45 h against 40 |
+| Sam Patel | `SP918535` | `SP345715` | Manager (Zeus) |
 | Admin | `AD000001` | `AD000001` | Admin. **Not** `Demo-pass-2026`: it's the password you chose on 13 Oct |
 
-The AWS usernames for Maria, Ana and the admin were checked on 14 Oct by signing in. For the
-others, the first block of `python3 tools/demo.py demo` prints every username.
+The AWS usernames for Maria, Ana, Sam and the admin were checked on 14 Oct by signing in; Ben's
+was read from the live people list (signed in as Maria, who is his line manager). The first
+block of `python3 tools/demo.py demo` prints every username too. `tools/e2e.sh --aws` uses
+Maria's, Ana's and Sam's.
 
 ### 30 minutes before
 
@@ -294,18 +296,21 @@ check's name to its offending rows, so healthy means no keys (`services/dashboar
 
 ## 4. Running the tests live
 
-All counts and times measured on the VDI on 14 Oct 2026, evening (full `bash tools/test-all.sh` run, every row PASS).
+All counts and times measured on the VDI on 14 Oct 2026, evening (full `bash tools/test-all.sh` run, every row PASS),
+**before the redesign**. The redesign adds tests, so today's counts are higher (the backend alone now
+collects more than 600). What you check live is the result: the last line says `passed` and nothing says
+`failed`. The integration run replaces the old counts.
 
 ### The suites
 
 | What | Command (from `~/DavidCitiProject`) | Takes | The line that proves it passed |
 | --- | --- | --- | --- |
-| Backend (pytest) | `.venv/bin/pytest -q` | 20 to 40 s, depending on what else the VDI is doing (21 s and 35 s on 14 Oct, evening) | `565 passed in 27.19s` |
-| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about two minutes (118 s) | `Test Files  36 passed (36)` and `Tests  404 passed (404)` |
+| Backend (pytest) | `.venv/bin/pytest -q` | 20 to 40 s, depending on what else the VDI is doing (21 s and 35 s on 14 Oct, evening) | `N passed in …s` and no `failed` (N was 565 before the redesign) |
+| Website (Vitest + React Testing Library) | `cd frontend && npm test` | about two minutes (118 s) | `Test Files  N passed (N)` and `Tests  N passed (N)`, nothing failed (36 files and 404 tests before the redesign) |
 | Lint | `cd frontend && npm run lint` | a few seconds | prints nothing (exit code 0) |
 
 The backend tests run against a real local Postgres database (`tracker_test`), each test
-rolled back afterwards. The 404 website tests do **not** touch a database: they fake the
+rolled back afterwards. The website tests (404 before the redesign) do **not** touch a database: they fake the
 API at `fetch`. Say it that way.
 
 ### Coverage
@@ -328,12 +333,12 @@ down mid-request (`postgres.py:121`) and turning a foreign-key violation into a 
 
 ### Run ONE test to show a rule
 
-| Rule | Command | Result (14 Oct) |
+| Rule | Command | Result (the `deselected` count is the rest of the suite, so it grows as tests are added) |
 | --- | --- | --- |
-| 40-hour week | `.venv/bin/pytest -q -k capacity` | `17 passed, 485 deselected` (about 1 s) |
-| Not yours = 404, word for word | `.venv/bin/pytest -q -k byte_identical` | `3 passed, 499 deselected` (about 0.4 s) |
-| Nothing can be deleted | `.venv/bin/pytest -q -k delete` | `14 passed, 488 deselected` (about 0.5 s) |
-| Unknown usernames cost the same hashing as real ones | `.venv/bin/pytest -q -k unknown_username_costs` | `1 passed, 501 deselected` |
+| 40-hour week | `.venv/bin/pytest -q -k capacity` | `18 passed` and a `deselected` count (about 1 s) |
+| Not yours = 404, word for word | `.venv/bin/pytest -q -k byte_identical` | `3 passed` and a `deselected` count (about 0.4 s) |
+| Nothing can be deleted | `.venv/bin/pytest -q -k delete` | `15 passed` and a `deselected` count (about 0.5 s) |
+| Unknown usernames cost the same hashing as real ones | `.venv/bin/pytest -q -k unknown_username_costs` | `1 passed` and a `deselected` count |
 | The 5 integrity queries catch planted problems | `.venv/bin/pytest -q tests/backend/test_integrity.py` | `10 passed in 0.36s` |
 | Approvals screen | `cd frontend && npx vitest run src/pages/approvals` | `Tests  5 passed (5)`, 2.3 s |
 
@@ -360,9 +365,9 @@ explains the result; the commands are under "Show a browser test live" below and
 | `requests.spec.js` (1 test) | An employee asks her line manager, he rejects it with a note from **To decide**, and she reads the answer at phone width. **Writes data**, so local only | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` |
 | `history.spec.js` (2 tests) | A manager reads a report's **History** without the before/after state; an employee sees **My history** on Account. Read-only, safe on AWS (passed there 14 Oct, night) | `E2E_MANAGER_USERNAME` and `E2E_EMPLOYEE_USERNAME` |
 | `tour.spec.js` (5 tests) | Every screen for manager and employee, desktop and phone, fails on sideways scroll or a serious axe accessibility problem, saves a screenshot of each. Plus: refreshing a deep link keeps the page. Read-only, safe on AWS (passed there 14 Oct, night) | `E2E_TOUR_DIR`, `E2E_MANAGER_USERNAME`, `E2E_EMPLOYEE_USERNAME` |
-| `timeline.spec.js` (4 tests) | Zeus's late Migration says **Late** with the icon; its tooltip opens on hover and on a phone tap with no sideways scroll; stripes only in print and forced colours; Apollo reads Design **Done**, Build **In progress 0%**, Launch **Blocked**. Read-only, so safe on AWS (not yet run there) | `E2E_ZEUS_MANAGER_USERNAME` (Sam, `SP345715` locally), or `E2E_ADMIN_PASSWORD` |
-| `budget.spec.js` (3 tests) | The Budget line sits at 100 of 125 of the bar column, desktop and phone; a row's tooltip opens on hover and on Tab. Read-only, so safe on AWS (not yet run there) | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
-| `workload.spec.js` (5 tests) | Gridlines, hour labels and Ben's bar line up, desktop and phone, no sideways scroll; Tab opens a row's tooltip (whose sentence includes "+5 h over"); the over segment is striped only in print and forced colours; words and marks clear contrast. Read-only, so safe on AWS (not yet run there) | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
+| `timeline.spec.js` (4 tests) | Zeus's late Migration says **Late** with the icon; its tooltip opens on hover and on a phone tap with no sideways scroll; stripes only in print and forced colours; Apollo reads Design **Done**, Build **In progress 0%**, Launch **Blocked**. Read-only, but on AWS (14 Oct night) 3 of 4 passed: the Late-row test did not find the warning icon there, so name it (`--aws timeline`) only if you want to see that | `E2E_ZEUS_MANAGER_USERNAME` (Sam, `SP345715` locally, `SP918535` on AWS), or `E2E_ADMIN_PASSWORD` |
+| `budget.spec.js` (3 tests) | The Budget line sits at 100 of 125 of the bar column, desktop and phone; a row's tooltip opens on hover and on Tab. Read-only, safe on AWS (3 of 3 passed there, 14 Oct night) | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
+| `workload.spec.js` (5 tests) | Gridlines, hour labels and Ben's bar line up, desktop and phone, no sideways scroll; Tab opens a row's tooltip (whose sentence includes "+5 h over"); the over segment is striped only in print and forced colours; words and marks clear contrast. Read-only, but on AWS (14 Oct night) 4 of 5 passed: the live data has three people marked "Not booked" where the test expects one, so name it (`--aws workload`) only if you want to see that | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
 | `schedule.spec.js` (4 tests) | The Schedule screen, desktop and phone: Ben has an Apollo bar and a red-outlined "+5 h over" week, no sideways scroll; tabbing onto a bar opens its tooltip and Enter opens the project. Read-only, safe on AWS (passed there 14 Oct, night) | `E2E_MANAGER_USERNAME` (defaults to local Maria, `ML460428`) |
 | `timelog.spec.js` (1 test) | Ben logs 15 minutes, Maria approves it on Approvals, Ben sees it Approved, and the project's "Spent (approved time)" goes up. **Writes data** (one approved entry, audit rows, bell notifications), so local only | `E2E_MANAGER_USERNAME` |
 | `project-lifecycle.spec.js` (1 test) | An admin creates, edits, archives, reactivates and re-archives a project (clicks **Create** in the New project dialog). **Writes data** (one archived project per run), so local only | `E2E_ADMIN_PASSWORD` |
@@ -376,6 +381,8 @@ E2E_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net E2E_MANAGER_USERNAME=ML662930
 ```
 
 The same with the script, which also warms the site up first: `./tools/e2e.sh --aws demo`.
+`./tools/e2e.sh --aws` with no name runs the four files seen passing on AWS (`demo`, `history`,
+`schedule`, `tour`: 13 tests, about 1.4 minutes).
 
 The full tour against AWS (5 tests, a screenshot and an axe accessibility scan of every
 screen). On 14 Oct, night, after the deploy, `demo`, `history`, `schedule` and `tour` ran
@@ -401,7 +408,7 @@ life cycle (`project-lifecycle.spec.js`, local only).
 
 ### Show a browser test live
 
-Playwright drives a real Chrome window by itself: it types, clicks and checks what appears.
+Playwright drives a real Chromium window by itself: it types, clicks and checks what appears.
 Showing it takes one command. `--show` slows every step to half a second so people can follow.
 
 ```sh
@@ -413,13 +420,16 @@ cd ~/DavidCitiProject
 The script wakes the live site first, looks up the usernames, and prints what it is about to
 do. Run it from a terminal on the VDI's desktop (the window needs a screen).
 
-**What the audience sees:** a Chrome window opens on its own. It signs in as Maria (the
+**What the audience sees:** a Chromium window opens on its own. It signs in as Maria (the
 manager), then walks the seven questions: the dashboard card for Apollo ("At risk", its
 budget), the allocation grid with Ben "Over-allocated" (Apollo 25 h, Zeus 20 h), Apollo's
 page with its Build deliverable, and the dependency view with Launch "Blocked". Then a
 second window opens at phone width (375 px), signs in again, checks nothing scrolls sideways
-and opens the menu, which shows Allocation. That is two tests. Headless the file takes about 10 seconds; with the slow steps expect
-around a minute (not timed). The terminal ends with "PASSED: 2 tests passed".
+and opens the menu, which shows Allocation. That is two tests. Headless the file takes about 5 to
+10 seconds. With the slow steps it took about 18 seconds at the default 500 ms (16.3 s of test time,
+measured on 14 Oct night), so plan on 20 seconds.
+`E2E_SLOWMO=1000 ./tools/e2e.sh --show demo` is easier to follow in a room and takes longer (not
+timed; a headless run at 1500 ms took 24 seconds). The terminal ends with "PASSED: 2 tests passed".
 
 **What to say:** "This is a real browser, driven by a script. It signs in as a manager and
 checks the answers to the seven questions are on screen. The same file runs headless in
