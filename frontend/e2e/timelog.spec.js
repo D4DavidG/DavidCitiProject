@@ -10,6 +10,7 @@
  * not done, and is booked on Apollo today.
  */
 import { expect, test } from '@playwright/test'
+import { closeAndAttach, newPersonPage, writesAllowed, WRITES_REFUSED } from './people.js'
 
 const DEMO_PASSWORD = 'Demo-pass-2026' // every seeded account's password (tools/demo.py)
 const API = process.env.E2E_API ?? 'http://localhost:3001/api/tracker'
@@ -17,12 +18,17 @@ const maria = process.env.E2E_MANAGER_USERNAME
 const note = `E2E time ${Date.now()}`
 
 test.skip(!maria, 'Set E2E_MANAGER_USERNAME (the seeded Maria Lopez).')
-// It writes data, so never against the live demo, even if E2E_BASE_URL is left set from an AWS run.
-test.skip(!(process.env.E2E_BASE_URL ?? 'http://localhost').includes('localhost'), 'Writes data: local stack only.')
+// It writes data, so never against the live demo, even if E2E_BASE_URL is left set from an AWS run,
+// unless tools/e2e.sh --aws --allow-writes started the run.
+test.skip(!writesAllowed, WRITES_REFUSED)
+
+const opened = [] // each person's browser, closed (and any video saved) after the test
+
+test.afterEach(async ({}, testInfo) => closeAndAttach(opened, testInfo)) // eslint-disable-line no-empty-pattern
 
 /** A fresh browser signed in as `username`. */
 async function signIn(browser, username) {
-  const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
+  const page = await newPersonPage(browser, opened, { width: 1440, height: 900 })
   await page.goto('/')
   await page.getByLabel('Username').fill(username)
   await page.getByRole('textbox', { name: 'Password', exact: true }).fill(DEMO_PASSWORD)
