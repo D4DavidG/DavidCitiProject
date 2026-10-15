@@ -12,6 +12,10 @@ const GO_LIVE = {
   taskId: 30, milestoneId: 12, projectId: 1, title: 'Go-live checklist', description: null,
   assigneeUserId: null, status: 'TODO', estimateMinutes: 480, projectName: 'Apollo', milestoneName: 'Launch',
 }
+const APOLLO = {
+  projectId: 1, name: 'Apollo', status: 'ACTIVE', startDate: '2026-10-01', endDate: '2026-12-31', atRisk: false,
+  deliverables: [], bookings: [{ userId: 3, name: 'Ben Okafor', startDate: '2026-10-05', endDate: '2026-11-29', hoursPerWeek: 20 }],
+}
 const ENTRY = {
   entryId: 30, taskId: 20, projectId: 1, userId: 4, workDate: '2026-10-12', minutes: 480, note: 'Layout',
   status: 'PENDING', taskTitle: 'Portal UI', projectName: 'Apollo',
@@ -22,13 +26,76 @@ function renderPage(answers = {}) {
     'GET /me/tasks': [200, page([PORTAL])],
     'GET /me/time-entries': [200, page([ENTRY])],
     'GET /me/ready-tasks': [200, page([], { held: 1, limit: 2 })],
+    'GET /dashboard/timeline': [200, page([APOLLO])],
     ...answers,
   })
   renderAt(<MyTasksPage />, { path: '/my-tasks', auth: session(USERS.employee) })
   return calls
 }
 
+/** My logged time is folded away by default: open it to see the table. */
+async function openLoggedTime() {
+  await userEvent.click(await screen.findByRole('button', { name: /^My logged time/ }))
+  return screen.findByRole('table', { name: /my logged time/i })
+}
+
 describe('MyTasksPage', () => {
+  it('is the employee\'s Dashboard: My projects, My tasks, Ready to take, then My logged time', async () => {
+    renderPage()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+    await screen.findByRole('link', { name: 'Apollo' }) // the timeline has loaded
+    await screen.findByRole('button', { name: 'My logged time (1 entry)' })
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent))
+      .toEqual(['My projects', 'My tasks', 'Ready to take', 'My logged time (1 entry)'])
+  })
+
+  it('shows my projects as a timeline, from GET /dashboard/timeline', async () => {
+    const calls = renderPage()
+    const section = await screen.findByRole('region', { name: 'My projects' })
+    expect(await within(section).findByRole('link', { name: 'Apollo' })).toHaveAttribute('href', '/projects/1')
+    expect(calls.some((c) => c.path === '/dashboard/timeline')).toBe(true)
+  })
+
+  it('searches my tasks on the server as I type', async () => {
+    const calls = renderPage()
+    await screen.findByRole('article', { name: 'Portal UI' })
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search my tasks' }), 'portal')
+    await waitFor(() => expect(calls.filter((c) => c.path === '/me/tasks').at(-1).query.q).toBe('portal'))
+    expect(calls.filter((c) => c.path === '/me/tasks')[0].query.q).toBeUndefined() // the first load asks for everything
+  })
+
+  it('says so when no task matches the search', async () => {
+    renderPage({ 'GET /me/tasks': ({ query }) => [200, page(query.q ? [] : [PORTAL])] })
+    await screen.findByRole('article', { name: 'Portal UI' })
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search my tasks' }), 'zzz{Enter}')
+    expect(await screen.findByText('No tasks match your search.')).toBeInTheDocument()
+  })
+
+  it('searches Ready tasks on the server as I type', async () => {
+    const calls = renderPage({ 'GET /me/ready-tasks': [200, page([GO_LIVE], { held: 1, limit: 2 })] })
+    await screen.findByRole('article', { name: 'Go-live checklist' })
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search ready tasks' }), 'launch')
+    await waitFor(() => expect(calls.filter((c) => c.path === '/me/ready-tasks').at(-1).query.q).toBe('launch'))
+    expect(calls.filter((c) => c.path === '/me/tasks')).toHaveLength(1) // the other list is left alone
+  })
+
+  it('says so when no Ready task matches the search', async () => {
+    renderPage({ 'GET /me/ready-tasks': ({ query }) => [200, page(query.q ? [] : [GO_LIVE], { held: 1, limit: 2 })] })
+    await screen.findByRole('article', { name: 'Go-live checklist' })
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search ready tasks' }), 'zzz{Enter}')
+    expect(await screen.findByText('No Ready tasks match your search.')).toBeInTheDocument()
+  })
+
+  it('keeps my logged time folded away, with the count in its title, until I open it', async () => {
+    renderPage({ 'GET /me/time-entries': [200, page([ENTRY], { total: 12, totalPages: 2 })] })
+    const summary = await screen.findByRole('button', { name: 'My logged time (12 entries)' })
+    expect(summary).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('table', { name: /my logged time/i })).not.toBeInTheDocument()
+    await userEvent.click(summary)
+    expect(summary).toHaveAttribute('aria-expanded', 'true')
+    expect(await screen.findByRole('table', { name: /my logged time/i })).toBeInTheDocument()
+  })
+
   it('lists my open tasks with their project and deliverable', async () => {
     renderPage()
     const task = await screen.findByRole('article', { name: 'Portal UI' })
@@ -134,7 +201,7 @@ describe('MyTasksPage', () => {
 
   it('lists my logged time with its approval status, and edits it', async () => {
     const calls = renderPage({ 'PATCH /time-entries/30': [200, { ...ENTRY, minutes: 420 }] })
-    const table = await screen.findByRole('table', { name: /my logged time/i })
+    const table = await openLoggedTime()
     expect(within(table).getByText('Portal UI')).toBeInTheDocument()
     expect(within(table).getByText('8 h')).toBeInTheDocument()
     expect(within(table).getByText('Pending')).toBeInTheDocument()
@@ -150,7 +217,7 @@ describe('MyTasksPage', () => {
 
   it('marks my time logged past capacity', async () => {
     renderPage({ 'GET /me/time-entries': [200, page([{ ...ENTRY, overCapacity: true }, { ...ENTRY, entryId: 31, overCapacity: false }])] })
-    const table = await screen.findByRole('table', { name: /my logged time/i })
+    const table = await openLoggedTime()
     expect(within(table).getAllByText('Over capacity')).toHaveLength(1)
   })
 
@@ -161,7 +228,7 @@ describe('MyTasksPage', () => {
     await userEvent.type(screen.getByLabelText('Hours'), '24')
     await userEvent.type(screen.getByLabelText('Minutes'), '30')
     await userEvent.click(screen.getByRole('button', { name: /^log$/i }))
-    expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('That is more than 24 h.')
+    expect(screen.getByLabelText('Hours')).toHaveAccessibleDescription('One entry can hold at most 24 h.')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(calls.some((c) => c.method === 'POST')).toBe(false)
   })
