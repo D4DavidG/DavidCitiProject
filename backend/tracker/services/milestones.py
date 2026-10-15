@@ -8,9 +8,10 @@ A deliverable's status is computed, never typed in:
 Progress is the share of its live tasks' estimated minutes that are done.
 
 Sign-off is refused while a task or dependency is unfinished. If that later
-stops being true (work reopened, a new unfinished dependency, reactivation), the
-sign-off is cleared, and so are the sign-offs of everything depending on it
-(integrity check 5 guards this).
+stops being true (a task added, reopened or reactivated; a new unfinished
+dependency; the deliverable reactivated), the sign-off is cleared, and so are the
+sign-offs of everything depending on it (integrity check 5 guards this). The
+manager can also reopen a sign-off by hand.
 
 Dependencies stay inside one project (the database enforces it too) and may
 never loop: checked here under a lock on the project row, and again by
@@ -101,7 +102,7 @@ def _check_dates(merged: dict) -> None:
 
 
 def _load(conn: psycopg.Connection, actor: Actor, milestone_id: int, manage: bool) -> tuple[dict, dict]:
-    """The deliverable and its project if visible (manage=True: manageable, project row locked); else 404/403."""
+    """The deliverable and its project if visible (manage=True: manageable, project row locked); else 404, 403 or 409 (archived project)."""
     row = conn.execute("SELECT * FROM milestones WHERE milestone_id = %s", (milestone_id,)).fetchone()
     if row is None:
         raise NotFound(NOT_FOUND)

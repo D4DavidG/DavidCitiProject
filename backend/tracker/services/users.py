@@ -103,11 +103,12 @@ def _target(conn: psycopg.Connection, user_id: int) -> dict:
 # --- creation ---
 
 def bootstrap_admin(conn: psycopg.Connection, password: str) -> None:
-    """Create the first admin, AD000001, unless it exists. Run once by the migration step.
+    """Create the first admin, AD000001, unless it exists.
 
-    Every cold start calls this inside the migration lock, so the existence check
-    comes before the deliberately slow hash; otherwise simultaneous cold starts
-    would each wait about a second.
+    When BOOTSTRAP_ADMIN_PASSWORD is set, every cold start calls this inside the
+    migration lock, so the existence check comes before the deliberately slow hash;
+    otherwise simultaneous cold starts would queue behind each other's hash
+    (~0.5 s each at 512 MB).
     """
     if conn.execute("SELECT 1 FROM users WHERE username = 'AD000001'").fetchone():
         return
@@ -157,9 +158,10 @@ def login(conn: psycopg.Connection, data: dict, secret: str, now: dt.datetime) -
                        .format(COLUMNS),
                        (username,)).fetchone()
     if row is None:
-        # Unknown username: do the same PBKDF2 work as a real check, so the response
-        # time doesn't reveal which usernames exist. It runs here, not at import,
-        # because a 600k-round hash at import would slow every cold start.
+        # Unknown username: do the same PBKDF2 work as a real check (one hash at the
+        # current round count), so the response time doesn't reveal which usernames
+        # exist. It runs here, not at import: a 600k-round hash at import would slow
+        # every cold start.
         passwords.hash_password(password)
         raise AuthenticationError(BAD_LOGIN)
     if not passwords.verify_password(password, row["password_hash"]):

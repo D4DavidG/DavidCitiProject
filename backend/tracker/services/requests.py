@@ -84,7 +84,8 @@ def _kind_fields(conn: psycopg.Connection, actor: Actor, kind: str, data: dict) 
 
 
 # Who may decide: never the asker; an admin decides any; a line manager decides
-# their own reports' requests. One condition shared by list and get.
+# requests from employees who report to them (a manager's go to the admins only).
+# One condition shared by list and get.
 _MAY_DECIDE = "(r.requested_by <> %(me)s AND (%(admin)s OR (u.role = 'EMPLOYEE' AND u.manager_id = %(me)s)))"
 _MAY_SEE = f"(r.requested_by = %(me)s OR {_MAY_DECIDE})"
 _SCOPES = {"MINE": "r.requested_by = %(me)s", "TO_DECIDE": _MAY_DECIDE}

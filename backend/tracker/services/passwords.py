@@ -14,7 +14,7 @@ import secrets
 import string
 import unicodedata
 
-DEFAULT_ROUNDS = 600_000  # OWASP's advice for PBKDF2-SHA256; about 1 s per login on Lambda (512 MB)
+DEFAULT_ROUNDS = 600_000  # OWASP's figure for PBKDF2-SHA256; ~0.5 s of hashing at 512 MB (infra/lambda.tf); a whole warm login measured 1.15 s through CloudFront
 ROUNDS = DEFAULT_ROUNDS  # tests lower this for speed; one test checks the default
 ALPHABET = string.ascii_letters + string.digits
 

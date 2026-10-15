@@ -60,7 +60,7 @@ def settings_from_env() -> dict:
         "connect_timeout": 15,
     }
     if os.getenv("IS_LOCAL", "true") == "false":
-        result["sslmode"] = "require"  # Aurora refuses unencrypted connections
+        result["sslmode"] = "require"  # encrypt the connection to Aurora on AWS (docs/full-stack.md asks for it)
     return result
 
 

@@ -5,8 +5,10 @@ The same request arrives with two path shapes:
     AWS:    CloudFront passes the path through -> "/api/tracker/projects/7"
 normalise_path() turns both into "/projects/7".
 
-JSON on the wire is camelCase; Python and Postgres use snake_case. The only
-conversion points are this module and services/views.py.
+JSON on the wire is camelCase; Python and Postgres use snake_case. Records are
+converted in services/views.py, computed results by camelize() here, and the few
+envelope keys (pageSize, totalPages, expiresAt, temporaryPassword) are written
+in camelCase by api/handlers.py.
 """
 
 import base64

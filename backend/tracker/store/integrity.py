@@ -1,7 +1,8 @@
 """The integrity check: five queries that must always return no rows.
 
-Each covers a rule the schema can't enforce row by row. They run after every
-database test and back GET /admin/integrity-check.
+Each covers a rule the schema can't enforce row by row (a rule the schema already
+guarantees could never fail here, so checking it would prove nothing). They run
+after every database test and back GET /admin/integrity-check.
 """
 
 import psycopg
@@ -35,7 +36,8 @@ QUERIES = {
         FROM tasks t JOIN projects p ON p.project_id = t.project_id
         WHERE p.is_archived AND NOT t.is_archived
     """,
-    # Every record has a CREATE audit row, so a write path that forgets record_change() fails.
+    # Every record has a CREATE audit row: a write path that forgets record_change()
+    # fails whichever test used it (this runs in every test's teardown).
     "audit": """
         SELECT t.entity_type, t.entity_id FROM (
                       SELECT 'users' AS entity_type, user_id AS entity_id FROM users

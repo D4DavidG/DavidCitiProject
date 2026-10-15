@@ -1,8 +1,8 @@
 """The outside shape of every record: camelCase, every field named explicitly.
 
 Used for API responses and audit snapshots, so the two always agree. Each field
-is named (a row is never dumped whole), so a column added later, such as
-password_hash, can't leak.
+is named (a row is never dumped whole), so password_hash, or any column added
+later, can't leak.
 """
 
 import datetime as dt

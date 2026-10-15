@@ -1,6 +1,8 @@
-"""Money is integer cents everywhere except on screen. This module does all the money maths.
+"""Money is integer cents everywhere except on screen. These are the money formulas;
+dashboard._money() repeats them in SQL so Postgres can sum them.
 
-Each formula multiplies first and rounds down once at the end, so no fraction of a cent is carried.
+Each formula rounds down once, at its end (the hourly rate is itself rounded, then
+frozen on each time entry), so no fraction of a cent is carried.
 """
 
 from domain.errors import ValidationError

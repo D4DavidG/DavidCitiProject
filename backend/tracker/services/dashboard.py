@@ -8,7 +8,8 @@
               integrity_check() the five invariants, live
 
 Q4 (deliverables and completion) is on the deliverables list. Each figure is one
-aggregate query over all the projects or people shown, never one query per row.
+aggregate query over a whole set of rows (every project in scope for the cards,
+the page of people for the grid), never one query per row.
 The cards, risk panel and budget screen share _money() and _risk_reasons(), so
 they cannot disagree.
 """
@@ -26,7 +27,7 @@ from services.actors import Actor
 from services.paging import page_of, paginate
 from store import integrity
 
-BEHIND_THRESHOLD = 15  # percentage points: "behind" means this far past the schedule
+BEHIND_THRESHOLD = 15  # percentage points: a deliverable is behind when time gone exceeds progress by more than this; budget burn when spend exceeds time gone by more than this
 
 
 def _elapsed_percent(start: dt.date, end: dt.date, today: dt.date) -> float:

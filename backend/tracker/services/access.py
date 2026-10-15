@@ -40,7 +40,7 @@ def can_see(conn: psycopg.Connection, actor: Actor, project: dict) -> bool:
 
 
 def managed_project(conn: psycopg.Connection, actor: Actor, project_id: int, lock: bool = False) -> dict:
-    """The project if `actor` is an admin or its manager and it is live; otherwise 404 (cannot see), 403 (not theirs) or 409 (archived)."""
+    """The project if `actor` is an admin or its manager and it is live; otherwise 404 (cannot see, which includes a manager's archived project), 403 (sees it, not theirs) or 409 (archived; only admins get this far)."""
     row = visible_project(conn, actor, project_id, lock=lock)
     if not (actor.is_admin or row["manager_id"] == actor.user_id):
         raise Forbidden("Only the project's manager or an admin can change this.")

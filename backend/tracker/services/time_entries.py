@@ -7,7 +7,8 @@
   weekly capacity is asked about first (409, code OVER_CAPACITY) unless their
   manager allowed overtime. Resent with confirm_over_capacity it is saved, marked
   over_capacity, and the notification says by how much. The user's row is locked
-  first, so two concurrent entries can't both slip under the limit.
+  first, so two concurrent entries can't both pass the capacity check and an
+  unconfirmed over-capacity entry can never slip through.
 - The hourly rate is frozen on the entry when logged, so a later raise never
   rewrites past costs. Only approved time counts as consumed budget.
 - The line manager or any admin approves or rejects; nobody approves their own.
@@ -165,7 +166,7 @@ def decide_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, approve:
     if actor.is_employee:
         raise Forbidden("Only managers and admins approve time.")
     with atomic(conn):
-        # Anyone but the author's line manager or an admin gets the same 404 as a missing entry.
+        # A manager who isn't the author's line manager gets the same 404 as a missing entry (employees were refused above with 403).
         before = conn.execute("SELECT e.*, u.manager_id, u.first_name || ' ' || u.last_name AS person_name"
                               " FROM time_entries e JOIN users u ON u.user_id = e.user_id"
                               " WHERE e.entry_id = %s FOR UPDATE OF e", (entry_id,)).fetchone()

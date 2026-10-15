@@ -121,7 +121,7 @@ def move_task(conn: psycopg.Connection, actor: Actor, task_id: int, status: str)
 
 
 # The one definition of "held": unfinished, live tasks on live projects, across all projects.
-# It reads the outer alias `u` (a users row), so it works for one person or a list.
+# A correlated subquery on the outer alias `u` (a users row), so it works for one person or a list.
 HELD = sql.SQL("(SELECT count(*) FROM tasks t JOIN projects p ON p.project_id = t.project_id"
                " WHERE t.assignee_user_id = u.user_id AND t.status IN ('TODO', 'IN_PROGRESS')"
                " AND NOT t.is_archived AND NOT p.is_archived)")
