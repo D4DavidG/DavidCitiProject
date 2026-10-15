@@ -47,10 +47,10 @@
 #           admin's published password (gusmao123). With no name it runs
 #           the four seen passing on AWS on 14 Oct night: demo, history, schedule, tour (17 tests
 #           since the tour gained its dark-mode pass on 15 Oct). timeline, budget and workload only
-#           read too, so you may name them. On 14 Oct night budget passed 3 of 3 on the live site and
-#           timeline and workload each had one test that failed there. Both causes were fixed in the
-#           specs on 15 Oct (a MUI icon test id that only development builds have; several people
-#           "Not booked"), but not yet re-run on AWS, so they stay out of that default set.
+#           read too, so you may name them. On the live site on 15 Oct (15:50) budget passed 3 of 3,
+#           workload 5 of 5 and timeline 3 of 4: its "Design Done" test fails there because the
+#           live data moved on (Apollo's Design is Late, 21% done), not because of the code. The
+#           tour passed 9 of 9 with Ben as the employee. They stay out of that default set.
 #           The site is warmed first (the database sleeps when idle).
 # Screens:  the tour saves its screenshots in E2E_TOUR_DIR (default $HOME/tour-shots).
 # Guide:    docs/TESTING.md (what each test checks, where it runs and why).
@@ -67,12 +67,12 @@ AWS_MANAGER="ML662930"   # Maria Lopez
 AWS_EMPLOYEE="BO435681"  # Ben Okafor, Maria's report (Ana Ruiz, AR553882, was archived in the 15 Oct demo)
 AWS_EMPLOYEE_NAME="Ben Okafor"
 AWS_ZEUS="SP918535"      # Sam Patel
-AWS_ADMIN_PASSWORD="gusmao123"  # AD000001 on the live site; David published it. Used only with --allow-writes
+AWS_ADMIN_PASSWORD="gusmao123"  # AD000001 on the live site (David published it): E2E_ADMIN_PASSWORD's default with --aws
 
 # Which files only read. Anything not named here counts as one that writes.
 READ_ONLY="demo history schedule tour timeline budget workload"
 # What --aws runs when no file is named: the files seen passing on the live site (14 Oct night).
-# timeline and workload each had one test fail on the live site (fixed 15 Oct, not yet re-run there), so they run there only when named.
+# The three chart files run there only when named (timeline's "Design Done" test expects the seed's data).
 AWS_DEFAULT="demo history schedule tour"
 
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed -e '/^$/d' -e 's/^# \{0,1\}//'; }
@@ -202,7 +202,7 @@ if [ "$AWS" -eq 1 ]; then
   fi
   for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
     case "$name" in
-      timeline|workload) echo "Note: $name.spec.js had one test fail on the live site on 14 Oct night; the spec was fixed on 15 Oct but not yet re-run there." ;;
+      timeline) echo "Note: on the live site timeline.spec.js's \"Design Done\" test fails: the live data moved on (Apollo's Design is no longer Done). The other three pass." ;;
     esac
   done
 fi
