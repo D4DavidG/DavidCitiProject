@@ -34,7 +34,7 @@ function Node({ node, needs, canManage, unlinking, refusal = null, onUnlink }) {
         )}
         {canManage && needs.map((dep) => (
           // Words, not just an icon: a phone has no hover to reveal a tooltip.
-          <Button key={dep.milestoneId} size="small" variant="outlined" color="error" startIcon={<LinkOffIcon fontSize="small" />}
+          <Button key={dep.milestoneId} size="small" variant="contained" color="error" startIcon={<LinkOffIcon fontSize="small" />}
             onClick={() => onUnlink(node, dep)} disabled={unlinking === dep.milestoneId} sx={{ justifySelf: 'start' }}>
             Remove link to {dep.name}
           </Button>
@@ -106,7 +106,7 @@ export default function DependencyPage() {
         subtitle="Read left to right: each deliverable can only finish after the ones it needs."
         actions={(
           <>
-            <Button component={Link} to={`/projects/${projectId}`} variant="outlined">Back to project</Button>
+            <Button component={Link} to={`/projects/${projectId}`} variant="contained">Back to project</Button>
             {canManage && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>Add a link</Button>}
           </>
         )}

@@ -58,12 +58,12 @@ function Deliverable({ deliverable, canManage, people, busy = false, refusal = n
         {open && <TaskList milestoneId={deliverable.milestoneId} canManage={canManage} people={people} onChanged={onChanged} />}
       </CardContent>
       <CardActions sx={{ flexWrap: 'wrap' }}>
-        <Button size="small" variant="outlined" onClick={() => setOpen(!open)}>{open ? 'Hide tasks' : 'Show tasks'}</Button>
+        <Button size="small" variant="contained" onClick={() => setOpen(!open)}>{open ? 'Hide tasks' : 'Show tasks'}</Button>
         {canManage && (deliverable.completedAt
-          ? <Button size="small" variant="outlined" disabled={busy} onClick={() => onAction(deliverable, 'reopen')}>Reopen</Button>
-          : <Button size="small" variant="outlined" disabled={busy || Boolean(notReady)} onClick={() => onAction(deliverable, 'sign-off')}>Sign off</Button>)}
-        {canManage && <Button size="small" variant="outlined" disabled={busy} onClick={() => onEdit(deliverable)}>Edit</Button>}
-        {canManage && <Button size="small" variant="outlined" color="error" disabled={busy} onClick={() => onArchive(deliverable)}>Archive</Button>}
+          ? <Button size="small" variant="contained" disabled={busy} onClick={() => onAction(deliverable, 'reopen')}>Reopen</Button>
+          : <Button size="small" variant="contained" disabled={busy || Boolean(notReady)} onClick={() => onAction(deliverable, 'sign-off')}>Sign off</Button>)}
+        {canManage && <Button size="small" variant="contained" disabled={busy} onClick={() => onEdit(deliverable)}>Edit</Button>}
+        {canManage && <Button size="small" variant="contained" color="error" disabled={busy} onClick={() => onArchive(deliverable)}>Archive</Button>}
         {canManage && !deliverable.completedAt && notReady && (
           <Typography variant="caption" color="text.secondary">Sign-off opens when it&apos;s done: {notReady}.</Typography>
         )}
