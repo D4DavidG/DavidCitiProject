@@ -24,7 +24,7 @@ def world(conn, org):  # noqa: F811
     milestones.add_dependency(conn, bob, build["milestone_id"], design["milestone_id"])
     task = f.task(conn, bob, design, assignee=alice, title="Sketch")
     entry = time_entries.log_time(conn, alice, task["task_id"], {"work_date": "2026-10-13", "minutes": 90})
-    request = requests.create_request(conn, bob, {"name": "Hermes", "justification": "Growth"})
+    request = requests.create_request(conn, bob, {"kind": "NEW_PROJECT", "name": "Hermes", "justification": "Growth"})
     return {**org, "design": design, "build": build, "task": task, "entry": entry, "request": request}
 
 
@@ -44,11 +44,15 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert get(e, "/auth/me", "/auth/me")["userId"] == world["alice"].user_id
     assert PAGE_KEYS <= get(a, "/users", "/users").keys()
     assert get(a, "/users/{id}", f"/users/{world['alice'].user_id}")["firstName"] == "Alice"
+    history = get(b, "/users/{id}/history", f"/users/{world['alice'].user_id}/history")
+    assert PAGE_KEYS <= history.keys() and history["items"][0]["actorName"]
 
     assert PAGE_KEYS <= get(b, "/projects", "/projects").keys()
     assert get(b, "/projects/{id}", f"/projects/{pid}")["name"] == "Apollo"
     budget = get(b, "/projects/{id}/budget", f"/projects/{pid}/budget")
     assert {"budgetCents", "plannedCents", "consumedCents", "pendingCents", "remainingCents"} <= budget.keys()
+    assert {"consumedPercent", "plannedPercent", "pendingPercent"} <= budget.keys()
+    assert not any("_" in k for k in budget)  # every key reaches the website in camelCase
     assert budget["pendingCents"] > 0  # Alice's 90 minutes, not yet approved
     graph = get(e, "/projects/{id}/dependency-graph", f"/projects/{pid}/dependency-graph")
     assert len(graph["nodes"]) == 2 and len(graph["edges"]) == 1
@@ -71,13 +75,19 @@ def test_every_read_route_answers_in_shape(conn, world):
 
     rid = world["request"]["request_id"]
     assert get(b, "/project-requests", "/project-requests", {"status": "PENDING"})["total"] == 1
-    assert get(b, "/project-requests/{id}", f"/project-requests/{rid}")["name"] == "Hermes"
+    one = get(b, "/project-requests/{id}", f"/project-requests/{rid}")
+    assert (one["name"], one["kind"], one["requesterName"]) == ("Hermes", "NEW_PROJECT", "Bob Tester")
+    assert get(e, "/project-requests", "/project-requests", {"scope": "MINE"})["total"] == 0
 
     assert PAGE_KEYS <= get(a, "/dashboard/at-risk", "/dashboard/at-risk").keys()
     board = get(b, "/dashboard/projects", "/dashboard/projects")
     assert PAGE_KEYS <= board.keys() and [c["name"] for c in board["items"]] == ["Apollo"]
     assert {"atRisk", "riskReasons", "progressPercent", "budgetCents", "plannedCents", "consumedCents",
-            "pendingCents", "managerName"} <= board["items"][0].keys()
+            "pendingCents", "managerName", "plannedPercent", "pendingPercent"} <= board["items"][0].keys()
+    one = get(a, "/dashboard/projects", "/dashboard/projects", {"pageSize": "1"})  # atRiskTotal counts every page
+    every = get(a, "/dashboard/projects", "/dashboard/projects")["items"]
+    assert PAGE_KEYS <= one.keys() and one["total"] >= 1
+    assert one["atRiskTotal"] == sum(c["atRisk"] for c in every)
     grid = get(b, "/dashboard/allocation", "/dashboard/allocation", {"weekFrom": "2026-10-12", "weeks": "2"})
     assert PAGE_KEYS <= grid.keys() and grid["weeks"] == ["2026-10-12", "2026-10-19"]
     alice_row = next(p for p in grid["items"] if p["userId"] == world["alice"].user_id)
@@ -86,6 +96,20 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert week["bookedHours"] == 20 and week["loggedMinutes"] == 90 and week["overByHours"] == 0
     assert week["projects"] == [{"projectId": pid, "name": "Apollo", "hours": 20}]
     assert b.call("GET", "/dashboard/allocation", query={"overOnly": "true"})[1]["total"] == 0
+    # The dashboard's workload chart: one week, a short page, and the total of everyone for its note.
+    status, one = b.call("GET", "/dashboard/allocation", query={"weekFrom": "2026-10-12", "weeks": "1", "pageSize": "1"})
+    assert status == 200 and one["weeks"] == ["2026-10-12"] and len(one["items"]) == 1
+    assert (one["pageSize"], one["total"]) == (1, grid["total"])
+    # The home pages' timeline: ten projects a page unless asked, field names exactly as the spec lists them.
+    home = get(e, "/dashboard/timeline", "/dashboard/timeline")
+    assert PAGE_KEYS <= home.keys() and (home["pageSize"], home["total"]) == (10, 1)
+    [row] = home["items"]
+    assert set(row) == {"projectId", "name", "status", "startDate", "endDate", "atRisk", "deliverables", "bookings"}
+    assert [d["name"] for d in row["deliverables"]] == ["Design", "Build"]
+    assert set(row["deliverables"][0]) == {"milestoneId", "name", "dueDate", "status"}
+    assert row["bookings"] == [{"userId": world["alice"].user_id, "name": "Alice Tester", "startDate": "2026-10-01",
+                                "endDate": "2026-12-31", "hoursPerWeek": 20}]
+    assert b.call("GET", "/dashboard/timeline", query={"pageSize": "1"})[1]["pageSize"] == 1
     check = get(a, "/admin/integrity-check", "/admin/integrity-check")
     assert check["checks"] == 5 and all(rows == [] for rows in check["violations"].values())
     assert get(a, "/admin/audit-log", "/admin/audit-log")["total"] > 0
@@ -101,6 +125,13 @@ def test_every_read_route_answers_in_shape(conn, world):
     assert status == 200 and done["updated"] == inbox["total"] - 1
     called.add(("POST", "/notifications/read-all"))
     assert b.call("GET", "/notifications/unread-count")[1]["count"] == 0
+
+    # `board` is taken above by /dashboard/projects; only Alice is booked on Apollo and Sketch is hers (TODO).
+    pull = get(b, "/projects/{id}/board", f"/projects/{pid}/board")
+    assert PAGE_KEYS <= pull.keys() and [t["title"] for t in pull["items"]] == ["Sketch"]
+    assert pull["people"] == [{"userId": world["alice"].user_id, "name": "Alice Tester", "held": 1, "limit": 2}]
+    ready = get(e, "/me/ready-tasks", "/me/ready-tasks")
+    assert (ready["total"], ready["held"], ready["limit"]) == (0, 1, 2)
 
     reads = {(r.method, r.path) for r in routes.ROUTES if r.method == "GET"}
     inbox_writes = {("POST", "/notifications/{id}/read"), ("POST", "/notifications/read-all")}
@@ -140,6 +171,36 @@ def test_approving_time_snapshots_only_the_entry_not_the_joined_names(conn, worl
     changed = {k for k in row["before_state"] if row["before_state"][k] != row["after_state"].get(k)}
     # updatedAt only differs outside a test, where the two steps aren't one transaction.
     assert {"status", "decidedBy", "decidedAt"} <= changed <= {"status", "decidedBy", "decidedAt", "updatedAt"}
+
+
+# --- search: q on every list (redesign spec, section 2) ----------------------------------------
+
+@pytest.mark.parametrize("who, path, q", [
+    ("alice", "/me/tasks", "SKETCH"),                  # task title
+    ("alice", "/me/ready-tasks", "spare"),             # task title
+    ("bob", "/approvals/time-entries", "alice"),       # person's name
+    ("bob", "/project-requests", "hermes"),            # request name
+    ("bob", "/notifications", "sketch"),               # message text
+    ("admin", "/admin/audit-log", "TIME_ENTRIES"),     # entity type
+    ("admin", "/users", "ali"),                        # the older lists take q too
+    ("bob", "/projects", "apol"),
+    ("bob", "/dashboard/projects", "apol"),
+])
+def test_q_searches_each_list_on_the_server(conn, world, who, path, q):
+    f.task(conn, world["bob"], world["build"], title="Spare")  # a Ready task for Alice's board
+    client = client_for(conn, world, who)
+    status, found = client.call("GET", path, query={"q": q})
+    assert status == 200 and found["total"] >= 1, found
+    status, missed = client.call("GET", path, query={"q": "no such thing"})
+    assert status == 200 and (missed["total"], missed["items"]) == (0, [])
+
+
+def test_request_scope_is_sent_or_decide_and_anything_else_is_400(conn, world):
+    b = client_for(conn, world, "bob")
+    assert [r["name"] for r in b.call("GET", "/project-requests", query={"scope": "sent"})[1]["items"]] == ["Hermes"]
+    assert b.call("GET", "/project-requests", query={"scope": "decide"})[1]["total"] == 0
+    status, payload = b.call("GET", "/project-requests", query={"scope": "everyone"})
+    assert status == 400 and payload["field"] == "scope"
 
 
 # --- the audit log's filters ----------------------------------------------------------------
@@ -183,6 +244,21 @@ def test_another_managers_request_is_404_not_403(conn, world):
     mine = carol.call("GET", f"/project-requests/{rid}")
     missing = carol.call("GET", "/project-requests/999999")
     assert mine == missing and mine[0] == 404
+
+
+def test_another_managers_report_request_is_404_not_403(conn, world):
+    req = requests.create_request(conn, world["alice"], {"kind": "OVERTIME", "justification": "Launch week"})
+    bob, carol = client_for(conn, world, "bob"), client_for(conn, world, "carol")
+    assert bob.call("GET", f"/project-requests/{req['request_id']}")[1]["requesterName"] == "Alice Tester"
+    theirs = carol.call("GET", f"/project-requests/{req['request_id']}")
+    assert theirs == carol.call("GET", "/project-requests/999999") and theirs[0] == 404
+
+
+def test_employee_cannot_decide_requests(conn, world):
+    e = client_for(conn, world, "alice")
+    req = requests.create_request(conn, world["alice"], {"kind": "OTHER", "name": "A desk", "justification": "Back"})
+    assert e.call("POST", f"/project-requests/{req['request_id']}/approve", {})[0] == 403
+    assert e.call("POST", f"/project-requests/{req['request_id']}/reject", {})[0] == 403
 
 
 def test_someone_elses_notification_is_404_like_a_missing_one(conn, world):

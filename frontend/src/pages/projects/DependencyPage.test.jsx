@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DependencyPage from './DependencyPage'
 import { APOLLO, BUILD, DESIGN } from './fixtures'
-import { USERS, renderAt, session, stubApi } from '../../test/utils'
+import { USERS, holdOpen, renderAt, session, stubApi } from '../../test/utils'
 
 const LAUNCH = { ...BUILD, milestoneId: 12, name: 'Launch', dueDate: '2026-12-12', status: 'BLOCKED', progressPercent: 0 }
 const GRAPH = {
@@ -65,6 +65,15 @@ describe('DependencyPage', () => {
     expect(calls.find((c) => c.method === 'POST').body).toEqual({ dependsOnMilestoneId: 12 })
   })
 
+  it('shows a refused link removal on the deliverable it was pressed on, not at the top of the page', async () => {
+    renderGraph(USERS.manager, { 'POST /milestones/12/dependencies/11/archive': [409, { error: 'Build is already signed off.' }] })
+    const launch = await screen.findByRole('article', { name: 'Launch' })
+    await userEvent.click(within(launch).getByRole('button', { name: /remove link to build/i }))
+    const refusal = await within(launch).findByText('Build is already signed off.')
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.closest('.MuiAlert-root')).toBeNull()
+  })
+
   it('removes a link', async () => {
     const calls = renderGraph(USERS.manager, { 'POST /milestones/12/dependencies/11/archive': [200, LAUNCH] })
     const launch = await screen.findByRole('article', { name: 'Launch' })
@@ -72,6 +81,20 @@ describe('DependencyPage', () => {
     expect(remove).toHaveTextContent('Remove link to Build') // visible words, not only an icon
     await userEvent.click(remove)
     await waitFor(() => expect(calls.some((c) => c.path === '/milestones/12/dependencies/11/archive')).toBe(true))
+  })
+
+  it('removes a link once, however often pressed: the button waits for the answer', async () => {
+    const calls = renderGraph(USERS.manager, { 'POST /milestones/12/dependencies/11/archive': [200, LAUNCH] })
+    const release = holdOpen('/milestones/12/dependencies/11/archive')
+    const launch = await screen.findByRole('article', { name: 'Launch' })
+    const remove = within(launch).getByRole('button', { name: /remove link to build/i })
+    fireEvent.click(remove)
+    fireEvent.click(remove)
+    expect(remove).toBeDisabled()
+    release()
+    await waitFor(() => expect(calls.filter((c) => c.path === '/milestones/12/dependencies/11/archive')).toHaveLength(1))
+    // The graph reloads and its cards are drawn again, so look the card up afresh.
+    await waitFor(() => expect(within(screen.getByRole('article', { name: 'Launch' })).getByRole('button', { name: /remove link to build/i })).toBeEnabled())
   })
 
   it('is read-only for employees', async () => {

@@ -2,27 +2,84 @@ import { describe, expect, it } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DashboardPage from './DashboardPage'
-import { page, renderAt, stubApi } from '../../test/utils'
+import { holdOpen, page, renderAt, stubApi } from '../../test/utils'
 
 const APOLLO = {
   projectId: 1, name: 'Apollo', status: 'ACTIVE', managerId: 2, managerName: 'Maria Lopez',
   startDate: '2026-10-01', predictedEndDate: '2026-12-31', progressPercent: 12,
   atRisk: true, riskReasons: [{ code: 'DELIVERABLE_BEHIND', message: 'Deliverable Build is 0% done with 25% of its time gone.' }],
   budgetCents: 15_000_000, plannedCents: 3_197_600, consumedCents: 137_000, pendingCents: 153_800,
-  consumedPercent: 0, plannedOverBudget: false, remainingCents: 14_863_000, scheduleElapsedPercent: 14,
+  consumedPercent: 0, plannedPercent: 21, pendingPercent: 1, plannedOverBudget: false, remainingCents: 14_863_000, scheduleElapsedPercent: 14,
 }
 const HERMES = {
   ...APOLLO, projectId: 3, name: 'Hermes', status: 'PLANNING', progressPercent: 0, atRisk: false, riskReasons: [],
-  budgetCents: 8_000_000, plannedCents: 0, consumedCents: 0, pendingCents: 0,
+  budgetCents: 8_000_000, plannedCents: 0, consumedCents: 0, pendingCents: 0, plannedPercent: 0, pendingPercent: 0,
 }
 
-function renderDashboard(answers = { 'GET /dashboard/projects': [200, page([APOLLO, HERMES])] }) {
-  const calls = stubApi(answers)
+const TIMELINE = {
+  projectId: 1, name: 'Apollo', status: 'ACTIVE', startDate: '2026-10-01', endDate: '2026-12-31', atRisk: true,
+  deliverables: [{ milestoneId: 11, name: 'Build', dueDate: '2026-11-20', status: 'IN_PROGRESS' }], bookings: [],
+}
+
+const BEN = {
+  userId: 4, name: 'Ben Okafor', capacityHours: 40, peakOverByHours: 5,
+  weeks: [{
+    week: '2026-10-12', bookedHours: 45, overByHours: 5, overAllocated: true,
+    projects: [{ projectId: 1, name: 'Apollo', hours: 25 }, { projectId: 2, name: 'Zeus', hours: 20 }],
+  }],
+}
+
+/** Overrides merge into the defaults, so a test that changes one answer keeps the others. */
+function renderDashboard(answers = {}) {
+  const calls = stubApi({
+    'GET /dashboard/projects': [200, page([APOLLO, HERMES], { atRiskTotal: 1 })],
+    'GET /dashboard/allocation': [200, { ...page([BEN], { total: 12 }), weeks: ['2026-10-12'] }],
+    'GET /dashboard/timeline': [200, page([TIMELINE])],
+    ...answers,
+  })
   renderAt(<DashboardPage />, { path: '/dashboard' })
   return calls
 }
 
 describe('DashboardPage', () => {
+  it('starts with My projects this week, a timeline from GET /dashboard/timeline, before the workload chart', async () => {
+    const calls = renderDashboard()
+    const timeline = await screen.findByRole('region', { name: 'My projects this week' })
+    expect(await within(timeline).findByRole('link', { name: 'Apollo' })).toHaveAttribute('href', '/projects/1')
+    const workload = await screen.findByRole('figure', { name: 'Workload this week · all projects' })
+    expect(timeline.compareDocumentPosition(workload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(1)
+  })
+
+  it('keeps the timeline when the project search changes', async () => {
+    const calls = renderDashboard()
+    await screen.findByRole('article', { name: 'Apollo' })
+    await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
+    await waitFor(() => expect(calls.at(-1).query.q).toBe('apo'))
+    expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(1)
+  })
+
+  it('searches projects as I type, sending q like every other list, with no Search button to press', async () => {
+    const calls = renderDashboard()
+    await screen.findByRole('article', { name: 'Apollo' })
+    expect(screen.queryByRole('button', { name: 'Search' })).not.toBeInTheDocument()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search projects' }), 'apo')
+    await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/projects').at(-1).query).toMatchObject({ q: 'apo', page: '1' }))
+    expect(calls.filter((c) => c.path === '/dashboard/projects').at(-1).query.search).toBeUndefined()
+  })
+
+  it('keeps the counts and cards on screen while a new search loads, so the page does not flicker', async () => {
+    renderDashboard()
+    const card = await screen.findByRole('article', { name: 'Apollo' })
+    const release = holdOpen('/dashboard/projects')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search projects' }), 'apo{Enter}')
+    await waitFor(() => expect(globalThis.fetch.mock.calls.some(([url]) => url.includes('q=apo'))).toBe(true))
+    expect(screen.queryByText(/^Loading/)).not.toBeInTheDocument()
+    expect(card).toBeInTheDocument()
+    expect(screen.getByLabelText('Total projects')).toBeInTheDocument()
+    release()
+  })
+
   it("tells a manager these are their own projects, not the company's", async () => {
     renderDashboard()
     expect(await screen.findByText(/the projects you manage/i)).toBeInTheDocument()
@@ -55,33 +112,51 @@ describe('DashboardPage', () => {
     expect(within(card).getByText('$1,370 spent of $150,000')).toBeInTheDocument()
   })
 
-  it('counts projects and at-risk projects at the top', async () => {
-    renderDashboard()
+  it('counts every project and every at-risk project, not just this page', async () => {
+    renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO, HERMES], { total: 30, totalPages: 3, atRiskTotal: 7 })] })
     await screen.findByRole('article', { name: 'Apollo' })
-    expect(screen.getByLabelText('Projects shown')).toHaveTextContent('2')
-    expect(screen.getByLabelText('At risk')).toHaveTextContent('1')
+    expect(screen.getByLabelText('Total projects')).toHaveTextContent('30')
+    expect(screen.getByLabelText('Total at risk')).toHaveTextContent('7') // this page alone has 1
   })
 
-  it('links each card to its project', async () => {
+  it('says the counts follow the filter', async () => {
+    renderDashboard()
+    await screen.findByRole('article', { name: 'Apollo' })
+    expect(screen.queryByText(/counts are for the current search/i)).not.toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
+    expect(await screen.findByText(/counts are for the current search/i)).toBeInTheDocument()
+  })
+
+  it('draws the budget chart between the counts and the cards', async () => {
+    renderDashboard()
+    const chart = await screen.findByRole('figure', { name: 'Budget by project' })
+    expect(screen.getByLabelText('Total at risk').compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(chart.compareDocumentPosition(screen.getByRole('article', { name: 'Apollo' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('opens each card\'s project with a secondary (outlined) button', async () => {
     renderDashboard()
     const card = await screen.findByRole('article', { name: 'Apollo' })
-    expect(within(card).getByRole('link', { name: /open project/i })).toHaveAttribute('href', '/projects/1')
+    const open = within(card).getByRole('link', { name: /open project/i })
+    expect(open).toHaveAttribute('href', '/projects/1')
+    expect(open).toHaveClass('MuiButton-outlined')
   })
 
   it('searches and filters on the server', async () => {
     const calls = renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO])] })
     await screen.findByRole('article', { name: 'Apollo' })
     await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
-    await waitFor(() => expect(calls.at(-1).query.search).toBe('apo'))
+    await waitFor(() => expect(calls.at(-1).query.q).toBe('apo'))
     await userEvent.click(screen.getByLabelText(/status/i))
     await userEvent.click(await screen.findByRole('option', { name: 'Active' }))
     await waitFor(() => expect(calls.at(-1).query.status).toBe('ACTIVE'))
-    expect(calls.at(-1).query.search).toBe('apo')
+    expect(calls.at(-1).query.q).toBe('apo')
   })
 
   it('says so when there are no projects', async () => {
     renderDashboard({ 'GET /dashboard/projects': [200, page([])] })
     expect(await screen.findByText(/no projects to show/i)).toBeInTheDocument()
+    expect(screen.queryByRole('figure', { name: 'Budget by project' })).not.toBeInTheDocument()
   })
 
   it('shows the error and retries', async () => {
@@ -90,8 +165,41 @@ describe('DashboardPage', () => {
       'GET /dashboard/projects': () => (++attempts === 1 ? [503, { error: 'The database is not ready. Please try again shortly.' }] : [200, page([APOLLO])]),
     })
     expect(await screen.findByText(/database is not ready/i)).toBeInTheDocument()
+    expect(screen.queryByRole('figure', { name: 'Budget by project' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /retry/i }))
     expect(await screen.findByRole('article', { name: 'Apollo' })).toBeInTheDocument()
+  })
+
+  it('shows this week\'s workload above the filters, asking for one week of the 8 most over', async () => {
+    const calls = renderDashboard()
+    const chart = await screen.findByRole('figure', { name: 'Workload this week · all projects' })
+    expect(chart.compareDocumentPosition(screen.getByLabelText(/search projects/i)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(calls.find((c) => c.path === '/dashboard/allocation').query).toMatchObject({ weeks: '1', pageSize: '8' })
+    expect(within(chart).getByText('Showing 1 of 12 people, most over first.')).toBeInTheDocument() // the panel passes the server's total
+    const allocation = screen.getByRole('link', { name: 'All people and weeks in Allocation' })
+    expect(allocation).toHaveAttribute('href', '/allocation')
+    expect(allocation).toHaveClass('MuiButton-outlined') // not in a sentence, so a button, not a text link
+  })
+
+  it('leaves the workload chart alone when searching projects', async () => {
+    const calls = renderDashboard()
+    await screen.findByRole('figure', { name: 'Workload this week · all projects' })
+    await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
+    await waitFor(() => expect(calls.at(-1).query.q).toBe('apo'))
+    expect(calls.filter((c) => c.path === '/dashboard/allocation')).toHaveLength(1)
+    expect(screen.getByRole('figure', { name: 'Workload this week · all projects' })).toBeInTheDocument()
+  })
+
+  it('keeps the cards when the workload chart fails, with Retry on the chart only', async () => {
+    renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO, HERMES])], 'GET /dashboard/allocation': [500, { error: 'Database unavailable.' }] })
+    expect(await screen.findByText('Database unavailable.')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1)
+    expect(await screen.findByRole('article', { name: 'Apollo' })).toBeInTheDocument()
+  })
+
+  it('says when there are no employees', async () => {
+    renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO])], 'GET /dashboard/allocation': [200, { ...page([]), weeks: ['2026-10-12'] }] })
+    expect(await screen.findByText('No employees to show.')).toBeInTheDocument()
   })
 
   it('pages through long lists', async () => {

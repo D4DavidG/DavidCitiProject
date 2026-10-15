@@ -1,8 +1,8 @@
 """The outside shape of every record: camelCase, every field named explicitly.
 
-Used for API responses and for audit snapshots, so both always agree. Naming
-each field (never dumping a row) is what guarantees password_hash can't leak
-when someone adds a column later.
+Used for API responses and audit snapshots, so the two always agree. Each field
+is named (a row is never dumped whole), so password_hash, or any column added
+later, can't leak.
 """
 
 import datetime as dt
@@ -21,14 +21,14 @@ def _pick(row: dict, fields: dict[str, str]) -> dict:
 _USER = {
     "userId": "user_id", "username": "username", "firstName": "first_name", "lastName": "last_name",
     "email": "email", "jobTitle": "job_title", "role": "role", "managerId": "manager_id",
-    "weeklyCapacityHours": "weekly_capacity_hours", "overtimeAllowed": "overtime_allowed",
+    "weeklyCapacityHours": "weekly_capacity_hours", "overtimeAllowed": "overtime_allowed", "taskLimit": "task_limit",
     "mustChangePassword": "must_change_password", "isArchived": "is_archived",
     "archivedAt": "archived_at", "createdAt": "created_at", "updatedAt": "updated_at",
 }
 
 
 def user_view(row: dict, include_salary: bool) -> dict:
-    """A person. Salary only for admins and the person themselves."""
+    """A person. The caller decides `include_salary` (admins and the person themselves only)."""
     view = _pick(row, _USER)
     if include_salary:
         view["annualSalaryCents"] = row.get("annual_salary_cents")
@@ -103,7 +103,7 @@ def entry_view(row: dict) -> dict:
     view = _pick(row, {
         "entryId": "entry_id", "taskId": "task_id", "projectId": "project_id", "userId": "user_id",
         "workDate": "work_date", "minutes": "minutes", "note": "note", "status": "status",
-        "decidedBy": "decided_by", "decidedAt": "decided_at", "createdAt": "created_at",
+        "overCapacity": "over_capacity", "decidedBy": "decided_by", "decidedAt": "decided_at", "createdAt": "created_at",
         "updatedAt": "updated_at",
     })
     return _with_names(view, row, {"taskTitle": "task_title", "projectName": "project_name",
@@ -111,12 +111,15 @@ def entry_view(row: dict) -> dict:
 
 
 def request_view(row: dict) -> dict:
-    return _pick(row, {
-        "requestId": "request_id", "requestedBy": "requested_by", "name": "name", "description": "description",
-        "justification": "justification", "proposedStart": "proposed_start", "proposedEnd": "proposed_end",
+    """A request of any kind. The asker's name is present when the service joined it."""
+    view = _pick(row, {
+        "requestId": "request_id", "kind": "kind", "requestedBy": "requested_by", "name": "name",
+        "description": "description", "justification": "justification", "proposedStart": "proposed_start",
+        "proposedEnd": "proposed_end", "projectId": "project_id", "taskLimit": "task_limit",
         "status": "status", "decidedBy": "decided_by", "decidedAt": "decided_at",
         "decisionNote": "decision_note", "createdProjectId": "created_project_id", "createdAt": "created_at",
     })
+    return _with_names(view, row, {"requesterName": "requester_name"})
 
 
 def notification_view(row: dict) -> dict:
@@ -127,9 +130,19 @@ def notification_view(row: dict) -> dict:
     })
 
 
-def audit_view(row: dict) -> dict:
-    return _pick(row, {
+def audit_view(row: dict, include_states: bool = True) -> dict:
+    """An audit row. The before/after state (which can hold a salary) only when include_states."""
+    view = _pick(row, {
         "auditId": "audit_id", "actorUserId": "actor_user_id", "actorRole": "actor_role", "action": "action",
-        "entityType": "entity_type", "entityId": "entity_id", "beforeState": "before_state",
-        "afterState": "after_state", "summary": "summary", "createdAt": "created_at",
+        "entityType": "entity_type", "entityId": "entity_id", "summary": "summary", "createdAt": "created_at",
     })
+    if include_states:
+        view["beforeState"], view["afterState"] = row.get("before_state"), row.get("after_state")
+    if "actor_name" in row:
+        view["actorName"] = row["actor_name"]
+    return view
+
+
+def holder_view(row: dict) -> dict:
+    """A booked person's load on a board: how many unfinished tasks they hold, and their limit."""
+    return _pick(row, {"userId": "user_id", "name": "name", "held": "held", "limit": "task_limit"})

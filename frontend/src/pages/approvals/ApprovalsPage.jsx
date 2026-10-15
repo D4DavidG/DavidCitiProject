@@ -1,11 +1,14 @@
 import { useCallback, useState } from 'react'
-import { Alert, Box, Button, Pagination } from '@mui/material'
+import { Box, Button, FormHelperText } from '@mui/material'
 import DataTable from '../../components/DataTable'
+import OverCapacityMark from '../../components/OverCapacityMark'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
+import SearchField from '../../components/SearchField'
 import { formatDate, formatHours } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useLastPage } from '../../services/useLastPage'
 
 /**
  * Logged time waiting for a decision: a manager sees their direct reports' time, an
@@ -13,22 +16,22 @@ import { useApi } from '../../services/useApi'
  * their own (the server enforces both).
  */
 export default function ApprovalsPage() {
+  const [q, setQ] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
-  const load = useCallback(() => request('GET', '/approvals/time-entries', { query: { page: pageNumber, pageSize: 20 } }), [pageNumber])
+  const load = useCallback(() => request('GET', '/approvals/time-entries', { query: { q, page: pageNumber, pageSize: 20 } }), [q, pageNumber])
   const { data, error, loading, reload } = useApi(load)
-  const [message, setMessage] = useState(null)
+  useLastPage(data, pageNumber, setPageNumber)
+  const [refusal, setRefusal] = useState(null) // { entryId, text }: shown in that entry's row
   const [busy, setBusy] = useState(null)
 
   async function decide(entry, action) {
     setBusy(entry.entryId)
-    setMessage(null)
+    setRefusal(null)
     try {
-      await request('POST', `/time-entries/${entry.entryId}/${action}`)
-      const verb = action === 'approve' ? 'Approved' : 'Rejected'
-      setMessage({ severity: 'success', text: `${verb} ${formatHours(entry.minutes)} by ${entry.personName}.` })
+      await request('POST', `/time-entries/${entry.entryId}/${action}`) // the Saved pop-up confirms it
       reload()
     } catch (failure) {
-      setMessage({ severity: 'error', text: failure.message })
+      setRefusal({ entryId: entry.entryId, text: failure.message })
     } finally {
       setBusy(null)
     }
@@ -40,16 +43,19 @@ export default function ApprovalsPage() {
     { key: 'taskTitle', label: 'Task' },
     { key: 'projectName', label: 'Project' },
     { key: 'workDate', label: 'Date', render: (e) => formatDate(e.workDate) },
-    { key: 'minutes', label: 'Time', render: (e) => formatHours(e.minutes) },
+    { key: 'minutes', label: 'Time', render: (e) => <>{formatHours(e.minutes)} {e.overCapacity && <OverCapacityMark />}</> },
     { key: 'note', label: 'Note' },
     {
       key: 'actions',
       label: '',
       align: 'right',
       render: (e) => (
-        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button size="small" variant="contained" color="success" disabled={busy === e.entryId} aria-label={`Approve ${describe(e)}`} onClick={() => decide(e, 'approve')}>Approve</Button>
-          <Button size="small" color="error" disabled={busy === e.entryId} aria-label={`Reject ${describe(e)}`} onClick={() => decide(e, 'reject')}>Reject</Button>
+        <Box sx={{ display: 'grid', gap: 0.5, justifyItems: 'end' }}>
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+            <Button size="small" variant="contained" disabled={busy === e.entryId} aria-label={`Approve ${describe(e)}`} onClick={() => decide(e, 'approve')}>Approve</Button>
+            <Button size="small" variant="outlined" color="error" disabled={busy === e.entryId} aria-label={`Reject ${describe(e)}`} onClick={() => decide(e, 'reject')}>Reject</Button>
+          </Box>
+          {refusal?.entryId === e.entryId && <FormHelperText error role="alert">{refusal.text}</FormHelperText>}
         </Box>
       ),
     },
@@ -61,14 +67,13 @@ export default function ApprovalsPage() {
         title="Approvals"
         subtitle="Time your team logged, waiting for your decision. Only approved time counts against a project's budget."
       />
-      {message && <Alert severity={message.severity} sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
+      <Box sx={{ mb: 3 }}>
+        <SearchField label="Search approvals" placeholder="Person, task or project" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
+      </Box>
       <PageState loading={loading && !data} error={error} onRetry={reload}>
-        <DataTable columns={columns} rows={data?.items ?? []} rowKey="entryId" label="Time waiting for approval" empty="Nothing waiting for approval." />
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <DataTable columns={columns} rows={data?.items ?? []} rowKey="entryId" label="Time waiting for approval"
+          empty={q ? 'No time waiting for approval matches your search.' : 'Nothing waiting for approval.'} />
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>
   )

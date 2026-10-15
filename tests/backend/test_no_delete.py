@@ -8,7 +8,7 @@ from conftest import insert, refused
 pytestmark = pytest.mark.schema
 
 TABLES = ["users", "projects", "assignments", "milestones", "milestone_dependencies",
-          "tasks", "time_entries", "project_requests", "notifications", "audit_log"]
+          "tasks", "time_entries", "project_requests", "notifications", "audit_log", "refresh_tokens"]
 
 
 @pytest.fixture
@@ -26,6 +26,7 @@ def one_of_everything(conn):
     insert(conn, "audit_log", action="CREATE", entity_type="x", entity_id=1, summary="s")
     conn.execute("INSERT INTO notifications (recipient_user_id, audit_id) SELECT %s, max(audit_id) FROM audit_log",
                  (manager["user_id"],))
+    rows.refresh_token(conn, alice)
 
 
 @pytest.mark.parametrize("table", TABLES)

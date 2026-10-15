@@ -11,9 +11,9 @@ import { usePeopleOptions } from '../../services/people'
 import { request } from '../../services/request'
 
 const DATE_FIELDS = [
-  { name: 'hoursPerWeek', label: 'Hours per week', type: 'number', required: true, helper: '1 to 40 hours a week on this project.' },
+  { name: 'hoursPerWeek', label: 'Hours per week', type: 'number', min: 1, max: 40, required: true, helper: '1 to 40 hours a week on this project.' },
   { name: 'startDate', label: 'Start date', type: 'date', required: true },
-  { name: 'endDate', label: 'End date', type: 'date', required: true },
+  { name: 'endDate', label: 'End date', type: 'date', required: true, notBefore: 'startDate' },
 ]
 
 function BookDialog({ projectId, onClose, onSaved }) {
@@ -53,8 +53,8 @@ export default function ResourcesTab({ projectId, bookings, canManage, onChanged
       align: 'right',
       render: (b) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button size="small" onClick={() => setEditing(b)}>Edit</Button>
-          <Button size="small" color="inherit" onClick={() => setArchiving(b)}>Archive</Button>
+          <Button size="small" variant="outlined" onClick={() => setEditing(b)}>Edit</Button>
+          <Button size="small" variant="outlined" color="error" onClick={() => setArchiving(b)}>Archive</Button>
         </Box>
       ),
     }] : []),

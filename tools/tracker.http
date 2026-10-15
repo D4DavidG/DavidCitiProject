@@ -1,0 +1,128 @@
+# Read-only tour of the ACME Project Tracker API, for the VS Code "REST Client"
+# extension (humao.rest-client). Click "Send Request" above any request.
+#
+# 1. Run the "login" request first. It asks for the password (nothing secret is
+#    stored in this file). Every later request reuses its token, which lasts 15
+#    minutes: after that every request answers 401, so run "login" again.
+# 2. Pick the server on the @baseUrl line: {{aws}} (live, CloudFront -> Lambda ->
+#    Aurora) or {{local}} (needs ./bin/start-dev.sh running, proxy on :3001).
+#
+# Every path and query name below is taken from backend/tracker/api/routes.py and
+# the services. There are no write requests here, so nothing in the data changes.
+# (Logging in does not write an audit row: reads and logins are not audited.)
+
+@aws = https://d1gov8jpsxhwer.cloudfront.net/api/tracker
+@local = http://localhost:3001/api/tracker
+@baseUrl = {{aws}}
+
+@token = {{login.response.body.token}}
+# Project 1 is Apollo in the local seed; check the "projects" list for ids on AWS.
+@projectId = 1
+
+### Health: the only public route. Proves CloudFront -> Lambda -> database is up.
+GET {{baseUrl}}/health
+
+### Log in as the admin (AD000001). Admin sees everything, including the audit log.
+# @name login
+# @prompt password Admin password (AD000001)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "AD000001",
+  "password": "{{password}}"
+}
+
+### Who am I: the user record behind the token (role is re-read from the database).
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### Q1 status of each project, Q2 at risk, Q7 budget: dashboard cards, at-risk first.
+### total and atRiskTotal count every page (try ?pageSize=1).
+GET {{baseUrl}}/dashboard/projects
+Authorization: Bearer {{token}}
+
+### Q2 projects at risk of missing deadlines, each with its reasons.
+GET {{baseUrl}}/dashboard/at-risk
+Authorization: Bearer {{token}}
+
+### Q3 resource allocation and Q5 over-allocated people: people x weeks, only those over capacity.
+GET {{baseUrl}}/dashboard/allocation?overOnly=true&weeks=8
+Authorization: Bearer {{token}}
+
+### Q1 project list: search and status filter, paginated (items, page, pageSize, total, totalPages).
+GET {{baseUrl}}/projects?status=ACTIVE&page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Q7 budget consumed versus planned, for one project.
+GET {{baseUrl}}/projects/{{projectId}}/budget
+Authorization: Bearer {{token}}
+
+### Q4 key deliverables and completion, for one project.
+GET {{baseUrl}}/projects/{{projectId}}/milestones
+Authorization: Bearer {{token}}
+
+### Q6 dependency chain between deliverables: nodes and edges for one project.
+GET {{baseUrl}}/projects/{{projectId}}/dependency-graph
+Authorization: Bearer {{token}}
+
+### Pull board for one project: tasks with a status, an assignee, who holds how many (held / limit).
+GET {{baseUrl}}/projects/{{projectId}}/board
+Authorization: Bearer {{token}}
+
+### Ready tasks the signed-in employee could take, with their held / limit. Employees only:
+# as the admin this answers 403, so log in as an employee (for example Ana) to try it.
+GET {{baseUrl}}/me/ready-tasks
+Authorization: Bearer {{token}}
+
+### Requests you may decide, pending only. scope: MINE (you asked) or TO_DECIDE; also kind=.
+# Admins decide every request; a manager decides their own employees' requests.
+GET {{baseUrl}}/project-requests?scope=TO_DECIDE&status=PENDING
+Authorization: Bearer {{token}}
+
+### Requests of one kind: NEW_PROJECT, ARCHIVE_PROJECT, TASK_LIMIT, OVERTIME or OTHER.
+# Sending one is a write (POST /project-requests), so it is not here. The body per kind:
+#   manager:  {"kind": "NEW_PROJECT", "name": "Hermes", "justification": "...",
+#              "proposedStart": "2026-11-01", "proposedEnd": "2027-02-28"}
+#   manager:  {"kind": "ARCHIVE_PROJECT", "projectId": 1, "justification": "..."}
+#   employee: {"kind": "TASK_LIMIT", "taskLimit": 3, "justification": "..."}
+#   employee: {"kind": "OVERTIME", "justification": "..."}
+#   either:   {"kind": "OTHER", "name": "A second monitor", "justification": "..."}
+GET {{baseUrl}}/project-requests?kind=OVERTIME
+Authorization: Bearer {{token}}
+
+### Audit log, newest first (admin only). Every change, with before/after state.
+GET {{baseUrl}}/admin/audit-log?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Audit log filtered: only changes to projects, on or after a date.
+# Filters: actorId, entityType (projects, milestones, assignments, tasks, time_entries,
+# users, project_requests), entityId, dateFrom, dateTo (YYYY-MM-DD).
+GET {{baseUrl}}/admin/audit-log?entityType=projects&dateFrom=2026-10-13
+Authorization: Bearer {{token}}
+
+### One person's history: what they did and what was done to their account, newest first.
+# Admins read anyone's (with before/after state); a manager reads their reports' and
+# anyone their own (no state). Anyone else gets 404. Filters: action, dateFrom, dateTo.
+GET {{baseUrl}}/users/1/history?page=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### Notifications for the signed-in user (the bell), unread only.
+GET {{baseUrl}}/notifications?unread=true
+Authorization: Bearer {{token}}
+
+### The number on the bell.
+GET {{baseUrl}}/notifications/unread-count
+Authorization: Bearer {{token}}
+
+### Logged time waiting for approval (feeds consumed cost, Q7, once approved).
+GET {{baseUrl}}/approvals/time-entries
+Authorization: Bearer {{token}}
+
+### People: search and role filter (managers and admins only).
+GET {{baseUrl}}/users?role=EMPLOYEE
+Authorization: Bearer {{token}}
+
+### Integrity check (admin only): the 5 invariant queries. Healthy = every list empty.
+GET {{baseUrl}}/admin/integrity-check
+Authorization: Bearer {{token}}

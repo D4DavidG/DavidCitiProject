@@ -40,6 +40,27 @@ def test_text_must_be_a_string():
         values.text({"name": 5}, "name")
 
 
+def test_search_box_reads_q_or_the_older_search_as_a_pattern():
+    assert values.search({"q": " Ali "}) == "%Ali%"
+    assert values.search({"search": "Ali"}) == "%Ali%"
+    assert values.search({"q": "new", "search": "old"}) == "%new%"
+    assert values.search({}) is None
+    assert values.search({"q": "   "}) is None  # a blank box is no search, not a search for spaces
+
+
+def test_search_escapes_like_wildcards_so_they_match_themselves():
+    # Backslash is Postgres's LIKE escape: "%" typed in a box means a percent sign, not "anything".
+    assert values.search({"q": "%"}) == r"%\%%"
+    assert values.search({"q": "a_b"}) == r"%a\_b%"
+    assert values.search({"q": "c:\\x"}) == r"%c:\\x%"
+
+
+def test_search_longer_than_100_characters_is_refused_naming_q():
+    with pytest.raises(ValidationError) as refused:
+        values.search({"q": "x" * 101})
+    assert refused.value.field == "q"
+
+
 def test_date_parses_iso_format():
     assert values.date({"start_date": "2026-10-13"}, "start_date") == dt.date(2026, 10, 13)
 
@@ -77,6 +98,16 @@ def test_only_allowed_fields_names_the_first_extra_one():
     with pytest.raises(ValidationError) as caught:
         values.only_allowed({"first_name": "A", "username": "X"}, {"first_name"})
     assert caught.value.field == "username"
+
+
+def test_require_names_the_first_missing_field():
+    with pytest.raises(ValidationError) as caught:
+        values.require({"name": "x"}, ("name", "start_date", "due_date"))
+    assert (str(caught.value), caught.value.field) == ("Start date is required.", "start_date")
+
+
+def test_require_passes_when_every_key_is_there():
+    assert values.require({"a": 1, "b": None}, ("a", "b")) is None  # presence only
 
 
 # --- money ----------------------------------------------------------------

@@ -1,8 +1,8 @@
 """Walk every mutating route once and prove each one writes at least one audit row.
 
 Add a route and forget record_change(), or forget to add the route here, and
-this fails. The only exemptions are login (not a change) and marking your own
-notifications read (inbox state, not business data).
+this fails. The only exemptions are login, refresh and logout (sessions, not
+business records) and marking your own notifications read (inbox state).
 """
 
 import json
@@ -11,7 +11,8 @@ import factories as f
 from api import routes
 from test_api import Client, username_of
 
-EXEMPT = {("POST", "/auth/login"), ("POST", "/notifications/{id}/read"), ("POST", "/notifications/read-all")}
+EXEMPT = {("POST", "/auth/login"), ("POST", "/notifications/{id}/read"), ("POST", "/notifications/read-all"),
+          ("POST", "/auth/refresh"), ("POST", "/auth/logout")}  # sessions, not business records
 
 
 def test_every_mutating_route_writes_an_audit_row(conn):
@@ -82,6 +83,8 @@ def test_every_mutating_route_writes_an_audit_row(conn):
     hit(b, "POST", "/milestones/{id}/reopen", f"/milestones/{m1['milestoneId']}/reopen")
     other = hit(b, "POST", "/milestones/{id}/tasks", f"/milestones/{m2['milestoneId']}/tasks",
                 {"title": "Spare", "estimateMinutes": 60})
+    hit(e, "POST", "/tasks/{id}/claim", f"/tasks/{other['taskId']}/claim")
+    hit(e, "POST", "/tasks/{id}/release", f"/tasks/{other['taskId']}/release")
     hit(b, "POST", "/tasks/{id}/archive", f"/tasks/{other['taskId']}/archive")
     hit(b, "POST", "/tasks/{id}/reactivate", f"/tasks/{other['taskId']}/reactivate")
     hit(b, "POST", "/milestones/{id}/archive", f"/milestones/{m2['milestoneId']}/archive")
@@ -89,11 +92,17 @@ def test_every_mutating_route_writes_an_audit_row(conn):
     hit(b, "POST", "/assignments/{id}/archive", f"/assignments/{booking['assignmentId']}/archive")
 
     req = hit(b, "POST", "/project-requests", "/project-requests",
-              {"name": "Hermes", "justification": "Growth", "proposedStart": "2026-11-01", "proposedEnd": "2027-01-31"})
+              {"kind": "NEW_PROJECT", "name": "Hermes", "justification": "Growth", "proposedStart": "2026-11-01", "proposedEnd": "2027-01-31"})
     hit(a, "POST", "/project-requests/{id}/approve", f"/project-requests/{req['requestId']}/approve", {})
-    req2 = hit(b, "POST", "/project-requests", "/project-requests", {"name": "Iris", "justification": "Maybe"})
+    req2 = hit(b, "POST", "/project-requests", "/project-requests",
+               {"kind": "NEW_PROJECT", "name": "Iris", "justification": "Maybe"})
     hit(a, "POST", "/project-requests/{id}/reject", f"/project-requests/{req2['requestId']}/reject",
         {"decisionNote": "Later"})
+    # An employee asks their line manager, who approves: overtime turns on (two audit rows).
+    req3 = hit(e, "POST", "/project-requests", "/project-requests", {"kind": "OVERTIME", "justification": "Launch week"})
+    hit(b, "POST", "/project-requests/{id}/approve", f"/project-requests/{req3['requestId']}/approve", {})
+    assert conn.execute("SELECT overtime_allowed FROM users WHERE user_id = %s",
+                        (alice.user_id,)).fetchone()["overtime_allowed"]
     hit(a, "POST", "/projects/{id}/archive", f"/projects/{pid}/archive")
     hit(a, "POST", "/projects/{id}/reactivate", f"/projects/{pid}/reactivate")
 

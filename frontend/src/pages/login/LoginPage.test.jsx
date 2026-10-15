@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route } from 'react-router'
 import LoginPage from './LoginPage'
@@ -56,6 +56,39 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Wrong username or password.')).toBeInTheDocument()
   })
 
+  it('makes both boxes glow red, with the message under the password box, and puts the cursor back in the username', async () => {
+    const login = vi.fn().mockRejectedValue(new ApiError(401, 'Wrong username or password.'))
+    renderLogin(session(null, { login }))
+    await signIn('ML662930', 'nope')
+    const message = await screen.findByText('Wrong username or password.')
+    const username = screen.getByLabelText(/username/i)
+    const password = screen.getByLabelText(/^password/i)
+    for (const box of [username, password]) {
+      expect(box).toHaveAttribute('aria-invalid', 'true')
+      expect(box.getAttribute('aria-describedby')).toBe(message.id) // a screen reader hears why on either box
+    }
+    expect(message.closest('.MuiFormControl-root')).toBe(password.closest('.MuiFormControl-root'))
+    expect(screen.queryByRole('alert')).toBeNull() // no message box at the top of the card
+    await waitFor(() => expect(username).toHaveFocus())
+  })
+
+  it.each([
+    ['the server cannot be reached', new ApiError(0, "Couldn't reach the server. Check your connection and try again.")],
+    ['the database is still waking up', new ApiError(503, 'The service is starting up. Try again in a moment.')],
+  ])('when %s, says so above the Sign in button and leaves both boxes unmarked', async (_, failure) => {
+    renderLogin(session(null, { login: vi.fn().mockRejectedValue(failure) }))
+    await signIn()
+    const message = await screen.findByRole('alert')
+    expect(message).toHaveTextContent(failure.message)
+    const button = screen.getByRole('button', { name: 'Sign in' })
+    expect(button).toHaveAttribute('aria-describedby', message.id)
+    expect(message.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy() // just above it
+    for (const box of [screen.getByLabelText(/username/i), screen.getByLabelText(/^password/i)]) {
+      expect(box).not.toHaveAttribute('aria-invalid', 'true') // the details weren't wrong
+    }
+    await waitFor(() => expect(button).toHaveFocus()) // Enter tries again
+  })
+
   it('upper-cases the username, which is always capitals', async () => {
     const auth = session(null, { login: vi.fn().mockResolvedValue(USERS.manager) })
     renderLogin(auth)
@@ -71,5 +104,46 @@ describe('LoginPage', () => {
   it('skips the form when already signed in', () => {
     renderLogin(session(USERS.manager))
     expect(screen.getByText('dashboard page')).toBeInTheDocument()
+  })
+
+  describe('while signing in', () => {
+    /** A login the test finishes by hand, like a request held open. */
+    function heldLogin() {
+      let fail
+      const login = vi.fn(() => new Promise((_, reject) => { fail = reject }))
+      return { login, fail: (error) => fail(error) }
+    }
+    const controls = () => [
+      screen.getByLabelText(/username/i), screen.getByLabelText(/^password/i), screen.getByRole('button', { name: /sign(ing)? in/i }),
+    ]
+
+    it('disables both fields and the button, which says it is signing in', async () => {
+      renderLogin(session(null, { login: heldLogin().login }))
+      await signIn()
+      expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled()
+      controls().forEach((control) => expect(control).toBeDisabled())
+    })
+
+    it('enables them again after a refusal, so the password can be retyped', async () => {
+      const held = heldLogin()
+      renderLogin(session(null, { login: held.login }))
+      await signIn('ML662930', 'nope')
+      held.fail(new ApiError(401, 'Wrong username or password.'))
+      expect(await screen.findByText('Wrong username or password.')).toBeInTheDocument()
+      controls().forEach((control) => expect(control).toBeEnabled())
+    })
+
+    it('sends one login, however many times the form is submitted', async () => {
+      const held = heldLogin()
+      renderLogin(session(null, { login: held.login }))
+      await userEvent.type(screen.getByLabelText(/username/i), 'ML662930')
+      await userEvent.type(screen.getByLabelText(/^password/i), 'Demo-pass-2026')
+      const form = screen.getByLabelText(/username/i).closest('form')
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+      expect(held.login).toHaveBeenCalledTimes(1)
+      held.fail(new ApiError(401, 'Wrong username or password.'))
+      await waitFor(() => expect(screen.getByLabelText(/username/i)).toBeEnabled())
+    })
   })
 })

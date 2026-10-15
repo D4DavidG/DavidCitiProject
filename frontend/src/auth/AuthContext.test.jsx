@@ -60,24 +60,55 @@ describe('AuthProvider', () => {
     expect(sessionStorage.getItem('acme.token')).toBe('stored-token')
   })
 
-  it('logs in, stores the token and the user', async () => {
-    const calls = stubApi({ 'POST /auth/login': [200, { token: 'new-token', user: USERS.manager }] })
+  it('logs in, stores both tokens and the user', async () => {
+    const calls = stubApi({ 'POST /auth/login': [200, { token: 'new-token', refreshToken: 'new-refresh', user: USERS.manager }] })
     renderProvider()
     await screen.findByText('status: signedOut')
     await userEvent.click(screen.getByText('log in'))
     await screen.findByText('status: signedIn')
     expect(calls[0].body).toEqual({ username: 'ML662930', password: 'secret-pass' })
     expect(sessionStorage.getItem('acme.token')).toBe('new-token')
+    expect(sessionStorage.getItem('acme.refresh')).toBe('new-refresh')
   })
 
-  it('logs out and forgets the token', async () => {
+  it('logs out: ends the refresh token on the server and forgets both tokens', async () => {
     sessionStorage.setItem('acme.token', 'stored-token')
-    stubApi({ 'GET /auth/me': [200, USERS.manager] })
+    sessionStorage.setItem('acme.refresh', 'stored-refresh')
+    const calls = stubApi({ 'GET /auth/me': [200, USERS.manager], 'POST /auth/logout': [204] })
     renderProvider()
     await screen.findByText('status: signedIn')
     await userEvent.click(screen.getByText('log out'))
     expect(screen.getByText('status: signedOut')).toBeInTheDocument()
+    expect(calls.find((c) => c.path === '/auth/logout').body).toEqual({ refreshToken: 'stored-refresh' })
     expect(sessionStorage.getItem('acme.token')).toBeNull()
+    expect(sessionStorage.getItem('acme.refresh')).toBeNull()
+  })
+
+  it('logs out here even when the server call fails', async () => {
+    sessionStorage.setItem('acme.token', 'stored-token')
+    sessionStorage.setItem('acme.refresh', 'stored-refresh')
+    stubApi({ 'GET /auth/me': [200, USERS.manager], 'POST /auth/logout': [503, { error: 'down' }] })
+    renderProvider()
+    await screen.findByText('status: signedIn')
+    await userEvent.click(screen.getByText('log out'))
+    expect(screen.getByText('status: signedOut')).toBeInTheDocument()
+    expect(screen.getByText('expired: false')).toBeInTheDocument()
+    expect(sessionStorage.getItem('acme.refresh')).toBeNull()
+  })
+
+  it('refreshes a stored session whose access token expired, stays signed in, and stores the new pair', async () => {
+    sessionStorage.setItem('acme.token', 'old-token')
+    sessionStorage.setItem('acme.refresh', 'old-refresh')
+    let probes = 0
+    const calls = stubApi({
+      'GET /auth/me': () => (++probes === 1 ? [401, { error: 'expired' }] : [200, USERS.manager]),
+      'POST /auth/refresh': [200, { token: 'new-token', refreshToken: 'new-refresh' }],
+    })
+    renderProvider()
+    await screen.findByText('status: signedIn')
+    expect(calls.find((c) => c.path === '/auth/refresh').body).toEqual({ refreshToken: 'old-refresh' })
+    expect(sessionStorage.getItem('acme.token')).toBe('new-token')
+    expect(sessionStorage.getItem('acme.refresh')).toBe('new-refresh')
   })
 
   it('signs out and flags the expiry when any later call answers 401', async () => {

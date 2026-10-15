@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link, useParams } from 'react-router'
-import { Alert, Box, Button, Chip, Tab, Tabs, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, FormHelperText, Tab, Tabs, Typography } from '@mui/material'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import FormDialog from '../../components/FormDialog'
 import PageHeader from '../../components/PageHeader'
@@ -12,15 +12,18 @@ import { formatDate } from '../../services/format'
 import { fullName, usePeopleOptions } from '../../services/people'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import BoardTab from './BoardTab'
 import BudgetTab from './BudgetTab'
 import DeliverablesTab from './DeliverablesTab'
+import RequestArchiveDialog from './RequestArchiveDialog'
 import ResourcesTab from './ResourcesTab'
+import { archiveAction } from './archiveAction'
 import { PROJECT_STATUSES } from './constants'
 
 const MANAGER_FIELDS = [
   { name: 'description', label: 'Description', type: 'textarea' },
   { name: 'startDate', label: 'Start date', type: 'date' },
-  { name: 'predictedEndDate', label: 'End date', type: 'date' },
+  { name: 'predictedEndDate', label: 'End date', type: 'date', notBefore: 'startDate' },
   { name: 'budgetCents', label: 'Budget ($)', type: 'money' },
   { name: 'status', label: 'Status', type: 'select', options: PROJECT_STATUSES },
 ]
@@ -53,7 +56,9 @@ EditProjectDialog.propTypes = {
 /**
  * One project: its header (status, dates, manager, progress), then tabs for
  * deliverables (question 4), resources (who is booked) and budget (question 7),
- * and a link to the dependency view (question 6).
+ * and a link to the dependency view (question 6). The header offers Archive project to
+ * admins and Request archive to the project's own manager. Employees see the
+ * "Resources" tab as "People".
  */
 export default function ProjectDetailPage() {
   const projectId = Number(useParams().id)
@@ -61,6 +66,10 @@ export default function ProjectDetailPage() {
   const [tab, setTab] = useState('deliverables')
   const [editing, setEditing] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [reactivating, setReactivating] = useState(false)
+  const [requesting, setRequesting] = useState(false)
+  const [requestSent, setRequestSent] = useState(false)
+  const [actionError, setActionError] = useState(null)
 
   const loadProject = useCallback(() => request('GET', `/projects/${projectId}`), [projectId])
   const project = useApi(loadProject)
@@ -73,10 +82,25 @@ export default function ProjectDetailPage() {
   )
   const manager = useApi(loadManager)
 
+  /** Reactivate an archived project; the button is disabled until the answer, so one press sends one request. */
+  async function reactivate() {
+    setActionError(null)
+    setReactivating(true)
+    try {
+      await request('POST', `/projects/${projectId}/reactivate`)
+      project.reload()
+    } catch (failure) {
+      setActionError(failure.message)
+    } finally {
+      setReactivating(false)
+    }
+  }
+
   const p = project.data
   const isAdmin = user.role === 'ADMIN'
   const canManage = Boolean(p) && !p.isArchived && (isAdmin || (user.role === 'MANAGER' && p.managerId === user.userId))
   const showBudget = user.role !== 'EMPLOYEE'
+  const archive = p ? archiveAction(user, p) : null
   const people = [...new Map((bookings.data?.items ?? []).map((b) => [b.userId, b.personName])).entries()]
 
   return (
@@ -90,10 +114,13 @@ export default function ProjectDetailPage() {
               <>
                 <Button component={Link} to={`/projects/${projectId}/dependencies`} variant="outlined">Dependency view</Button>
                 {canManage && <Button variant="outlined" onClick={() => setEditing(true)}>Edit project</Button>}
-                {isAdmin && !p.isArchived && <Button color="inherit" onClick={() => setArchiving(true)}>Archive project</Button>}
+                {archive === 'archive' && <Button variant="outlined" color="error" onClick={() => setArchiving(true)}>Archive project</Button>}
+                {archive === 'request' && <Button variant="outlined" onClick={() => { setRequestSent(false); setRequesting(true) }}>Request archive</Button>}
+                {requestSent && <Typography variant="body2" role="status" sx={{ alignSelf: 'center' }}>Request sent. An admin will answer it.</Typography>}
                 {isAdmin && p.isArchived && (
-                  <Button variant="contained" onClick={async () => { await request('POST', `/projects/${projectId}/reactivate`); project.reload() }}>Reactivate</Button>
+                  <Button variant="contained" onClick={reactivate} disabled={reactivating}>{reactivating ? 'Reactivating…' : 'Reactivate'}</Button>
                 )}
+                {actionError && <FormHelperText error role="alert" sx={{ alignSelf: 'center', m: 0 }}>{actionError}</FormHelperText>}
               </>
             )}
           />
@@ -108,19 +135,22 @@ export default function ProjectDetailPage() {
 
           <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" allowScrollButtonsMobile>
             <Tab value="deliverables" label="Deliverables" />
-            <Tab value="resources" label="Resources" />
+            <Tab value="resources" label={user.role === 'EMPLOYEE' ? 'People' : 'Resources'} />
             {showBudget && <Tab value="budget" label="Budget" />}
+            <Tab value="board" label="Board" />
           </Tabs>
 
-          {tab === 'deliverables' && <DeliverablesTab projectId={projectId} canManage={canManage} people={people} />}
+          {tab === 'deliverables' && <DeliverablesTab projectId={projectId} canManage={canManage} people={people} startDate={p.startDate} predictedEndDate={p.predictedEndDate} />}
           {tab === 'resources' && (
             <PageState loading={bookings.loading && !bookings.data} error={bookings.error} onRetry={bookings.reload}>
               <ResourcesTab projectId={projectId} bookings={bookings.data?.items ?? []} canManage={canManage} onChanged={bookings.reload} />
             </PageState>
           )}
           {tab === 'budget' && showBudget && <BudgetTab projectId={projectId} />}
+          {tab === 'board' && <BoardTab projectId={projectId} canManage={canManage} />}
 
           {editing && <EditProjectDialog project={p} isAdmin={isAdmin} onClose={() => setEditing(false)} onSaved={() => project.reload()} />}
+          {requesting && <RequestArchiveDialog project={p} onSent={() => setRequestSent(true)} onClose={() => setRequesting(false)} />}
           {archiving && (
             <ConfirmDialog
               open

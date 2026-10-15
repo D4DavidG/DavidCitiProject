@@ -21,6 +21,7 @@ export function session(user, overrides = {}) {
     login: vi.fn(),
     logout: vi.fn(),
     refreshUser: vi.fn(),
+    startSession: vi.fn((result) => result.user),
     ...overrides,
   }
 }
@@ -28,10 +29,13 @@ export function session(user, overrides = {}) {
 /**
  * Render `ui` at `path`, inside a router whose route pattern is `route`.
  * Extra routes (e.g. a /login placeholder) let redirect tests see where they landed.
+ * `theme` defaults to the light theme; pass makeTheme('dark') to check dark mode.
  */
-export function renderAt(ui, { path = '/', route = '*', auth = session(USERS.manager), extraRoutes = null } = {}) {
+export function renderAt(ui, {
+  path = '/', route = '*', auth = session(USERS.manager), extraRoutes = null, theme: chosen = theme,
+} = {}) {
   return render(
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={chosen}>
       <AuthContext.Provider value={auth}>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
@@ -60,6 +64,22 @@ export function stubApi(answers) {
   })
   vi.stubGlobal('fetch', fetchMock)
   return calls
+}
+
+/**
+ * Hold every call to `path` open until the returned release() runs, so a test can
+ * act while that request is still in flight. Call it after stubApi; it wraps that stub.
+ */
+export function holdOpen(path) {
+  const stubbed = globalThis.fetch
+  let open
+  const gate = new Promise((resolve) => { open = resolve })
+  vi.stubGlobal('fetch', vi.fn((url, init) => {
+    const { pathname } = new URL(url, 'http://localhost')
+    if (pathname.replace(/^\/api\/tracker/, '') !== path) return stubbed(url, init)
+    return gate.then(() => stubbed(url, init))
+  }))
+  return () => open()
 }
 
 /** A list envelope, as every list endpoint returns. */

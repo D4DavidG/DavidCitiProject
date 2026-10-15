@@ -1,14 +1,17 @@
 """Time logged on tasks (Jira's "log work", OpenProject's time entries).
 
-- Only a task's assignee logs time on it: a date, a number of minutes, a note.
+- Only a task's assignee logs time on it: a date, minutes, a note.
 - The date can't be in the future and must fall inside one of their bookings on
   that project. At most 24 hours per person per day.
-- Capacity: logging that takes the person's Monday-to-Sunday week past their
-  weekly capacity is refused unless their manager allowed overtime. The user's
-  row is locked first, so two entries sent at once can't both slip under.
-- The hourly rate is frozen on the entry when it's logged, so a later raise
-  never rewrites past costs. Only approved time counts as consumed budget.
-- The line manager or any admin approves or rejects. Nobody approves their own.
+- Capacity: an entry that takes the person's Monday-to-Sunday week past their
+  weekly capacity is asked about first (409, code OVER_CAPACITY) unless their
+  manager allowed overtime. Resent with confirm_over_capacity it is saved, marked
+  over_capacity, and the notification says by how much. The user's row is locked
+  first, so two concurrent entries can't both pass the capacity check and an
+  unconfirmed over-capacity entry can never slip through.
+- The hourly rate is frozen on the entry when logged, so a later raise never
+  rewrites past costs. Only approved time counts as consumed budget.
+- The line manager or any admin approves or rejects; nobody approves their own.
 """
 
 import datetime as dt
@@ -26,16 +29,26 @@ from services.views import entry_view
 from store.postgres import atomic, insert, update
 
 NOT_FOUND = "Time entry not found."
-_FIELDS = {"work_date", "minutes", "note"}
+_FIELDS = {"work_date", "minutes", "note", "confirm_over_capacity"}
 
 
 def hours_text(minutes: int) -> str:
-    """'2 h', '1 h 30 min', '45 min'."""
+    """Minutes as plain text: '2 h', '1 h 30 min', '45 min'."""
     h, m = divmod(minutes, 60)
     return " ".join(part for part in (f"{h} h" if h else "", f"{m} min" if m else "") if part) or "0 min"
 
 
+def _confirmed(data: dict) -> bool:
+    """Did the person say "Log anyway"? Read it, then drop it: it is not a column."""
+    return values.boolean(data, "confirm_over_capacity", required=False) or False
+
+
+def _over_text(over: int) -> str:
+    return f" ({hours_text(over)} over capacity)" if over else ""
+
+
 def _clean(data: dict, partial: bool) -> dict:
+    data = {k: v for k, v in data.items() if k != "confirm_over_capacity"}
     clean = {}
     if not partial or "work_date" in data:
         clean["work_date"] = values.date(data, "work_date")
@@ -49,8 +62,12 @@ def _clean(data: dict, partial: bool) -> dict:
 
 
 def _check_limits(conn: psycopg.Connection, user_id: int, project_id: int, work_date: dt.date,
-                  minutes: int, ignore_entry: int | None) -> None:
-    """Booked that day, at most 24 h that day, and within capacity unless overtime is allowed."""
+                  minutes: int, ignore_entry: int | None, confirmed: bool) -> int:
+    """No booking that day, or over 24 h, is always refused (409).
+
+    Past capacity without overtime raises OverCapacity until `confirmed`; then
+    returns the minutes past capacity (else 0). `ignore_entry` leaves an edited entry out of the sums.
+    """
     person = conn.execute("SELECT weekly_capacity_hours, overtime_allowed FROM users WHERE user_id = %s FOR UPDATE",
                           (user_id,)).fetchone()
     booked = conn.execute("SELECT 1 FROM assignments WHERE user_id = %s AND project_id = %s AND NOT is_archived"
@@ -68,13 +85,18 @@ def _check_limits(conn: psycopg.Connection, user_id: int, project_id: int, work_
                         " AND work_date BETWEEN %(s)s AND %(e)s AND status <> 'REJECTED' AND entry_id <> %(ignore)s",
                         {**other, "s": start, "e": start + dt.timedelta(days=6)}).fetchone()["n"]
     capacity = person["weekly_capacity_hours"]
-    if week + minutes > capacity * 60 and not person["overtime_allowed"]:
-        raise OverCapacity(f"That would take you to {hours_text(week + minutes)} in the week of {start.isoformat()},"
-                           f" past your capacity of {capacity} h. Ask your manager to allow overtime.")
+    over = week + minutes - capacity * 60
+    if over <= 0 or person["overtime_allowed"]:
+        return 0
+    if not confirmed:
+        raise OverCapacity(f"This puts you {hours_text(over)} over your {capacity} h week."
+                           " Log anyway? Your manager will be told.")
+    return over
 
 
 def log_time(conn: psycopg.Connection, actor: Actor, task_id: int, data: dict) -> dict:
     values.only_allowed(data, _FIELDS)
+    confirmed = _confirmed(data)
     clean = _clean(data, partial=False)
     with atomic(conn):
         task = conn.execute("SELECT * FROM tasks WHERE task_id = %s", (task_id,)).fetchone()
@@ -88,21 +110,27 @@ def log_time(conn: psycopg.Connection, actor: Actor, task_id: int, data: dict) -
             raise Forbidden("Only the task's assignee logs time on it.")
         if task["is_archived"]:
             raise Conflict("This task is archived.")
-        _check_limits(conn, actor.user_id, task["project_id"], clean["work_date"], clean["minutes"], None)
+        over = _check_limits(conn, actor.user_id, task["project_id"], clean["work_date"], clean["minutes"], None,
+                             confirmed)
         salary = conn.execute("SELECT annual_salary_cents FROM users WHERE user_id = %s",
                               (actor.user_id,)).fetchone()["annual_salary_cents"]
         clean.update(task_id=task_id, project_id=task["project_id"], user_id=actor.user_id,
-                     hourly_rate_cents=money.hourly_rate_cents(salary))
+                     hourly_rate_cents=money.hourly_rate_cents(salary), over_capacity=over > 0)
         row = insert(conn, "time_entries", clean)
         audit.record_change(conn, actor, "CREATE", "time_entries", row["entry_id"], None, entry_view(row),
                             f"{actor.name} logged {hours_text(row['minutes'])} for {row['work_date'].isoformat()}"
-                            f" on task {task['title']}")
+                            f" on task {task['title']}{_over_text(over)}")
     return row
 
 
 def edit_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, data: dict) -> dict:
-    """Change your own entry. It goes back to pending approval."""
+    """Change your own entry; it goes back to pending approval.
+
+    A change of hours or date, or any edit of a rejected entry, rechecks the
+    limits and the over-capacity mark.
+    """
     values.only_allowed(data, _FIELDS)
+    confirmed = _confirmed(data)
     clean = _clean(data, partial=True)
     if not clean:
         raise ValidationError("Nothing to change.")
@@ -112,13 +140,24 @@ def edit_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, data: dict
         if before is None:
             raise NotFound(NOT_FOUND)
         merged = {**before, **clean}
-        _check_limits(conn, actor.user_id, before["project_id"], merged["work_date"], merged["minutes"], entry_id)
+        over, mark = 0, before["over_capacity"]  # a note-only edit checks nothing and keeps its mark
+        # Rejected entries don't count toward the totals; editing one brings it back, so it counts as new work.
+        rejoining = before["status"] == "REJECTED"
+        if rejoining or "minutes" in clean or "work_date" in clean:
+            less = (not rejoining and merged["work_date"] == before["work_date"]
+                    and merged["minutes"] <= before["minutes"])
+            # Logging less never asks, and never marks an entry that was inside capacity.
+            over = _check_limits(conn, actor.user_id, before["project_id"], merged["work_date"], merged["minutes"],
+                                 entry_id, confirmed or less)
+            if less and not before["over_capacity"]:
+                over = 0
+            mark = over > 0
         # An edited entry goes back to pending: clear the old decision along with the change.
         row = update(conn, "time_entries", "entry_id", entry_id,
-                     {**clean, "status": "PENDING", "decided_by": None, "decided_at": None})
+                     {**clean, "over_capacity": mark, "status": "PENDING", "decided_by": None, "decided_at": None})
         audit.record_change(conn, actor, "UPDATE", "time_entries", entry_id, entry_view(before), entry_view(row),
                             f"{actor.name} edited a time entry ({hours_text(row['minutes'])}"
-                            f" on {row['work_date'].isoformat()})")
+                            f" on {row['work_date'].isoformat()}){_over_text(over)}")
     return row
 
 
@@ -127,6 +166,7 @@ def decide_entry(conn: psycopg.Connection, actor: Actor, entry_id: int, approve:
     if actor.is_employee:
         raise Forbidden("Only managers and admins approve time.")
     with atomic(conn):
+        # A manager who isn't the author's line manager gets the same 404 as a missing entry (employees were refused above with 403).
         before = conn.execute("SELECT e.*, u.manager_id, u.first_name || ' ' || u.last_name AS person_name"
                               " FROM time_entries e JOIN users u ON u.user_id = e.user_id"
                               " WHERE e.entry_id = %s FOR UPDATE OF e", (entry_id,)).fetchone()
@@ -164,10 +204,19 @@ def my_entries(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     return paginate(conn, query, params, sql.SQL("e.work_date DESC, e.entry_id DESC"), page, page_size)
 
 
-def pending_approvals(conn: psycopg.Connection, actor: Actor, page: int, page_size: int) -> dict:
-    """Entries waiting for `actor`: their reports' (managers) or everyone's (admins)."""
+def pending_approvals(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
+    """Entries waiting for `actor`: their reports' (managers) or everyone's (admins).
+
+    `q` searches the person's name, the task title and the project name.
+    """
     if actor.is_employee:
         raise Forbidden("Only managers and admins approve time.")
-    mine = "TRUE" if actor.is_admin else "u.manager_id = %(me)s"
-    query = sql.SQL("{} WHERE e.status = 'PENDING' AND {}").format(sql.SQL(_LISTED), sql.SQL(mine))
-    return paginate(conn, query, {"me": actor.user_id}, sql.SQL("e.work_date, e.entry_id"), page, page_size)
+    where, params = ["e.status = 'PENDING'"], {"me": actor.user_id}
+    if not actor.is_admin:
+        where.append("u.manager_id = %(me)s")
+    if pattern := values.search(filters):
+        where.append("(u.first_name || ' ' || u.last_name ILIKE %(q)s OR t.title ILIKE %(q)s OR p.name ILIKE %(q)s)")
+        params["q"] = pattern
+    # WHERE fragments are fixed strings written above; every value is a parameter.
+    query = sql.SQL("{} WHERE {}").format(sql.SQL(_LISTED), sql.SQL(" AND ").join(map(sql.SQL, where)))
+    return paginate(conn, query, params, sql.SQL("e.work_date, e.entry_id"), page, page_size)

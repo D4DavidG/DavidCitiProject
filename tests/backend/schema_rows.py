@@ -81,3 +81,14 @@ def entry(conn, tk, person, **overrides):
 
 def audit_create(conn, entity_type, entity_id):
     insert(conn, "audit_log", action="CREATE", entity_type=entity_type, entity_id=entity_id, summary="test")
+
+
+def refresh_token(conn, person, **overrides):
+    values = {
+        "user_id": person["user_id"],
+        "token_hash": "a" * 64,
+        "created_at": "2026-10-13 12:00+00",
+        "expires_at": "2026-10-13 20:00+00",
+    }
+    values.update(overrides)
+    return insert(conn, "refresh_tokens", **values)

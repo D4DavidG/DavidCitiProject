@@ -44,33 +44,42 @@ email and password. A forgotten password is reset by an admin.
 Modelled on Jira, GitHub Projects and OpenProject, not on a payroll system.
 
 - **Tasks:** each deliverable is broken into tasks. The project's manager creates them,
-  gives each an estimate in hours, and assigns it to someone booked on the project.
+  gives each an estimate in hours and minutes, and assigns it to someone booked on the project.
+- **Pull:** the manager can leave a task unassigned; it shows as Ready, and anyone booked
+  on the project takes it with Take this, up to their task limit (default 2). Managers can
+  still assign, even past it.
 - **Ticking work off:** the assignee moves their task from To Do to In Progress to Done.
 - **Progress** of a deliverable is the share of its estimated hours that are done.
   "Blocked" shows automatically while a deliverable it depends on isn't finished.
 - **Sign-off:** the manager signs a deliverable off, and only once all its tasks and
   dependencies are done.
-- **Logging time:** the assignee logs hours on their task (a date, a number of hours,
+- **Logging time:** the assignee logs time on their task (a date, hours and minutes,
   a note). Their line manager, or any admin, approves or rejects it. Only approved time
   is charged to the project's budget, at the hourly rate the person had when they
   logged it.
 - **Capacity:** each person has a weekly capacity (default 40 hours) and an "overtime
   allowed" switch, set by their line manager. With the switch off, logging hours past
-  capacity is refused. With it on, the week is flagged as overtime.
+  capacity asks "Log anyway?" first; if the person confirms, the entry is saved, marked
+  "Over capacity", and their manager is told. With it on, the week is flagged as overtime. The same person also
+  has a task limit (default 2, 1 to 10): how many unfinished tasks they may take themselves.
 
 ## Who can do what
 
 | Action | Admin | Manager | Employee |
 | --- | --- | --- | --- |
 | Create, archive and restore users; reset passwords; edit salaries | yes | no | no |
-| Set weekly capacity and "overtime allowed" | anyone | own reports | no |
+| Set weekly capacity, "overtime allowed" and task limit | anyone | own reports | no |
 | Edit own name and email; see own salary | yes | yes | yes |
-| Create projects, approve requests, assign managers, archive or restore projects | yes | no | no |
-| Request a new project | n/a | yes | no |
+| Create projects, assign managers, archive or restore projects | yes | no | no |
+| Ask for a new project or to archive one (Requests) | n/a | yes | no |
+| Ask for a higher task limit or overtime (Requests) | n/a | no | yes |
+| Ask anything else (Requests, free text) | n/a | yes | yes |
+| Decide requests | all | own reports' | no |
 | Edit description, dates, budget and status; book people | all | own projects | no |
 | Deliverables and dependencies: create, edit, sign off, archive | all | own projects | no |
 | Tasks: create, assign, estimate | all | own projects | no |
 | Move a task's status; log time on it | no | no | own assigned tasks |
+| Take a Ready task; put back your own | no | no | booked on the project |
 | Approve or reject logged time | anyone | own reports | no |
 | See projects | all, including archived | the ones they manage | booked on, active only |
 | Audit log | yes | no | no |
@@ -80,8 +89,9 @@ their own time.
 
 ## Rules the app enforces (each one demoable as a refusal)
 
-1. **No overtime unless allowed.** Logging hours past someone's weekly capacity is
-   refused unless their manager switched overtime on. Booking someone past capacity is
+1. **Overtime is never silent.** Logging hours past someone's weekly capacity is
+   refused until they confirm, unless their manager switched overtime on; confirmed
+   time is marked and their manager is told. Booking someone past capacity is
    allowed but flagged red: that's the over-allocation answer.
 2. **Nothing is deleted.** Records are archived and can be reactivated, so cost history
    survives. There is no DELETE route, and the database itself refuses deletes.
@@ -113,8 +123,8 @@ at risk       = past end date and not complete, OR a deliverable overdue,
 ## Screens
 
 Login, Change password, Dashboard, Projects (list and detail, with Deliverables, Tasks,
-Resources and Budget tabs), Dependency view, Allocation grid, People, My tasks (update
-status, log time), Approvals (logged time), Project requests, Notifications, Audit log
+Board, Resources and Budget tabs), Dependency view, Allocation grid, People, My tasks (Ready to take; update
+status, log time), Approvals (logged time), Requests, Notifications, Audit log
 (admin).
 
 ## Out of the MVP

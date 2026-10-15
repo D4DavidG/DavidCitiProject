@@ -262,6 +262,7 @@ load test against the deployed URL.
   python3 tools/loadtest.py
   python3 tools/loadtest.py --users 25 --seconds 30
   ```
+(`tools/loadtest.py` was removed on 14 Oct; the k6 test replaces it: `K6_PROFILE=aws K6_BASE_URL=$TRACKER_API K6_USERNAME=ML662930 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js`, see `docs/TESTING.md` section 7.)
   Expected: `OK: 0 failed requests` on both. LocalStack failed above 15 users because of
   its own file limit, so this run shows what AWS really does. Aurora is capped at 4 units
   (`infra/rds.tf:26`), so p95 times may rise at 25 users; failures should not. Paste

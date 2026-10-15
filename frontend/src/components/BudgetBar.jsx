@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types'
 import { Box, Chip, LinearProgress, Typography } from '@mui/material'
 import { formatCents, spentPercent } from '../services/format'
+import { useChartColours } from '../theme/chartColours'
 
 /**
  * Question 7: budget consumed versus planned. All figures and the percentage come
@@ -10,6 +11,7 @@ import { formatCents, spentPercent } from '../services/format'
 export default function BudgetBar({
   budgetCents, consumedCents, plannedCents, pendingCents, consumedPercent, remainingCents, plannedOverBudget,
 }) {
+  const { budget } = useChartColours()
   const hasBudget = budgetCents > 0
   // The server's remaining figure, not the (rounded-down) percentage: $5 over still reads 100%.
   const over = hasBudget && remainingCents < 0
@@ -28,8 +30,8 @@ export default function BudgetBar({
           value={consumedCents > 0 ? Math.max(Math.min(consumedPercent ?? 0, 100), 1) : 0}
           color={over ? 'error' : 'primary'}
           aria-label="Budget spent"
-          // A neutral track, so an almost-empty bar can't be mistaken for a full one.
-          sx={{ my: 1, height: 8, borderRadius: 4, bgcolor: 'grey.200' }}
+          // A neutral track (the budget chart's, per mode), so an almost-empty bar can't be mistaken for a full one.
+          sx={{ my: 1, height: 8, bgcolor: budget.track }}
         />
       )}
       {hasBudget && (

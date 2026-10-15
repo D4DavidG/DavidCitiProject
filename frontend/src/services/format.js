@@ -58,6 +58,18 @@ export function formatHours(minutes) {
   return parts.join(' ') || '0 min'
 }
 
+/** Booked hours a week (a whole number): 25 -> "25 h/wk"; spoken (for aria-labels) -> "25 hours a week". */
+export function formatPerWeek(hours, { spoken = false } = {}) {
+  if (!spoken) return `${hours} h/wk`
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'} a week`
+}
+
+/** 420 -> { hours: '7', minutes: '0' }: the text for the Hours and Minutes boxes when editing. */
+export function splitMinutes(minutes) {
+  if (minutes === null || minutes === undefined) return { hours: '', minutes: '' }
+  return { hours: String(Math.floor(minutes / 60)), minutes: String(minutes % 60) }
+}
+
 /** "2026-10-14" -> "Oct 14, 2026". A date has no time zone, so it is read as UTC to keep the day. */
 export function formatDate(iso) {
   if (!iso) return DASH
@@ -84,6 +96,15 @@ export function addDays(iso, days) {
   const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
   date.setUTCDate(date.getUTCDate() + days)
   return date.toISOString().slice(0, 10)
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Whole days from one date to another: "2026-10-14" to "2026-10-21" -> 7. Dates only, so UTC, like addDays. */
+export function daysBetween(fromIso, toIso) {
+  const from = Date.parse(`${fromIso.slice(0, 10)}T00:00:00Z`)
+  const to = Date.parse(`${toIso.slice(0, 10)}T00:00:00Z`)
+  return Math.round((to - from) / DAY_MS)
 }
 
 /** A timestamp, shown in Eastern time: "Oct 13, 2026, 9:03 PM". */

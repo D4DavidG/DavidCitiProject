@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { ThemeProvider } from '@mui/material/styles'
 import BudgetBar from './BudgetBar'
 import StatusChip from './StatusChip'
+import { makeTheme } from '../theme/theme'
 
 describe('BudgetBar', () => {
   const apollo = { budgetCents: 15_000_000, plannedCents: 3_197_600, consumedCents: 137_000, pendingCents: 153_800, consumedPercent: 0, plannedOverBudget: false, remainingCents: 14_863_000 }
@@ -28,6 +30,14 @@ describe('BudgetBar', () => {
     render(<BudgetBar {...apollo} consumedCents={0} consumedPercent={0} />)
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
   })
+
+  it.each([['light', 'rgb(238, 238, 238)'], ['dark', 'rgb(28, 34, 28)']])(
+    'draws the bar on the quiet track of the mode (%s), not a fixed light grey',
+    (mode, track) => {
+      render(<ThemeProvider theme={makeTheme(mode)}><BudgetBar {...apollo} consumedPercent={42} /></ThemeProvider>)
+      expect(screen.getByRole('progressbar')).toHaveStyle({ backgroundColor: track })
+    },
+  )
 
   it('fills the bar to the share spent, from the server', () => {
     render(<BudgetBar {...apollo} consumedPercent={42} />)

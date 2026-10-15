@@ -4,7 +4,7 @@ import pytest
 
 import factories as f
 from domain.errors import Conflict, Forbidden, NotFound, ValidationError
-from services import assignments, projects
+from services import assignments, notifications, projects
 
 
 @pytest.fixture
@@ -84,6 +84,21 @@ def test_search_and_status_filter(conn, org):
     assert [p["name"] for p in page["items"]] == ["Zeus"]
 
 
+def test_list_projects_takes_q_like_every_other_list(conn, org):
+    page = projects.list_projects(conn, org["admin"], {"q": "ZE"}, 1, 50)
+    assert [p["name"] for p in page["items"]] == ["Zeus"]
+
+
+def test_percent_and_underscore_in_the_search_box_match_only_themselves(conn, org):
+    f.project(conn, org["admin"], org["bob"], name="100% Club")
+    f.project(conn, org["admin"], org["bob"], name="Data_Lake")
+
+    def found(q):
+        return [p["name"] for p in projects.list_projects(conn, org["admin"], {"q": q}, 1, 50)["items"]]
+    assert found("%") == ["100% Club"]
+    assert found("_") == ["Data_Lake"]
+
+
 def test_archived_projects_hidden_unless_asked_and_only_admins_can_ask(conn, org):
     projects.archive_project(conn, org["admin"], org["zeus"]["project_id"])
     assert "Zeus" not in {p["name"] for p in projects.list_projects(conn, org["admin"], {}, 1, 50)["items"]}
@@ -141,6 +156,21 @@ def test_archive_cascades_and_reactivate_restores_only_what_it_archived(conn, or
                             (org["apollo"]["project_id"],)).fetchall()
     assert bookings == [{"user_id": org["alice"].user_id, "is_archived": False},
                         {"user_id": org["eve"].user_id, "is_archived": True}]
+
+
+def test_archive_and_reactivate_tell_each_person_booked_on_the_project_once(conn, org):
+    ms = f.deliverable(conn, org["bob"], org["apollo"])
+    f.task(conn, org["bob"], ms, assignee=org["alice"])  # her task, archived with it, adds no second notification
+    separately = f.booking(conn, org["admin"], org["apollo"], org["eve"])
+    assignments.archive_booking(conn, org["bob"], separately["assignment_id"])  # Eve is off Apollo already
+
+    def unread():
+        return [notifications.unread_count(conn, org[who]) for who in ("alice", "eve")]
+    start = unread()
+    projects.archive_project(conn, org["admin"], org["apollo"]["project_id"])
+    assert unread() == [start[0] + 1, start[1]]
+    projects.reactivate_project(conn, org["admin"], org["apollo"]["project_id"])
+    assert unread() == [start[0] + 2, start[1]]
 
 
 def test_only_admins_archive_projects(conn, org):

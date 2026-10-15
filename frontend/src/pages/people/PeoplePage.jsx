@@ -1,26 +1,31 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Pagination,
+  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, FormHelperText, MenuItem,
   Switch, TextField, Typography,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/PersonAddAlt'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormDialog from '../../components/FormDialog'
+import HistoryPanel from '../../components/HistoryPanel'
 import PageHeader from '../../components/PageHeader'
-import PageState from '../../components/PageState'
+import PageState, { Pager } from '../../components/PageState'
+import SearchField from '../../components/SearchField'
 import { useAuth } from '../../auth/useAuth'
 import { ROLE_LABELS } from '../../components/navigation'
 import { formatCents } from '../../services/format'
 import { fullName, usePeopleOptions } from '../../services/people'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
+import { useLastPage } from '../../services/useLastPage'
+import { useIsMobile } from '../../theme/responsive'
 
 const ROLE_OPTIONS = [['EMPLOYEE', 'Employee'], ['MANAGER', 'Manager'], ['ADMIN', 'Admin']]
 const CAPACITY_FIELDS = [
-  { name: 'weeklyCapacityHours', label: 'Weekly capacity (hours)', type: 'number', helper: 'Logging past this in a week is refused unless overtime is allowed.' },
+  { name: 'weeklyCapacityHours', label: 'Weekly capacity (hours)', type: 'number', min: 1, max: 60, helper: 'Logging past this asks the person to confirm and tells their manager, unless overtime is allowed.' },
   { name: 'overtimeAllowed', label: 'Overtime allowed', type: 'boolean' },
+  { name: 'taskLimit', label: 'Task limit', type: 'number', min: 1, max: 10, helper: 'The most unfinished tasks they can take from the board themselves, 1 to 10. Managers can still assign past it.' },
 ]
 
 function accountFields(managers) {
@@ -35,15 +40,20 @@ function accountFields(managers) {
   ]
 }
 
-/** Shows a generated password once, with a copy button. It is never shown again. */
+/**
+ * Shows a generated password once, with a button that copies the username and password
+ * together, labelled as on screen, so the admin can paste both to the person. It is never
+ * shown again.
+ */
 function PasswordShown({ title, person, username, password, onClose }) {
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState('idle') // 'idle' | 'copied' | 'failed'
   async function copy() {
     try {
-      await navigator.clipboard.writeText(password)
-      setCopied(true)
+      // Throws when there is no clipboard (plain-HTTP pages) or the browser refuses.
+      await navigator.clipboard.writeText(`Username: ${username}\nTemporary password: ${password}`)
+      setCopyState('copied')
     } catch {
-      setCopied(false)
+      setCopyState('failed')
     }
   }
   return (
@@ -56,9 +66,10 @@ function PasswordShown({ title, person, username, password, onClose }) {
         <Typography variant="body2" color="text.secondary">Temporary password</Typography>
         <Typography sx={{ fontFamily: 'monospace', fontSize: '1.25rem' }}>{password}</Typography>
         <Alert severity="warning">This password is shown only once. Give it to them; they must change it when they first sign in.</Alert>
+        {copyState === 'failed' && <Alert severity="error">Couldn&apos;t copy. Select the username and password and copy them by hand.</Alert>}
       </DialogContent>
       <DialogActions>
-        <Button onClick={copy}>{copied ? 'Copied' : 'Copy password'}</Button>
+        <Button variant="outlined" onClick={copy}>{copyState === 'copied' ? 'Copied' : 'Copy username and password'}</Button>
         <Button variant="contained" onClick={onClose}>Done</Button>
       </DialogActions>
     </Dialog>
@@ -77,28 +88,47 @@ PasswordShown.propTypes = {
  * The people in the organisation. Admins create accounts (the server generates the
  * username and a one-time password), edit them, reset passwords and archive them.
  * Managers see everyone and set capacity and overtime for their own direct reports.
+ * History (what someone did and what was done to their account) is open to admins for
+ * everyone and to managers for their own reports.
  */
 export default function PeoplePage() {
   const { user } = useAuth()
+  const isMobile = useIsMobile()
   const isAdmin = user.role === 'ADMIN'
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const [q, setQ] = useState('')
   const [role, setRole] = useState('')
   const [includeArchived, setIncludeArchived] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
-  const [dialog, setDialog] = useState(null) // { kind: 'create'|'edit'|'capacity'|'reset'|'archive', person? }
+  const [dialog, setDialog] = useState(null) // { kind: 'create'|'edit'|'capacity'|'history'|'reset'|'archive', person? }
   const [shown, setShown] = useState(null)
-  const [message, setMessage] = useState(null)
+  const [refusal, setRefusal] = useState(null) // { userId, text }: a failed Reactivate, shown in that person's row
+  const [reactivatingId, setReactivatingId] = useState(null)
   const { options: managers } = usePeopleOptions('MANAGER')
 
   const load = useCallback(() => request('GET', '/users', {
-    query: { search, role, includeArchived: includeArchived ? 'true' : undefined, page: pageNumber, pageSize: 20 },
-  }), [search, role, includeArchived, pageNumber])
+    query: { q, role, includeArchived: includeArchived ? 'true' : undefined, page: pageNumber, pageSize: 20 },
+  }), [q, role, includeArchived, pageNumber])
   const { data, error, loading, reload } = useApi(load)
+  useLastPage(data, pageNumber, setPageNumber)
   const rows = data?.items ?? []
   const showSalary = rows.some((p) => p.annualSalaryCents !== undefined)
 
+  /** Reactivate an archived person; their button is disabled until the answer, so one press sends one request. */
+  async function reactivate(p) {
+    setRefusal(null)
+    setReactivatingId(p.userId)
+    try {
+      await request('POST', `/users/${p.userId}/reactivate`)
+      reload()
+    } catch (failure) {
+      setRefusal({ userId: p.userId, text: failure.message })
+    } finally {
+      setReactivatingId(null)
+    }
+  }
+
   const canSetCapacity = (p) => isAdmin || (user.role === 'MANAGER' && p.managerId === user.userId)
+  const canSeeHistory = canSetCapacity // the same people: admins see everyone, managers their reports
   const columns = [
     { key: 'name', label: 'Name', render: (p) => fullName(p) },
     { key: 'username', label: 'Username' },
@@ -122,13 +152,21 @@ export default function PeoplePage() {
       render: (p) => {
         const name = fullName(p)
         return (
-          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            {canSetCapacity(p) && !p.isArchived && <Button size="small" aria-label={`Capacity for ${name}`} onClick={() => setDialog({ kind: 'capacity', person: p })}>Capacity</Button>}
-            {isAdmin && !p.isArchived && <Button size="small" aria-label={`Edit ${name}`} onClick={() => setDialog({ kind: 'edit', person: p })}>Edit</Button>}
-            {isAdmin && !p.isArchived && p.userId !== user.userId && <Button size="small" aria-label={`Reset password for ${name}`} onClick={() => setDialog({ kind: 'reset', person: p })}>Reset password</Button>}
-            {isAdmin && p.userId !== user.userId && (p.isArchived
-              ? <Button size="small" aria-label={`Reactivate ${name}`} onClick={async () => { await request('POST', `/users/${p.userId}/reactivate`).catch((f) => setMessage(f.message)); reload() }}>Reactivate</Button>
-              : <Button size="small" color="inherit" aria-label={`Archive ${name}`} onClick={() => setDialog({ kind: 'archive', person: p })}>Archive</Button>)}
+          <Box sx={{ display: 'grid', gap: 0.5, justifyItems: 'end' }}>
+            <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {canSetCapacity(p) && !p.isArchived && <Button size="small" variant="outlined" aria-label={`Capacity for ${name}`} onClick={() => setDialog({ kind: 'capacity', person: p })}>Capacity</Button>}
+              {canSeeHistory(p) && <Button size="small" variant="outlined" aria-label={`History for ${name}`} onClick={() => setDialog({ kind: 'history', person: p })}>History</Button>}
+              {isAdmin && !p.isArchived && <Button size="small" variant="outlined" aria-label={`Edit ${name}`} onClick={() => setDialog({ kind: 'edit', person: p })}>Edit</Button>}
+              {isAdmin && !p.isArchived && p.userId !== user.userId && <Button size="small" variant="outlined" aria-label={`Reset password for ${name}`} onClick={() => setDialog({ kind: 'reset', person: p })}>Reset password</Button>}
+              {isAdmin && p.userId !== user.userId && (p.isArchived
+                ? (
+                  <Button size="small" variant="outlined" aria-label={`Reactivate ${name}`} onClick={() => reactivate(p)} disabled={reactivatingId === p.userId}>
+                    {reactivatingId === p.userId ? 'Reactivating…' : 'Reactivate'}
+                  </Button>
+                )
+                : <Button size="small" variant="outlined" color="error" aria-label={`Archive ${name}`} onClick={() => setDialog({ kind: 'archive', person: p })}>Archive</Button>)}
+            </Box>
+            {refusal?.userId === p.userId && <FormHelperText error role="alert">{refusal.text}</FormHelperText>}
           </Box>
         )
       },
@@ -145,11 +183,10 @@ export default function PeoplePage() {
         subtitle="Everyone in the organisation, their role, capacity and line manager."
         actions={isAdmin && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({ kind: 'create' })}>New person</Button>}
       />
-      {message && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
-
-      <Box component="form" onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); setPageNumber(1) }} sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, alignItems: 'center' }}>
-        <TextField id="people-search" label="Search people" size="small" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} sx={{ flex: '1 1 220px' }} placeholder="Name, username or email" />
-        <Button type="submit" variant="outlined">Search</Button>
+      <Box sx={{ mb: 2 }}>
+        <SearchField id="people-search" label="Search people" placeholder="Name, username or email" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
+      </Box>
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, alignItems: 'center' }}>
         <TextField id="people-role" select label="Role" size="small" value={role} onChange={(e) => { setRole(e.target.value); setPageNumber(1) }} sx={{ minWidth: 160 }}>
           <MenuItem value="">All roles</MenuItem>
           <MenuItem value="ADMIN">Admins</MenuItem>
@@ -163,11 +200,7 @@ export default function PeoplePage() {
 
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={rows} rowKey="userId" label="People" empty="Nobody matches." />
-        {data?.totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-            <Pagination count={data.totalPages} page={pageNumber} onChange={(_, value) => setPageNumber(value)} />
-          </Box>
-        )}
+        <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
 
       {dialog?.kind === 'create' && (
@@ -204,6 +237,13 @@ export default function PeoplePage() {
           onSubmit={async (body) => { await request('PATCH', `/users/${person.userId}/capacity`, { body }); reload() }}
           onClose={close}
         />
+      )}
+      {dialog?.kind === 'history' && (
+        <Dialog open onClose={close} aria-labelledby="history-title" maxWidth="lg" fullWidth fullScreen={isMobile}>
+          <DialogTitle id="history-title">{`History: ${fullName(person)}`}</DialogTitle>
+          <DialogContent><HistoryPanel userId={person.userId} /></DialogContent>
+          <DialogActions><Button variant="outlined" onClick={close}>Close</Button></DialogActions>
+        </Dialog>
       )}
       {dialog?.kind === 'reset' && (
         <ConfirmDialog

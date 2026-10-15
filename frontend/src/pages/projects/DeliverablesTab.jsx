@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Alert, Box, Button, Card, CardActions, CardContent, Chip, LinearProgress, Typography } from '@mui/material'
+import { Box, Button, Card, CardActions, CardContent, Chip, FormHelperText, LinearProgress, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import FormDialog from '../../components/FormDialog'
 import PageState from '../../components/PageState'
 import StatusChip from '../../components/StatusChip'
+import TimelineChart from '../../components/charts/TimelineChart'
 import { formatDate } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -15,7 +16,7 @@ const FIELDS = [
   { name: 'name', label: 'Name', required: true },
   { name: 'description', label: 'Description', type: 'textarea' },
   { name: 'startDate', label: 'Start date', type: 'date', required: true },
-  { name: 'dueDate', label: 'Due date', type: 'date', required: true },
+  { name: 'dueDate', label: 'Due date', type: 'date', required: true, notBefore: 'startDate' },
 ]
 
 /**
@@ -32,7 +33,7 @@ function signOffBlocker(d) {
   return reasons.length ? reasons.join(' and ') : null
 }
 
-function Deliverable({ deliverable, canManage, people, onAction, onEdit, onArchive, onChanged }) {
+function Deliverable({ deliverable, canManage, people, busy = false, refusal = null, onAction, onEdit, onArchive, onChanged }) {
   const [open, setOpen] = useState(false)
   const titleId = `deliverable-${deliverable.milestoneId}`
   const notReady = signOffBlocker(deliverable)
@@ -57,15 +58,16 @@ function Deliverable({ deliverable, canManage, people, onAction, onEdit, onArchi
         {open && <TaskList milestoneId={deliverable.milestoneId} canManage={canManage} people={people} onChanged={onChanged} />}
       </CardContent>
       <CardActions sx={{ flexWrap: 'wrap' }}>
-        <Button size="small" onClick={() => setOpen(!open)}>{open ? 'Hide tasks' : 'Show tasks'}</Button>
+        <Button size="small" variant="outlined" onClick={() => setOpen(!open)}>{open ? 'Hide tasks' : 'Show tasks'}</Button>
         {canManage && (deliverable.completedAt
-          ? <Button size="small" onClick={() => onAction(deliverable, 'reopen')}>Reopen</Button>
-          : <Button size="small" disabled={Boolean(notReady)} onClick={() => onAction(deliverable, 'sign-off')}>Sign off</Button>)}
-        {canManage && <Button size="small" onClick={() => onEdit(deliverable)}>Edit</Button>}
-        {canManage && <Button size="small" color="inherit" onClick={() => onArchive(deliverable)}>Archive</Button>}
+          ? <Button size="small" variant="outlined" disabled={busy} onClick={() => onAction(deliverable, 'reopen')}>Reopen</Button>
+          : <Button size="small" variant="outlined" disabled={busy || Boolean(notReady)} onClick={() => onAction(deliverable, 'sign-off')}>Sign off</Button>)}
+        {canManage && <Button size="small" variant="outlined" disabled={busy} onClick={() => onEdit(deliverable)}>Edit</Button>}
+        {canManage && <Button size="small" variant="outlined" color="error" disabled={busy} onClick={() => onArchive(deliverable)}>Archive</Button>}
         {canManage && !deliverable.completedAt && notReady && (
           <Typography variant="caption" color="text.secondary">Sign-off opens when it&apos;s done: {notReady}.</Typography>
         )}
+        {refusal && <FormHelperText error role="alert" sx={{ flexBasis: '100%', m: 0 }}>{refusal}</FormHelperText>}
       </CardActions>
     </Card>
   )
@@ -85,6 +87,10 @@ Deliverable.propTypes = {
   }).isRequired,
   canManage: PropTypes.bool.isRequired,
   people: PropTypes.arrayOf(PropTypes.array).isRequired,
+  /** True while a sign-off or reopen of this deliverable is on its way: its buttons are disabled. */
+  busy: PropTypes.bool,
+  /** The server's sentence when a sign-off, reopen or similar was refused, shown on the card. */
+  refusal: PropTypes.string,
   onAction: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onArchive: PropTypes.func.isRequired,
@@ -93,23 +99,29 @@ Deliverable.propTypes = {
 
 /**
  * Question 4: the project's deliverables, each with a status and progress the
- * server computes from its tasks. The manager signs a deliverable off; the server
- * refuses while any task, or anything it depends on, is unfinished.
+ * server computes from its tasks, drawn first as a timeline and then as cards. Both
+ * come from the one dependency-graph request, so they can't disagree. The manager
+ * signs a deliverable off; the server refuses while any task, or anything it depends
+ * on, is unfinished.
  */
-export default function DeliverablesTab({ projectId, canManage, people }) {
-  const load = useCallback(() => request('GET', `/projects/${projectId}/milestones`), [projectId])
+export default function DeliverablesTab({ projectId, canManage, people, startDate, predictedEndDate }) {
+  const load = useCallback(() => request('GET', `/projects/${projectId}/dependency-graph`), [projectId])
   const { data, error, loading, reload } = useApi(load)
-  const [actionError, setActionError] = useState(null)
+  const [refusal, setRefusal] = useState(null) // { milestoneId, text }: shown on that deliverable's card
   const [dialog, setDialog] = useState(null) // null | { deliverable?: object }
   const [archiving, setArchiving] = useState(null)
+  const [actingId, setActingId] = useState(null)
 
   async function act(deliverable, action) {
-    setActionError(null)
+    setRefusal(null)
+    setActingId(deliverable.milestoneId) // its buttons are disabled until the answer, so one press sends one request
     try {
       await request('POST', `/milestones/${deliverable.milestoneId}/${action}`)
       reload()
     } catch (failure) {
-      setActionError(failure.message)
+      setRefusal({ milestoneId: deliverable.milestoneId, text: failure.message })
+    } finally {
+      setActingId(null)
     }
   }
 
@@ -119,20 +131,22 @@ export default function DeliverablesTab({ projectId, canManage, people }) {
     reload()
   }
 
-  const items = data?.items ?? []
+  const items = data?.nodes ?? []
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
-      {actionError && <Alert severity="error" onClose={() => setActionError(null)}>{actionError}</Alert>}
       {canManage && (
         <Box><Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({})}>New deliverable</Button></Box>
       )}
       <PageState loading={loading} error={error} onRetry={reload} empty={data && items.length === 0 ? 'No deliverables yet.' : null}>
+        <TimelineChart deliverables={items} edges={data?.edges ?? []} projectStart={startDate} projectEnd={predictedEndDate} />
         {items.map((d) => (
           <Deliverable
             key={d.milestoneId}
             deliverable={d}
             canManage={canManage}
             people={people}
+            busy={actingId === d.milestoneId}
+            refusal={refusal?.milestoneId === d.milestoneId ? refusal.text : null}
             onAction={act}
             onEdit={(deliverable) => setDialog({ deliverable })}
             onArchive={setArchiving}
@@ -171,4 +185,8 @@ DeliverablesTab.propTypes = {
   canManage: PropTypes.bool.isRequired,
   /** [userId, name] for everyone booked on the project (task assignees). */
   people: PropTypes.arrayOf(PropTypes.array).isRequired,
+  /** The project's start date (ISO), for the timeline's axis. */
+  startDate: PropTypes.string.isRequired,
+  /** The project's predicted end date (ISO), for the timeline's axis. */
+  predictedEndDate: PropTypes.string.isRequired,
 }

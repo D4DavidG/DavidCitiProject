@@ -33,7 +33,8 @@ screen.
 **Update, 14 Oct midday:**
 - **Pushed:** you pushed everything through `1d1ea98`.
 - **Website deployed:** at 11:35 UTC.
-- **Backend:** the deploy ran, but its result wasn't checked afterwards.
+- **Backend deployed:** a rerun of `deploy-backend.sh` reported "0 added, 0 changed,
+  0 destroyed", so AWS already runs the current code.
 - **Checklist step 3.5 (deep links):** passed on AWS.
 - **Permissions:** the blanket shell permission described in Decisions has been removed
   again, at your request.
@@ -296,8 +297,9 @@ first:
 
 **Small things noted but not fixed** (your call; none affects the demo path):
 
-- The dashboard's "At risk" counter counts only the current page (12 cards), while
-  "Projects shown" is the total.
+- ~~The dashboard's "At risk" counter counts only the current page (12 cards), while
+  "Projects shown" is the total.~~ Fixed 14 Oct: **Total projects** and **Total at risk**,
+  both counted by the server across every page (`atRiskTotal`).
 - A project's "Reactivate" button shows nothing if the server refuses.
 - Archiving a deliverable says it "can be reactivated", but there's no screen to list
   archived deliverables or tasks yet.

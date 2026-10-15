@@ -1,9 +1,9 @@
 """Projects: created by admins, run by one manager each, archived rather than deleted.
 
-A project's manager may change its description, dates, budget and status. Its
-name and its manager are admin-only. Archiving a project archives its bookings,
-deliverables and tasks with the same timestamp, and reactivating restores
-exactly those.
+A project's manager may change its description, dates, budget and status; its
+name and manager are admin-only. Archiving also archives its bookings,
+deliverables and tasks with the same timestamp, and reactivating restores only
+the rows carrying that timestamp (ones archived earlier stay archived).
 """
 
 import datetime as dt
@@ -25,7 +25,7 @@ _ADMIN_FIELDS = {"name", "description", "manager_id", "start_date", "predicted_e
 _ADMIN_ONLY = {"name", "manager_id"}
 CHILDREN = ("assignments", "milestones", "tasks")
 
-# Question 1: a project's progress is the share of its live tasks' estimated minutes that are done.
+# Q1: progress = share of the project's live tasks' estimated minutes that are done (0 with no tasks).
 _WITH_PROGRESS = (
     "SELECT p.*, COALESCE(pr.progress_percent, 0) AS progress_percent FROM projects p"
     " LEFT JOIN (SELECT project_id, (COALESCE(sum(estimate_minutes) FILTER (WHERE status = 'DONE'), 0) * 100"
@@ -64,13 +64,11 @@ def _check(conn: psycopg.Connection, merged: dict) -> None:
 
 
 def create_project(conn: psycopg.Connection, actor: Actor, data: dict) -> dict:
-    """Admin only."""
+    """Create a project. Admin only; managers file a project request instead."""
     if not actor.is_admin:
         raise Forbidden("Only admins create projects. Managers can file a project request.")
     values.only_allowed(data, _ADMIN_FIELDS)
-    for required in ("name", "manager_id", "start_date", "predicted_end_date"):
-        if required not in data:
-            raise ValidationError(f"{required.replace('_', ' ').capitalize()} is required.", field=required)
+    values.require(data, ("name", "manager_id", "start_date", "predicted_end_date"))
     clean = _clean(data)
     with atomic(conn):
         _check(conn, clean)
@@ -102,13 +100,13 @@ def list_projects(conn: psycopg.Connection, actor: Actor, filters: dict, page: i
                      " AND a.user_id = %(me)s AND NOT a.is_archived)")
     if not (actor.is_admin and values.boolean(filters, "include_archived", required=False)):
         where.append("NOT p.is_archived")
-    if search := values.text(filters, "search", required=False, max_length=100):
+    if pattern := values.search(filters):
         where.append("p.name ILIKE %(q)s")
-        params["q"] = f"%{search}%"
+        params["q"] = pattern
     if status := values.choice(filters, "status", STATUSES, required=False):
         where.append("p.status = %(status)s")
         params["status"] = status
-    # The WHERE fragments are fixed strings from this function; every value is a parameter.
+    # WHERE fragments are fixed strings written above; every value is a parameter.
     query = sql.SQL("{} WHERE {}").format(sql.SQL(_WITH_PROGRESS), sql.SQL(" AND ").join(map(sql.SQL, where)))
     return paginate(conn, query, params, sql.SQL("p.name, p.project_id"), page, page_size)
 
@@ -143,7 +141,7 @@ def archive_project(conn: psycopg.Connection, actor: Actor, project_id: int) -> 
                            " updated_at = now() WHERE project_id = %s RETURNING *",
                            (stamp, actor.user_id, project_id)).fetchone()
         audit.record_change(conn, actor, "ARCHIVE", "projects", project_id, project_view(before), project_view(row),
-                            f"{actor.name} archived project {row['name']}")
+                            f"{actor.name} archived project {row['name']}", also_notify=_booked(conn, project_id, None))
         for table in CHILDREN:
             _set_children(conn, actor, table, project_id, row["name"], archive=True, stamp=stamp)
     return row
@@ -160,10 +158,18 @@ def reactivate_project(conn: psycopg.Connection, actor: Actor, project_id: int) 
         row = conn.execute("UPDATE projects SET is_archived = FALSE, archived_at = NULL, archived_by = NULL,"
                            " updated_at = now() WHERE project_id = %s RETURNING *", (project_id,)).fetchone()
         audit.record_change(conn, actor, "REACTIVATE", "projects", project_id, project_view(before),
-                            project_view(row), f"{actor.name} reactivated project {row['name']}")
+                            project_view(row), f"{actor.name} reactivated project {row['name']}",
+                            also_notify=_booked(conn, project_id, before["archived_at"]))
         for table in CHILDREN:
             _set_children(conn, actor, table, project_id, row["name"], archive=False, stamp=before["archived_at"])
     return row
+
+
+def _booked(conn: psycopg.Connection, project_id: int, archived_at: dt.datetime | None) -> list[int]:
+    """Whose bookings go with the project: live ones (archived_at None) or those archived with it."""
+    return [r["user_id"] for r in conn.execute(
+        "SELECT DISTINCT user_id FROM assignments WHERE project_id = %s AND archived_at IS NOT DISTINCT FROM %s",
+        (project_id, archived_at)).fetchall()]
 
 
 def _set_children(conn: psycopg.Connection, actor: Actor, table: str, project_id: int, name: str,

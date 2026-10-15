@@ -1,26 +1,29 @@
+import { Suspense } from 'react'
 import { HashRouter, Link, Navigate, Outlet, Route, Routes } from 'react-router'
 import { Alert, Button, CssBaseline } from '@mui/material'
-import { ThemeProvider } from '@mui/material/styles'
 import AuthProvider from './auth/AuthContext'
 import RequireRole from './auth/RequireRole'
 import { STAFF, homePath, useAuth } from './auth/useAuth'
 import AppLayout from './components/AppLayout'
+import lazyPage from './components/lazyPage'
 import PageState from './components/PageState'
-import AccountPage from './pages/account/AccountPage'
-import AllocationPage from './pages/allocation/AllocationPage'
-import ApprovalsPage from './pages/approvals/ApprovalsPage'
-import AuditLogPage from './pages/audit/AuditLogPage'
-import DashboardPage from './pages/dashboard/DashboardPage'
 import ChangePasswordPage from './pages/login/ChangePasswordPage'
 import LoginPage from './pages/login/LoginPage'
-import MyTasksPage from './pages/mytasks/MyTasksPage'
-import NotificationsPage from './pages/notifications/NotificationsPage'
-import PeoplePage from './pages/people/PeoplePage'
-import DependencyPage from './pages/projects/DependencyPage'
-import ProjectDetailPage from './pages/projects/ProjectDetailPage'
-import ProjectsPage from './pages/projects/ProjectsPage'
-import RequestsPage from './pages/requests/RequestsPage'
-import theme from './theme/theme'
+import ColorModeProvider from './theme/ColorModeProvider'
+
+const AccountPage = lazyPage(() => import('./pages/account/AccountPage'))
+const AllocationPage = lazyPage(() => import('./pages/allocation/AllocationPage'))
+const ApprovalsPage = lazyPage(() => import('./pages/approvals/ApprovalsPage'))
+const AuditLogPage = lazyPage(() => import('./pages/audit/AuditLogPage'))
+const DashboardPage = lazyPage(() => import('./pages/dashboard/DashboardPage'))
+const MyTasksPage = lazyPage(() => import('./pages/mytasks/MyTasksPage'))
+const NotificationsPage = lazyPage(() => import('./pages/notifications/NotificationsPage'))
+const PeoplePage = lazyPage(() => import('./pages/people/PeoplePage'))
+const DependencyPage = lazyPage(() => import('./pages/projects/DependencyPage'))
+const ProjectDetailPage = lazyPage(() => import('./pages/projects/ProjectDetailPage'))
+const ProjectsPage = lazyPage(() => import('./pages/projects/ProjectsPage'))
+const RequestsPage = lazyPage(() => import('./pages/requests/RequestsPage'))
+const SchedulePage = lazyPage(() => import('./pages/schedule/SchedulePage'))
 
 /** "/" sends you to your home screen, or to the login page. */
 function Home() {
@@ -38,11 +41,14 @@ function NotFound() {
   )
 }
 
-/** Every signed-in page shares the layout; RequireRole keeps signed-out visitors out. */
+/**
+ * Every signed-in page shares the layout; RequireRole keeps signed-out visitors out.
+ * Suspense sits inside the layout, so the menu stays while a page's file arrives.
+ */
 function SignedIn() {
   return (
     <RequireRole>
-      <AppLayout><Outlet /></AppLayout>
+      <AppLayout><Suspense fallback={<PageState loading />}><Outlet /></Suspense></AppLayout>
     </RequireRole>
   )
 }
@@ -50,7 +56,8 @@ function SignedIn() {
 /**
  * The route table. Hash URLs (#/projects/7) mean the server only ever serves
  * index.html, so CloudFront needs no rewrite rule (it was removed on 13 Oct because
- * it also swallowed the API's 404s).
+ * it also swallowed the API's 404s). Each signed-in page is its own file, downloaded
+ * on its first visit.
  */
 export function AppRoutes() {
   return (
@@ -61,13 +68,14 @@ export function AppRoutes() {
       <Route element={<SignedIn />}>
         <Route path="/dashboard" element={<RequireRole roles={STAFF}><DashboardPage /></RequireRole>} />
         <Route path="/allocation" element={<RequireRole roles={STAFF}><AllocationPage /></RequireRole>} />
+        <Route path="/schedule" element={<RequireRole roles={STAFF}><SchedulePage /></RequireRole>} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/projects/:id/dependencies" element={<DependencyPage />} />
         <Route path="/my-tasks" element={<RequireRole roles={['EMPLOYEE']}><MyTasksPage /></RequireRole>} />
         <Route path="/approvals" element={<RequireRole roles={STAFF}><ApprovalsPage /></RequireRole>} />
         <Route path="/people" element={<RequireRole roles={STAFF}><PeoplePage /></RequireRole>} />
-        <Route path="/requests" element={<RequireRole roles={STAFF}><RequestsPage /></RequireRole>} />
+        <Route path="/requests" element={<RequestsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/audit" element={<RequireRole roles={['ADMIN']}><AuditLogPage /></RequireRole>} />
@@ -77,16 +85,16 @@ export function AppRoutes() {
   )
 }
 
-/** The whole app: theme, session, router. */
+/** The whole app: light or dark theme (with the graph-paper page), session, router. */
 export default function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ColorModeProvider>
+      <CssBaseline enableColorScheme />
       <HashRouter>
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>
       </HashRouter>
-    </ThemeProvider>
+    </ColorModeProvider>
   )
 }

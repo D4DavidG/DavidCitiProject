@@ -7,7 +7,7 @@ import pytest
 
 import factories as f
 from domain.errors import Forbidden, NotFound
-from services import dashboard, projects, tasks, time_entries, users
+from services import assignments, dashboard, milestones, projects, tasks, time_entries, users
 
 
 @pytest.fixture
@@ -67,9 +67,29 @@ def test_project_card_combines_status_progress_risk_and_money(conn, org):
     # Design is 13 of 60 days in (22%) with 0% of its work done: more than 15 points behind.
     assert card["at_risk"] is True
     assert [r["code"] for r in card["risk_reasons"]] == ["DELIVERABLE_BEHIND"]
-    for key in ("budget_cents", "planned_cents", "consumed_cents", "pending_cents", "consumed_percent"):
+    for key in ("budget_cents", "planned_cents", "consumed_cents", "pending_cents", "consumed_percent",
+                "planned_percent", "pending_percent"):
         assert card[key] == budget[key], key  # the card and the budget screen never disagree
     assert (card["consumed_cents"], card["pending_cents"]) == (9_614, 4_807)
+
+
+def test_planned_and_pending_percent_are_whole_numbers_rounded_down(conn, org):
+    approved = log(conn, org["alice"], org["task"], "2026-10-12", 2)
+    log(conn, org["alice"], org["task"], "2026-10-13", 1)  # 4,807 c stays pending
+    time_entries.decide_entry(conn, org["bob"], approved["entry_id"], approve=True)
+    pid = org["apollo"]["project_id"]
+    budget = dashboard.project_budget(conn, org["bob"], pid)
+    assert (budget["planned_percent"], budget["pending_percent"]) == (25, 0)  # 1,263,554 of 5,000,000
+    projects.update_project(conn, org["admin"], pid, {"budget_cents": 900_000})
+    budget = dashboard.project_budget(conn, org["bob"], pid)
+    assert budget["pending_percent"] == 0     # 0.53%: rounded down, not to nearest
+    assert budget["planned_percent"] == 140   # bookings cost more than the budget: past 100
+
+
+def test_no_budget_gives_no_percentages(conn, org):
+    projects.update_project(conn, org["admin"], org["zeus"]["project_id"], {"budget_cents": 0})
+    budget = dashboard.project_budget(conn, org["carol"], org["zeus"]["project_id"])
+    assert (budget["consumed_percent"], budget["planned_percent"], budget["pending_percent"]) == (None, None, None)
 
 
 def test_at_risk_projects_come_first_with_their_reasons(conn, org):
@@ -95,6 +115,28 @@ def test_project_cards_can_be_searched_and_paginated(conn, org):
     assert [c["name"] for c in cards(conn, org["admin"], {"status": "ACTIVE"})] == ["Zeus"]
     page = dashboard.project_cards(conn, org["admin"], {}, 2, 1)
     assert (page["total"], page["total_pages"], [c["name"] for c in page["items"]]) == (2, 2, ["Zeus"])
+
+
+def test_project_cards_take_q_like_every_other_list(conn, org):
+    assert [c["name"] for c in cards(conn, org["admin"], {"q": "ZEU"})] == ["Zeus"]
+
+
+def test_at_risk_total_counts_every_page_not_just_this_one(conn, org):
+    f.project(conn, org["admin"], org["carol"], name="Old", start_date="2026-08-01", predicted_end_date="2026-10-01")
+    first = dashboard.project_cards(conn, org["admin"], {}, 1, 1)
+    assert ([c["name"] for c in first["items"]], first["total"], first["at_risk_total"]) == (["Apollo"], 3, 2)
+    last = dashboard.project_cards(conn, org["admin"], {}, 3, 1)
+    assert ([c["name"] for c in last["items"]], last["at_risk_total"]) == (["Zeus"], 2)  # healthy page, still 2
+    zeus = dashboard.project_cards(conn, org["admin"], {"search": "zeu"}, 1, 1)
+    assert (zeus["total"], zeus["at_risk_total"]) == (1, 0)
+    assert dashboard.project_cards(conn, org["admin"], {"search": "old"}, 1, 1)["at_risk_total"] == 1
+
+
+def test_at_risk_total_follows_the_managers_scope(conn, org):
+    f.project(conn, org["admin"], org["carol"], name="Old", start_date="2026-08-01", predicted_end_date="2026-10-01")
+    for who, expected in (("bob", (1, 1)), ("carol", (2, 1))):
+        page = dashboard.project_cards(conn, org[who], {}, 1, 20)
+        assert (page["total"], page["at_risk_total"]) == expected, who
 
 
 def test_employees_do_not_get_project_cards(conn, org):
@@ -220,6 +262,19 @@ def test_allocation_is_paginated_by_person(conn, org, crowd):
     assert [r["user_id"] for r in page["items"]] == [org["alice"].user_id]
 
 
+def test_allocation_for_one_week_ranks_by_that_week_and_counts_everyone(conn, org, crowd):
+    """The dashboard's workload chart asks for weeks=1 and the 8 worst: its "Showing 8 of 12" note needs both."""
+    admin, this_week = org["admin"], {"week_from": "2026-10-12", "weeks": 1}
+    everyone = dashboard.allocation(conn, admin, this_week, page_size=100)
+    top = dashboard.allocation(conn, admin, this_week, page=1, page_size=1)
+    assert [r["user_id"] for r in top["items"]] == [crowd["dan"].user_id]
+    assert top["total"] == len(everyone["items"]) > 1
+    peaks = [r["peak_over_by_hours"] for r in everyone["items"]]
+    assert peaks == sorted(peaks, reverse=True) and all(len(r["weeks"]) == 1 for r in everyone["items"])
+    # Alice is over only next week, so this week she ranks as within capacity.
+    assert (row_for(everyone, org["alice"])["peak_over_by_hours"], row_for(everyone, org["alice"])["status"]) == (0, "OK")
+
+
 def test_allocation_grid_flags_overtime_worked(conn, org):
     users.set_capacity(conn, org["bob"], org["alice"].user_id, {"weekly_capacity_hours": 10, "overtime_allowed": True})
     log(conn, org["alice"], org["task"], "2026-10-12", 6)
@@ -232,6 +287,87 @@ def test_allocation_grid_flags_overtime_worked(conn, org):
 def test_employees_do_not_get_the_allocation_grid(conn, org):
     with pytest.raises(Forbidden):
         dashboard.allocation(conn, org["alice"], {})
+
+
+# --- home pages: a timeline of your projects (redesign spec, section 3) -----------------------------
+
+def timeline_names(conn, actor):
+    return [p["name"] for p in dashboard.timeline(conn, actor, 1, 10)["items"]]
+
+
+def test_timeline_row_holds_the_projects_span_deliverables_and_bookings(conn, org):
+    apollo = dashboard.timeline(conn, org["bob"], 1, 10)["items"][0]
+    assert apollo == {
+        "project_id": org["apollo"]["project_id"], "name": "Apollo", "status": "PLANNING",
+        "start_date": "2026-10-01", "end_date": "2026-12-31", "at_risk": True,  # Design: 21% of its time gone, 0% done
+        "deliverables": [{"milestone_id": org["design"]["milestone_id"], "name": "Design", "due_date": "2026-11-30",
+                          "status": "NOT_STARTED"}],
+        "bookings": [{"user_id": org["alice"].user_id, "name": "Alice Tester", "start_date": "2026-10-01",
+                      "end_date": "2026-12-31", "hours_per_week": 20}],
+    }
+
+
+def test_timeline_at_risk_is_the_dashboards_own_rule(conn, org):
+    f.project(conn, org["admin"], org["carol"], name="Old", start_date="2026-08-01", predicted_end_date="2026-10-01")
+    risk = {c["name"]: c["at_risk"] for c in cards(conn, org["admin"])}
+    timeline = {p["name"]: p["at_risk"] for p in dashboard.timeline(conn, org["admin"], 1, 10)["items"]}
+    assert timeline == risk == {"Apollo": True, "Old": True, "Zeus": False}
+
+
+def test_timeline_shows_each_role_its_own_projects(conn, org):
+    assert timeline_names(conn, org["admin"]) == ["Apollo", "Zeus"]
+    assert timeline_names(conn, org["bob"]) == ["Apollo"]
+    assert timeline_names(conn, org["carol"]) == ["Zeus"]
+    assert timeline_names(conn, org["alice"]) == ["Apollo"]  # booked on Apollo only
+
+
+def test_employee_timeline_has_only_projects_they_can_open_and_only_their_own_bookings(conn, org):
+    bea, _ = f.person(conn, org["admin"], manager=org["bob"], first_name="Bea")
+    f.booking(conn, org["bob"], org["apollo"], bea, hours_per_week=10)
+    # Alice keeps a task on Zeus after her booking there is archived: she can't open Zeus, so it isn't listed.
+    zeus_booking = f.booking(conn, org["carol"], org["zeus"], org["alice"])
+    f.task(conn, org["carol"], f.deliverable(conn, org["carol"], org["zeus"]), assignee=org["alice"])
+    assignments.archive_booking(conn, org["carol"], zeus_booking["assignment_id"])
+    rows = {p["name"]: p for p in dashboard.timeline(conn, org["alice"], 1, 10)["items"]}
+    assert list(rows) == ["Apollo"]
+    with pytest.raises(NotFound):  # the same rule as opening the project
+        projects.get_project(conn, org["alice"], org["zeus"]["project_id"])
+    assert [b["user_id"] for b in rows["Apollo"]["bookings"]] == [org["alice"].user_id]  # not Bea's
+    manager_view = dashboard.timeline(conn, org["bob"], 1, 10)["items"][0]
+    assert sorted(b["name"] for b in manager_view["bookings"]) == ["Alice Tester", "Bea Tester"]
+
+
+def test_timeline_leaves_out_archived_projects_deliverables_and_bookings(conn, org):
+    extra = f.deliverable(conn, org["bob"], org["apollo"], name="Dropped")
+    milestones.archive_milestone(conn, org["bob"], extra["milestone_id"])
+    bea, _ = f.person(conn, org["admin"], manager=org["bob"], first_name="Bea")
+    gone = f.booking(conn, org["bob"], org["apollo"], bea)
+    assignments.archive_booking(conn, org["bob"], gone["assignment_id"])
+    projects.archive_project(conn, org["admin"], org["zeus"]["project_id"])
+    [apollo] = dashboard.timeline(conn, org["admin"], 1, 10)["items"]
+    assert [d["name"] for d in apollo["deliverables"]] == ["Design"]
+    assert [b["name"] for b in apollo["bookings"]] == ["Alice Tester"]
+
+
+def test_timeline_is_paginated(conn, org):
+    page = dashboard.timeline(conn, org["admin"], 2, 1)
+    assert (page["total"], page["total_pages"], page["page_size"]) == (2, 2, 1)
+    assert [p["name"] for p in page["items"]] == ["Zeus"]
+
+
+def test_timeline_runs_the_same_queries_whatever_the_page_size(conn, org):
+    from test_work import CountingConn
+
+    def queries(page_size):
+        counter = CountingConn(conn)
+        dashboard.timeline(counter, org["admin"], 1, page_size)
+        return counter.count
+    before = queries(10)
+    for n in range(5):
+        proj = f.project(conn, org["admin"], org["bob"], name=f"Extra {n}")
+        f.deliverable(conn, org["bob"], proj)
+        f.booking(conn, org["bob"], proj, org["alice"], hours_per_week=1)
+    assert (before, queries(10), queries(1)) == (6, 6, 6)  # page + count, money, risk, deliverables, bookings
 
 
 # --- the invariant ------------------------------------------------------------------------------

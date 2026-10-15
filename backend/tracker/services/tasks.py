@@ -1,14 +1,17 @@
-"""Tasks: the pieces of a deliverable that employees tick off (the Jira / GitHub Projects pattern).
+"""Tasks: the pieces of a deliverable that employees tick off (the Kanban pull pattern).
 
-The project's manager (or an admin) creates a task, estimates it and assigns it
-to someone booked on the project. Only the assignee moves its status, between
-TODO, IN_PROGRESS and DONE. Moving a task out of DONE, or adding one, under a
-signed-off deliverable clears that sign-off.
+The project's manager (or an admin) creates and estimates a task. With no
+assignee it is Ready: an employee booked on the project takes it ("Take this",
+claim_task) up to their task limit, and can put it back (release_task). The
+manager can still assign it to anyone booked, even past their limit. Only the
+assignee moves its status (TODO, IN_PROGRESS, DONE). Adding a task, or moving
+one out of DONE, under a signed-off deliverable clears that sign-off.
 """
 
 import datetime as dt
 
 import psycopg
+from psycopg import sql
 
 from domain import values
 from domain.errors import Conflict, Forbidden, NotFound, ValidationError
@@ -64,9 +67,7 @@ def _signed_off(conn: psycopg.Connection, milestone_id: int) -> bool:
 
 def create_task(conn: psycopg.Connection, actor: Actor, milestone_id: int, data: dict) -> dict:
     values.only_allowed(data, _FIELDS)
-    for required in ("title", "estimate_minutes"):
-        if required not in data:
-            raise ValidationError(f"{required.replace('_', ' ').capitalize()} is required.", field=required)
+    values.require(data, ("title", "estimate_minutes"))
     clean = _clean(data)
     with atomic(conn):
         ms, project = milestones._load(conn, actor, milestone_id, manage=True)
@@ -117,6 +118,72 @@ def move_task(conn: psycopg.Connection, actor: Actor, task_id: int, status: str)
     return row
 
 
+# The one definition of "held": unfinished, live tasks on live projects, across all projects.
+# A correlated subquery on the outer alias `u` (a users row), so it works for one person or a list.
+HELD = sql.SQL("(SELECT count(*) FROM tasks t JOIN projects p ON p.project_id = t.project_id"
+               " WHERE t.assignee_user_id = u.user_id AND t.status IN ('TODO', 'IN_PROGRESS')"
+               " AND NOT t.is_archived AND NOT p.is_archived)")
+
+
+def held_count(conn: psycopg.Connection, user_id: int) -> int:
+    """How many unfinished tasks this person holds right now."""
+    return conn.execute(sql.SQL("SELECT {} AS held FROM users u WHERE u.user_id = %s").format(HELD),
+                        (user_id,)).fetchone()["held"]
+
+
+def _limit_message(held: int, limit: int) -> str:
+    tail = " Finish one first, or ask your manager to raise it."
+    if held > limit:
+        return f"You already hold {held} unfinished tasks, over your limit of {limit}.{tail}"
+    noun = "task" if held == 1 else "tasks"
+    return f"You already hold {held} unfinished {noun}, your limit.{tail}"
+
+
+def claim_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
+    """Take this: an employee booked on the project takes a Ready task, up to their limit."""
+    if not actor.is_employee:
+        raise Forbidden("Only employees take tasks.")
+    with atomic(conn):
+        before, _ = _load(conn, actor, task_id, manage=False)  # locks the task row first
+        if before["is_archived"]:
+            raise Conflict("This task is archived.")
+        if before["status"] == "DONE":
+            raise Conflict("This task is already done.")
+        if before["assignee_user_id"] is not None:
+            raise Conflict("This task is already taken.")
+        # Lock order is task, then person. The count runs after the lock so it sees any
+        # claim that committed while we waited (two concurrent claims can't both fit).
+        limit = conn.execute("SELECT task_limit FROM users WHERE user_id = %s FOR UPDATE",
+                             (actor.user_id,)).fetchone()["task_limit"]
+        held = held_count(conn, actor.user_id)
+        if held >= limit:
+            raise Conflict(_limit_message(held, limit))
+        row = conn.execute("UPDATE tasks SET assignee_user_id = %s, status = 'IN_PROGRESS', updated_at = now()"
+                           " WHERE task_id = %s RETURNING *", (actor.user_id, task_id)).fetchone()
+        audit.record_change(conn, actor, "CLAIM", "tasks", task_id, task_view(before), task_view(row),
+                            f"{actor.name} took task {row['title']}")
+    return row
+
+
+def release_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
+    """Put back: the holder returns an unfinished task to Ready."""
+    with atomic(conn):
+        before, _ = _load(conn, actor, task_id, manage=False)  # locks the task row first
+        if before["assignee_user_id"] != actor.user_id:
+            raise Forbidden("Only the task's assignee can put it back.")
+        if before["is_archived"]:
+            raise Conflict("This task is archived.")
+        if before["status"] == "DONE":
+            raise Conflict("This task is done. Move it back to In progress first.")
+        # Same lock order as claim_task (task, then person), so the two can't deadlock (pull-board spec, section 7).
+        conn.execute("SELECT 1 FROM users WHERE user_id = %s FOR UPDATE", (actor.user_id,))
+        row = conn.execute("UPDATE tasks SET assignee_user_id = NULL, status = 'TODO', updated_at = now()"
+                           " WHERE task_id = %s RETURNING *", (task_id,)).fetchone()
+        audit.record_change(conn, actor, "RELEASE", "tasks", task_id, task_view(before), task_view(row),
+                            f"{actor.name} put back task {row['title']}")
+    return row
+
+
 def archive_task(conn: psycopg.Connection, actor: Actor, task_id: int) -> dict:
     with atomic(conn):
         before, project = _load(conn, actor, task_id, manage=True)
@@ -159,7 +226,51 @@ def list_tasks(conn: psycopg.Connection, actor: Actor, milestone_id: int) -> lis
                         (milestone_id,)).fetchall()
 
 
-def my_tasks(conn: psycopg.Connection, actor: Actor) -> list[dict]:
-    """Your open tasks on live projects, oldest first."""
-    return conn.execute(f"{_WITH_NAMES} WHERE t.assignee_user_id = %s AND t.status <> 'DONE' AND NOT t.is_archived"
-                        " AND NOT p.is_archived ORDER BY m.due_date, t.task_id", (actor.user_id,)).fetchall()
+# The search box on My tasks and Ready to take: task title, deliverable name or project name.
+_SEARCH = "(t.title ILIKE %(q)s OR m.name ILIKE %(q)s OR p.name ILIKE %(q)s)"
+
+
+def _search(filters: dict | None) -> tuple[sql.Composable, dict]:
+    """The extra WHERE condition and parameter for `q`, or nothing when there is no search."""
+    pattern = values.search(filters or {})
+    return (sql.SQL(" AND " + _SEARCH), {"q": pattern}) if pattern else (sql.SQL(""), {})
+
+
+def my_tasks(conn: psycopg.Connection, actor: Actor, filters: dict | None = None) -> list[dict]:
+    """Your open tasks on live projects, oldest first, optionally searched (`q`)."""
+    condition, params = _search(filters)
+    return conn.execute(
+        sql.SQL("{} WHERE t.assignee_user_id = %(me)s AND t.status <> 'DONE' AND NOT t.is_archived"
+                " AND NOT p.is_archived{} ORDER BY m.due_date, t.task_id").format(sql.SQL(_WITH_NAMES), condition),
+        {"me": actor.user_id, **params}).fetchall()
+
+
+def board(conn: psycopg.Connection, actor: Actor, project_id: int) -> dict:
+    """A project's board: every live task, and each booked person's held count and limit."""
+    visible_project(conn, actor, project_id)  # 404 if it isn't yours
+    items = conn.execute(f"{_WITH_NAMES} WHERE t.project_id = %s AND NOT t.is_archived"
+                         " ORDER BY m.due_date, t.task_id", (project_id,)).fetchall()
+    # EXISTS, not a join, so someone with two live bookings on the project is listed once.
+    people = conn.execute(
+        sql.SQL("SELECT u.user_id, u.first_name || ' ' || u.last_name AS name, {} AS held, u.task_limit"
+                " FROM users u WHERE NOT u.is_archived AND EXISTS (SELECT 1 FROM assignments a"
+                " WHERE a.user_id = u.user_id AND a.project_id = %s AND NOT a.is_archived)"
+                " ORDER BY u.last_name, u.first_name").format(HELD), (project_id,)).fetchall()
+    return {"items": items, "people": people}
+
+
+def ready_tasks(conn: psycopg.Connection, actor: Actor, filters: dict | None = None) -> dict:
+    """Ready to take: unassigned, unfinished tasks on projects you are booked on, plus your held count and limit.
+
+    `q` searches the task, deliverable and project names; the count and limit are always the whole.
+    """
+    condition, params = _search(filters)
+    items = conn.execute(
+        sql.SQL("{} WHERE t.assignee_user_id IS NULL AND t.status <> 'DONE' AND NOT t.is_archived"
+                " AND NOT p.is_archived AND EXISTS (SELECT 1 FROM assignments a"
+                " WHERE a.project_id = t.project_id AND a.user_id = %(me)s AND NOT a.is_archived){}"
+                " ORDER BY m.due_date, t.task_id").format(sql.SQL(_WITH_NAMES), condition),
+        {"me": actor.user_id, **params}).fetchall()
+    me = conn.execute(sql.SQL("SELECT {} AS held, u.task_limit FROM users u WHERE u.user_id = %s").format(HELD),
+                      (actor.user_id,)).fetchone()
+    return {"items": items, "held": me["held"], "limit": me["task_limit"]}

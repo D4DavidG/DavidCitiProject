@@ -1,5 +1,7 @@
 """The migration runner: applies numbered files once, in order, all or nothing."""
 
+import shutil
+
 import pytest
 
 from domain.errors import MigrationError
@@ -30,14 +32,35 @@ def tables(conn):
 
 
 def test_fresh_database_reaches_the_latest_version(mconn):
-    assert migrate.run(mconn) == [1]
+    assert migrate.run(mconn) == [1, 2, 3, 4, 5]
     assert {"users", "projects", "tasks", "time_entries", "audit_log"} <= tables(mconn)
 
 
 def test_second_run_applies_nothing(mconn):
     migrate.run(mconn)
     assert migrate.run(mconn) == []
-    assert mconn.execute("SELECT count(*) AS n FROM schema_migrations").fetchone()["n"] == 1
+    assert mconn.execute("SELECT count(*) AS n FROM schema_migrations").fetchone()["n"] == 5
+
+
+def test_002_adds_task_limit_to_existing_people(mconn, tmp_path):
+    shutil.copy(migrate.MIGRATIONS_DIR / "001_init.sql", tmp_path)
+    assert migrate.run(mconn, directory=tmp_path) == [1]
+    mconn.execute("INSERT INTO users (username, first_name, last_name, email, role, password_hash)"
+                  " VALUES ('AA000001', 'A', 'B', 'a@acme.test', 'EMPLOYEE', 'x')")
+    assert migrate.run(mconn) == [2, 3, 4, 5]
+    assert mconn.execute("SELECT task_limit FROM users").fetchone()["task_limit"] == 2
+
+
+def test_003_keeps_existing_requests_as_project_requests(mconn, tmp_path):
+    for name in ("001_init.sql", "002_task_limit.sql"):
+        shutil.copy(migrate.MIGRATIONS_DIR / name, tmp_path)
+    assert migrate.run(mconn, directory=tmp_path) == [1, 2]
+    user = mconn.execute("INSERT INTO users (username, first_name, last_name, email, role, password_hash)"
+                         " VALUES ('AA000001', 'A', 'B', 'a@acme.test', 'MANAGER', 'x') RETURNING user_id").fetchone()
+    mconn.execute("INSERT INTO project_requests (requested_by, name, justification) VALUES (%s, 'X', 'Because')",
+                  (user["user_id"],))
+    assert migrate.run(mconn) == [3, 4, 5]
+    assert mconn.execute("SELECT kind FROM project_requests").fetchone()["kind"] == "NEW_PROJECT"
 
 
 def test_broken_migration_leaves_no_trace(mconn, tmp_path):

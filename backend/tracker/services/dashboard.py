@@ -5,12 +5,15 @@
     Q3 Q5     allocation()      hours booked per person per week, which projects they come from,
                                 and who is over capacity (worst first)
     Q7        project_budget()  planned cost (bookings) vs consumed cost (approved time)
+    Q2 Q3 Q4  timeline()        the home pages: each of your projects across weeks, with
+                                its deliverables and bookings
               integrity_check() the five invariants, live
 
-Q4 (deliverables and completion) is on the deliverables list. Every figure is an
-aggregate query over the whole page of projects or people, never one query per
-row. The cards, the risk panel and the budget screen share _money() and
-_risk_reasons(), so they can never disagree.
+Q4 (deliverables and completion) is on the deliverables list. Each figure is one
+aggregate query over a whole set of rows (every project in scope for the cards,
+the page of people for the grid), never one query per row.
+The cards, risk panel and budget screen share _money() and _risk_reasons(), so
+they cannot disagree.
 """
 
 import datetime as dt
@@ -20,13 +23,14 @@ from psycopg import sql
 
 from domain import clock, values
 from domain.errors import Forbidden
+from services import milestones
 from services import projects as project_service
 from services.access import visible_project
 from services.actors import Actor
 from services.paging import page_of, paginate
 from store import integrity
 
-BEHIND_THRESHOLD = 15  # percentage points
+BEHIND_THRESHOLD = 15  # percentage points: a deliverable is behind when time gone exceeds progress by more than this; budget burn when spend exceeds time gone by more than this
 
 
 def _elapsed_percent(start: dt.date, end: dt.date, today: dt.date) -> float:
@@ -43,10 +47,13 @@ def _staff_only(actor: Actor, what: str) -> None:
         raise Forbidden(f"Only managers and admins see {what}.")
 
 
-# --- money and risk, shared by every screen ----------------------------------------------------
+# --- money and risk, shared by every screen ---
 
 def _money(conn: psycopg.Connection, project_ids: list[int]) -> dict[int, dict]:
-    """Planned, consumed (approved) and pending cents for each project, in one query."""
+    """Planned (bookings), consumed (approved time) and pending cents per project, in one query.
+
+    The SQL repeats money.py's formulas so the database can sum them; keep the two in step.
+    """
     rows = conn.execute(
         "SELECT p.project_id,"
         " (SELECT COALESCE(sum(a.hours_per_week * ((a.end_date - a.start_date) + 1)"
@@ -70,13 +77,15 @@ def _figures(project: dict, money: dict, today: dt.date) -> dict:
         "remaining_cents": budget - money["consumed_cents"],
         "planned_over_budget": money["planned_cents"] > budget,
         "consumed_percent": (money["consumed_cents"] * 100 // budget) if budget else None,
+        "planned_percent": (money["planned_cents"] * 100 // budget) if budget else None,
+        "pending_percent": (money["pending_cents"] * 100 // budget) if budget else None,
         "schedule_elapsed_percent": int(_elapsed_percent(project["start_date"], project["predicted_end_date"], today)),
     }
 
 
 def _risk_reasons(conn: psycopg.Connection, projects: list[dict], money: dict[int, dict],
                   today: dt.date) -> dict[int, list[dict]]:
-    """Why each unfinished project is at risk (an empty list if it isn't). One deliverables query."""
+    """Why each unfinished project is at risk (empty list if it isn't), using one deliverables query for all."""
     deliverables = conn.execute(
         "SELECT m.project_id, m.name, m.start_date, m.due_date, m.completed_at,"
         " COALESCE(sum(t.estimate_minutes), 0) AS total,"
@@ -117,23 +126,26 @@ def _live_projects(conn: psycopg.Connection, actor: Actor, filters: dict) -> lis
     where, params = ["NOT p.is_archived"], {"me": actor.user_id}
     if not actor.is_admin:
         where.append("p.manager_id = %(me)s")
-    if search := values.text(filters, "search", required=False, max_length=100):
+    if pattern := values.search(filters):
         where.append("p.name ILIKE %(q)s")
-        params["q"] = f"%{search}%"
+        params["q"] = pattern
     if status := values.choice(filters, "status", project_service.STATUSES, required=False):
         where.append("p.status = %(status)s")
         params["status"] = status
-    # The WHERE fragments are fixed strings from this function; every value is a parameter.
+    # WHERE fragments are fixed strings written above; every value is a parameter.
     query = sql.SQL("SELECT wp.*, m.first_name || ' ' || m.last_name AS manager_name FROM ({} WHERE {}) wp"
                     " JOIN users m ON m.user_id = wp.manager_id ORDER BY wp.name, wp.project_id").format(
         sql.SQL(project_service._WITH_PROGRESS), sql.SQL(" AND ").join(map(sql.SQL, where)))
     return conn.execute(query, params).fetchall()
 
 
-# --- Q1, Q2 and Q7: the manager's dashboard -------------------------------------------------------
+# --- Q1, Q2 and Q7: the manager's dashboard ---
 
 def project_cards(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
-    """One card per live project in scope: status, progress, risk and money. At-risk projects first."""
+    """One card per live project in scope: status, progress, risk and money. At-risk projects first.
+
+    at_risk_total counts every page, not just this one.
+    """
     _staff_only(actor, "the project dashboard")
     today = clock.today()
     rows = _live_projects(conn, actor, filters)
@@ -148,10 +160,10 @@ def project_cards(conn: psycopg.Connection, actor: Actor, filters: dict, page: i
         **_figures(r, money[r["project_id"]], today),
     } for r in rows]
     cards.sort(key=lambda c: not c["at_risk"])  # stable: at-risk first, each group still by name
-    return page_of(cards, page, page_size)
+    return {**page_of(cards, page, page_size), "at_risk_total": sum(c["at_risk"] for c in cards)}
 
 
-# --- Q7: budget ---------------------------------------------------------------------
+# --- Q7: budget ---
 
 def project_budget(conn: psycopg.Connection, actor: Actor, project_id: int) -> dict:
     """Admins and the project's manager. All figures in cents."""
@@ -161,7 +173,7 @@ def project_budget(conn: psycopg.Connection, actor: Actor, project_id: int) -> d
     return {"project_id": project_id, **_figures(project, _money(conn, [project_id])[project_id], clock.today())}
 
 
-# --- Q2: at risk --------------------------------------------------------------------------
+# --- Q2: at risk ---
 
 def at_risk(conn: psycopg.Connection, actor: Actor) -> list[dict]:
     """Live, unfinished projects with at least one reason to worry. Admins: all; managers: theirs."""
@@ -172,9 +184,9 @@ def at_risk(conn: psycopg.Connection, actor: Actor) -> list[dict]:
              "reasons": reasons[r["project_id"]]} for r in rows if reasons[r["project_id"]]]
 
 
-# --- Q3 and Q5: allocation --------------------------------------------------------------------
+# --- Q3 and Q5: allocation ---
 
-# Every active employee x every shown week: hours booked, projects, minutes logged.
+# One row per active employee per shown week: hours booked, projects, minutes logged.
 _CELLS = (
     "WITH w AS (SELECT generate_series(%(from)s::date, %(from)s::date + 7 * (%(n)s - 1), '7 days')::date AS week),"
     " people AS (SELECT user_id, first_name || ' ' || last_name AS name, job_title, weekly_capacity_hours,"
@@ -195,8 +207,8 @@ _CELLS = (
 def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int = 1, page_size: int = 20) -> dict:
     """People x weeks, worst week first. Each cell says which projects its hours come from.
 
-    A person's peak is their largest "over by" in any shown week; the list is
-    sorted by it, and over_only keeps people whose peak is above zero.
+    A person's peak is their largest "over by" in any shown week. The list is
+    sorted by it, and over_only keeps people whose peak is above zero. Weeks start on Monday.
     """
     _staff_only(actor, "the allocation grid")
     week_from = clock.week_start(values.date(filters, "week_from", required=False) or clock.today())
@@ -253,7 +265,50 @@ def allocation(conn: psycopg.Connection, actor: Actor, filters: dict, page: int 
     return {**people, "items": [rows[i] for i in ids], "weeks": week_list}
 
 
-# --- the invariant --------------------------------------------------------------------------------
+# --- home pages: a timeline of your projects ---
+
+def timeline(conn: psycopg.Connection, actor: Actor, page: int = 1, page_size: int = 10) -> dict:
+    """Your live projects for the home page's timeline: span, risk, deliverables and bookings.
+
+    Admins: every live project; managers: theirs; employees: those they have a live
+    booking on (the rule in services/access.py, so every name links to a project they
+    can open), with only their own bookings. Six queries whatever the page size: the
+    page and its count, then money, risk, deliverables and bookings for all of its
+    projects at once.
+    """
+    where = ["NOT p.is_archived"]
+    if actor.is_manager:
+        where.append("p.manager_id = %(me)s")
+    elif actor.is_employee:
+        where.append("EXISTS (SELECT 1 FROM assignments a WHERE a.project_id = p.project_id"
+                     " AND a.user_id = %(me)s AND NOT a.is_archived)")
+    # WHERE fragments are fixed strings written above; every value is a parameter.
+    query = sql.SQL("SELECT p.* FROM projects p WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
+    result = paginate(conn, query, {"me": actor.user_id}, sql.SQL("p.start_date, p.name, p.project_id"),
+                      page, page_size)
+    ids = [p["project_id"] for p in result["items"]]
+    reasons = _risk_reasons(conn, result["items"], _money(conn, ids), clock.today())
+    deliverables = milestones.decorated(conn, "NOT m.is_archived AND m.project_id = ANY(%(ids)s)", {"ids": ids})
+    bookings = conn.execute(
+        "SELECT a.project_id, a.user_id, u.first_name || ' ' || u.last_name AS name, a.start_date, a.end_date,"
+        " a.hours_per_week FROM assignments a JOIN users u ON u.user_id = a.user_id"
+        " WHERE a.project_id = ANY(%(ids)s) AND NOT a.is_archived AND (NOT %(own)s OR a.user_id = %(me)s)"
+        " ORDER BY a.start_date, name, a.assignment_id",
+        {"ids": ids, "own": actor.is_employee, "me": actor.user_id}).fetchall()
+    rows = [{
+        "project_id": p["project_id"], "name": p["name"], "status": p["status"],
+        "start_date": p["start_date"].isoformat(), "end_date": p["predicted_end_date"].isoformat(),
+        "at_risk": bool(reasons[p["project_id"]]),
+        "deliverables": [{"milestone_id": d["milestone_id"], "name": d["name"], "due_date": d["due_date"].isoformat(),
+                          "status": d["status"]} for d in deliverables if d["project_id"] == p["project_id"]],
+        "bookings": [{"user_id": b["user_id"], "name": b["name"], "start_date": b["start_date"].isoformat(),
+                      "end_date": b["end_date"].isoformat(), "hours_per_week": b["hours_per_week"]}
+                     for b in bookings if b["project_id"] == p["project_id"]],
+    } for p in result["items"]]
+    return {**result, "items": rows}
+
+
+# --- the invariant ---
 
 def integrity_check(conn: psycopg.Connection, actor: Actor) -> dict:
     """Admin only: run the five integrity queries; every list should be empty."""

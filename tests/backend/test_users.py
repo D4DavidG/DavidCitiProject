@@ -4,6 +4,7 @@ Rule tests call the services directly and never import the api package.
 """
 
 import datetime as dt
+import hashlib
 import re
 
 import pytest
@@ -87,7 +88,8 @@ def test_duplicate_email_is_a_conflict(conn, org):
 def test_login_with_username_returns_a_token_for_that_user(conn, org):
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
     result = users.login(conn, {"username": username.lower(), "password": org["alice_pw"]}, SECRET, NOW)
-    assert tokens.verify(result["token"], SECRET, NOW) == org["alice"].user_id
+    assert tokens.verify(result["token"], SECRET, NOW).user_id == org["alice"].user_id
+    assert result["refresh_token"]
     assert result["user"]["must_change_password"] is True
 
 
@@ -100,14 +102,35 @@ def test_every_login_failure_gets_the_same_401(conn, org, case):
     elif case == "unknown user":
         credentials["username"] = "ZZ999999"
     else:
-        users.archive_user(conn, org["admin"], org["alice"].user_id)
+        users.archive_user(conn, org["admin"], org["alice"].user_id, NOW)
     with pytest.raises(AuthenticationError) as caught:
         users.login(conn, credentials, SECRET, NOW)
     assert str(caught.value) == users.BAD_LOGIN
 
 
+def test_unknown_username_costs_the_same_hashing_as_a_wrong_password(conn, org, monkeypatch):
+    # The dummy check for an unknown username once ran at a fixed 1,000 rounds while real
+    # hashes run at 600,000: about 1 s apart on AWS, enough to tell which usernames exist.
+    # Any round count other than the suite's 1,000 exposes a dummy that doesn't follow ROUNDS.
+    monkeypatch.setattr(users.passwords, "ROUNDS", 1234)
+    bob, bob_pw = f.person(conn, org["admin"], first_name="Bob")
+    username = users.get_user(conn, bob, bob.user_id)["username"]
+    rounds_used = []
+    real_pbkdf2 = hashlib.pbkdf2_hmac
+
+    def spy(name, password, salt, rounds):
+        rounds_used.append(rounds)
+        return real_pbkdf2(name, password, salt, rounds)
+
+    monkeypatch.setattr(hashlib, "pbkdf2_hmac", spy)
+    for name in (username, "ZZ999999"):  # known user with a wrong password, then an unknown username
+        with pytest.raises(AuthenticationError):
+            users.login(conn, {"username": name, "password": "wrong-" + bob_pw}, SECRET, NOW)
+    assert rounds_used == [1234, 1234]
+
+
 def test_change_password_clears_the_forced_change(conn, org):
-    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"})
+    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"}, SECRET, NOW)
     assert actors.load(conn, org["alice"].user_id).must_change_password is False
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
     users.login(conn, {"username": username, "password": "brand-new-pw"}, SECRET, NOW)
@@ -116,25 +139,25 @@ def test_change_password_clears_the_forced_change(conn, org):
 @pytest.mark.parametrize("new,field", [("short", "new_password"), (None, "new_password")])
 def test_new_password_rules(conn, org, new, field):
     with pytest.raises(ValidationError) as caught:
-        users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": new})
+        users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": new}, SECRET, NOW)
     assert caught.value.field == field
 
 
 def test_new_password_must_differ_from_the_current_one(conn, org):
     with pytest.raises(ValidationError, match="differ"):
         users.change_password(conn, org["alice"], {"current_password": org["alice_pw"],
-                                                   "new_password": org["alice_pw"]})
+                                                   "new_password": org["alice_pw"]}, SECRET, NOW)
 
 
 def test_wrong_current_password_is_refused(conn, org):
     with pytest.raises(ValidationError) as caught:
-        users.change_password(conn, org["alice"], {"current_password": "not-it-at-all", "new_password": "brand-new-pw"})
+        users.change_password(conn, org["alice"], {"current_password": "not-it-at-all", "new_password": "brand-new-pw"}, SECRET, NOW)
     assert caught.value.field == "current_password"
 
 
 def test_admin_reset_generates_a_new_password_and_forces_a_change(conn, org):
-    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"})
-    new_password = users.reset_password(conn, org["admin"], org["alice"].user_id)
+    users.change_password(conn, org["alice"], {"current_password": org["alice_pw"], "new_password": "brand-new-pw"}, SECRET, NOW)
+    new_password = users.reset_password(conn, org["admin"], org["alice"].user_id, NOW)
     assert actors.load(conn, org["alice"].user_id).must_change_password is True
     username = users.get_user(conn, org["alice"], org["alice"].user_id)["username"]
     users.login(conn, {"username": username, "password": new_password}, SECRET, NOW)
@@ -142,7 +165,7 @@ def test_admin_reset_generates_a_new_password_and_forces_a_change(conn, org):
 
 def test_only_admins_reset_passwords(conn, org):
     with pytest.raises(Forbidden):
-        users.reset_password(conn, org["boss"], org["alice"].user_id)
+        users.reset_password(conn, org["boss"], org["alice"].user_id, NOW)
 
 
 # --- self-service and admin edits -----------------------------------------
@@ -196,6 +219,29 @@ def test_line_manager_sets_capacity_and_overtime(conn, org):
     assert (row["weekly_capacity_hours"], row["overtime_allowed"]) == (30, True)
 
 
+def test_line_manager_sets_the_task_limit(conn, org):
+    row = users.set_capacity(conn, org["boss"], org["alice"].user_id, {"task_limit": 3})
+    assert row["task_limit"] == 3
+
+
+@pytest.mark.parametrize("limit, message", [(0, "between 1 and 10"), (11, "between 1 and 10"),
+                                            ("3", "a whole number"), (2.5, "a whole number")])
+def test_task_limit_must_be_1_to_10(conn, org, limit, message):
+    # The message matters: before Task 2, only_allowed already raises a ValidationError on
+    # field task_limit ("Task limit can't be changed here."), so checking the field alone passes early.
+    with pytest.raises(ValidationError, match=f"^Task limit must be {message}.$") as caught:
+        users.set_capacity(conn, org["boss"], org["alice"].user_id, {"task_limit": limit})
+    assert caught.value.field == "task_limit"
+
+
+def test_a_new_persons_task_limit_is_2(conn, org):
+    assert users.get_user(conn, org["admin"], org["alice"].user_id)["task_limit"] == 2
+
+
+def test_an_admin_sets_the_task_limit_through_the_account_edit(conn, org):
+    assert users.admin_update(conn, org["admin"], org["alice"].user_id, {"task_limit": 4})["task_limit"] == 4
+
+
 def test_another_manager_cannot_set_capacity(conn, org):
     with pytest.raises(NotFound):
         users.set_capacity(conn, org["other_boss"], org["alice"].user_id, {"overtime_allowed": True})
@@ -226,6 +272,11 @@ def test_list_users_searches_filters_and_paginates(conn, org):
     assert (page["total"], page["page"], page["page_size"], page["total_pages"]) == (1, 1, 10, 1)
 
 
+def test_list_users_takes_q_like_every_other_list(conn, org):
+    page = users.list_users(conn, org["admin"], {"q": "ALI"}, page=1, page_size=10)
+    assert [u["first_name"] for u in page["items"]] == ["Alice"]
+
+
 def test_employees_cannot_list_users(conn, org):
     with pytest.raises(Forbidden):
         users.list_users(conn, org["alice"], {}, page=1, page_size=10)
@@ -236,7 +287,7 @@ def test_employees_cannot_list_users(conn, org):
 def test_archiving_a_person_archives_their_live_bookings(conn, org):
     proj = f.project(conn, org["admin"], org["boss"])
     f.booking(conn, org["admin"], proj, org["alice"])
-    users.archive_user(conn, org["admin"], org["alice"].user_id)
+    users.archive_user(conn, org["admin"], org["alice"].user_id, NOW)
     live = conn.execute("SELECT count(*) AS n FROM assignments WHERE user_id = %s AND NOT is_archived",
                         (org["alice"].user_id,)).fetchone()["n"]
     assert live == 0
@@ -244,18 +295,18 @@ def test_archiving_a_person_archives_their_live_bookings(conn, org):
 
 def test_archiving_a_manager_with_live_projects_or_reports_is_refused(conn, org):
     with pytest.raises(Conflict, match="report"):
-        users.archive_user(conn, org["admin"], org["boss"].user_id)
+        users.archive_user(conn, org["admin"], org["boss"].user_id, NOW)
     f.project(conn, org["admin"], org["other_boss"])
     with pytest.raises(Conflict, match="project"):
-        users.archive_user(conn, org["admin"], org["other_boss"].user_id)
+        users.archive_user(conn, org["admin"], org["other_boss"].user_id, NOW)
 
 
 def test_admin_cannot_archive_themselves(conn, org):
     with pytest.raises(Conflict):
-        users.archive_user(conn, org["admin"], org["admin"].user_id)
+        users.archive_user(conn, org["admin"], org["admin"].user_id, NOW)
 
 
 def test_reactivate_brings_a_person_back(conn, org):
-    users.archive_user(conn, org["admin"], org["alice"].user_id)
+    users.archive_user(conn, org["admin"], org["alice"].user_id, NOW)
     row = users.reactivate_user(conn, org["admin"], org["alice"].user_id)
     assert row["is_archived"] is False

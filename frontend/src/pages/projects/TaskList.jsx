@@ -22,8 +22,8 @@ export default function TaskList({ milestoneId, canManage, people, onChanged }) 
   const fields = [
     { name: 'title', label: 'Title', required: true },
     { name: 'description', label: 'Description', type: 'textarea' },
-    { name: 'estimateMinutes', label: 'Estimate (hours)', type: 'hours', required: true },
-    { name: 'assigneeUserId', label: 'Assignee', type: 'select', numeric: true, options: people, helper: 'Only people booked on this project can be assigned.' },
+    { name: 'estimateMinutes', label: 'Estimate', type: 'duration', max: 60000, required: true },
+    { name: 'assigneeUserId', label: 'Assignee', type: 'select', numeric: true, options: people, helper: 'Leave empty to put it on the board as Ready' },
   ]
   const names = Object.fromEntries(people)
 
@@ -32,7 +32,7 @@ export default function TaskList({ milestoneId, canManage, people, onChanged }) 
     { key: 'assignee', label: 'Assignee', render: (t) => t.assigneeName ?? names[t.assigneeUserId] ?? 'Unassigned' },
     { key: 'estimate', label: 'Estimate', render: (t) => formatHours(t.estimateMinutes) },
     { key: 'status', label: 'Status', render: (t) => <StatusChip status={t.status} /> },
-    ...(canManage ? [{ key: 'actions', label: '', align: 'right', render: (t) => <Button size="small" onClick={() => setDialog({ task: t })}>Edit</Button> }] : []),
+    ...(canManage ? [{ key: 'actions', label: '', align: 'right', render: (t) => <Button size="small" variant="outlined" onClick={() => setDialog({ task: t })}>Edit</Button> }] : []),
   ]
 
   async function save(body) {
@@ -48,7 +48,7 @@ export default function TaskList({ milestoneId, canManage, people, onChanged }) 
         <DataTable columns={columns} rows={data?.items ?? []} rowKey="taskId" label="Tasks" empty="No tasks yet." />
       </PageState>
       {canManage && (
-        <Box><Button size="small" startIcon={<AddIcon />} onClick={() => setDialog({})}>Add task</Button></Box>
+        <Box><Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => setDialog({})}>Add task</Button></Box>
       )}
       {dialog && (
         <FormDialog

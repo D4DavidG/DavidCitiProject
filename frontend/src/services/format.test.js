@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, centsToDollarsInput, formatCents, formatDate, formatDateTime, formatDay, formatHours, parseDollars, todayIso,
+  addDays, centsToDollarsInput, daysBetween, formatCents, formatDate, formatDateTime, formatDay, formatHours, formatPerWeek, parseDollars, splitMinutes, todayIso,
 } from './format'
 
 describe('formatCents', () => {
@@ -50,6 +50,19 @@ describe('formatHours', () => {
   })
 })
 
+describe('splitMinutes', () => {
+  it('splits minutes into the text for the Hours and Minutes boxes', () => {
+    expect(splitMinutes(420)).toEqual({ hours: '7', minutes: '0' })
+    expect(splitMinutes(150)).toEqual({ hours: '2', minutes: '30' })
+    expect(splitMinutes(45)).toEqual({ hours: '0', minutes: '45' })
+  })
+
+  it('leaves both boxes empty when there is no value', () => {
+    expect(splitMinutes(null)).toEqual({ hours: '', minutes: '' })
+    expect(splitMinutes(undefined)).toEqual({ hours: '', minutes: '' })
+  })
+})
+
 describe('formatDate', () => {
   it('formats a date-only value without shifting the day', () => {
     expect(formatDate('2026-10-14')).toBe('Oct 14, 2026')
@@ -71,6 +84,11 @@ describe('formatDay and addDays', () => {
     expect(addDays('2026-10-26', 7)).toBe('2026-11-02')
     expect(addDays('2026-10-12', -7)).toBe('2026-10-05')
   })
+
+  it('counts whole days between two dates', () => {
+    expect(daysBetween('2026-08-14', '2026-12-31')).toBe(139)
+    expect(daysBetween('2026-10-14', '2026-10-14')).toBe(0)
+  })
 })
 
 describe('todayIso', () => {
@@ -83,5 +101,13 @@ describe('todayIso', () => {
 describe('formatDateTime', () => {
   it('formats a timestamp in Eastern time, like the server', () => {
     expect(formatDateTime('2026-10-14T01:03:25+00:00')).toBe('Oct 13, 2026, 9:03 PM')
+  })
+})
+
+describe('formatPerWeek', () => {
+  it('shows booked hours a week short on screen, and in words for screen readers', () => {
+    expect(formatPerWeek(25)).toBe('25 h/wk')
+    expect(formatPerWeek(25, { spoken: true })).toBe('25 hours a week')
+    expect(formatPerWeek(1, { spoken: true })).toBe('1 hour a week')
   })
 })

@@ -1,7 +1,7 @@
-"""Read and validate one field from a request body (already converted to snake_case).
+"""Read and validate one field of a request body (already snake_case).
 
-Every helper raises ValidationError naming the field, so the API can tie the
-message to the right form input. They refuse rather than guess: "3" is not an
+Each helper raises ValidationError naming the field, so the form can show the
+message on the right input. They refuse rather than guess: "3" is not an
 integer and "false" is not a boolean.
 """
 
@@ -25,6 +25,16 @@ def _label(key: str) -> str:
     return key.replace("_", " ").capitalize()
 
 
+def require(data: dict, keys) -> None:
+    """Refuse a create body that lacks any of `keys`, naming the first one missing.
+
+    Presence only; each field's own helper checks its value.
+    """
+    for key in keys:
+        if key not in data:
+            raise ValidationError(f"{_label(key)} is required.", field=key)
+
+
 def text(data: dict, key: str, required: bool = True, max_length: int = 200) -> str | None:
     """A trimmed string; blank counts as missing."""
     value = _get(data, key, required)
@@ -40,6 +50,20 @@ def text(data: dict, key: str, required: bool = True, max_length: int = 200) -> 
     if len(value) > max_length:
         raise ValidationError(f"{_label(key)} must be at most {max_length} characters.", field=key)
     return value
+
+
+def search(filters: dict) -> str | None:
+    """A list's search box: `q` (or `search`, the older name a few lists took), as an ILIKE pattern.
+
+    None when blank. `%`, `_` and `\\` are escaped (backslash is Postgres's LIKE escape), so
+    they match themselves rather than anything. The pattern is always passed as a parameter,
+    never written into the SQL.
+    """
+    key = "q" if filters.get("q") is not None else "search"
+    term = text(filters, key, required=False, max_length=100)
+    if not term:
+        return None
+    return "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
 def date(data: dict, key: str, required: bool = True) -> dt.date | None:

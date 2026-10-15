@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProjectDetailPage from './ProjectDetailPage'
-import { APOLLO, BOOKINGS, BUDGET, BUILD, BUILD_TASKS, DESIGN, MARIA } from './fixtures'
-import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
+import { APOLLO, BOARD_PEOPLE, BOARD_TASKS, BOOKINGS, BUDGET, BUILD, BUILD_TASKS, DESIGN, MARIA } from './fixtures'
+import { USERS, holdOpen, page, renderAt, session, stubApi } from '../../test/utils'
+
+const BOARD = page(BOARD_TASKS, { people: BOARD_PEOPLE })
 
 function renderDetail(user = USERS.manager, answers = {}) {
   const calls = stubApi({
     'GET /projects/1': [200, APOLLO],
     'GET /users/2': [200, MARIA],
     'GET /projects/1/assignments': [200, page(BOOKINGS)],
-    'GET /projects/1/milestones': [200, page([DESIGN, BUILD])],
+    'GET /projects/1/dependency-graph': [200, { nodes: [DESIGN, BUILD], edges: [{ from: 11, to: 10 }] }],
     'GET /milestones/11/tasks': [200, page(BUILD_TASKS)],
     'GET /milestones/10/tasks': [200, page([])],
     'GET /projects/1/budget': [200, BUDGET],
@@ -29,10 +31,10 @@ describe('ProjectDetailPage', () => {
     expect(await screen.findByText(/Maria Lopez/)).toBeInTheDocument()
   })
 
-  it('has Deliverables, Resources and Budget tabs, and a link to the dependency view', async () => {
+  it('has Deliverables, Resources, Budget and Board tabs, and a link to the dependency view', async () => {
     renderDetail()
     await screen.findByRole('heading', { name: 'Apollo' })
-    for (const name of ['Deliverables', 'Resources', 'Budget']) {
+    for (const name of ['Deliverables', 'Resources', 'Budget', 'Board']) {
       expect(screen.getByRole('tab', { name })).toBeInTheDocument()
     }
     expect(screen.getByRole('link', { name: /dependency view/i })).toHaveAttribute('href', '/projects/1/dependencies')
@@ -52,12 +54,36 @@ describe('ProjectDetailPage', () => {
   it("shows the server's refusal when a sign-off is refused", async () => {
     const ready = { ...BUILD, status: 'IN_PROGRESS', doneTaskCount: 2, progressPercent: 100 }
     renderDetail(USERS.manager, {
-      'GET /projects/1/milestones': [200, page([ready])],
+      'GET /projects/1/dependency-graph': [200, { nodes: [ready], edges: [] }],
       'POST /milestones/11/sign-off': [409, { error: 'Design must be signed off first.' }],
     })
     const build = await screen.findByRole('region', { name: 'Build' })
     await userEvent.click(within(build).getByRole('button', { name: /sign off/i }))
+    const refusal = await within(build).findByText('Design must be signed off first.') // on the card pressed, not at the top
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.closest('.MuiAlert-root')).toBeNull()
+  })
+
+  it('sends one sign-off however often it is pressed, and disables the card\'s buttons until the answer', async () => {
+    const ready = { ...BUILD, status: 'IN_PROGRESS', doneTaskCount: 2, progressPercent: 100 }
+    const calls = renderDetail(USERS.manager, {
+      'GET /projects/1/dependency-graph': [200, { nodes: [ready], edges: [] }],
+      'POST /milestones/11/sign-off': [409, { error: 'Design must be signed off first.' }],
+    })
+    const release = holdOpen('/milestones/11/sign-off')
+    const build = await screen.findByRole('region', { name: 'Build' })
+    const signOff = within(build).getByRole('button', { name: /sign off/i })
+    fireEvent.click(signOff)
+    fireEvent.click(signOff)
+    for (const name of [/sign off/i, /^edit$/i, /^archive$/i]) {
+      expect(within(build).getByRole('button', { name })).toBeDisabled()
+    }
+    release()
     expect(await screen.findByText('Design must be signed off first.')).toBeInTheDocument()
+    expect(calls.filter((c) => c.path === '/milestones/11/sign-off')).toHaveLength(1)
+    for (const name of [/sign off/i, /^edit$/i, /^archive$/i]) {
+      expect(within(build).getByRole('button', { name })).toBeEnabled()
+    }
   })
 
   it('adds a deliverable', async () => {
@@ -91,6 +117,35 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ userId: 5, hoursPerWeek: 10, startDate: '2026-10-15', endDate: '2026-12-31' }))
   })
 
+  it('checks a booking in the browser: 41 hours and an end before the start send nothing', async () => {
+    const calls = renderDetail(USERS.manager, { 'GET /users': [200, page([{ userId: 5, firstName: 'Chloe', lastName: 'Kim', role: 'EMPLOYEE' }])] })
+    await screen.findByRole('heading', { name: 'Apollo' })
+    await userEvent.click(screen.getByRole('tab', { name: 'Resources' }))
+    await userEvent.click(await screen.findByRole('button', { name: /book someone/i }))
+    await userEvent.click(screen.getByLabelText(/person/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'Chloe Kim' }))
+    await userEvent.type(screen.getByLabelText(/hours per week/i), '41')
+    await userEvent.type(screen.getByLabelText(/start date/i), '2026-10-15')
+    await userEvent.type(screen.getByLabelText(/end date/i), '2026-10-01')
+    await userEvent.click(screen.getByRole('button', { name: /^book$/i }))
+    expect(screen.getByLabelText(/hours per week/i)).toHaveAccessibleDescription('Enter a whole number from 1 to 40.')
+    expect(screen.getByLabelText(/end date/i)).toHaveAccessibleDescription("End date can't be before start date.")
+    expect(screen.getByLabelText(/hours per week/i)).toHaveFocus()
+    expect(calls.some((c) => c.method === 'POST')).toBe(false)
+  })
+
+  it('draws row actions as the secondary kind and every Archive as the danger kind', async () => {
+    renderDetail(USERS.manager)
+    await screen.findByRole('heading', { name: 'Apollo' })
+    const card = await screen.findByRole('region', { name: 'Build' })
+    expect(within(card).getByRole('button', { name: 'Edit' })).toHaveClass('MuiButton-outlined')
+    expect(within(card).getByRole('button', { name: 'Archive' })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+    await userEvent.click(screen.getByRole('tab', { name: 'Resources' }))
+    const table = await screen.findByRole('table', { name: /people booked/i })
+    expect(within(table).getAllByRole('button', { name: 'Edit' })[0]).toHaveClass('MuiButton-outlined')
+    expect(within(table).getAllByRole('button', { name: 'Archive' })[0]).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+  })
+
   it('shows the budget figures', async () => {
     renderDetail()
     await screen.findByRole('heading', { name: 'Apollo' })
@@ -109,7 +164,7 @@ describe('ProjectDetailPage', () => {
     // A deliverable reads DONE only once signed off; "ready" is all tasks done and not blocked.
     const launchReady = { ...BUILD, milestoneId: 12, name: 'Launch', status: 'IN_PROGRESS', doneTaskCount: 2, progressPercent: 100 }
     const testsBlocked = { ...BUILD, milestoneId: 13, name: 'Tests', status: 'BLOCKED', taskCount: 1, doneTaskCount: 1 }
-    renderDetail(USERS.manager, { 'GET /projects/1/milestones': [200, page([DESIGN, BUILD, launchReady, testsBlocked])] })
+    renderDetail(USERS.manager, { 'GET /projects/1/dependency-graph': [200, { nodes: [DESIGN, BUILD, launchReady, testsBlocked], edges: [] }] })
     const build = await screen.findByRole('region', { name: 'Build' })
     expect(within(build).getByRole('button', { name: /sign off/i })).toBeDisabled()
     expect(within(build).getByText(/2 tasks left to finish/i)).toBeInTheDocument()
@@ -121,9 +176,22 @@ describe('ProjectDetailPage', () => {
 
   it('gives both reasons when a deliverable has open tasks and is waiting on another', async () => {
     const launch = { ...BUILD, milestoneId: 12, name: 'Launch', status: 'BLOCKED', taskCount: 1, doneTaskCount: 0 }
-    renderDetail(USERS.manager, { 'GET /projects/1/milestones': [200, page([DESIGN, BUILD, launch])] })
+    renderDetail(USERS.manager, { 'GET /projects/1/dependency-graph': [200, { nodes: [DESIGN, BUILD, launch], edges: [] }] })
     const card = await screen.findByRole('region', { name: 'Launch' })
     expect(within(card).getByText(/1 task left to finish and waiting for what it depends on/i)).toBeInTheDocument()
+  })
+
+  it('draws the deliverables timeline above the cards, from the one dependency-graph request', async () => {
+    const calls = renderDetail()
+    const chart = await screen.findByRole('figure', { name: 'Deliverables timeline' })
+    expect(chart.compareDocumentPosition(screen.getByRole('region', { name: 'Build' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(calls.some((c) => c.path === '/projects/1/milestones' && c.method === 'GET')).toBe(false)
+  })
+
+  it('shows no chart when there are no deliverables', async () => {
+    renderDetail(USERS.manager, { 'GET /projects/1/dependency-graph': [200, { nodes: [], edges: [] }] })
+    expect(await screen.findByText('No deliverables yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('figure')).toBeNull()
   })
 
   it('writes "1 task", not "1 tasks"', async () => {
@@ -143,17 +211,45 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/projects/1/archive')).toBe(true))
   })
 
+  it('reactivates an archived project once, however often pressed, and shows a refusal', async () => {
+    const calls = renderDetail(USERS.admin, {
+      'GET /projects/1': [200, { ...APOLLO, isArchived: true }],
+      'POST /projects/1/reactivate': [409, { error: 'Its manager is archived: reactivate them first.' }],
+    })
+    const release = holdOpen('/projects/1/reactivate')
+    const reactivate = await screen.findByRole('button', { name: /^reactivate$/i })
+    fireEvent.click(reactivate)
+    fireEvent.click(reactivate)
+    expect(screen.getByRole('button', { name: /reactivat/i })).toBeDisabled()
+    release()
+    const refusal = await screen.findByText('Its manager is archived: reactivate them first.')
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.parentElement).toBe(screen.getByRole('button', { name: /^reactivate$/i }).parentElement) // beside the button pressed
+    expect(calls.filter((c) => c.path === '/projects/1/reactivate')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /^reactivate$/i })).toBeEnabled()
+  })
+
   it('adds a task to a deliverable, assigned to someone booked on the project', async () => {
     const calls = renderDetail(USERS.manager, { 'POST /milestones/11/tasks': [201, { ...BUILD_TASKS[0], taskId: 22, title: 'Docs' }] })
     const build = await screen.findByRole('region', { name: 'Build' })
     await userEvent.click(within(build).getByRole('button', { name: /show tasks/i }))
     await userEvent.click(await within(build).findByRole('button', { name: /add task/i }))
     await userEvent.type(screen.getByLabelText(/^title/i), 'Docs')
-    await userEvent.type(screen.getByLabelText(/estimate/i), '3')
+    const estimate = screen.getByRole('group', { name: /^estimate/i })
+    await userEvent.type(within(estimate).getByLabelText('Hours'), '3')
     await userEvent.click(screen.getByLabelText(/assignee/i))
     await userEvent.click(await screen.findByRole('option', { name: 'Ana Ruiz' }))
     await userEvent.click(screen.getByRole('button', { name: /create/i }))
     await waitFor(() => expect(calls.find((c) => c.method === 'POST').body).toEqual({ title: 'Docs', estimateMinutes: 180, assigneeUserId: 3 }))
+  })
+
+  it('tells the manager an empty assignee puts the task on the board as Ready', async () => {
+    renderDetail(USERS.manager)
+    const build = await screen.findByRole('region', { name: 'Build' })
+    await userEvent.click(within(build).getByRole('button', { name: /show tasks/i }))
+    await userEvent.click(await within(build).findByRole('button', { name: /add task/i }))
+    expect(screen.getByText('Leave empty to put it on the board as Ready')).toBeInTheDocument()
+    expect(screen.queryByText('Only people booked on this project can be assigned.')).not.toBeInTheDocument()
   })
 
   it("edits a task's estimate", async () => {
@@ -162,9 +258,10 @@ describe('ProjectDetailPage', () => {
     await userEvent.click(within(build).getByRole('button', { name: /show tasks/i }))
     await within(build).findByText('Portal UI')
     await userEvent.click(within(build).getAllByRole('button', { name: /^edit$/i })[0])
-    const estimate = screen.getByLabelText(/estimate/i)
-    await userEvent.clear(estimate)
-    await userEvent.type(estimate, '12')
+    const estimate = screen.getByRole('group', { name: /^estimate/i })
+    const hours = within(estimate).getByLabelText('Hours')
+    await userEvent.clear(hours)
+    await userEvent.type(hours, '12')
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH').body).toEqual({ estimateMinutes: 720 }))
   })
@@ -225,8 +322,203 @@ describe('ProjectDetailPage', () => {
     expect(screen.queryByRole('button', { name: /sign off/i })).not.toBeInTheDocument()
   })
 
+  it('calls the Resources tab "People" for employees, and "Resources" for managers and admins', async () => {
+    renderDetail(USERS.employee)
+    await screen.findByRole('heading', { name: 'Apollo' })
+    expect(screen.getByRole('tab', { name: 'People' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Resources' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }))
+    expect(await screen.findByText('Ana Ruiz')).toBeInTheDocument()
+  })
+
+  it.each([['manager', USERS.manager], ['admin', USERS.admin]])('keeps the brief\'s word "Resources" for a %s', async (_, user) => {
+    renderDetail(user)
+    await screen.findByRole('heading', { name: 'Apollo' })
+    expect(screen.getByRole('tab', { name: 'Resources' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'People' })).not.toBeInTheDocument()
+  })
+
+  describe('archive buttons in the header', () => {
+    it("lets the project's manager ask the admins, with an optional reason", async () => {
+      const calls = renderDetail(USERS.manager, { 'POST /project-requests': [201, { requestId: 4 }] })
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.queryByRole('button', { name: /^archive project$/i })).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: /^request archive$/i }))
+      const dialog = await screen.findByRole('dialog', { name: /request archive of apollo/i })
+      await userEvent.type(within(dialog).getByLabelText(/reason/i), 'Handed over')
+      await userEvent.click(within(dialog).getByRole('button', { name: /send request/i }))
+      await waitFor(() => expect(calls.find((c) => c.method === 'POST').body)
+        .toEqual({ kind: 'ARCHIVE_PROJECT', projectId: 1, justification: 'Handed over' }))
+      const sent = await screen.findByText(/request sent.*an admin will answer it/i)
+      expect(sent).toHaveAttribute('role', 'status') // beside the button, not a page-wide alert
+      expect(sent.parentElement).toBe(screen.getByRole('button', { name: /^request archive$/i }).parentElement)
+    })
+
+    it('gives an admin Archive project, not the request', async () => {
+      renderDetail(USERS.admin)
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.getByRole('button', { name: /^archive project$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /request archive/i })).not.toBeInTheDocument()
+    })
+
+    it('draws Archive project as the danger kind and Request archive as the secondary kind', async () => {
+      renderDetail(USERS.admin)
+      expect(await screen.findByRole('button', { name: /^archive project$/i })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
+      cleanup()
+      renderDetail(USERS.manager)
+      const request = await screen.findByRole('button', { name: /^request archive$/i })
+      expect(request).toHaveClass('MuiButton-outlined')
+      expect(request).not.toHaveClass('MuiButton-colorError')
+    })
+
+    it("gives another project's manager neither", async () => {
+      renderDetail(USERS.manager, { 'GET /projects/1': [200, { ...APOLLO, managerId: 9 }] })
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.queryByRole('button', { name: /archive/i })).not.toBeInTheDocument()
+    })
+
+    it('offers an employee neither', async () => {
+      renderDetail(USERS.employee)
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.queryByRole('button', { name: /archive/i })).not.toBeInTheDocument()
+    })
+
+    it('offers the manager nothing once the project is archived', async () => {
+      renderDetail(USERS.manager, { 'GET /projects/1': [200, { ...APOLLO, isArchived: true }] })
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.queryByRole('button', { name: /archive/i })).not.toBeInTheDocument()
+    })
+  })
+
   it('answers a project that is not yours the same as a missing one', async () => {
     renderDetail(USERS.manager, { 'GET /projects/1': [404, { error: 'Project not found.' }] })
     expect(await screen.findByText('Project not found.')).toBeInTheDocument()
+  })
+  describe('Board tab', () => {
+    const openBoard = async () => userEvent.click(await screen.findByRole('tab', { name: 'Board' }))
+    const boardCalls = (calls) => calls.filter((c) => c.method === 'GET' && c.path === '/projects/1/board')
+
+    it('has a Board tab with Ready, To do, In progress and Done columns', async () => {
+      renderDetail(USERS.manager, { 'GET /projects/1/board': [200, BOARD] })
+      await openBoard()
+      for (const [column, title] of [['Ready', 'Go-live checklist'], ['To do', 'Portal UI'], ['In progress', 'Portal API'], ['Done', 'Wireframes']]) {
+        expect(within(await screen.findByRole('region', { name: column })).getByRole('article', { name: title })).toBeInTheDocument()
+      }
+      expect(screen.getByText('Ana Ruiz 1 / 2')).toBeInTheDocument()
+      expect(within(screen.getByRole('article', { name: 'Portal UI' })).getByText('Build · 40 h')).toBeInTheDocument()
+    })
+
+    it('names the holder strip as a group so a screen reader announces it', async () => {
+      renderDetail(USERS.manager, { 'GET /projects/1/board': [200, BOARD] })
+      await openBoard()
+      const strip = await screen.findByRole('group', { name: 'Who holds what' })
+      expect(within(strip).getByText('Ana Ruiz 1 / 2')).toBeInTheDocument()
+    })
+
+    it('flags anyone holding more than their limit', async () => {
+      const people = [BOARD_PEOPLE[0], { userId: 4, name: 'Ben Okafor', held: 3, limit: 2 }]
+      renderDetail(USERS.manager, { 'GET /projects/1/board': [200, page(BOARD_TASKS, { people })] })
+      await openBoard()
+      expect(await screen.findByText('Ben Okafor 3 / 2, over limit')).toBeInTheDocument()
+    })
+
+    it('lets an employee take a Ready task and put back their own', async () => {
+      const calls = renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [200, {}],
+        'POST /tasks/32/release': [200, {}],
+      })
+      await openBoard()
+      const ready = await screen.findByRole('article', { name: 'Go-live checklist' })
+      expect(screen.queryByRole('button', { name: 'Assign' })).not.toBeInTheDocument()
+      expect(within(screen.getByRole('article', { name: 'Portal UI' })).queryByRole('button')).not.toBeInTheDocument()
+      expect(within(ready).getByRole('button', { name: 'Take this' })).toHaveClass('MuiButton-outlined') // a row action: secondary, not a second primary
+      await userEvent.click(within(ready).getByRole('button', { name: 'Take this' }))
+      await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toBe(true))
+      await userEvent.click(within(screen.getByRole('article', { name: 'Portal API' })).getByRole('button', { name: 'Put back' }))
+      await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/tasks/32/release')).toBe(true))
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(3))
+    })
+
+    it("shows the server's refusal at the limit", async () => {
+      const refusal = 'You already hold 2 unfinished tasks, your limit. Finish one first, or ask your manager to raise it.'
+      renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [409, { error: refusal }],
+      })
+      await openBoard()
+      const card = await screen.findByRole('article', { name: 'Go-live checklist' })
+      await userEvent.click(within(card).getByRole('button', { name: 'Take this' }))
+      const line = await within(card).findByText(refusal) // on the card of the task pressed
+      expect(line).toHaveAttribute('role', 'alert')
+      expect(line.closest('.MuiAlert-root')).toBeNull()
+    })
+
+    it('lets the manager assign every card outside Done', async () => {
+      const calls = renderDetail(USERS.manager, {
+        'GET /projects/1/board': [200, BOARD],
+        'PATCH /tasks/30': [200, {}],
+      })
+      await openBoard()
+      await screen.findByRole('article', { name: 'Go-live checklist' })
+      expect(screen.getAllByRole('button', { name: 'Assign' })).toHaveLength(3)
+      expect(within(screen.getByRole('region', { name: 'Done' })).queryByRole('button', { name: 'Assign' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Take this' })).not.toBeInTheDocument()
+      await userEvent.click(within(screen.getByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Assign' }))
+      const dialog = screen.getByRole('dialog')
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Assignee' }))
+      await userEvent.click(await screen.findByRole('option', { name: 'Ben Okafor' }))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Assign' }))
+      await waitFor(() => expect(calls.find((c) => c.method === 'PATCH' && c.path === '/tasks/30').body).toEqual({ assigneeUserId: 4 }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
+    })
+
+    it('sends one claim when Take this is pressed twice, and shows no error', async () => {
+      const calls = renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [200, {}],
+      })
+      await openBoard()
+      const release = holdOpen('/tasks/30/claim')
+      const button = within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' })
+      fireEvent.click(button)
+      fireEvent.click(button)
+      expect(button).toBeDisabled()
+      release()
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
+      expect(calls.filter((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toHaveLength(1)
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('keeps Take this disabled until the reload after the claim has finished', async () => {
+      const calls = renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [200, {}],
+      })
+      await openBoard()
+      const releaseClaim = holdOpen('/tasks/30/claim')
+      const button = within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' })
+      fireEvent.click(button)
+      const releaseReload = holdOpen('/projects/1/board')
+      releaseClaim()
+      await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && c.path === '/tasks/30/claim')).toHaveLength(1))
+      expect(boardCalls(calls)).toHaveLength(1)
+      expect(button).toBeDisabled()
+      releaseReload()
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
+      await waitFor(() => expect(button).toBeEnabled())
+    })
+
+    it('shows "already taken" and reloads the board when someone got there first', async () => {
+      const calls = renderDetail(USERS.employee, {
+        'GET /projects/1/board': [200, BOARD],
+        'POST /tasks/30/claim': [409, { error: 'This task is already taken.' }],
+      })
+      await openBoard()
+      await userEvent.click(within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' }))
+      expect(await within(screen.getByRole('article', { name: 'Go-live checklist' })).findByText('This task is already taken.')).toBeInTheDocument()
+      await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
+    })
   })
 })

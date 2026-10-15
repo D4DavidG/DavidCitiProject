@@ -2,11 +2,10 @@
 
 The token says who you are; the database says what you may do. It carries only
 the user id and its times, never the role: the role is re-read from Postgres on
-every request, so a demoted user's old token can't keep admin powers.
+every request, so a demoted user's old token can't keep powers they no longer have.
 
-Signed, not encrypted: anyone holding a token can read it, so nothing
-sensitive goes in. Every failure gets the same message, because telling an
-attacker which part of a forgery was wrong tells them what to fix.
+Signed, not encrypted: anyone can read a token, so nothing sensitive goes in.
+Every failure gets the same message, so a forger learns nothing about what was wrong.
 """
 
 import base64
@@ -14,12 +13,20 @@ import datetime as dt
 import hashlib
 import hmac
 import json
+from typing import NamedTuple
 
 from domain.errors import AuthenticationError
 
-LIFETIME = dt.timedelta(hours=8)
+LIFETIME = dt.timedelta(minutes=15)  # short: a stolen token is useful for 15 minutes at most
 INVALID_MESSAGE = "Your session is invalid or has expired. Please sign in again."
 _HEADER = {"alg": "HS256", "typ": "JWT"}
+
+
+class Claims(NamedTuple):
+    """What a valid token says: who, and when it was issued (Unix seconds)."""
+
+    user_id: int
+    issued_at: int
 
 
 def _encode(obj: dict) -> str:
@@ -44,8 +51,8 @@ def issue(user_id: int, secret: str, now: dt.datetime) -> str:
     return f"{signing_input}.{_sign(signing_input, secret)}"
 
 
-def verify(token: str | None, secret: str, now: dt.datetime) -> int:
-    """Return the user id in a valid, unexpired token; otherwise one uniform 401."""
+def verify(token: str | None, secret: str, now: dt.datetime) -> Claims:
+    """Return the user id and issue time of a valid, unexpired token; otherwise one uniform 401."""
     try:
         header, payload, signature = token.split(".")
         # Check the signature before trusting anything inside the token.
@@ -54,6 +61,6 @@ def verify(token: str | None, secret: str, now: dt.datetime) -> int:
         claims = json.loads(_decode(payload))
         if claims["exp"] <= now.timestamp():
             raise ValueError("expired")
-        return int(claims["sub"])
+        return Claims(int(claims["sub"]), int(claims["iat"]))
     except (AttributeError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         raise AuthenticationError(INVALID_MESSAGE) from exc

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link, useParams } from 'react-router'
-import { Alert, Box, Button, Card, CardContent, Typography } from '@mui/material'
+import { Box, Button, Card, CardContent, FormHelperText, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowIcon from '@mui/icons-material/ArrowForward'
 import LinkOffIcon from '@mui/icons-material/LinkOff'
@@ -15,7 +15,7 @@ import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
 import { steps } from './graph'
 
-function Node({ node, needs, canManage, onUnlink }) {
+function Node({ node, needs, canManage, unlinking, refusal = null, onUnlink }) {
   const titleId = `node-${node.milestoneId}`
   const waiting = needs.filter((n) => n.status !== 'DONE')
   return (
@@ -34,11 +34,12 @@ function Node({ node, needs, canManage, onUnlink }) {
         )}
         {canManage && needs.map((dep) => (
           // Words, not just an icon: a phone has no hover to reveal a tooltip.
-          <Button key={dep.milestoneId} size="small" color="inherit" startIcon={<LinkOffIcon fontSize="small" />}
-            onClick={() => onUnlink(node, dep)} sx={{ justifySelf: 'start', color: 'text.secondary' }}>
+          <Button key={dep.milestoneId} size="small" variant="outlined" color="error" startIcon={<LinkOffIcon fontSize="small" />}
+            onClick={() => onUnlink(node, dep)} disabled={unlinking === dep.milestoneId} sx={{ justifySelf: 'start' }}>
             Remove link to {dep.name}
           </Button>
         ))}
+        {refusal && <FormHelperText error role="alert" sx={{ m: 0 }}>{refusal}</FormHelperText>}
       </CardContent>
     </Card>
   )
@@ -54,6 +55,10 @@ Node.propTypes = {
   }).isRequired,
   needs: PropTypes.arrayOf(PropTypes.object).isRequired,
   canManage: PropTypes.bool.isRequired,
+  /** The deliverable whose link from this one is being removed right now: its button waits for the answer. */
+  unlinking: PropTypes.number,
+  /** The server's sentence when removing one of this deliverable's links was refused. */
+  refusal: PropTypes.string,
   onUnlink: PropTypes.func.isRequired,
 }
 
@@ -70,7 +75,8 @@ export default function DependencyPage() {
   const loadGraph = useCallback(() => request('GET', `/projects/${projectId}/dependency-graph`), [projectId])
   const graph = useApi(loadGraph)
   const [adding, setAdding] = useState(false)
-  const [actionError, setActionError] = useState(null)
+  const [refusal, setRefusal] = useState(null) // { milestoneId, text }: shown on that deliverable's card
+  const [unlinking, setUnlinking] = useState(null) // { from, to } while a link is being removed
 
   const p = project.data
   const canManage = Boolean(p) && !p.isArchived && (user.role === 'ADMIN' || (user.role === 'MANAGER' && p.managerId === user.userId))
@@ -81,12 +87,15 @@ export default function DependencyPage() {
   const options = nodes.map((n) => [n.milestoneId, n.name])
 
   async function unlink(node, dep) {
-    setActionError(null)
+    setRefusal(null)
+    setUnlinking({ from: node.milestoneId, to: dep.milestoneId })
     try {
       await request('POST', `/milestones/${node.milestoneId}/dependencies/${dep.milestoneId}/archive`)
       graph.reload()
     } catch (failure) {
-      setActionError(failure.message)
+      setRefusal({ milestoneId: node.milestoneId, text: failure.message })
+    } finally {
+      setUnlinking(null)
     }
   }
 
@@ -102,7 +111,6 @@ export default function DependencyPage() {
           </>
         )}
       />
-      {actionError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError(null)}>{actionError}</Alert>}
 
       <PageState loading={graph.loading} error={graph.error} onRetry={graph.reload} empty={graph.data && nodes.length === 0 ? 'No deliverables yet, so there is no chain to show.' : null}>
         <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start' }, overflowX: 'auto' }}>
@@ -112,7 +120,7 @@ export default function DependencyPage() {
               <Box component="section" aria-label={`Step ${index + 1}`} sx={{ display: 'grid', gap: 1.5, minWidth: 240, width: { xs: '100%', md: 260 } }}>
                 <Typography variant="overline" color="text.secondary">Step {index + 1}</Typography>
                 {column.map((node) => (
-                  <Node key={node.milestoneId} node={node} needs={needsOf(node.milestoneId)} canManage={canManage} onUnlink={unlink} />
+                  <Node key={node.milestoneId} node={node} needs={needsOf(node.milestoneId)} canManage={canManage} unlinking={unlinking?.from === node.milestoneId ? unlinking.to : undefined} refusal={refusal?.milestoneId === node.milestoneId ? refusal.text : undefined} onUnlink={unlink} />
                 ))}
               </Box>
             </Box>

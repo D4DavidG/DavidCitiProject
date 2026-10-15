@@ -1,10 +1,10 @@
 """Postgres connections, transactions, and translation of driver errors.
 
-Every connection is autocommit. Every write goes through atomic(), which is a
-real BEGIN ... COMMIT at the outermost level and a savepoint when nested. With
-psycopg's default (autocommit=False) the first statement opens a hidden
-transaction, every later transaction() is only a savepoint, and nothing is ever
-committed. tests/backend/test_store_commits.py guards against that.
+Every connection is autocommit, and every write goes through atomic(): a real
+BEGIN ... COMMIT at the outermost level, a savepoint when nested. With psycopg's
+default (autocommit=False) the first statement opens a hidden transaction, every
+later transaction() is only a savepoint, and nothing is ever committed.
+tests/backend/test_store_commits.py guards against that.
 """
 
 import os
@@ -17,9 +17,8 @@ from psycopg.rows import dict_row
 
 from domain.errors import Conflict, NotFound, StorageUnavailable, ValidationError
 
-# Constraint name -> (error class, message shown to the caller). Only rules a
-# person can trigger through the API are listed; anything else is a bug and is
-# re-raised unchanged.
+# Database constraint name -> (error class, message for the caller). Only rules a
+# user can trip through the API are listed; any other violation is a bug and is re-raised.
 CONSTRAINT_ERRORS = {
     "users_username_unique": (Conflict, "That username is already taken."),
     "users_email_unique": (Conflict, "That email is already in use."),
@@ -61,7 +60,7 @@ def settings_from_env() -> dict:
         "connect_timeout": 15,
     }
     if os.getenv("IS_LOCAL", "true") == "false":
-        result["sslmode"] = "require"  # Aurora on AWS
+        result["sslmode"] = "require"  # encrypt the connection to Aurora on AWS (docs/full-stack.md asks for it)
     return result
 
 
@@ -80,7 +79,7 @@ def columns(names: list[str]) -> sql.Composable:
 
 def insert(conn: psycopg.Connection, table: str, values: dict,
            returning: sql.Composable = sql.SQL("*")) -> dict:
-    """INSERT one row and return it. Names are quoted identifiers; values are parameters."""
+    """INSERT one row and return it. Names are quoted identifiers, values are parameters (no string-built SQL)."""
     query = sql.SQL("INSERT INTO {} ({}) VALUES ({}) RETURNING {}").format(
         sql.Identifier(table), columns(list(values)),
         sql.SQL(", ").join(map(sql.Placeholder, values)), returning)

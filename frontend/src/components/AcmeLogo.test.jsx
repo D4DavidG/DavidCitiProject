@@ -1,0 +1,65 @@
+import { describe, expect, it } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { ThemeProvider } from '@mui/material/styles'
+import AcmeLogo from './AcmeLogo'
+import { makeTheme } from '../theme/theme'
+
+function draw(props, mode = 'light') {
+  const theme = makeTheme(mode)
+  render(<ThemeProvider theme={theme}><AcmeLogo {...props} /></ThemeProvider>)
+  return { theme, logo: screen.getByRole('img', { name: 'ACME' }) }
+}
+
+describe('AcmeLogo', () => {
+  it('is one image named ACME, with a title', () => {
+    const { logo } = draw()
+    expect(logo.tagName).toBe('svg')
+    expect(logo.querySelector('title')).toHaveTextContent('ACME')
+  })
+
+  it('is as tall as its size, and keeps its shape', () => {
+    const { logo } = draw({ size: 96 })
+    expect(logo).toHaveAttribute('height', '96')
+    expect(Number(logo.getAttribute('width'))).toBeCloseTo((96 * 154) / 58, 0)
+  })
+
+  it('makes the A taller than the other letters', () => {
+    const { logo } = draw()
+    const top = (part) => Math.min(...logo.querySelector(`[data-part="${part}"]`).getAttribute('d').match(/-?\d+(\.\d+)?/g).filter((_, i) => i % 2).map(Number))
+    expect(top('a')).toBeLessThan(top('cme'))
+  })
+
+  it.each([['light', 'rgb(20, 96, 44)'], ['dark', 'rgb(215, 215, 215)']])(
+    'writes ACME in the brand colour for %s mode (forest green, or light grey on dark)',
+    (mode, colour) => {
+      const { logo } = draw({}, mode)
+      expect(logo).toHaveStyle({ color: colour })
+      expect(logo.querySelector('[data-part="cme"]')).toHaveAttribute('fill', 'currentColor')
+    },
+  )
+
+  it('takes the text colour around it in the top bar', () => {
+    render(<ThemeProvider theme={makeTheme('light')}><p style={{ color: 'rgb(1, 2, 3)' }}><AcmeLogo tone="inherit" /></p></ThemeProvider>)
+    expect(screen.getByRole('img', { name: 'ACME' })).toHaveStyle({ color: 'rgb(1, 2, 3)' })
+  })
+
+  it('shines bright gold at the tip of the A, edged in deep gold', () => {
+    const { logo } = draw()
+    for (const part of ['tip', 'spark']) {
+      expect(logo.querySelector(`[data-part="${part}"]`)).toHaveAttribute('fill', '#FFD54A')
+      expect(logo.querySelector(`[data-part="${part}"]`)).toHaveAttribute('stroke', '#8A6100')
+    }
+  })
+
+  // The dark-mode bar is light grey (#D7D7D7) and the bright gold on it measures 1.02:1, so a gold
+  // edge would vanish with it and the A would lose its tip.
+  it.each(['light', 'dark'])('in the top bar, edges the shine in the bar\'s own text colour, one screen pixel wide (%s)', (mode) => {
+    const { logo } = draw({ tone: 'inherit' }, mode)
+    for (const part of ['tip', 'spark']) {
+      const shine = logo.querySelector(`[data-part="${part}"]`)
+      expect(shine).toHaveAttribute('stroke', 'currentColor')
+      expect(shine).toHaveAttribute('stroke-width', '1')
+      expect(shine).toHaveAttribute('vector-effect', 'non-scaling-stroke')
+    }
+  })
+})

@@ -46,6 +46,8 @@ def _r(method, path, handler, roles=ANY, **kw):
 ROUTES = [
     _r("GET", "/health", h.health, public=True),
     _r("POST", "/auth/login", h.login, public=True),
+    _r("POST", "/auth/refresh", h.refresh, public=True),  # the refresh token in the body is the credential
+    _r("POST", "/auth/logout", h.logout, public=True, status=204),
     _r("GET", "/auth/me", h.me, allowed_before_password_change=True),
     _r("POST", "/auth/change-password", h.change_password, allowed_before_password_change=True),
 
@@ -53,6 +55,7 @@ ROUTES = [
     _r("POST", "/users", h.create_user, {ADMIN}, status=201),
     _r("PATCH", "/users/me", h.update_me),
     _r("GET", "/users/{id}", h.get_user),
+    _r("GET", "/users/{id}/history", h.user_history),
     _r("PATCH", "/users/{id}", h.admin_update_user, {ADMIN}),
     _r("PATCH", "/users/{id}/capacity", h.set_capacity, STAFF),
     _r("POST", "/users/{id}/reset-password", h.reset_password, {ADMIN}),
@@ -67,6 +70,7 @@ ROUTES = [
     _r("POST", "/projects/{id}/reactivate", h.reactivate_project, {ADMIN}),
     _r("GET", "/projects/{id}/budget", h.project_budget, STAFF),
     _r("GET", "/projects/{id}/dependency-graph", h.dependency_graph),
+    _r("GET", "/projects/{id}/board", h.board),
 
     _r("GET", "/projects/{id}/assignments", h.list_bookings),
     _r("POST", "/projects/{id}/assignments", h.create_booking, STAFF, status=201),
@@ -88,9 +92,12 @@ ROUTES = [
     _r("POST", "/milestones/{id}/tasks", h.create_task, STAFF, status=201),
     _r("PATCH", "/tasks/{id}", h.update_task, STAFF),
     _r("POST", "/tasks/{id}/status", h.move_task, {EMPLOYEE}),
+    _r("POST", "/tasks/{id}/claim", h.claim_task, {EMPLOYEE}),
+    _r("POST", "/tasks/{id}/release", h.release_task, {EMPLOYEE}),
     _r("POST", "/tasks/{id}/archive", h.archive_task, STAFF),
     _r("POST", "/tasks/{id}/reactivate", h.reactivate_task, STAFF),
     _r("GET", "/me/tasks", h.my_tasks),
+    _r("GET", "/me/ready-tasks", h.ready_tasks, {EMPLOYEE}),
 
     _r("POST", "/tasks/{id}/time-entries", h.log_time, {EMPLOYEE}, status=201),
     _r("GET", "/me/time-entries", h.my_time),
@@ -99,15 +106,17 @@ ROUTES = [
     _r("POST", "/time-entries/{id}/reject", h.reject_time, STAFF),
     _r("GET", "/approvals/time-entries", h.pending_time, STAFF),
 
-    _r("GET", "/project-requests", h.list_requests, STAFF),
-    _r("POST", "/project-requests", h.create_request, {MANAGER}, status=201),
-    _r("GET", "/project-requests/{id}", h.get_request, STAFF),
-    _r("POST", "/project-requests/{id}/approve", h.approve_request, {ADMIN}),
-    _r("POST", "/project-requests/{id}/reject", h.reject_request, {ADMIN}),
+    # Requests of every kind; the service says which kinds a role sends and who decides.
+    _r("GET", "/project-requests", h.list_requests),
+    _r("POST", "/project-requests", h.create_request, status=201),
+    _r("GET", "/project-requests/{id}", h.get_request),
+    _r("POST", "/project-requests/{id}/approve", h.approve_request, STAFF),
+    _r("POST", "/project-requests/{id}/reject", h.reject_request, STAFF),
 
     _r("GET", "/dashboard/projects", h.project_cards, STAFF),
     _r("GET", "/dashboard/at-risk", h.at_risk, STAFF),
     _r("GET", "/dashboard/allocation", h.allocation, STAFF),
+    _r("GET", "/dashboard/timeline", h.timeline),  # everyone's home page; the service picks the projects
     _r("GET", "/admin/integrity-check", h.integrity_check, {ADMIN}),
     _r("GET", "/admin/audit-log", h.audit_log, {ADMIN}),
 

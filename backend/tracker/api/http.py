@@ -1,12 +1,14 @@
 """Turn a Lambda Function URL event into a Request, and a payload into a response.
 
 The same request arrives with two path shapes:
-    local:  proxy :3001 strips /api/tracker -> "/projects/7" (sometimes "//projects/7")
+    local:  the proxy on :3001 strips /api/tracker -> "/projects/7" (sometimes "//projects/7")
     AWS:    CloudFront passes the path through -> "/api/tracker/projects/7"
-normalise_path() makes both "/projects/7".
+normalise_path() turns both into "/projects/7".
 
-JSON on the wire is camelCase; Python and Postgres use snake_case. Conversion
-happens here and in services/views.py, nowhere else.
+JSON on the wire is camelCase; Python and Postgres use snake_case. Records are
+converted in services/views.py, computed results by camelize() here, and the few
+envelope keys (pageSize, totalPages, expiresAt, temporaryPassword) are written
+in camelCase by api/handlers.py.
 """
 
 import base64
@@ -40,7 +42,7 @@ def to_camel(name: str) -> str:
 
 
 def camelize(value):
-    """Recursively camelCase dict keys (for computed results such as the dashboard)."""
+    """camelCase every dict key, recursively (computed results; records go through views.py)."""
     if isinstance(value, dict):
         return {to_camel(k): camelize(v) for k, v in value.items()}
     if isinstance(value, list):

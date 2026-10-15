@@ -80,7 +80,9 @@ def sign_in(username: str, password: str, new_password: str | None = None) -> Ap
     if payload["user"]["mustChangePassword"]:
         if not new_password:
             sys.exit(f"{username} must change their password first: set TRACKER_NEW_ADMIN_PASSWORD.")
-        api.ok("POST", "/auth/change-password", {"currentPassword": password, "newPassword": new_password})
+        # A password change ends every older session, so carry on with the one it returns.
+        result = api.ok("POST", "/auth/change-password", {"currentPassword": password, "newPassword": new_password})
+        api = Api(result["token"], username)
     return api
 
 
@@ -189,14 +191,18 @@ def seed() -> None:
     step("last week: Ana 30 h (approved), Ben 40 h (pending: at capacity), Chloe 50 h (approved, overtime on)")
 
     # Intake and history.
-    req = sam.ok("POST", "/project-requests", {"name": "Hermes", "justification": "Partners asked for an API",
+    req = sam.ok("POST", "/project-requests", {"kind": "NEW_PROJECT", "name": "Hermes",
+                                               "justification": "Partners asked for an API",
                                                "proposedStart": day(14), "proposedEnd": day(120)})
     admin.ok("POST", f"/project-requests/{req['requestId']}/approve", {"budgetCents": 80_000_00})
-    maria.ok("POST", "/project-requests", {"name": "Iris", "justification": "Internal analytics dashboard"})
+    maria.ok("POST", "/project-requests", {"kind": "NEW_PROJECT", "name": "Iris",
+                                           "justification": "Internal analytics dashboard"})
     legacy = admin.ok("POST", "/projects", {"name": "Legacy CRM", "managerId": uid["maria.lopez@acme.test"],
                                             "startDate": day(-200), "predictedEndDate": day(-40), "status": "COMPLETE"})
     admin.ok("POST", f"/projects/{legacy['projectId']}/archive")
-    step("Hermes approved from a request, Iris pending, Legacy CRM archived")
+    # Ben is at capacity with overtime off: he asks Maria, his line manager, to allow it.
+    ben.ok("POST", "/project-requests", {"kind": "OVERTIME", "justification": "Portal UI needs a Saturday to finish"})
+    step("Hermes approved from a request, Iris pending, Legacy CRM archived, Ben's overtime request pending")
     print(f"\nDone. Every seeded person's password is {DEMO_PASSWORD}. Usernames: python3 tools/demo.py demo")
 
 
@@ -252,7 +258,7 @@ def demo() -> None:
     tasks = ben.ok("GET", "/me/tasks")["items"]
     ui_task = next(t for t in tasks if t["title"] == "Portal UI")
     saturday = (LAST_MONDAY + dt.timedelta(days=5)).isoformat()
-    expect("Ben logs 2 more hours last week: he is at 40 h with overtime off",
+    expect("Ben logs 2 more hours last week: at 40 h with overtime off, he is asked to confirm",
            *ben.call("POST", f"/tasks/{ui_task['taskId']}/time-entries", {"workDate": saturday, "minutes": 120}), 409)
     expect("Ben logs time tomorrow", *ben.call("POST", f"/tasks/{ui_task['taskId']}/time-entries",
                                                  {"workDate": day(1), "minutes": 60}), 400)

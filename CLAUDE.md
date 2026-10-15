@@ -12,27 +12,111 @@ David.
 **Rule:** if something here goes out of date, fix it in the same commit as the code that
 outdated it.
 
-### Where things stand (updated 14 Oct, midday)
+### Where things stand (updated 14 Oct, night)
 
-- **Built:** backend, database and every website screen in `MVP.md`. All of it is
-  deployed to AWS and checked there. Tests: 374 backend, 199 website, and Playwright
-  browser tests (`e2e/demo.spec.js` walks the demo; `e2e/tour.spec.js` screenshots
-  every screen at desktop and phone width).
+- **Built:** backend, database and every website screen in `MVP.md`, plus everything
+  below. **AWS was last checked at `a52da44`** (14 Oct, about 09:30). Everything
+  committed after it runs on the local stack but is **not on AWS** until David runs
+  `git push origin David`, then `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`
+  (both together; migrations 002 to 005 apply on the Lambda's first cold start). The
+  click-level list is at the top of `docs/DEMO-RUNBOOK.md`.
+  - **14 Oct, daytime (`a52da44` to `5e994e6`):** Hours and Minutes boxes, **Copy
+    username and password**, the login-timing fix (`services/users.py`), the pull board
+    (migration `002_task_limit.sql`), the bell's 10 s check with its pop-up, three charts
+    (plain MUI boxes, no chart library, the server sends every percentage: a deliverables
+    timeline on each project, a budget chart and this week's workload on the dashboard,
+    `components/charts/`), and an employee's project work notifying the project's manager
+    too (`services/audit.py`).
+  - **14 Oct, evening (everything since `5e994e6`, on branch `David`):**
+    - **requests for everyone** (migration `003_request_kinds.sql`; spec
+      `docs/superpowers/specs/2026-10-14-requests-design.md`): employees ask their line
+      manager for a higher task limit, overtime or anything else; managers ask the admins
+      for a new project, to archive one, or anything else; approving applies the change
+      and the asker's bell says so;
+    - **overtime is a warning, not a refusal** (migration `004_over_capacity.sql`; spec
+      `docs/superpowers/specs/2026-10-14-overtime-design.md`): logging past weekly
+      capacity without overtime answers 409 with `code: "OVER_CAPACITY"`, the website
+      asks **Log anyway**, and the resent entry is saved, marked "Over capacity" and the
+      manager is told;
+    - **15-minute access tokens and refresh tokens** (migration `005_sessions.sql`; spec
+      `docs/superpowers/specs/2026-10-14-tokens-design.md`): `POST /auth/refresh` rotates
+      the refresh token (reuse of an old one ends every session of that user),
+      `POST /auth/logout` revokes it, and a password change, reset or archive ends the
+      user's older sessions;
+    - **employee history** (no migration; spec
+      `docs/superpowers/specs/2026-10-14-history-design.md`): `GET /users/{id}/history`;
+      admins, the line manager and the person may read it (others get 404), and only
+      admins see the before/after state, so a salary never reaches a manager. **History**
+      on People, **My history** on Account;
+    - the dashboard's **Total projects** and **Total at risk**, counted by the server
+      across every page (`atRiskTotal` on `GET /dashboard/projects`);
+    - the OpenAPI file `docs/openapi.json` (69 operations, built from the route table);
+    - two accessibility fixes found by the axe scan (the menu's links each in a list
+      item, `components/AppLayout.jsx`; empty weeks on the allocation grid in readable
+      grey, `pages/allocation/AllocationPage.jsx`);
+    - **pages load on first visit** (spec `docs/superpowers/specs/2026-10-14-speed-design.md`):
+      each signed-in page is its own file (`components/lazyPage.js`), first download
+      739 kB to 560 kB, with a Reload message if a page's file can't be fetched; one
+      `Pager` (in `PageState.jsx`) and `values.require` replace copied code.
+  - **14 Oct, night (branch David2, merged in; none of it on AWS yet):**
+    - the **Schedule** screen (managers and admins; people by weeks, a bar per booking in
+      its project's colour, over weeks outlined; `pages/schedule/`);
+    - **forms locked while saving**: every field and button is disabled while a form,
+      confirm dialog, sign-in or change-password request is in flight, so one press sends one
+      request (`components/FormDialog.jsx`);
+    - a **"Saved"** message after every successful change (`components/AppLayout.jsx`);
+    - **refresh no longer signs you out on a network blip**: only an answer from
+      `/auth/refresh` that says the token is dead ends the session (`services/request.js`);
+    - the **k6 load test** `tools/k6/load.js`, replacing `tools/loadtest.py` (deleted);
+    - **template cleanup**: the Vite template's unused files and the workshop's other-track
+      guides and examples (`data/`, the Java and Node examples) removed;
+    - the browser specs `schedule.spec.js`, `timelog.spec.js` (log time, approve, spent
+      goes up) and `project-lifecycle.spec.js` (create, edit, archive, reactivate); the last
+      two write data, so local only;
+    - a **backend comments pass** (shorter docstrings, no code change).
+- **Tests (merged branch, 14 Oct night: `bash tools/test-all.sh` steps 1 to 5 PASS; the browser steps were run by hand against this branch's own site on port 3002, because the script's site on port 3000 served another folder's code):**
+  565 backend (97% of statements, 95% with branches; `api/` 100%), 404 website in 36
+  files (95.5% of statements, 97.04% of lines), lint, bandit and the production build
+  clean, and 30 Playwright browser tests in 12 files (29 passed, 1 skipped: the README
+  screenshots run only on request). `e2e/demo.spec.js` walks the demo; `e2e/pull.spec.js`
+  takes and puts back a task; `e2e/requests.spec.js` asks and answers a request;
+  `e2e/history.spec.js` reads a person's history; `e2e/tour.spec.js` screenshots every
+  screen at desktop and phone width and runs axe on it (50 scans; serious or critical
+  WCAG A/AA problems fail); `timeline`, `budget` and `workload` specs check the charts; `schedule.spec.js` checks the
+  Schedule bars; `timelog.spec.js` and `project-lifecycle.spec.js` walk log-time-then-approve
+  and an admin's project life cycle.
 - **Read these first:**
   - `docs/GUIDE.md`: David's one-stop guide (demo scripts, how to reach everything,
     evaluator Q&A);
+  - `docs/REPOINFO.md` (what to say, with every claim checked against the code,
+    and a "say this, not that" table) and `docs/DEMO-RUNBOOK.md` (what to run and click
+    live, the tests, Plan B); `tools/tracker.http` holds read-only API requests for VS
+    Code's REST Client; `docs/openapi.json` is the OpenAPI file for Postman and
+    SwaggerHub (regenerate with `.venv/bin/python tools/openapi.py` after any route
+    change; `test_openapi.py` fails until you do);
   - `docs/OVERNIGHT-REPORT.md`: what was built on the night of 13 to 14 Oct, every
     decision made for David, and what isn't verified;
   - `docs/superpowers/plans/2026-10-13-manual-verification.md`: the AWS checklist,
-    all steps done.
+    all steps done;
+  - `docs/superpowers/specs/2026-10-14-email-and-sms-findings.md`: why AWS can't send
+    email or texts (role and network), and the design for any future reset flow;
+  - `docs/superpowers/specs/2026-10-14-pull-board-design.md`: the pull board (Take this,
+    a per-person task limit), built 14 Oct (69 routes; five migration files, 001 to 005).
 - **Who does what:** Claude edits, tests and commits when asked. David pushes and
   deploys: `.claude/settings.local.json` denies Claude `git push`, the `bin/` deploy
-  and cleanup scripts, and `terraform apply`/`destroy`. Shell commands outside its
-  short allow list prompt David. Hand him the exact commands to run.
+  and cleanup scripts, and `terraform apply`/`destroy`. Every other shell command runs
+  without a prompt (a blanket `"Bash"` allow, added 14 Oct at David's request; delete
+  that line to go back). Hand him the exact commands for the denied ones.
 - **Open items:**
+  - deploy everything committed since `a52da44` (see **Built**): `git push origin David`,
+    `./bin/deploy-backend.sh` (migrations 002 to 005 on the first cold start),
+    `./bin/deploy-frontend.sh`; deploy both together (the old website knows no refresh and
+    would sign out after 15 min);
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
-  - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8).
+  - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8);
+  - changing your own email needs no current password (`update_self` in
+    `services/users.py`); it matters once an emailed reset exists;
 
 ---
 
@@ -46,15 +130,16 @@ disagrees.
 | Question | Decision |
 | --- | --- |
 | Manager model (plan §2.1) | (a) org chart. `users.manager_id` is the line manager. Any manager staffs anyone onto projects they manage. Employees never choose projects |
-| Accounts | Admin creates accounts. The server generates the username (`^[A-Z]{2}[0-9]{6}$`, initials plus 6 digits, **never changes**) and a 12-character password (`secrets`), shown once. Login is by username. A forced change on first login (every route but change-password and "me" answers 403). Self-edit: name and email only. Forgotten password: admin reset. Emailed reset code is a stretch goal: the workshop role has no SES access |
+| Accounts | Admin creates accounts. The server generates the username (`^[A-Z]{2}[0-9]{6}$`, initials plus 6 digits, **never changes**) and a 12-character password (`secrets`), shown once. Login is by username and returns a 15-minute access token plus a refresh token (8 h from login, rotated on each use; `services/sessions.py`). A forced change on first login (every route but change-password and "me" answers 403). Self-edit: name and email only. Forgotten password: admin reset. Emailed reset code is a stretch goal. Checked 14 Oct: the Lambda can't send email or texts. Its role has no `ses:` permission, and it sits in a VPC with no NAT gateway or email/SNS endpoint, which our role can't create |
 | Consumed cost (§2.2) | **Time logged on tasks** (date, minutes, note), as in Jira and OpenProject, not Workday. Only the task's assignee logs. Only approved entries cost money, at the `hourly_rate_cents` frozen on the entry when logged. Clock in/out, pay periods, overtime review and overtime premiums were **removed on 13 Oct** as payroll features |
-| Overtime | Each person has `weekly_capacity_hours` (default 40) and `overtime_allowed` (default off), set by their line manager or an admin. Logging past capacity in a Mon-to-Sun week is refused (409) unless allowed; when allowed, the week is flagged |
+| Overtime | Each person has `weekly_capacity_hours` (default 40) and `overtime_allowed` (default off), set by their line manager or an admin. Logging past capacity in a Mon-to-Sun week without overtime **asks first** (409, `code: "OVER_CAPACITY"`, changed 14 Oct); resent with `confirmOverCapacity: true` it is saved, marked `over_capacity`, and the notification says by how much. When allowed, it is saved unmarked and the week is flagged |
 | Over-allocation | Bookings above a person's capacity are **allowed and flagged** (question 5), not refused. One booking is 1 to 40 h/week; no overlapping live bookings per person per project |
 | Approver | The line manager (`users.manager_id`) **or any admin** approves or rejects logged time. Nobody approves their own |
-| Tasks | Deliverables hold tasks (estimate, assignee, To Do / In Progress / Done). The manager creates and assigns; the assignee moves status and logs time. Deliverable status is **computed**; the manager signs off, refused until all tasks and dependencies are done |
-| Invariant | `GET /admin/integrity-check`: 5 queries that must return no rows (no dependency loops; nothing live under an archived project; every record has its CREATE audit row; no time logged outside a booking; no signed-off deliverable with unfinished work). Runs after every test |
+| Tasks | Deliverables hold tasks (estimate, assignee, To Do / In Progress / Done). The manager creates; employees pull Ready tasks (Take this, up to their `task_limit`, default 2); managers can still assign. The assignee moves status and logs time. Deliverable status is **computed**; the manager signs off, refused until all tasks and dependencies are done |
+| Requests (14 Oct) | `project_requests` gains a `kind` (migration 003). Managers ask the admins (new project, archive a project, free text); employees ask their line manager or an admin (task limit, overtime, free text). Who may decide = who is notified when it is sent. Approving runs the existing service (`archive_project`, `set_capacity`) in the same transaction |
+| Invariant | `GET /admin/integrity-check`: 5 queries that must return no rows (no dependency loops; nothing live under an archived project; every record has its CREATE audit row; no time logged outside a booking; no signed-off deliverable with unfinished work). Runs after every database test |
 | Schema | `TEXT` + `CHECK` instead of `ENUM`; numbered migrations in `store/migrations/`. Full design: `docs/superpowers/specs/2026-10-13-database-design.md` |
-| Wire naming (§2.4) | camelCase in JSON, snake_case in Python and Postgres, converted only in `api/serializers.py` |
+| Wire naming (§2.4) | camelCase in JSON, snake_case in Python and Postgres, converted only in `api/http.py` (incoming keys, computed results) and `services/views.py` (each record's fields, by name) |
 | Removal | `POST /{thing}/{id}/archive` and `/reactivate`. No DELETE verb anywhere, and tests assert it. Explain in the README why this departs from the rubric's DELETE/204 |
 | Update verb | PATCH, with partial bodies. The server refuses fields the caller's role may not change |
 | Storage | **Postgres only, no in-memory store.** Tests run against their own database, `tracker_test`, with each test rolled back |
@@ -77,7 +162,7 @@ backend/tracker/                 # one Lambda; the URL segment is /api/tracker/.
 ├── requirements.txt             # psycopg[binary] only
 ├── .gitignore                   # the pip packages start-dev.sh vendors here (trap 4)
 ├── store/
-│   ├── migrations/001_init.sql  # numbered SQL files; never edit one that has run on Aurora
+│   ├── migrations/              # 001_init.sql to 005_sessions.sql; never edit one that has run on Aurora
 │   ├── migrate.py               # applies new migrations on cold start, under an advisory lock
 │   ├── integrity.py             # the 5 integrity queries
 │   └── postgres.py              # connection, atomic(), queries; psycopg errors -> domain errors
@@ -88,12 +173,14 @@ backend/tracker/                 # one Lambda; the URL segment is /api/tracker/.
 ├── services/                    # business rules, no framework or HTTP imports
 │   ├── auth.py  users.py  projects.py  deliverables.py  resources.py
 │   ├── timesheets.py  budget.py  dashboard.py  requests.py
+│   ├── tokens.py  sessions.py   # 15-minute access token; refresh tokens (rotation, reuse detection)
 │   └── audit.py                 # record_change(): audit row + notifications
 └── api/
     ├── routes.py                # the one route table: method, path, roles, handler
-    ├── authorise.py             # token check, then the role re-read from the DB
+    ├── app.py                   # dispatch() and authorise(): token check, then the role re-read from the DB
     ├── errors.py                # the one exception -> status table
-    └── serializers.py           # explicit fields, snake_case -> camelCase
+    ├── handlers.py              # one function per route
+    └── http.py                  # event parsing, camelCase <-> snake_case (record fields: services/views.py)
 tests/backend/                   # pytest; conftest rebuilds tracker_test, runs the integrity check on teardown
 requirements-dev.txt, pytest.ini  # repo root: test tooling (venv in .venv/)
 frontend/src/
@@ -201,14 +288,17 @@ the demo, so evaluators can tick items off without translating:
 **Every successful change writes one audit row, and that row notifies everyone above
 the actor.** That covers every create, edit, archive and reactivate: users (account
 created, role or title changed, password changed or reset), projects, deliverables,
-resources, budget, dependencies, tasks (created, assigned, status moved), time entries
-(logged, edited, approved, rejected), capacity and overtime settings, and project
-requests and their decisions. Reads are not logged.
+resources, budget, dependencies, tasks (created, assigned, claimed from the board, put
+back, status moved), time entries (logged, edited, approved, rejected), capacity,
+overtime and task-limit settings, and requests of every kind and their decisions (a
+decision also notifies the asker, through `record_change(..., also_notify=)`). Reads
+are not logged. Nor are sessions (login, refresh, logout): a refresh every 15 minutes
+would flood the log and the admins' bells.
 Refused requests (403, 404, 409) changed nothing, so they are not logged either.
 
 | Actor's role (stored in the DB at the time) | Who is notified |
 | --- | --- |
-| Employee | Their line manager (`users.manager_id`) and every admin |
+| Employee | Their line manager (`users.manager_id`), every admin and, when the change is to a project's work (task, logged time, booking, deliverable), that project's manager (`projects.manager_id`; added 14 Oct at David's request) |
 | Manager | Every admin |
 | Admin | Every *other* admin |
 
@@ -241,8 +331,10 @@ Routes (add to the plan §7 table): `GET /notifications` (own only, paginated,
 `?unread=true`), `GET /notifications/unread-count`, `POST /notifications/{id}/read` (404
 if not yours), `POST /notifications/read-all`. All require any authenticated user.
 `GET /admin/audit-log` stays admin only, with filters by actor, entity and date.
+`GET /users/{id}/history` (14 Oct) is one person's trail (rows they made, rows about their
+account) for admins, their line manager and themselves; before/after state for admins only.
 
-UI: a bell with an MUI `Badge` unread count in the app bar, polled every 30 s and after
+UI: a bell with an MUI `Badge` unread count in the app bar, polled every 10 s while the tab is visible, at once on return, and after
 each write. Add a notifications page, and an admin audit-log page with filters. These
 are in-app notifications only. Email notifications stay out of scope (plan §16).
 
@@ -472,8 +564,9 @@ deployed URL:
   Lambda handler is a plain `handler(event, context)`. Don't add FastAPI or MongoDB.
 - **Plan §16 rules out email notifications.** That still holds. The in-app
   notifications in §2 above are a different feature, and they are in scope.
-- **The rubric expects token refresh.** It lists "token expiration and refresh". We do
-  expiry plus a clean re-login, and list refresh tokens as a deliberate omission (§16).
+- **The rubric expects token refresh.** It lists "token expiration and refresh". Built
+  14 Oct: a 15-minute access token and a rotating refresh token in the response body
+  (not a cookie; why is in `docs/superpowers/specs/2026-10-14-tokens-design.md` §2).
 - **How scoring works.** Five technical scores (Implementation, Design, Code, Testing,
   Experience) and three soft-skill scores (Curious, Observant, Driven), each 1 to 10. The
   final score is the average of the two averages, and 9 or above is excellent.
@@ -490,15 +583,15 @@ The detail is in the plan:
 - Money is integer cents everywhere except on screen, and one module converts it (§2.3).
 - Nothing is deleted: archive and reactivate. There is no DELETE route and no `delete`
   method, and tests assert their absence (§4). A Postgres trigger also refuses `DELETE` on
-  every table.
-- The invariant: the 5 integrity queries return no rows. Every test's teardown checks
-  it, and so does `GET /admin/integrity-check`.
+  every application table (`schema_migrations` has none).
+- The invariant: the 5 integrity queries return no rows. Every database test's teardown
+  checks it, and so does `GET /admin/integrity-check`.
 - Answer 404, never 403, for something that exists but isn't yours, with byte-identical
   messages (§7).
 - Authorise from the role stored in the database, never from the token's claim (§7).
 - One route table and one `authorise()` (§7).
 - One exception-to-status table (§7).
-- Every error has the shape `{ "error": "..." }` (§7).
+- Every error has the shape `{ "error": "..." }`, plus `field` or `code` when they apply (§7).
 - Lists return `{ items, page, pageSize, total, totalPages }` (§7).
 - Write endpoints return the new resource (§7).
 - Serialise fields by name, never by dumping the model (§7).
@@ -525,12 +618,14 @@ The detail is in the plan:
   since the scaffold is JS.
 - **Frontend packages (installed 14 Oct):** MUI 9 (`@mui/material`, `@mui/icons-material`,
   emotion), React Router 8 (`HashRouter`), react-responsive, prop-types; Vitest 5, React
-  Testing Library, Playwright. CI fails on high-severity `npm audit` findings, so run it
+  Testing Library, Playwright, `@axe-core/playwright` (exact 4.13.0, the tour's
+  accessibility scan). CI fails on high-severity `npm audit` findings, so run it
   before adding anything else (0 on 14 Oct).
 - **Frontend rules in practice:** every API call goes through `src/services/request.js`;
   only `src/services/format.js` turns cents, minutes and dates into text (and typed
   dollars into cents); field names are exactly the API's camelCase; forms are
-  `components/FormDialog.jsx` (edit sends only changed fields); MUI icons are named
+  `components/FormDialog.jsx` (edit sends only changed fields); chart colours come only from
+  `src/theme/chartColours.js`; MUI icons are named
   `…Outlined` in v9 (check `node_modules/@mui/icons-material/<Name>.js` exists).
 - **Terraform:** snake_case, a comment on every resource, and `terraform validate`
   before committing.
@@ -561,7 +656,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # on
 (cd frontend && npm test)                                                  # website: Vitest + RTL
 (cd frontend && npm run test:coverage && npm run lint)
 (cd frontend && E2E_ADMIN_PASSWORD=... npm run e2e)                        # Playwright; needs start-dev.sh + seed
-# Screen tour: usernames come from `demo.py demo`; add E2E_BASE_URL=<CloudFront URL> for AWS
+# Screen tour: usernames come from `demo.py demo`; add E2E_BASE_URL=https://d1gov8jpsxhwer.cloudfront.net for AWS
 (cd frontend && E2E_MANAGER_USERNAME=... E2E_EMPLOYEE_USERNAME=... E2E_TOUR_DIR=/some/dir npm run e2e -- tour)
 ```
 
@@ -569,16 +664,15 @@ Demo against the running API (local proxy, or the deployed URL via `TRACKER_API`
 
 ```sh
 TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py seed   # once: users, projects, tasks, time
-TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then every refusal
-TRACKER_ADMIN_PASSWORD=... python3 tools/loadtest.py    # concurrent reads + logins; LocalStack fails past ~15 users (its file limit)
+TRACKER_ADMIN_PASSWORD=... python3 tools/demo.py demo   # the seven questions, then ten refusals
+K6_USERNAME=ML460428 K6_PASSWORD=Demo-pass-2026 k6 run tools/k6/load.js   # k6 load test: reads + a login burst; LocalStack fails past ~15 users (its file limit)
 terraform -chdir=infra output -raw bootstrap_admin_password  # AD000001's first password (per environment)
 (set -a; source ENVIRONMENT.config; python3 tools/console.py logs)  # AWS console, signed in (lambda|logs|rds|cloudfront|s3)
 ```
 
 ## 12. Safe to ignore
 
-- `data/`, `infra/eks.tf`, `infra/helm/`, and `infra/documentdb.tf` (off by default).
-- `backend/_examples/java-service` and `backend/_examples/nodejs-service`.
+- `infra/eks.tf`, `infra/helm/`, and `infra/documentdb.tf` (off by default).
 - Every guide in `docs/` except `full-stack.md` and `validation.md`.
 - Jupyter, Spark, Trino, kubectl and Helm, which `setup-environment.sh` installs for
   other tracks. Their install failures don't matter to us.
