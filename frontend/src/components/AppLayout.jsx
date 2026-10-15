@@ -14,6 +14,7 @@ import { useIsMobile } from '../theme/responsive'
 import AcmeLogo from './AcmeLogo'
 import { NAV_ITEMS, ROLE_LABELS } from './navigation'
 import NotificationBell from './NotificationBell'
+import TopSearch from './TopSearch'
 import { onWrite } from '../services/request'
 
 const DRAWER_WIDTH = 240
@@ -88,7 +89,7 @@ NavList.propTypes = {
 }
 
 /**
- * The frame around every signed-in page: a top bar (logo, light/dark switch, bell, who you
+ * The frame around every signed-in page: a top bar (logo, search, light/dark switch, bell, who you
  * are, sign out, all bare words and icons on the green) and the menu: a sidebar on desktop that
  * collapses to icons from a bookmark tab on its edge (remembered in this browser), a drawer on phones. After every successful change it says "Saved" for
  * 3 seconds at the top centre, so it never covers the bell's pop-up at the bottom.
@@ -133,6 +134,8 @@ export default function AppLayout({ children }) {
             <AcmeLogo size={isMobile ? 26 : 32} tone="inherit" />
             {!isMobile && <Typography component="span" sx={{ fontWeight: 600 }} noWrap>Project Tracker</Typography>}
           </Box>
+          {/* Pages and projects; on phones a search button that opens the box across the bar. */}
+          <TopSearch />
           <ColorModeToggle color="inherit" />
           <NotificationBell />
           {/* Bare words on the bar (spec 6.2): variant text with color inherit is the theme's one unboxed button. */}

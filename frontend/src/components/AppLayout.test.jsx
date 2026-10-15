@@ -94,6 +94,23 @@ describe('AppLayout', () => {
     expect(within(bar).getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument()
   })
 
+  it('puts the search for pages and projects in the top bar, after the logo', () => {
+    renderLayout(USERS.manager)
+    const bar = screen.getByRole('banner')
+    const search = within(bar).getByRole('combobox', { name: 'Search pages and projects' })
+    const logo = within(bar).getByRole('img', { name: 'ACME' })
+    expect(logo.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('makes the search a button in the top bar on phones', async () => {
+    responsive.useIsMobile.mockReturnValue(true)
+    renderLayout(USERS.manager)
+    const bar = screen.getByRole('banner')
+    expect(within(bar).queryByRole('combobox')).not.toBeInTheDocument()
+    await userEvent.click(within(bar).getByRole('button', { name: 'Search pages and projects' }))
+    expect(within(bar).getByRole('combobox', { name: 'Search pages and projects' })).toHaveFocus()
+  })
+
   it.each([['light', '#165E26', '#FFFFFF'], ['dark', '#165E26', '#FFFFFF']])(
     'paints the top bar the one forest green with white words, in both modes (%s)',
     (mode, background, words) => {
@@ -127,7 +144,8 @@ describe('AppLayout', () => {
 
   it('draws the keyboard focus ring in the bar\'s own text colour inside the top bar', async () => {
     renderLayout(USERS.manager)
-    await userEvent.tab() // the first control in the bar: the light/dark switch
+    await userEvent.tab() // the first control in the bar: the search
+    await userEvent.tab() // then the light/dark switch
     expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toHaveClass('Mui-focusVisible')
     // jsdom resolves currentColor whether or not a rule sets it, so read the rule the bar adds.
     const bar = [...screen.getByRole('banner').classList].find((name) => name.startsWith('css-'))
