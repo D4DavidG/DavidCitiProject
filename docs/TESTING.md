@@ -718,21 +718,22 @@ warm database, a folder for screenshots), runs Playwright, and ends with the pla
 | Several files | `./tools/e2e.sh demo schedule` |
 | **Watch it**: a real window, half a second between steps | `./tools/e2e.sh --show demo` |
 | Watch it slower or faster (milliseconds between steps) | `E2E_SLOWMO=800 ./tools/e2e.sh --show demo` |
-| **A video of every test**, then the report with the videos | `./tools/e2e.sh --video demo` |
-| Playwright's own window: pick a test, run it, step back through it | `./tools/e2e.sh --ui` |
+| **A video of every test**, then the report that plays them (videos kept in `~/e2e-videos`, or `E2E_VIDEO_DIR`) | `./tools/e2e.sh --video demo` |
+| Playwright's own window (UI mode): pick a test, run it, replay each step | `./tools/e2e.sh --ui` |
 | The live AWS site: `demo`, `history`, `schedule` and `tour` (17 tests, about 2.5 minutes) | `./tools/e2e.sh --aws` |
 | The live site, watching | `./tools/e2e.sh --aws --show demo` |
-| A file that adds data, on the live site (asks you to be sure) | `./tools/e2e.sh --aws --allow-writes timelog` |
+| A file that adds data, on the live site (warns, then waits 5 seconds) | `./tools/e2e.sh --aws --allow-writes timelog` |
 | Playwright's HTML report afterwards | `./tools/e2e.sh --report demo` |
 | List the tests without running any (needs no server) | `./tools/e2e.sh --list` |
-| Pass options straight to Playwright | `./tools/e2e.sh demo -- --repeat-each=3` |
+| Pass options straight to Playwright (everything after `--`) | `./tools/e2e.sh demo -- --grep phone` |
 
 **Good to know:**
 - **Names.** A name is any part of a file name: `lifecycle` runs `project-lifecycle.spec.js`.
   A word that matches several runs them all (`time` runs `timeline` and `timelog`), and the
   script says so.
 - **A screen is needed** for `--show` and `--ui`: run them from a terminal on the machine's
-  desktop. Use `--show` on one file at a time; `demo` takes about 20 seconds that way, and
+  desktop. `--ui` does not go with `--list`, `--report` or `--video`; `--video` works with or
+  without `--show`, locally and with `--aws`. Use `--show` on one file at a time; `demo` takes about 20 seconds that way, and
   `tour` about 3 minutes even headless (run it beforehand and look at the pictures it saves in
   `~/tour-shots`, or the folder in `E2E_TOUR_DIR`).
 - **Which files only read, and which add data.** `demo`, `tour`, `history`, `schedule`,
@@ -741,14 +742,20 @@ warm database, a folder for screenshots), runs Playwright, and ends with the pla
   and rings bells (Maria's count goes up). `screenshots` rewrites `docs/screenshots/` and runs
   only when named with `E2E_SCREENSHOTS=1`.
 - **AWS stays read-only by default.** With `--aws` the script refuses any file that adds data,
-  before anything runs, unless you add `--allow-writes`, which warns first. It wakes the site
-  first (the database sleeps when idle; the first answer can take 15 seconds) and never sends
-  a local admin password to the live site.
+  before anything runs, unless you add `--allow-writes` (with `--aws` only), which warns and
+  pauses 5 seconds first: every such run adds rows to the live database that stay for good.
+  `screenshots` never runs there. The script wakes the site first (the database sleeps when
+  idle; the first answer can take 15 seconds). With no file named it runs `demo`, `history`,
+  `schedule` and `tour`; `timeline`, `budget` and `workload` only read too, so you may name
+  them.
 - **Who signs in.** Locally, Maria Lopez (manager), Ana Ruiz (employee) and Sam Patel (a
   second manager), looked up in the local database by email. On AWS, Maria `ML662930`, Ben
-  Okafor `BO435681` (Ana is archived there) and Sam `SP918535`, all with the password
-  `Demo-pass-2026`. The admin's password is read only from `E2E_ADMIN_PASSWORD`; without it,
-  `project-lifecycle` skips. Locally, this asks for it without showing it:
+  Okafor `BO435681` (Ana was archived there in the 15 Oct demo) and Sam `SP918535`, all with
+  the password `Demo-pass-2026`; the specs read the employee's name from `E2E_EMPLOYEE_NAME`
+  (shared helper: `frontend/e2e/people.js`). The admin's
+  password comes from `E2E_ADMIN_PASSWORD`; on AWS it defaults to the published `gusmao123`
+  (used only by `project-lifecycle`, which needs `--allow-writes` there). Locally, without it,
+  `project-lifecycle` skips; this asks for it without showing it:
   `read -rsp "Local admin password: " E2E_ADMIN_PASSWORD && export E2E_ADMIN_PASSWORD && echo && ./tools/e2e.sh project-lifecycle`.
 - **AWS runs whatever was last deployed.** A test can fail on the live site simply because
   the screen it expects is not deployed yet. Run `--aws` only after deploying the version you
