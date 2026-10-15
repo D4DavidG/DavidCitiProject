@@ -216,8 +216,16 @@ no glow. Glows off under `prefers-reduced-motion` transitions (keep the static l
    (Archive, Reject, Revoke). Never filled red.
 
 Plus icon-only buttons (bell, menu, dark mode, collapse menu), each with a tooltip and an
-accessible name. **Links (plain text) only go somewhere** (a project's name, a notification's
-subject) and are green ink, no underline, underlined on hover and focus. **Anything that
+accessible name. **A project's name in a list is a secondary button** that opens it (David
+asked for exactly that: "the name of the project should be a button to open it"), left
+aligned, so every row looks the same. **Plain text links appear only inside sentences**
+(a notification's text, a "see the spec" line), green ink, no underline, underlined on hover
+and focus.
+
+**Messages:** success is confirmed by the one "Saved" pop-up; a page shows its own success
+line only when it carries something new (a generated password, "it's waiting for
+approval"), and then right next to what you pressed. Page-wide alerts are for page states
+(couldn't load, nothing here yet) and for the "How to read this" panels, nothing else. **Anything that
 does something is a button,** never a bare word. No other button colours, sizes or shades:
 set them once in the theme (`MuiButton` variants and defaults) and use only those.
 
