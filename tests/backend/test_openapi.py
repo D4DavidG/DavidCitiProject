@@ -6,6 +6,7 @@ builds, and that the saved file is the same as a fresh build. No database.
 
 import importlib.util
 import inspect
+import json
 from pathlib import Path
 
 from api import routes
@@ -18,6 +19,11 @@ openapi_tool = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(openapi_tool)
 
 ERROR = {"$ref": "#/components/responses/Error"}
+
+
+def test_openapi_file_is_up_to_date():
+    saved = json.loads(openapi_tool.OUT.read_text())
+    assert saved == openapi_tool.build(), "docs/openapi.json is out of date: run .venv/bin/python tools/openapi.py"
 
 
 def _op(doc, method, path):
