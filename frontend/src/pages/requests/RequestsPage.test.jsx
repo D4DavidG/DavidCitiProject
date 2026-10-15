@@ -104,6 +104,13 @@ describe('RequestsPage', () => {
     document.querySelectorAll('.MuiButton-root').forEach((b) => expect(b.className, b.textContent).not.toMatch(/MuiButton-(outlined|text)\b/))
   })
 
+  it("confirms a rejection with the dialog's red (danger) button", async () => {
+    renderRequests()
+    const rows = await table()
+    await userEvent.click(within(rows).getByRole('button', { name: /reject iris/i }))
+    const dialog = await screen.findByRole('dialog', { name: 'Reject Iris' })
+    expect(within(dialog).getByRole('button', { name: /^reject$/i })).toHaveClass('MuiButton-contained', 'MuiButton-colorError')
+  })
 
   it('steps back to the last page that exists when the last request on the last page is decided', async () => {
     let decided = false
