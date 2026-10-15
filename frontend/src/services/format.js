@@ -130,3 +130,28 @@ export function formatDateTime(iso) {
   if (!iso) return DASH
   return dateTime.format(new Date(iso))
 }
+
+const dayInZone = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ZONE })
+
+/** A project's latest change (a timestamp) as its day in Eastern time: "Updated Oct 13, 2026". */
+export function formatUpdated(iso) {
+  return `Updated ${iso ? dayInZone.format(new Date(iso)) : DASH}`
+}
+
+/** 1 -> "1 live project", 3 -> "3 live projects". */
+export function formatLiveProjects(count) {
+  return `${count} live ${count === 1 ? 'project' : 'projects'}`
+}
+
+/**
+ * One project a person is still on, as a line of the archive warning:
+ * "Apollo · 20 hours a week until Dec 31, 2026 · 2 open tasks". A part that is 0 or
+ * missing is left out; a booking that only starts later reads "booked until <date>".
+ */
+export function formatInvolvement({ name, hoursPerWeek, bookingEndDate, openTaskCount }) {
+  const parts = [name]
+  if (hoursPerWeek > 0) parts.push(`${formatPerWeek(hoursPerWeek, { spoken: true })}${bookingEndDate ? ` until ${formatDate(bookingEndDate)}` : ''}`)
+  else if (bookingEndDate) parts.push(`booked until ${formatDate(bookingEndDate)}`)
+  if (openTaskCount > 0) parts.push(`${openTaskCount} open ${openTaskCount === 1 ? 'task' : 'tasks'}`)
+  return parts.join(' · ')
+}

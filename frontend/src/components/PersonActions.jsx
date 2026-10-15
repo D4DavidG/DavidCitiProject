@@ -4,6 +4,7 @@ import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormHelperText, Menu, MenuItem, Typography,
 } from '@mui/material'
 import ArrowIcon from '@mui/icons-material/KeyboardArrowDownOutlined'
+import ArchivePersonDialog from './ArchivePersonDialog'
 import ConfirmDialog from './ConfirmDialog'
 import FormDialog from './FormDialog'
 import HistoryPanel from './HistoryPanel'
@@ -306,16 +307,8 @@ export default function PersonActions({ person = null, userId, name, label = 'Ac
           onClose={close}
         />
       )}
-      {dialog?.kind === 'archive' && (
-        <ConfirmDialog
-          open
-          title={`Archive ${targetName}?`}
-          message="They can no longer sign in and their bookings end. Their history (logged time, audit trail) is kept, and an admin can reactivate them."
-          confirmLabel="Archive account"
-          onConfirm={() => saved(request('POST', `/users/${target.userId}/archive`))}
-          onClose={close}
-        />
-      )}
+      {/* Checks first which live projects they are still on, and flags them in red before archiving. */}
+      {dialog?.kind === 'archive' && <ArchivePersonDialog person={target} onArchived={onChanged} onClose={close} />}
       {shown && <PasswordShown {...shown} onClose={() => setShown(null)} />}
     </Box>
   )

@@ -20,7 +20,8 @@ function stubClipboard(writeText = vi.fn().mockResolvedValue(undefined)) {
 afterEach(() => { delete navigator.clipboard })
 
 function renderPeople(user = USERS.admin, answers = {}) {
-  const calls = stubApi({ 'GET /users': [200, page([MARIA, BEN, DEV])], ...answers })
+  // Ben is on no live project, so Archive asks nothing more (ArchivePersonDialog has the warning's own tests).
+  const calls = stubApi({ 'GET /users': [200, page([MARIA, BEN, DEV])], 'GET /users/4/projects': [200, page([])], ...answers })
   renderAt(<PeoplePage />, { path: '/people', auth: session(user) })
   return calls
 }
@@ -32,6 +33,13 @@ async function choose(person, item) {
 }
 
 const CAPACITY = 'Capacity, overtime and task limit'
+
+/** The Archive dialog's confirm button, once the check of their live projects has unlocked it. */
+async function archiveButton() {
+  const button = within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i })
+  await waitFor(() => expect(button).toBeEnabled())
+  return button
+}
 
 describe('PeoplePage', () => {
   it('lists people with username, role, capacity, and salary where the server shares it', async () => {
@@ -213,16 +221,16 @@ describe('PeoplePage', () => {
   it('archives an account after confirming', async () => {
     const calls = renderPeople(USERS.admin, { 'POST /users/4/archive': [200, { ...BEN, isArchived: true }] })
     await choose('Ben Okafor', 'Archive')
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
+    await userEvent.click(await archiveButton())
     await waitFor(() => expect(calls.some((c) => c.path === '/users/4/archive')).toBe(true))
   })
 
   it('archives once, however often Archive account is pressed, and shows a refusal in the dialog', async () => {
     const calls = renderPeople(USERS.admin, { 'POST /users/4/archive': [409, { error: 'Ben Okafor manages a live project: hand it over first.' }] })
     await choose('Ben Okafor', 'Archive')
-    const dialog = await screen.findByRole('dialog')
+    const confirm = await archiveButton()
+    const dialog = screen.getByRole('dialog')
     const release = holdOpen('/users/4/archive')
-    const confirm = within(dialog).getByRole('button', { name: /archive account/i })
     fireEvent.click(confirm)
     fireEvent.click(confirm)
     expect(within(dialog).getByRole('button', { name: /please wait/i })).toBeDisabled()
@@ -271,7 +279,7 @@ describe('PeoplePage', () => {
     await screen.findByText('Maria Lopez')
     await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
     await choose('Ben Okafor', 'Archive')
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
+    await userEvent.click(await archiveButton())
     expect(await screen.findByText('Maria Lopez')).toBeInTheDocument()
     expect(screen.queryByText('Nobody matches.')).not.toBeInTheDocument()
     expect(calls.at(-1).query.page).toBe('1')
