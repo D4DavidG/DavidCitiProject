@@ -11,6 +11,7 @@ import FormDialog from '../../components/FormDialog'
 import HistoryPanel from '../../components/HistoryPanel'
 import PageHeader from '../../components/PageHeader'
 import PageState, { Pager } from '../../components/PageState'
+import SearchField from '../../components/SearchField'
 import { useAuth } from '../../auth/useAuth'
 import { ROLE_LABELS } from '../../components/navigation'
 import { formatCents } from '../../services/format'
@@ -93,7 +94,6 @@ export default function PeoplePage() {
   const { user } = useAuth()
   const isMobile = useIsMobile()
   const isAdmin = user.role === 'ADMIN'
-  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [role, setRole] = useState('')
   const [includeArchived, setIncludeArchived] = useState(false)
@@ -180,9 +180,10 @@ export default function PeoplePage() {
       />
       {message && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
 
-      <Box component="form" onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); setPageNumber(1) }} sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, alignItems: 'center' }}>
-        <TextField id="people-search" label="Search people" size="small" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} sx={{ flex: '1 1 220px' }} placeholder="Name, username or email" />
-        <Button type="submit" variant="outlined">Search</Button>
+      <Box sx={{ mb: 2 }}>
+        <SearchField id="people-search" label="Search people" placeholder="Name, username or email" onSearch={(q) => { setSearch(q); setPageNumber(1) }} />
+      </Box>
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, alignItems: 'center' }}>
         <TextField id="people-role" select label="Role" size="small" value={role} onChange={(e) => { setRole(e.target.value); setPageNumber(1) }} sx={{ minWidth: 160 }}>
           <MenuItem value="">All roles</MenuItem>
           <MenuItem value="ADMIN">Admins</MenuItem>

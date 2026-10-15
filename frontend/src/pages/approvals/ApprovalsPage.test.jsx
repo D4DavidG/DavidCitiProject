@@ -54,6 +54,24 @@ describe('ApprovalsPage', () => {
     await waitFor(() => expect(calls.some((c) => c.path === '/time-entries/30/reject')).toBe(true))
   })
 
+  it('searches on the server and goes back to page 1', async () => {
+    const calls = renderQueue({ 'GET /approvals/time-entries': [200, page([ENTRY], { totalPages: 3 })] })
+    await screen.findByText('Ben Okafor')
+    expect(calls[0].query.q).toBeUndefined()
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search approvals' }), 'ben')
+    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'ben', page: '1' }))
+  })
+
+  it('says so when a search finds nothing, not that nothing is waiting', async () => {
+    renderQueue({ 'GET /approvals/time-entries': ({ query }) => [200, page(query.q ? [] : [ENTRY])] })
+    await screen.findByText('Ben Okafor')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search approvals' }), 'zzz')
+    expect(await screen.findByText(/matches your search/i)).toBeInTheDocument()
+    expect(screen.queryByText(/nothing waiting for approval/i)).not.toBeInTheDocument()
+  })
+
   it("shows the server's refusal", async () => {
     renderQueue({ 'POST /time-entries/30/approve': [404, { error: 'Time entry not found.' }] })
     await screen.findByText('Ben Okafor')

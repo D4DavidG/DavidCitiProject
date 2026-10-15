@@ -58,6 +58,23 @@ describe('NotificationsPage', () => {
     await waitFor(() => expect(calls.at(-1).query.unread).toBe('true'))
   })
 
+  it('searches on the server and goes back to page 1', async () => {
+    const calls = renderPage({ 'GET /notifications': [200, page([UNREAD, READ], { totalPages: 3 })] })
+    await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    expect(calls[0].query.q).toBeUndefined()
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search notifications' }), 'email')
+    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'email', page: '1' }))
+  })
+
+  it('says so when a search finds nothing', async () => {
+    renderPage({ 'GET /notifications': ({ query }) => [200, page(query.q ? [] : [UNREAD])] })
+    await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search notifications' }), 'zzz')
+    expect(await screen.findByText('No notifications match your search.')).toBeInTheDocument()
+  })
+
   it('says when there is nothing new, and offers nothing to mark', async () => {
     renderPage({ 'GET /notifications': [200, page([])] })
     expect(await screen.findByText(/no notifications/i)).toBeInTheDocument()

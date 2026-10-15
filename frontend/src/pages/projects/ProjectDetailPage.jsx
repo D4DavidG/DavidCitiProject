@@ -15,7 +15,9 @@ import { useApi } from '../../services/useApi'
 import BoardTab from './BoardTab'
 import BudgetTab from './BudgetTab'
 import DeliverablesTab from './DeliverablesTab'
+import RequestArchiveDialog from './RequestArchiveDialog'
 import ResourcesTab from './ResourcesTab'
+import { archiveAction } from './archiveAction'
 import { PROJECT_STATUSES } from './constants'
 
 const MANAGER_FIELDS = [
@@ -54,7 +56,9 @@ EditProjectDialog.propTypes = {
 /**
  * One project: its header (status, dates, manager, progress), then tabs for
  * deliverables (question 4), resources (who is booked) and budget (question 7),
- * and a link to the dependency view (question 6).
+ * and a link to the dependency view (question 6). The header offers Archive project to
+ * admins and Request archive to the project's own manager. Employees see the
+ * "Resources" tab as "People".
  */
 export default function ProjectDetailPage() {
   const projectId = Number(useParams().id)
@@ -63,6 +67,8 @@ export default function ProjectDetailPage() {
   const [editing, setEditing] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [reactivating, setReactivating] = useState(false)
+  const [requesting, setRequesting] = useState(false)
+  const [requestSent, setRequestSent] = useState(false)
   const [actionError, setActionError] = useState(null)
 
   const loadProject = useCallback(() => request('GET', `/projects/${projectId}`), [projectId])
@@ -94,6 +100,7 @@ export default function ProjectDetailPage() {
   const isAdmin = user.role === 'ADMIN'
   const canManage = Boolean(p) && !p.isArchived && (isAdmin || (user.role === 'MANAGER' && p.managerId === user.userId))
   const showBudget = user.role !== 'EMPLOYEE'
+  const archive = p ? archiveAction(user, p) : null
   const people = [...new Map((bookings.data?.items ?? []).map((b) => [b.userId, b.personName])).entries()]
 
   return (
@@ -107,7 +114,8 @@ export default function ProjectDetailPage() {
               <>
                 <Button component={Link} to={`/projects/${projectId}/dependencies`} variant="outlined">Dependency view</Button>
                 {canManage && <Button variant="outlined" onClick={() => setEditing(true)}>Edit project</Button>}
-                {isAdmin && !p.isArchived && <Button color="inherit" onClick={() => setArchiving(true)}>Archive project</Button>}
+                {archive === 'archive' && <Button color="inherit" onClick={() => setArchiving(true)}>Archive project</Button>}
+                {archive === 'request' && <Button color="inherit" onClick={() => setRequesting(true)}>Request archive</Button>}
                 {isAdmin && p.isArchived && (
                   <Button variant="contained" onClick={reactivate} disabled={reactivating}>{reactivating ? 'Reactivating…' : 'Reactivate'}</Button>
                 )}
@@ -115,6 +123,7 @@ export default function ProjectDetailPage() {
             )}
           />
           {actionError && <Alert severity="error" sx={{ mb: 2 }}>{actionError}</Alert>}
+          {requestSent && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setRequestSent(false)}>Request sent. An admin will answer it.</Alert>}
           {p.isArchived && <Alert severity="warning" sx={{ mb: 2 }}>This project is archived: hidden from lists and read-only, but kept with its history.</Alert>}
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
@@ -126,7 +135,7 @@ export default function ProjectDetailPage() {
 
           <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" allowScrollButtonsMobile>
             <Tab value="deliverables" label="Deliverables" />
-            <Tab value="resources" label="Resources" />
+            <Tab value="resources" label={user.role === 'EMPLOYEE' ? 'People' : 'Resources'} />
             {showBudget && <Tab value="budget" label="Budget" />}
             <Tab value="board" label="Board" />
           </Tabs>
@@ -141,6 +150,7 @@ export default function ProjectDetailPage() {
           {tab === 'board' && <BoardTab projectId={projectId} canManage={canManage} />}
 
           {editing && <EditProjectDialog project={p} isAdmin={isAdmin} onClose={() => setEditing(false)} onSaved={() => project.reload()} />}
+          {requesting && <RequestArchiveDialog project={p} onSent={() => setRequestSent(true)} onClose={() => setRequesting(false)} />}
           {archiving && (
             <ConfirmDialog
               open

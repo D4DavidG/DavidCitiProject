@@ -3,6 +3,7 @@ import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, Switch, 
 import PageHeader from '../../components/PageHeader'
 import { useAuth } from '../../auth/useAuth'
 import PageState, { Pager } from '../../components/PageState'
+import SearchField from '../../components/SearchField'
 import { formatDateTime } from '../../services/format'
 import { onUnreadChange, request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -23,11 +24,12 @@ const SUBTITLES = {
 export default function NotificationsPage() {
   const { user } = useAuth()
   const [unreadOnly, setUnreadOnly] = useState(false)
+  const [q, setQ] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
   const [error, setError] = useState(null)
   const load = useCallback(() => request('GET', '/notifications', {
-    query: { unread: unreadOnly ? 'true' : undefined, page: pageNumber, pageSize: 20 },
-  }), [unreadOnly, pageNumber])
+    query: { unread: unreadOnly ? 'true' : undefined, q, page: pageNumber, pageSize: 20 },
+  }), [unreadOnly, q, pageNumber])
   const notifications = useApi(load)
   const { reload } = notifications
 
@@ -53,6 +55,9 @@ export default function NotificationsPage() {
         subtitle={SUBTITLES[user.role]}
         actions={<Button variant="outlined" disabled={nothingUnread} onClick={() => write('/notifications/read-all')}>Mark all as read</Button>}
       />
+      <Box sx={{ mb: 2 }}>
+        <SearchField label="Search notifications" placeholder="Words in the message" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
+      </Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <FormControlLabel
         sx={{ mb: 2 }}
@@ -63,7 +68,7 @@ export default function NotificationsPage() {
         loading={notifications.loading && !notifications.data}
         error={notifications.error}
         onRetry={notifications.reload}
-        empty={notifications.data && items.length === 0 ? 'No notifications.' : null}
+        empty={notifications.data && items.length === 0 ? (q ? 'No notifications match your search.' : 'No notifications.') : null}
       >
         <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0, display: 'grid', gap: 1 }}>
           {items.map((n) => (

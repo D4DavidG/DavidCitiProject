@@ -7,6 +7,7 @@ import AuditChanges from '../../components/AuditChanges'
 import { ENTITY_LABELS, actionLabel } from '../../components/auditText'
 import PageHeader from '../../components/PageHeader'
 import PageState, { Pager } from '../../components/PageState'
+import SearchField from '../../components/SearchField'
 import { ROLE_LABELS } from '../../components/navigation'
 import { formatDateTime } from '../../services/format'
 import { usePeopleOptions } from '../../services/people'
@@ -24,12 +25,13 @@ const EMPTY_FILTERS = { actorId: '', entityType: '', entityId: '', dateFrom: '',
 export default function AuditLogPage() {
   const [draft, setDraft] = useState(EMPTY_FILTERS)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [q, setQ] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
   const [open, setOpen] = useState(null)
   const { options: people } = usePeopleOptions(undefined)
   const names = Object.fromEntries(people)
 
-  const load = useCallback(() => request('GET', '/admin/audit-log', { query: { ...filters, page: pageNumber, pageSize: 25 } }), [filters, pageNumber])
+  const load = useCallback(() => request('GET', '/admin/audit-log', { query: { ...filters, q, page: pageNumber, pageSize: 25 } }), [filters, q, pageNumber])
   const { data, error, loading, reload } = useApi(load)
   const set = (name) => (e) => setDraft({ ...draft, [name]: e.target.value })
 
@@ -37,6 +39,9 @@ export default function AuditLogPage() {
     <>
       <PageHeader title="Audit log" subtitle="Every change, who made it and when. Nothing here can be edited or deleted." />
 
+      <Box sx={{ mb: 2 }}>
+        <SearchField label="Search the audit log" placeholder="Person, record type or action" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
+      </Box>
       <Box
         component="form"
         onSubmit={(e) => { e.preventDefault(); setFilters(draft); setPageNumber(1) }}

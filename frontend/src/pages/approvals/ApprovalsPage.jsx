@@ -4,6 +4,7 @@ import DataTable from '../../components/DataTable'
 import OverCapacityMark from '../../components/OverCapacityMark'
 import PageHeader from '../../components/PageHeader'
 import PageState, { Pager } from '../../components/PageState'
+import SearchField from '../../components/SearchField'
 import { formatDate, formatHours } from '../../services/format'
 import { request } from '../../services/request'
 import { useApi } from '../../services/useApi'
@@ -14,8 +15,9 @@ import { useApi } from '../../services/useApi'
  * their own (the server enforces both).
  */
 export default function ApprovalsPage() {
+  const [q, setQ] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
-  const load = useCallback(() => request('GET', '/approvals/time-entries', { query: { page: pageNumber, pageSize: 20 } }), [pageNumber])
+  const load = useCallback(() => request('GET', '/approvals/time-entries', { query: { q, page: pageNumber, pageSize: 20 } }), [q, pageNumber])
   const { data, error, loading, reload } = useApi(load)
   const [message, setMessage] = useState(null)
   const [busy, setBusy] = useState(null)
@@ -62,9 +64,13 @@ export default function ApprovalsPage() {
         title="Approvals"
         subtitle="Time your team logged, waiting for your decision. Only approved time counts against a project's budget."
       />
+      <Box sx={{ mb: 3 }}>
+        <SearchField label="Search approvals" placeholder="Person, task or project" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
+      </Box>
       {message && <Alert severity={message.severity} sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
       <PageState loading={loading && !data} error={error} onRetry={reload}>
-        <DataTable columns={columns} rows={data?.items ?? []} rowKey="entryId" label="Time waiting for approval" empty="Nothing waiting for approval." />
+        <DataTable columns={columns} rows={data?.items ?? []} rowKey="entryId" label="Time waiting for approval"
+          empty={q ? 'No time waiting for approval matches your search.' : 'Nothing waiting for approval.'} />
         <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
       </PageState>
     </>

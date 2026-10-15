@@ -289,6 +289,62 @@ describe('ProjectDetailPage', () => {
     expect(screen.queryByRole('button', { name: /sign off/i })).not.toBeInTheDocument()
   })
 
+  it('calls the Resources tab "People" for employees, and "Resources" for managers and admins', async () => {
+    renderDetail(USERS.employee)
+    await screen.findByRole('heading', { name: 'Apollo' })
+    expect(screen.getByRole('tab', { name: 'People' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Resources' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }))
+    expect(await screen.findByText('Ana Ruiz')).toBeInTheDocument()
+  })
+
+  it.each([['manager', USERS.manager], ['admin', USERS.admin]])('keeps the brief\'s word "Resources" for a %s', async (_, user) => {
+    renderDetail(user)
+    await screen.findByRole('heading', { name: 'Apollo' })
+    expect(screen.getByRole('tab', { name: 'Resources' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'People' })).not.toBeInTheDocument()
+  })
+
+  describe('archive buttons in the header', () => {
+    it("lets the project's manager ask the admins, with an optional reason", async () => {
+      const calls = renderDetail(USERS.manager, { 'POST /project-requests': [201, { requestId: 4 }] })
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.queryByRole('button', { name: /^archive project$/i })).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: /^request archive$/i }))
+      const dialog = await screen.findByRole('dialog', { name: /request archive of apollo/i })
+      await userEvent.type(within(dialog).getByLabelText(/reason/i), 'Handed over')
+      await userEvent.click(within(dialog).getByRole('button', { name: /send request/i }))
+      await waitFor(() => expect(calls.find((c) => c.method === 'POST').body)
+        .toEqual({ kind: 'ARCHIVE_PROJECT', projectId: 1, justification: 'Handed over' }))
+      expect(await screen.findByText(/request sent.*an admin will answer it/i)).toBeInTheDocument()
+    })
+
+    it('gives an admin Archive project, not the request', async () => {
+      renderDetail(USERS.admin)
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.getByRole('button', { name: /^archive project$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /request archive/i })).not.toBeInTheDocument()
+    })
+
+    it("gives another project's manager neither", async () => {
+      renderDetail(USERS.manager, { 'GET /projects/1': [200, { ...APOLLO, managerId: 9 }] })
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.queryByRole('button', { name: /archive/i })).not.toBeInTheDocument()
+    })
+
+    it('offers an employee neither', async () => {
+      renderDetail(USERS.employee)
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.queryByRole('button', { name: /archive/i })).not.toBeInTheDocument()
+    })
+
+    it('offers the manager nothing once the project is archived', async () => {
+      renderDetail(USERS.manager, { 'GET /projects/1': [200, { ...APOLLO, isArchived: true }] })
+      await screen.findByRole('heading', { name: 'Apollo' })
+      expect(screen.queryByRole('button', { name: /archive/i })).not.toBeInTheDocument()
+    })
+  })
+
   it('answers a project that is not yours the same as a missing one', async () => {
     renderDetail(USERS.manager, { 'GET /projects/1': [404, { error: 'Project not found.' }] })
     expect(await screen.findByText('Project not found.')).toBeInTheDocument()

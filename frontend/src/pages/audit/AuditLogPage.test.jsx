@@ -50,6 +50,26 @@ describe('AuditLogPage', () => {
     await waitFor(() => expect(calls.at(-1).query).toMatchObject({ actorId: '3', entityType: 'users', dateFrom: '2026-10-13' }))
   })
 
+  it('searches on the server and goes back to page 1', async () => {
+    const calls = renderLog({ 'GET /admin/audit-log': [200, page([EMAIL_CHANGE, CREATED], { totalPages: 3 })] })
+    await screen.findByRole('table', { name: /audit log/i })
+    expect(calls.find((c) => c.path === '/admin/audit-log').query.q).toBeUndefined()
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search the audit log' }), 'ana')
+    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'ana', page: '1' }))
+  })
+
+  it('keeps the search when filters are applied, and the filters when searching', async () => {
+    const calls = renderLog()
+    await screen.findByRole('table', { name: /audit log/i })
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search the audit log' }), 'ana')
+    await waitFor(() => expect(calls.at(-1).query.q).toBe('ana'))
+    await userEvent.type(screen.getByLabelText(/^from/i), '2026-10-13')
+    await userEvent.click(screen.getByRole('button', { name: /apply/i }))
+    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'ana', dateFrom: '2026-10-13' }))
+  })
+
   it('shows only the fields that changed, before and after', async () => {
     renderLog()
     const table = await screen.findByRole('table', { name: /audit log/i })

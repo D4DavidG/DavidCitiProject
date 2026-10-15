@@ -42,11 +42,20 @@ describe('PeoplePage', () => {
     const calls = renderPeople()
     await screen.findByRole('table', { name: 'People' })
     await userEvent.type(screen.getByLabelText(/search people/i), 'okafor')
-    await userEvent.click(screen.getByRole('button', { name: /^search$/i }))
     await waitFor(() => expect(calls.at(-1).query.search).toBe('okafor'))
     await userEvent.click(screen.getByLabelText(/^role/i))
     await userEvent.click(await screen.findByRole('option', { name: 'Employees' }))
     await waitFor(() => expect(calls.at(-1).query.role).toBe('EMPLOYEE'))
+  })
+
+  it('searches as you type, with no Search button, and goes back to page 1', async () => {
+    const calls = renderPeople(USERS.admin, { 'GET /users': [200, page([MARIA, BEN, DEV], { totalPages: 3 })] })
+    await screen.findByRole('table', { name: 'People' })
+    expect(screen.queryByRole('button', { name: /^search$/i })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
+    await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search people' }), 'ben')
+    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ search: 'ben', page: '1' }))
   })
 
   it('creates an account and shows the generated username and password once', async () => {
