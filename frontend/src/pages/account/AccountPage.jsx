@@ -42,7 +42,7 @@ export default function AccountPage() {
         actions={(
           <>
             <Button variant="contained" onClick={() => setEditing(true)}>Edit my details</Button>
-            <Button component={Link} to="/change-password" variant="outlined">Change password</Button>
+            <Button component={Link} to="/change-password">Change password</Button>
           </>
         )}
       />

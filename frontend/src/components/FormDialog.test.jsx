@@ -483,10 +483,10 @@ describe('FormDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith({ overtimeAllowed: true })
   })
 
-  it('has one primary button (Save) and Cancel as the secondary kind', () => {
+  it('fills both Save and Cancel, like every button on the site (spec 6.2)', () => {
     renderForm({})
     expect(screen.getByRole('button', { name: /save/i })).toHaveClass('MuiButton-contained')
-    expect(screen.getByRole('button', { name: /cancel/i })).toHaveClass('MuiButton-outlined')
+    expect(screen.getByRole('button', { name: /cancel/i })).toHaveClass('MuiButton-contained')
   })
 
   it('closes after a successful save', async () => {
