@@ -63,19 +63,22 @@ test('an employee logs time, the manager approves it, and it counts as spent', a
   await dialog.getByLabel('Note').fill(note)
   await dialog.getByRole('button', { name: 'Log' }).click()
   await expect(employee.getByText("Logged 15 min on Portal UI. It's waiting for approval.")).toBeVisible()
+  // My logged time is a folded section: open it to see the entry.
+  await employee.getByRole('button', { name: /^My logged time/ }).click()
   const mine = employee.getByRole('table', { name: 'My logged time' }).getByRole('row').filter({ hasText: note })
   await expect(mine).toContainText('Pending')
 
-  // Maria approves it from Approvals.
+  // Maria approves it from Approvals. The Saved pop-up confirms it, and the entry leaves the queue.
   await manager.goto('/#/approvals')
   const row = manager.getByRole('row').filter({ hasText: note })
   await expect(row).toContainText('Ben Okafor')
   await row.getByRole('button', { name: 'Approve 15 min by Ben Okafor' }).click()
-  await expect(manager.getByText('Approved 15 min by Ben Okafor.')).toBeVisible()
+  await expect(manager.getByRole('status').filter({ hasText: /^Saved$/ })).toBeVisible()
   await expect(manager.getByRole('row').filter({ hasText: note })).toHaveCount(0)
 
-  // Ben sees it approved.
+  // Ben sees it approved (the reload folds My logged time again).
   await employee.reload()
+  await employee.getByRole('button', { name: /^My logged time/ }).click()
   await expect(employee.getByRole('table', { name: 'My logged time' }).getByRole('row').filter({ hasText: note }))
     .toContainText('Approved')
 

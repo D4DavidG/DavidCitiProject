@@ -26,7 +26,8 @@ test("a manager reads a report's history, without the before/after state", async
   await signIn(page, MANAGER)
   await page.goto('/#/people')
   await page.getByLabel('Search people').fill('ana.ruiz')
-  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  // The search runs as you type (after a 300 ms pause): wait until the list is down to Ana.
+  await expect(page.getByRole('button', { name: /^History for / })).toHaveCount(1)
   await page.getByRole('button', { name: 'History for Ana Ruiz' }).click()
   const dialog = page.getByRole('dialog', { name: 'History: Ana Ruiz' })
   await expect(dialog.getByRole('table', { name: 'History' })).toBeVisible()

@@ -71,8 +71,10 @@ test('a late row says Late with the icon, and its tooltip opens on hover', async
   const chart = await openZeus(page)
   const row = migration(chart)
   await expect(row).toContainText('Late, 0%')
-  await expect(row.getByTestId('WarningAmberRoundedIcon')).toBeVisible()
-  await expect(row.getByText('Late, 0%')).toHaveCSS('color', 'rgb(198, 40, 40)') // error.main, #C62828
+  // The warning icon sits on the same line as the words, just before them. Not found by MUI's
+  // data-testid: MUI adds that only in development, so on the built site (AWS) it is not there.
+  await expect(row.getByText('Late, 0%').locator('..').locator('svg')).toBeVisible()
+  await expect(row.getByText('Late, 0%')).toHaveCSS('color', 'rgb(179, 38, 30)') // the theme's error.main, #B3261E
   await expect(page.getByRole('tooltip')).toHaveCount(0)
   await row.hover()
   await expect(page.getByRole('tooltip')).toHaveText(/^0% done · Migration · Aug \d+ – Oct \d+, 2026 · Late$/)

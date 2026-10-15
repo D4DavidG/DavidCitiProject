@@ -20,13 +20,15 @@ test.skip(!(process.env.E2E_BASE_URL ?? 'http://localhost').includes('localhost'
 /** An ISO date `days` from today (the browser's date input takes YYYY-MM-DD). */
 const isoIn = (days) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10)
 
-/** The projects list, searched for this run's project, with Show archived on or off. */
+/**
+ * The projects list, searched for this run's project, with Show archived on or off. The search
+ * runs as you type (after a 300 ms pause), so the caller's expect waits for the answer.
+ */
 async function findInList(page, showArchived) {
   await page.goto('/#/projects')
   const toggle = page.getByLabel('Show archived')
   if ((await toggle.isChecked()) !== showArchived) await toggle.click()
   await page.getByLabel('Search projects').fill(name)
-  await page.getByRole('button', { name: 'Search', exact: true }).click()
 }
 
 /** Archive the open project through its confirmation dialog. */

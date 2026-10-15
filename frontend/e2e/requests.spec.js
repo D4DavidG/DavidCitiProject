@@ -1,6 +1,6 @@
 /*
  * Requests for everyone, end to end: an employee (Ana) asks her line manager (Maria) a
- * free-text question, Maria rejects it with a note from To decide, and Ana sees the
+ * free-text question, Maria rejects it with a note from Approve or deny, and Ana sees the
  * answer on her phone. Run it LOCALLY only: it writes one rejected request, its CREATE
  * and REJECT audit rows, and bell notifications. Free text plus reject, so nobody's
  * task limit, overtime or projects change.
@@ -42,11 +42,14 @@ test('an employee asks, the manager answers, the employee sees it on a phone', a
   await expect(asker.getByRole('row', { name: new RegExp(subject) })).toContainText('Pending')
 
   const decider = await openRequests(browser, maria)
-  await decider.getByRole('tab', { name: 'To decide' }).click()
+  await decider.getByRole('tab', { name: 'Approve or deny' }).click()
   await decider.getByRole('button', { name: `Reject ${subject}` }).click()
   await decider.getByLabel('Note to Ana Ruiz').fill('Ask me at our one-to-one')
   await decider.getByRole('button', { name: 'Reject', exact: true }).click()
-  await expect(decider.getByText(`Rejected: ${subject}.`)).toBeVisible()
+  // The Saved pop-up confirms it, and the row shows the new status with no Reject button left.
+  await expect(decider.getByRole('status').filter({ hasText: /^Saved$/ })).toBeVisible()
+  await expect(decider.getByRole('row', { name: new RegExp(subject) })).toContainText('Rejected')
+  await expect(decider.getByRole('button', { name: `Reject ${subject}` })).toHaveCount(0)
 
   const phone = await openRequests(browser, ana, { width: 390, height: 844 })
   const card = phone.getByRole('list', { name: 'Requests' }).getByRole('listitem').filter({ hasText: subject })

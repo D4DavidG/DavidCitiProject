@@ -89,6 +89,13 @@ for (const [name, size] of [['desktop', { width: 1440, height: 900 }], ['phone',
   })
 }
 
+/**
+ * The open tooltip that says exactly `sentence`. Found by its words, not as "the only tooltip":
+ * tabbing passes the home timeline's rows first, and the last one's tooltip is still fading out
+ * for a moment when Ben's opens.
+ */
+const tooltip = (page, sentence) => page.getByRole('tooltip', { name: sentence, exact: true })
+
 test('tabbing onto a row opens its tooltip, as hovering does', async ({ page }) => {
   const chart = await openDashboard(page)
   const row = ben(chart)
@@ -96,7 +103,7 @@ test('tabbing onto a row opens its tooltip, as hovering does', async ({ page }) 
   await expect(row).toHaveAttribute('aria-label', sentence)
 
   await row.hover()
-  await expect(page.getByRole('tooltip')).toHaveText(sentence)
+  await expect(tooltip(page, sentence)).toBeVisible()
   await page.mouse.move(0, 0)
   await expect(page.getByRole('tooltip')).toHaveCount(0)
 
@@ -108,7 +115,8 @@ test('tabbing onto a row opens its tooltip, as hovering does', async ({ page }) 
     reached = await row.evaluate((el) => el === document.activeElement)
   }
   expect(reached, 'Tab reaches the row').toBe(true)
-  await expect(page.getByRole('tooltip')).toHaveText(sentence)
+  await expect(tooltip(page, sentence)).toBeVisible()
+  await expect(page.getByRole('tooltip')).toHaveCount(1) // the faded one has gone; only Ben's is left
   if (DIR) await page.screenshot({ path: `${DIR}/workload-focus.png` })
 })
 
@@ -159,7 +167,8 @@ test('words and the red and ink marks clear contrast against what is really behi
   expect(await contrast(row.getByText('Ben Okafor'), 'color')).toBeGreaterThanOrEqual(4.5)
   expect(await contrast(row.getByText('+5 h over'), 'color')).toBeGreaterThanOrEqual(4.5)
   expect(await contrast(row.getByText('45 / 40 h'), 'color')).toBeGreaterThanOrEqual(4.5)
-  expect(await contrast(chart.getByText('Not booked'), 'color')).toBeGreaterThanOrEqual(4.5)
+  // Every unbooked person's row says "Not booked" in the same colour; the live site has several, so check the first.
+  expect(await contrast(chart.getByText('Not booked').first(), 'color')).toBeGreaterThanOrEqual(4.5)
   expect(await contrast(chart.getByTestId('hour-axis').getByText('40 h'), 'color')).toBeGreaterThanOrEqual(4.5)
   expect(await contrast(row.getByTestId('over'), 'backgroundColor')).toBeGreaterThanOrEqual(3)
   expect(await contrast(row.getByTestId('capacity'), 'backgroundColor')).toBeGreaterThanOrEqual(3)

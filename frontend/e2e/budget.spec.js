@@ -43,15 +43,23 @@ for (const [name, size] of [['desktop', { width: 1440, height: 900 }], ['phone',
   })
 }
 
+/**
+ * The open tooltip that says exactly `sentence`. Found by its words, not as "the only tooltip":
+ * the Tab press below can land on a top-bar button first (on 15 Oct, the sun/moon button), and
+ * that button's tooltip is still fading out for a moment when the row's opens.
+ */
+const tooltip = (page, sentence) => page.getByRole('tooltip', { name: sentence, exact: true })
+
 test('a row opens its tooltip on hover and on keyboard focus', async ({ page }) => {
   const chart = await openDashboard(page)
   const row = chart.getByRole('img').first()
   const sentence = await row.getAttribute('aria-label')
   await row.hover()
-  await expect(page.getByRole('tooltip')).toHaveText(sentence)
+  await expect(tooltip(page, sentence)).toBeVisible()
   await page.mouse.move(0, 0)
   await expect(page.getByRole('tooltip')).toHaveCount(0)
   await page.keyboard.press('Tab')
   await row.focus()
-  await expect(page.getByRole('tooltip')).toHaveText(sentence)
+  await expect(tooltip(page, sentence)).toBeVisible()
+  await expect(page.getByRole('tooltip')).toHaveCount(1) // the faded one has gone; only the row's is left
 })
