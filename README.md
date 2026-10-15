@@ -259,6 +259,10 @@ Start at the index, [docs/README.md](docs/README.md). Every guide:
 | [docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md) | How David used Claude Code: instructions, agents and orchestration |
 | [CLAUDE.md](CLAUDE.md) | The working notes Claude Code reads on every session |
 
+The design write-ups, build plans and demo-day notes from 13 to 15 Oct were folded into these
+guides and removed from the tree; [DECISIONS.md, section 14](docs/DECISIONS.md#14-original-write-ups-in-git-history)
+gives the command that reads each one from git history.
+
 ## How it fits together
 
 ```text
