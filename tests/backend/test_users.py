@@ -272,6 +272,11 @@ def test_list_users_searches_filters_and_paginates(conn, org):
     assert (page["total"], page["page"], page["page_size"], page["total_pages"]) == (1, 1, 10, 1)
 
 
+def test_list_users_takes_q_like_every_other_list(conn, org):
+    page = users.list_users(conn, org["admin"], {"q": "ALI"}, page=1, page_size=10)
+    assert [u["first_name"] for u in page["items"]] == ["Alice"]
+
+
 def test_employees_cannot_list_users(conn, org):
     with pytest.raises(Forbidden):
         users.list_users(conn, org["alice"], {}, page=1, page_size=10)

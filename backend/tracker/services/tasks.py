@@ -226,10 +226,23 @@ def list_tasks(conn: psycopg.Connection, actor: Actor, milestone_id: int) -> lis
                         (milestone_id,)).fetchall()
 
 
-def my_tasks(conn: psycopg.Connection, actor: Actor) -> list[dict]:
-    """Your open tasks on live projects, oldest first."""
-    return conn.execute(f"{_WITH_NAMES} WHERE t.assignee_user_id = %s AND t.status <> 'DONE' AND NOT t.is_archived"
-                        " AND NOT p.is_archived ORDER BY m.due_date, t.task_id", (actor.user_id,)).fetchall()
+# The search box on My tasks and Ready to take: task title, deliverable name or project name.
+_SEARCH = "(t.title ILIKE %(q)s OR m.name ILIKE %(q)s OR p.name ILIKE %(q)s)"
+
+
+def _search(filters: dict | None) -> tuple[sql.Composable, dict]:
+    """The extra WHERE condition and parameter for `q`, or nothing when there is no search."""
+    pattern = values.search(filters or {})
+    return (sql.SQL(" AND " + _SEARCH), {"q": pattern}) if pattern else (sql.SQL(""), {})
+
+
+def my_tasks(conn: psycopg.Connection, actor: Actor, filters: dict | None = None) -> list[dict]:
+    """Your open tasks on live projects, oldest first, optionally searched (`q`)."""
+    condition, params = _search(filters)
+    return conn.execute(
+        sql.SQL("{} WHERE t.assignee_user_id = %(me)s AND t.status <> 'DONE' AND NOT t.is_archived"
+                " AND NOT p.is_archived{} ORDER BY m.due_date, t.task_id").format(sql.SQL(_WITH_NAMES), condition),
+        {"me": actor.user_id, **params}).fetchall()
 
 
 def board(conn: psycopg.Connection, actor: Actor, project_id: int) -> dict:
@@ -246,13 +259,18 @@ def board(conn: psycopg.Connection, actor: Actor, project_id: int) -> dict:
     return {"items": items, "people": people}
 
 
-def ready_tasks(conn: psycopg.Connection, actor: Actor) -> dict:
-    """Ready to take: unassigned, unfinished tasks on projects you are booked on, plus your held count and limit."""
+def ready_tasks(conn: psycopg.Connection, actor: Actor, filters: dict | None = None) -> dict:
+    """Ready to take: unassigned, unfinished tasks on projects you are booked on, plus your held count and limit.
+
+    `q` searches the task, deliverable and project names; the count and limit are always the whole.
+    """
+    condition, params = _search(filters)
     items = conn.execute(
         sql.SQL("{} WHERE t.assignee_user_id IS NULL AND t.status <> 'DONE' AND NOT t.is_archived"
                 " AND NOT p.is_archived AND EXISTS (SELECT 1 FROM assignments a"
-                " WHERE a.project_id = t.project_id AND a.user_id = %s AND NOT a.is_archived)"
-                " ORDER BY m.due_date, t.task_id").format(sql.SQL(_WITH_NAMES)), (actor.user_id,)).fetchall()
+                " WHERE a.project_id = t.project_id AND a.user_id = %(me)s AND NOT a.is_archived){}"
+                " ORDER BY m.due_date, t.task_id").format(sql.SQL(_WITH_NAMES), condition),
+        {"me": actor.user_id, **params}).fetchall()
     me = conn.execute(sql.SQL("SELECT {} AS held, u.task_limit FROM users u WHERE u.user_id = %s").format(HELD),
                       (actor.user_id,)).fetchone()
     return {"items": items, "held": me["held"], "limit": me["task_limit"]}

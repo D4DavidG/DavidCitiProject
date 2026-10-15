@@ -52,6 +52,16 @@ def text(data: dict, key: str, required: bool = True, max_length: int = 200) -> 
     return value
 
 
+def search(filters: dict) -> str | None:
+    """A list's search box: `q` (or `search`, the older name a few lists took), as an ILIKE pattern.
+
+    None when blank. The pattern is always passed as a parameter, never written into the SQL.
+    """
+    key = "q" if filters.get("q") is not None else "search"
+    term = text(filters, key, required=False, max_length=100)
+    return f"%{term}%" if term else None
+
+
 def date(data: dict, key: str, required: bool = True) -> dt.date | None:
     """A calendar date written YYYY-MM-DD."""
     value = _get(data, key, required)

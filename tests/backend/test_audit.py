@@ -210,13 +210,13 @@ def test_role_used_for_recipients_is_the_stored_one(conn, org):
 def test_user_lists_and_counts_their_unread_notifications(conn, org):
     users.update_self(conn, org["alice"], {"first_name": "Alicia"})
     assert notifications.unread_count(conn, org["boss"]) == 1
-    page = notifications.list_notifications(conn, org["boss"], unread_only=True, page=1, page_size=10)
+    page = notifications.list_notifications(conn, org["boss"], {"unread": True}, page=1, page_size=10)
     assert page["items"][0]["summary"].startswith("Alicia")
 
 
 def test_mark_read_only_works_on_your_own(conn, org):
     users.update_self(conn, org["alice"], {"first_name": "Alicia"})
-    note = notifications.list_notifications(conn, org["boss"], unread_only=True, page=1, page_size=10)["items"][0]
+    note = notifications.list_notifications(conn, org["boss"], {"unread": True}, page=1, page_size=10)["items"][0]
     with pytest.raises(Exception) as caught:
         notifications.mark_read(conn, org["loner"], note["notification_id"])
     assert type(caught.value).__name__ == "NotFound"
@@ -229,6 +229,32 @@ def test_read_all_clears_the_count(conn, org):
     users.update_self(conn, org["alice"], {"first_name": "A2"})
     notifications.read_all(conn, org["boss"])
     assert notifications.unread_count(conn, org["boss"]) == 0
+
+
+def test_notifications_search_the_message_ignoring_case(conn, org):
+    users.update_self(conn, org["alice"], {"first_name": "Alicia"})
+    users.update_self(conn, org["loner"], {"first_name": "Solo"})
+
+    def found(**filters):
+        return [n["summary"] for n in notifications.list_notifications(conn, org["admin"], filters, 1, 10)["items"]]
+    assert found(q="ALICIA") == ["Alicia Tester updated their profile"]
+    assert found(q="nobody") == []
+    notifications.read_all(conn, org["admin"])
+    assert found(q="solo", unread=True) == []  # both filters apply
+
+
+def test_audit_log_search_actor_name_entity_type_and_action_ignoring_case(conn, org):
+    users.update_self(conn, org["alice"], {"first_name": "Alicia"})
+    requests.create_request(conn, org["alice"], {"kind": "OVERTIME", "justification": "Launch week"})
+    alice = org["alice"].user_id
+
+    def found(q):
+        rows = audit.list_audit(conn, org["admin"], {"q": q}, page=1, page_size=50)["items"]
+        return {(r["actor_user_id"], r["entity_type"], r["action"]) for r in rows}
+    assert found("ALICIA") == {(alice, "users", "UPDATE"), (alice, "project_requests", "CREATE")}  # actor's name
+    assert found("project_req") == {(alice, "project_requests", "CREATE")}                       # entity type
+    assert found("upDATE") == {(alice, "users", "UPDATE")}                                       # action
+    assert found("nothing like this") == set()
 
 
 def test_admin_filters_the_audit_log(conn, org):

@@ -201,6 +201,29 @@ def test_admin_to_decide_has_every_request(conn, org):
     assert names(conn, org["admin"], scope="MINE") == []
 
 
+def test_requests_search_the_name_and_the_asker_ignoring_case(conn, org):
+    ask(conn, org["alice"], "OVERTIME")  # "Allow overtime"
+    file(conn, org["bob"])                # "Hermes"
+    assert names(conn, org["admin"], q="HERM") == ["Hermes"]          # request name
+    assert names(conn, org["admin"], q="alice") == ["Allow overtime"]  # the asker's name
+    assert names(conn, org["admin"], q="zeus") == []
+
+
+def test_scope_sent_and_decide_are_the_two_tabs(conn, org):
+    ask(conn, org["alice"], "OVERTIME")
+    file(conn, org["bob"])
+    assert names(conn, org["bob"], scope="sent") == ["Hermes"]
+    assert names(conn, org["bob"], scope="decide") == ["Allow overtime"]
+    assert names(conn, org["bob"], scope="decide", q="hermes") == []  # search stays inside the tab
+    assert names(conn, org["alice"], scope="decide") == []
+
+
+def test_any_other_scope_is_400_naming_the_field(conn, org):
+    with pytest.raises(ValidationError) as refused:
+        names(conn, org["bob"], scope="everyone")
+    assert refused.value.field == "scope"
+
+
 def test_kind_filter(conn, org):
     ask(conn, org["alice"], "OVERTIME")
     ask(conn, org["alice"], "OTHER", name="A desk")

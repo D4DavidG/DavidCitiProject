@@ -70,17 +70,22 @@ BODIES = {
     "reject_request": {"decisionNote": TEXT},
 }
 
-# Query filters beyond page and pageSize: handler name -> {query name: type}.
+# Query filters beyond page and pageSize: handler name -> {query name: type}. `q` is the
+# search box on every list; `search` is its older name on the three lists that had one.
 FILTERS = {
-    "list_users": {"search": TEXT, "role": TEXT, "includeArchived": BOOL},
+    "list_users": {"q": TEXT, "search": TEXT, "role": TEXT, "includeArchived": BOOL},
     "user_history": {"action": TEXT, "dateFrom": DATE, "dateTo": DATE},
-    "list_projects": {"search": TEXT, "status": TEXT, "includeArchived": BOOL},
+    "list_projects": {"q": TEXT, "search": TEXT, "status": TEXT, "includeArchived": BOOL},
+    "my_tasks": {"q": TEXT},
+    "ready_tasks": {"q": TEXT},
     "my_time": {"dateFrom": DATE, "dateTo": DATE},
-    "list_requests": {"scope": TEXT, "status": TEXT, "kind": TEXT},
-    "project_cards": {"search": TEXT, "status": TEXT},
+    "pending_time": {"q": TEXT},
+    "list_requests": {"q": TEXT, "scope": {"type": "string", "enum": ["sent", "decide"]}, "status": TEXT,
+                      "kind": TEXT},
+    "project_cards": {"q": TEXT, "search": TEXT, "status": TEXT},
     "allocation": {"weekFrom": DATE, "weeks": INT, "overOnly": BOOL},
-    "audit_log": {"actorId": INT, "entityType": TEXT, "entityId": INT, "dateFrom": DATE, "dateTo": DATE},
-    "list_notifications": {"unread": BOOL},
+    "audit_log": {"q": TEXT, "actorId": INT, "entityType": TEXT, "entityId": INT, "dateFrom": DATE, "dateTo": DATE},
+    "list_notifications": {"q": TEXT, "unread": BOOL},
 }
 
 COMPONENTS = {

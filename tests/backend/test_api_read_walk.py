@@ -173,6 +173,36 @@ def test_approving_time_snapshots_only_the_entry_not_the_joined_names(conn, worl
     assert {"status", "decidedBy", "decidedAt"} <= changed <= {"status", "decidedBy", "decidedAt", "updatedAt"}
 
 
+# --- search: q on every list (redesign spec, section 2) ----------------------------------------
+
+@pytest.mark.parametrize("who, path, q", [
+    ("alice", "/me/tasks", "SKETCH"),                  # task title
+    ("alice", "/me/ready-tasks", "spare"),             # task title
+    ("bob", "/approvals/time-entries", "alice"),       # person's name
+    ("bob", "/project-requests", "hermes"),            # request name
+    ("bob", "/notifications", "sketch"),               # message text
+    ("admin", "/admin/audit-log", "TIME_ENTRIES"),     # entity type
+    ("admin", "/users", "ali"),                        # the older lists take q too
+    ("bob", "/projects", "apol"),
+    ("bob", "/dashboard/projects", "apol"),
+])
+def test_q_searches_each_list_on_the_server(conn, world, who, path, q):
+    f.task(conn, world["bob"], world["build"], title="Spare")  # a Ready task for Alice's board
+    client = client_for(conn, world, who)
+    status, found = client.call("GET", path, query={"q": q})
+    assert status == 200 and found["total"] >= 1, found
+    status, missed = client.call("GET", path, query={"q": "no such thing"})
+    assert status == 200 and (missed["total"], missed["items"]) == (0, [])
+
+
+def test_request_scope_is_sent_or_decide_and_anything_else_is_400(conn, world):
+    b = client_for(conn, world, "bob")
+    assert [r["name"] for r in b.call("GET", "/project-requests", query={"scope": "sent"})[1]["items"]] == ["Hermes"]
+    assert b.call("GET", "/project-requests", query={"scope": "decide"})[1]["total"] == 0
+    status, payload = b.call("GET", "/project-requests", query={"scope": "everyone"})
+    assert status == 400 and payload["field"] == "scope"
+
+
 # --- the audit log's filters ----------------------------------------------------------------
 
 def test_audit_log_filters_by_actor_entity_and_date(conn, world):

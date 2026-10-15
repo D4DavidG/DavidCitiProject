@@ -94,7 +94,7 @@ def _project_manager(conn: psycopg.Connection, entity_type: str, entity_id: int 
 
 
 def list_audit(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
-    """Admin only: the audit log, newest first, filtered by actor, entity and date."""
+    """Admin only: the audit log, newest first, filtered by actor, entity and date, and searched (`q`)."""
     if not actor.is_admin:
         raise Forbidden("Only admins can read the audit log.")
     where, params = ["TRUE"], {}
@@ -107,6 +107,10 @@ def list_audit(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     if (entity_id := values.integer(filters, "entity_id", required=False)) is not None:
         where.append("entity_id = %(entity_id)s")
         params["entity_id"] = entity_id
+    if pattern := values.search(filters):  # the actor's name, the entity type or the action
+        where.append("(entity_type ILIKE %(q)s OR action ILIKE %(q)s OR actor_user_id IN"
+                     " (SELECT user_id FROM users WHERE first_name || ' ' || last_name ILIKE %(q)s))")
+        params["q"] = pattern
     _date_filters(filters, where, params)
     # The WHERE fragments are fixed strings from this function; every value is a parameter.
     query = sql.SQL("SELECT * FROM audit_log WHERE {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))

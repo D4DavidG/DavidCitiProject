@@ -88,15 +88,25 @@ def _kind_fields(conn: psycopg.Connection, actor: Actor, kind: str, data: dict) 
 # One condition shared by list and get.
 _MAY_DECIDE = "(r.requested_by <> %(me)s AND (%(admin)s OR (u.role = 'EMPLOYEE' AND u.manager_id = %(me)s)))"
 _MAY_SEE = f"(r.requested_by = %(me)s OR {_MAY_DECIDE})"
-_SCOPES = {"MINE": "r.requested_by = %(me)s", "TO_DECIDE": _MAY_DECIDE}
+# The Requests page's two tabs. MINE and TO_DECIDE are the names the website sent before
+# 15 Oct; they still work, so a page loaded before a deploy keeps working.
+_SCOPES = {"sent": "r.requested_by = %(me)s", "decide": _MAY_DECIDE}
+_OLD_SCOPES = {"MINE": "sent", "TO_DECIDE": "decide"}
 _SELECT = ("SELECT r.*, u.first_name || ' ' || u.last_name AS requester_name"
            " FROM project_requests r JOIN users u ON u.user_id = r.requested_by")
 
 
 def list_requests(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
-    """Your own requests (scope MINE), the ones you may decide (TO_DECIDE), or both (no scope)."""
-    scope = values.choice(filters, "scope", set(_SCOPES), required=False)
+    """Your own requests (scope `sent`), the ones you may decide (`decide`), or both (no scope).
+
+    `q` searches the request's name and the asker's name.
+    """
+    scope = filters.get("scope")
+    scope = values.choice({"scope": _OLD_SCOPES.get(scope, scope)}, "scope", set(_SCOPES), required=False)
     where, params = [_SCOPES[scope] if scope else _MAY_SEE], {"me": actor.user_id, "admin": actor.is_admin}
+    if pattern := values.search(filters):
+        where.append("(r.name ILIKE %(q)s OR u.first_name || ' ' || u.last_name ILIKE %(q)s)")
+        params["q"] = pattern
     if status := values.choice(filters, "status", STATUSES, required=False):
         where.append("r.status = %(status)s")
         params["status"] = status

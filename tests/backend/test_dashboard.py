@@ -117,6 +117,10 @@ def test_project_cards_can_be_searched_and_paginated(conn, org):
     assert (page["total"], page["total_pages"], [c["name"] for c in page["items"]]) == (2, 2, ["Zeus"])
 
 
+def test_project_cards_take_q_like_every_other_list(conn, org):
+    assert [c["name"] for c in cards(conn, org["admin"], {"q": "ZEU"})] == ["Zeus"]
+
+
 def test_at_risk_total_counts_every_page_not_just_this_one(conn, org):
     f.project(conn, org["admin"], org["carol"], name="Old", start_date="2026-08-01", predicted_end_date="2026-10-01")
     first = dashboard.project_cards(conn, org["admin"], {}, 1, 1)

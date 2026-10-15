@@ -293,9 +293,9 @@ def list_users(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     where, params = ["TRUE"], {}
     if not values.boolean(filters, "include_archived", required=False):
         where.append("NOT is_archived")
-    if search := values.text(filters, "search", required=False, max_length=100):
+    if pattern := values.search(filters):
         where.append("(first_name || ' ' || last_name ILIKE %(q)s OR username ILIKE %(q)s OR email ILIKE %(q)s)")
-        params["q"] = f"%{search}%"
+        params["q"] = pattern
     if role := values.choice(filters, "role", ROLES, required=False):
         where.append("role = %(role)s")
         params["role"] = role

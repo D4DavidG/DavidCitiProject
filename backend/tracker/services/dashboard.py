@@ -126,9 +126,9 @@ def _live_projects(conn: psycopg.Connection, actor: Actor, filters: dict) -> lis
     where, params = ["NOT p.is_archived"], {"me": actor.user_id}
     if not actor.is_admin:
         where.append("p.manager_id = %(me)s")
-    if search := values.text(filters, "search", required=False, max_length=100):
+    if pattern := values.search(filters):
         where.append("p.name ILIKE %(q)s")
-        params["q"] = f"%{search}%"
+        params["q"] = pattern
     if status := values.choice(filters, "status", project_service.STATUSES, required=False):
         where.append("p.status = %(status)s")
         params["status"] = status

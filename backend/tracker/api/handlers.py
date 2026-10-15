@@ -314,7 +314,7 @@ def board(ctx: Context) -> dict:
 
 def ready_tasks(ctx: Context) -> dict:
     """List the Ready tasks you can take, with how many you hold and your limit."""
-    result = tasks.ready_tasks(ctx.conn, ctx.actor)
+    result = tasks.ready_tasks(ctx.conn, ctx.actor, ctx.query)
     return {**_whole(result["items"], task_view), "held": result["held"], "limit": result["limit"]}
 
 
@@ -330,7 +330,7 @@ def reactivate_task(ctx: Context) -> dict:
 
 def my_tasks(ctx: Context) -> dict:
     """List the tasks assigned to you."""
-    return _whole(tasks.my_tasks(ctx.conn, ctx.actor), task_view)
+    return _whole(tasks.my_tasks(ctx.conn, ctx.actor, ctx.query), task_view)
 
 
 def log_time(ctx: Context) -> dict:
@@ -360,7 +360,7 @@ def reject_time(ctx: Context) -> dict:
 
 def pending_time(ctx: Context) -> dict:
     """List the time entries waiting for your approval."""
-    return _page(time_entries.pending_approvals(ctx.conn, ctx.actor, *ctx.page_args()), entry_view)
+    return _page(time_entries.pending_approvals(ctx.conn, ctx.actor, ctx.query, *ctx.page_args()), entry_view)
 
 
 # --- project requests ---------------------------------------------------------------------
@@ -428,8 +428,7 @@ def audit_log(ctx: Context) -> dict:
 
 def list_notifications(ctx: Context) -> dict:
     """List your notifications."""
-    result = notifications.list_notifications(ctx.conn, ctx.actor, ctx.query.get("unread", False), *ctx.page_args())
-    return _page(result, notification_view)
+    return _page(notifications.list_notifications(ctx.conn, ctx.actor, ctx.query, *ctx.page_args()), notification_view)
 
 
 def unread_count(ctx: Context) -> dict:

@@ -175,6 +175,18 @@ def test_my_tasks_lists_open_tasks_assigned_to_me(conn, org):
     assert [t["title"] for t in tasks.my_tasks(conn, org["alice"])] == [mine["title"]]
 
 
+def test_my_tasks_search_task_deliverable_and_project_names_ignoring_case(conn, org):
+    f.task(conn, org["bob"], org["design"], assignee=org["alice"], title="Sketch the logo")
+    f.task(conn, org["bob"], org["build"], assignee=org["alice"], title="Wire the API")
+
+    def found(q):
+        return sorted(t["title"] for t in tasks.my_tasks(conn, org["alice"], {"q": q}))
+    assert found("LOGO") == ["Sketch the logo"]                    # task title
+    assert found("buil") == ["Wire the API"]                       # deliverable name
+    assert found("aPOLLo") == ["Sketch the logo", "Wire the API"]  # project name
+    assert found("hermes") == []
+
+
 def test_manager_reassigns_and_re_estimates(conn, org):
     t = f.task(conn, org["bob"], org["design"], assignee=org["alice"])
     row = tasks.update_task(conn, org["bob"], t["task_id"], {"assignee_user_id": org["eve"].user_id,
@@ -236,7 +248,7 @@ def week_minutes(conn, org):
 
 
 def newest_summary(conn, person):
-    return notifications.list_notifications(conn, person, unread_only=False, page=1, page_size=1)["items"][0]["summary"]
+    return notifications.list_notifications(conn, person, {}, page=1, page_size=1)["items"][0]["summary"]
 
 
 def test_logging_past_capacity_asks_first_without_overtime(conn, org):
@@ -409,9 +421,22 @@ def test_pending_approvals_show_only_my_reports(conn, org):
     e_task = f.task(conn, org["bob"], org["design"], assignee=org["eve"])
     log(conn, org["alice"], a_task, "2026-10-12", 1)
     log(conn, org["eve"], e_task, "2026-10-12", 1)
-    bob_queue = time_entries.pending_approvals(conn, org["bob"], 1, 50)["items"]
+    bob_queue = time_entries.pending_approvals(conn, org["bob"], {}, 1, 50)["items"]
     assert [e["user_id"] for e in bob_queue] == [org["alice"].user_id]
-    assert len(time_entries.pending_approvals(conn, org["admin"], 1, 50)["items"]) == 2
+    assert len(time_entries.pending_approvals(conn, org["admin"], {}, 1, 50)["items"]) == 2
+
+
+def test_pending_approvals_search_person_task_and_project_ignoring_case(conn, org):
+    log(conn, org["alice"], f.task(conn, org["bob"], org["design"], assignee=org["alice"], title="Sketch"),
+        "2026-10-12", 1)
+    log(conn, org["eve"], f.task(conn, org["bob"], org["build"], assignee=org["eve"], title="Wire"), "2026-10-12", 1)
+
+    def found(q):
+        return sorted(e["task_title"] for e in time_entries.pending_approvals(conn, org["admin"], {"q": q}, 1, 50)["items"])
+    assert found("ALICE") == ["Sketch"]           # the person's name
+    assert found("wir") == ["Wire"]               # task title
+    assert found("apollo") == ["Sketch", "Wire"]  # project name
+    assert found("zeus") == []
 
 
 def test_shrinking_a_booking_past_logged_time_is_refused(conn, org):
@@ -633,6 +658,19 @@ def test_two_bookings_on_one_project_list_a_person_and_a_task_once(conn, org):
 def test_board_of_a_project_you_cannot_see_is_not_found(conn, org):
     with pytest.raises(NotFound, match="^Project not found.$"):
         tasks.board(conn, org["carol"], org["apollo"]["project_id"])
+
+
+def test_ready_tasks_search_task_deliverable_and_project_names_ignoring_case(conn, org):
+    f.task(conn, org["bob"], org["design"], title="Sketch the logo")
+    f.task(conn, org["bob"], org["build"], title="Wire the API")
+
+    def found(q):
+        return sorted(t["title"] for t in tasks.ready_tasks(conn, org["alice"], {"q": q})["items"])
+    assert found("LOGO") == ["Sketch the logo"]                    # task title
+    assert found("buil") == ["Wire the API"]                       # deliverable name
+    assert found("aPOLLo") == ["Sketch the logo", "Wire the API"]  # project name
+    assert found("hermes") == []
+    assert tasks.ready_tasks(conn, org["alice"], {"q": "hermes"})["limit"] == 2  # the limit isn't searched
 
 
 def test_ready_tasks_are_unassigned_unfinished_live_tasks_on_my_booked_projects(conn, org):

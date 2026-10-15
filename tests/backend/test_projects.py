@@ -84,6 +84,11 @@ def test_search_and_status_filter(conn, org):
     assert [p["name"] for p in page["items"]] == ["Zeus"]
 
 
+def test_list_projects_takes_q_like_every_other_list(conn, org):
+    page = projects.list_projects(conn, org["admin"], {"q": "ZE"}, 1, 50)
+    assert [p["name"] for p in page["items"]] == ["Zeus"]
+
+
 def test_archived_projects_hidden_unless_asked_and_only_admins_can_ask(conn, org):
     projects.archive_project(conn, org["admin"], org["zeus"]["project_id"])
     assert "Zeus" not in {p["name"] for p in projects.list_projects(conn, org["admin"], {}, 1, 50)["items"]}

@@ -168,6 +168,10 @@ def test_filters_are_documented():
     assert {"search", "status", "includeArchived"} <= set(query("GET", "/projects"))
     assert "unread" in query("GET", "/notifications")
     assert {"overOnly", "weekFrom", "weeks"} <= set(query("GET", "/dashboard/allocation"))
+    for path in ("/me/tasks", "/me/ready-tasks", "/approvals/time-entries", "/project-requests", "/notifications",
+                 "/admin/audit-log", "/users", "/projects", "/dashboard/projects"):
+        assert query("GET", path)["q"] == {"type": "string"}, path  # the search box on every list
+    assert query("GET", "/project-requests")["scope"] == {"type": "string", "enum": ["sent", "decide"]}
     # A query key api/http.py parses as a number or as true/false is documented with that type.
     ints, bools = {to_camel(k) for k in INT_QUERY_KEYS}, {to_camel(k) for k in BOOL_QUERY_KEYS}
     for route in routes.ROUTES:

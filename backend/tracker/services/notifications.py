@@ -7,6 +7,7 @@ is not audited (that would notify people about notifications).
 import psycopg
 from psycopg import sql
 
+from domain import values
 from domain.errors import NotFound
 from services.actors import Actor
 from services.paging import paginate
@@ -19,10 +20,17 @@ _SELECT = (
 )
 
 
-def list_notifications(conn: psycopg.Connection, actor: Actor, unread_only: bool, page: int, page_size: int) -> dict:
-    """Your own notifications, newest first."""
-    query = sql.SQL(_SELECT + " AND NOT n.is_read") if unread_only else sql.SQL(_SELECT)
-    return paginate(conn, query, {"me": actor.user_id}, sql.SQL("notification_id DESC"), page, page_size)
+def list_notifications(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
+    """Your own notifications, newest first: `unread` only, `q` searches the message."""
+    where, params = ["TRUE"], {"me": actor.user_id}
+    if values.boolean(filters, "unread", required=False):
+        where.append("NOT n.is_read")
+    if pattern := values.search(filters):
+        where.append("a.summary ILIKE %(q)s")
+        params["q"] = pattern
+    # WHERE fragments are fixed strings written above; every value is a parameter.
+    query = sql.SQL(_SELECT + " AND {}").format(sql.SQL(" AND ").join(map(sql.SQL, where)))
+    return paginate(conn, query, params, sql.SQL("notification_id DESC"), page, page_size)
 
 
 def unread_count(conn: psycopg.Connection, actor: Actor) -> int:

@@ -100,9 +100,9 @@ def list_projects(conn: psycopg.Connection, actor: Actor, filters: dict, page: i
                      " AND a.user_id = %(me)s AND NOT a.is_archived)")
     if not (actor.is_admin and values.boolean(filters, "include_archived", required=False)):
         where.append("NOT p.is_archived")
-    if search := values.text(filters, "search", required=False, max_length=100):
+    if pattern := values.search(filters):
         where.append("p.name ILIKE %(q)s")
-        params["q"] = f"%{search}%"
+        params["q"] = pattern
     if status := values.choice(filters, "status", STATUSES, required=False):
         where.append("p.status = %(status)s")
         params["status"] = status

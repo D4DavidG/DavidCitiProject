@@ -204,10 +204,19 @@ def my_entries(conn: psycopg.Connection, actor: Actor, filters: dict, page: int,
     return paginate(conn, query, params, sql.SQL("e.work_date DESC, e.entry_id DESC"), page, page_size)
 
 
-def pending_approvals(conn: psycopg.Connection, actor: Actor, page: int, page_size: int) -> dict:
-    """Entries waiting for `actor`: their reports' (managers) or everyone's (admins)."""
+def pending_approvals(conn: psycopg.Connection, actor: Actor, filters: dict, page: int, page_size: int) -> dict:
+    """Entries waiting for `actor`: their reports' (managers) or everyone's (admins).
+
+    `q` searches the person's name, the task title and the project name.
+    """
     if actor.is_employee:
         raise Forbidden("Only managers and admins approve time.")
-    mine = "TRUE" if actor.is_admin else "u.manager_id = %(me)s"
-    query = sql.SQL("{} WHERE e.status = 'PENDING' AND {}").format(sql.SQL(_LISTED), sql.SQL(mine))
-    return paginate(conn, query, {"me": actor.user_id}, sql.SQL("e.work_date, e.entry_id"), page, page_size)
+    where, params = ["e.status = 'PENDING'"], {"me": actor.user_id}
+    if not actor.is_admin:
+        where.append("u.manager_id = %(me)s")
+    if pattern := values.search(filters):
+        where.append("(u.first_name || ' ' || u.last_name ILIKE %(q)s OR t.title ILIKE %(q)s OR p.name ILIKE %(q)s)")
+        params["q"] = pattern
+    # WHERE fragments are fixed strings written above; every value is a parameter.
+    query = sql.SQL("{} WHERE {}").format(sql.SQL(_LISTED), sql.SQL(" AND ").join(map(sql.SQL, where)))
+    return paginate(conn, query, params, sql.SQL("e.work_date, e.entry_id"), page, page_size)
