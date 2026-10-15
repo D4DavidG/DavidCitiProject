@@ -8,7 +8,7 @@ over budget, who is working on what, and who is booked for more hours than they 
 built by David Gusmao, alone, in three days (13 to 15 Oct 2026) for the Citi coding workshop.
 
 - **Website:** React 19 with Material UI and react-responsive (works on phones).
-- **API:** Python 3.13 on AWS Lambda, one function, 70 endpoints.
+- **API:** Python 3.13 on AWS Lambda, one function, 71 endpoints.
 - **Database:** PostgreSQL (Aurora Serverless v2 on AWS, a local Postgres on the dev machine).
 - **Hosting:** S3 and CloudFront, all built by Terraform and the repo's shell scripts.
 
@@ -103,18 +103,18 @@ These were taken before the 15 Oct changes below, so the dashboard's two columns
 
 - **Dashboard** (managers, admins): two columns, **At risk** and **On track**, each showing the
   3 projects with the most recent activity, with **See all** for the rest, so it stays readable
-  with hundreds of projects. Totals of projects and of projects at risk, a budget chart and this
-  week's workload.
-- **Late deliverables explain themselves:** hover the late marker to read "was due … · today is
-  … · N days late".
+  with hundreds of projects. Totals of projects and of projects at risk, a budget chart, this
+  week's workload, and a timeline per project whose row of dates starts "Week of".
+- **Late deliverables explain themselves:** hover a late deliverable on a timeline to read "was
+  due … · today is … · N days late".
 - **Allocation grid:** people by weeks, sorted by each person's worst week; each cell lists the
   projects its hours come from. **How to read this** explains the colours, and why only some
   names open a menu (you can act only on people you manage).
 - **Schedule:** one bar per booking, in its project's colour; weeks past capacity outlined in red.
-- **Projects:** Deliverables (with a timeline whose row of dates starts "Week of"), Tasks,
-  Board, Resources (bookings) and Budget tabs, and a dependency view.
+- **Projects:** Deliverables (with a timeline), Tasks, Board, Resources (bookings) and Budget
+  tabs, and a dependency view.
 - **Search** in the top bar finds pages (the ones your role may open) and projects by name.
-  Press `/` or `Ctrl+K` to jump to it.
+  Press `/`, `Ctrl+K` or `Cmd+K` to jump to it.
 
 **Doing the work**
 
@@ -134,16 +134,16 @@ These were taken before the 15 Oct changes below, so the dashboard's two columns
 - **People** (admins create accounts): the server generates the username (initials plus 6
   digits) and a 12-character password, shown once with a **Copy username and password** button
   and changed at first sign-in.
-- **Minimum pay:** nobody can be paid less than $20 an hour, which is $41,600 a year (the hourly
-  rate is salary / 2,080 hours). The API refuses less when creating anyone or changing a salary.
+- **Minimum pay:** every new account and every pay change is at least $20 an hour, which is
+  $41,600 a year (the hourly rate is salary / 2,080 hours). The API refuses less.
 - **Archive warning:** archiving someone still on a live project (a booking that hasn't ended,
   or an unfinished task) shows a red warning listing those projects, and the button becomes
   **Archive anyway**.
 - **Nothing is deleted:** people, projects, deliverables, tasks and bookings are archived and can
   be reactivated, so every past cost can still be explained.
 - **Audit log and notifications:** every change writes one audit row and notifies the people
-  above whoever made it (the bell checks every 10 seconds). Admins see the before and after of
-  every change; **History** shows one person's trail.
+  above whoever made it, and the person it concerns (the bell checks every 10 seconds). Admins
+  see the before and after of every change; **History** shows one person's trail.
 - **Sessions:** 15-minute sign-in tokens, renewed in the background by a refresh token that
   lasts up to 8 hours.
 - Light and dark themes, phone layouts, and accessibility checked by an automated scan (axe) on
@@ -205,7 +205,7 @@ proves, the coverage, and why the gaps are there: [docs/TESTING.md](docs/TESTING
 ## Try the API in Swagger
 
 Swagger UI is a web page that lists every endpoint and lets you call it. It reads
-[docs/openapi.json](docs/openapi.json) (70 operations, built from the route table).
+[docs/openapi.json](docs/openapi.json) (71 operations, built from the route table).
 
 **Against the live AWS site** (nothing else needs to be running):
 

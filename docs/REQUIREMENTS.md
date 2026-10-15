@@ -19,7 +19,7 @@ the money is going. The app answers seven questions, and each answer has its own
 | 1 | What is the status of each active project? | Dashboard; Projects list, status column |
 | 2 | Which projects are at risk of missing deadlines? | Dashboard, **At risk** column with the reason; a late deliverable's tooltip gives the due date, today and days late |
 | 3 | How are resources allocated across projects? | Allocation grid and Schedule: people down, weeks across |
-| 4 | What are the key deliverables and their completion status? | Deliverables tab: progress from tasks, timeline (dates headed "Week of"), sign-off |
+| 4 | What are the key deliverables and their completion status? | Deliverables tab: progress from tasks, timeline, sign-off; a timeline per project on the dashboard |
 | 5 | Which team members are over-allocated? | Allocation grid and Schedule: projects and hours per person per week, flagged past capacity |
 | 6 | What is the dependency chain between deliverables? | Dependency view on the project |
 | 7 | How much budget is consumed versus planned? | Budget bar on the dashboard and on the project |
@@ -34,7 +34,7 @@ the money is going. The app answers seven questions, and each answer has its own
 | CRUD for deliverables | Same, per project, plus tasks under each and "depends on" links between deliverables |
 | CRUD for resources | Assign a person to a project for N hours per week over a date range |
 | CRUD for budget tracking | A budget per project. Planned cost comes from bookings; consumed cost comes from approved logged hours |
-| Search and filter | Name search and status filter on every list, done on the server, paginated; a search box in the top bar finds pages and projects (`/` or `Ctrl+K`) |
+| Search and filter | Name search and status filter on every list, done on the server, paginated; a search box in the top bar finds pages and projects (`/`, `Ctrl+K` or `Cmd+K`) |
 | Responsive design | Tables turn into cards on phones; the allocation grid scrolls sideways |
 | Real-time visibility | The dashboard, plus a notification bell that checks every 10 seconds |
 
@@ -46,14 +46,16 @@ once. The user must change it on first login. Users can then change their own na
 email and password. A forgotten password is reset by an admin.
 
 Pay is at least $20 an hour: $41,600 a year, since the hourly rate is the annual salary
-divided by 2,080 hours. The server refuses less when anyone is created or a salary changed
-(400, `field: "annualSalaryCents"`).
+divided by 2,080 hours. A new account needs a salary, and the server refuses less when
+anyone is created or a salary changed (400, `field: "annualSalaryCents"`). A lower salary
+set before this rule stays until someone changes it; the first admin, `AD000001`, has none.
 
 Archiving someone who is still on a live project (a booking that hasn't ended, or a task
 not done) warns first: the dialog lists those projects in red and the button becomes
 **Archive anyway**. The API answers 409 with `code: "ON_PROJECTS"` until the request says
 `confirmOnProjects: true`. `GET /users/{id}/projects` lists them (for admins, the line
-manager and the person; anyone else gets 404).
+manager and the person; anyone else gets 404). Archiving ends the person's bookings; their
+open tasks stay assigned to them until someone reassigns them.
 
 ## Tasks and time (how the work gets tracked)
 
@@ -124,7 +126,7 @@ their own time.
 9. **An integrity check proves the data is consistent:** no dependency loops, nothing
    live under an archived project, every record has its audit row, no time logged
    outside a booking, and no signed-off deliverable with unfinished work.
-10. **Nobody is paid under $20 an hour** ($41,600 a year).
+10. **New accounts and pay changes are at least $20 an hour** ($41,600 a year).
 11. **Archiving someone still on a live project asks first,** naming the projects.
 
 ## How the money works
@@ -152,12 +154,12 @@ David's demo prompted these; each is described above where it belongs.
 
 | Change | Where it shows |
 | --- | --- |
-| Search pages (by role) and projects from the top bar; `/` or `Ctrl+K` jumps to it | Top bar, every screen |
+| Search pages (by role) and projects from the top bar; `/`, `Ctrl+K` or `Cmd+K` jumps to it | Top bar, every screen |
 | Archiving someone still on a live project warns first and lists the projects | People, Archive |
 | Minimum pay of $20 an hour | People, create and edit |
 | For managers and admins, two columns of at most 3 projects each, **At risk** and **On track**, the most recently active first, with **See all**; `GET /dashboard/projects` gains `atRisk`, `sort=updated` and `lastActivityAt` | Dashboard |
-| A late deliverable's tooltip: "was due … · today is … · N days late" | Dashboard |
-| The timeline's row of dates starts with "Week of" | Project, Deliverables |
+| A late deliverable's tooltip: "was due … · today is … · N days late" | Dashboard and project timelines |
+| The row of dates starts with "Week of" | Dashboard timelines (both kinds of dashboard), Schedule |
 | **How to read this** says why only some names open a menu (you can act only on people you manage) | Allocation |
 | No grid pattern behind the pages; the light page a little greener | Every screen |
 | Browser tests can record a video (`./tools/e2e.sh --video`), open Playwright's UI (`--ui`), and on AWS run the tests that add data with `--allow-writes` | `tools/e2e.sh`; see [TESTING.md](TESTING.md) |

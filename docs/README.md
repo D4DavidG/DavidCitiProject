@@ -21,7 +21,7 @@ Read them in this order if you are new: requirements, then architecture, then wh
 
 | File | What it is |
 | --- | --- |
-| [openapi.json](openapi.json) | The API description (OpenAPI 3.0.3, 70 operations), built from the route table by `tools/openapi.py`; a test fails if it falls out of date. Import it into Postman or SwaggerHub |
+| [openapi.json](openapi.json) | The API description (OpenAPI 3.0.3, 71 operations), built from the route table by `tools/openapi.py`; a test fails if it falls out of date. Import it into Postman or SwaggerHub |
 | [swagger.html](swagger.html) | Swagger UI, which reads `openapi.json`. Serve it with `./tools/swagger.sh` and open http://localhost:8090/swagger.html; pick the Local or AWS server. Steps: [API.md](API.md) |
 
 ## Pictures
