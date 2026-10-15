@@ -45,10 +45,10 @@ workflow scripts set that line. It shows that Claude helped, not which model.
 
 ## 2. One feature, idea to deploy
 
-Every feature after day one went through the same steps. The names in brackets are the
-`superpowers` skills that drive each step (section 5).
+From 14 Oct, each bigger feature went through these steps. The names in brackets are the
+skills that drive each step (section 5).
 
-1. **Decide** (grilling). Claude asks David one multiple-choice question at a time (Claude
+1. **Decide** (the `grill-me` interview, or brainstorming's questions). Claude asks David one multiple-choice question at a time (Claude
    Code's `AskUserQuestion` tool), until every choice that changes the code is made. The
    answers became the decisions table in [CLAUDE.md](../CLAUDE.md), now explained in
    [DECISIONS.md](DECISIONS.md). Where Claude had to decide alone, it wrote down the ruling and
@@ -88,8 +88,9 @@ on the VDI only). A ruling is one line: what, why, and the cost if wrong. A real
 READ COMMITTED a combined statement's subquery keeps the pre-wait snapshot, so the second of
 two concurrent claims would count stale and pass the limit".
 
-**Read the real specs and plans.** The 17 design notes and 12 plans were removed from the
-folder on 15 Oct, to keep the docs short, but they stay in git history:
+**Read the real specs and plans.** The 17 design and research notes and 12 plans
+(`docs/superpowers/`) left the tree on 15 Oct, to keep the docs short, but they stay in git
+history:
 
 ```sh
 git ls-tree -r --name-only 4d8b949 -- docs/superpowers
@@ -110,7 +111,7 @@ test-database names. So running agents side by side needed rules, not just more 
 | Locks | Only one agent commits (or runs tests) at a time: `flock` on a shared lock file | `git.lock` and `test.lock` from the redesign night on |
 | Batched tests | Each step runs only its own tests; a checkpoint agent runs everything at milestones | From 14 Oct 19:50, at David's request, to save the 2 CPUs |
 | The spec as the channel | A change asked for mid-run goes into the spec, which every lane reads first and every reviewer checks against | Gold highlights (`5bfeac9`), red field errors (`4ca8c27`), one design language (`771f12e`), each within minutes on 14 Oct night |
-| Multi-lens review | Several reviewers, each looking for one kind of problem: the spec, correctness, tests, security, accessibility | Final reviews of each build |
+| Multi-lens review | Several reviewers, each looking for one kind of problem: the spec, correctness, tests, security, accessibility | Every task review (the spec, then build quality); two reviewers on the comments pass; four probes on the email question |
 | Adversarial review | A skeptic tries to disprove each finding; a reviewer breaks a scratch copy on purpose to see if the tests notice (mutation testing) | Screenshot review (35 of 59 findings rejected); Schedule (3 breaks passed all 18 tests, so 9 fixes followed) |
 | Verify before claiming | Every report ends with "verified (and how)" and "not verified (and why)"; layout and colour always go in "not verified" | Every task, from CLAUDE.md section 1 |
 | Ultracode | A standing permission from David to start multi-agent workflows without asking each time | From 14 Oct 06:18 |
@@ -229,7 +230,7 @@ skills or tools.
 | Name | What it is | How it was used |
 | --- | --- | --- |
 | Claude Code | Anthropic's coding agent, in VS Code (`anthropic.claude-code` 2.1.300) | The lead session: Opus 5.5; effort medium, high from 13 Oct 16:33, xhigh from 14 Oct 23:09 |
-| `superpowers` plugin (6.4.2) | The process skills: brainstorming, writing-plans, subagent-driven-development, test-driven-development, requesting-code-review, verification-before-completion, finishing-a-development-branch, dispatching-parallel-agents | Every build from 14 Oct (section 2). Worktrees were made with plain `git worktree add`, not its worktree skill |
+| `superpowers` plugin (6.4.2) | The process skills: brainstorming, writing-plans, subagent-driven-development, test-driven-development, requesting-code-review, verification-before-completion, finishing-a-development-branch, dispatching-parallel-agents | The bigger builds from 14 Oct (section 2). Worktrees were made with plain `git worktree add`, not its worktree skill |
 | `grill-me` skill | A relentless interview to sharpen a plan, from `mattpocock/skills` (kept in `.agents/skills/` and `.claude/skills/`, recorded in `skills-lock.json`; all ignored by git) | The 13 Oct decisions. It calls a `grilling` skill that wasn't installed, so Claude ran the interview by hand |
 | `dataviz` skill | A method for charts: form, colour, accessibility | Its colour-blind check cut the chart palette to 5 colours |
 | `workflow-authoring` skill | How to write a workflow script | Every workflow script |
@@ -250,13 +251,13 @@ Client is not installed; [tools/tracker.http](../tools/tracker.http) is written 
 | A Sonnet comments pass wrote confident, wrong comments (one said `money.py` does all the money maths; the dashboard also does it in SQL). Two Opus reviewers found 4 important and about 18 minor problems, fixed in `b3e9ed7` with a check that no code changed | Review comments like code |
 | On Schedule, a reviewer broke a scratch copy 3 ways and all 18 tests still passed: nothing checked where a bar is drawn. 9 fixes followed | A reviewer who tries to break the code finds what tests miss |
 | Skeptics rejected 35 of 59 screenshot findings (one was a tab underline caught mid-animation) | Reviewers cry wolf too: check a finding before fixing it |
-| The AWS backend vanished on 14 Oct (about 20:50); no agent had run a writing Terraform command, and the workshop role can't read the AWS audit trail | Read a `terraform plan` first (it said 10 to add, 0 to destroy), then David redeployed |
+| The AWS backend vanished on 14 Oct (about 20:50); no agent had run a writing Terraform command, and the workshop role can't read the AWS audit trail | Look before changing: a read-only `terraform plan` showed 10 to add and 0 to destroy, then David redeployed |
 | An overnight workflow stalled while the VDI was paused: agents run on that machine, so nothing moves while it sleeps | Keep the desktop running for a long unattended run, and check early; a workflow can be resumed from its cache |
 | A second dev server (port 3002, in a worktree) shared the main folder's packages, so it rewrote the pre-bundled library files (Vite's cache) the port-3000 server was using | Two dev servers need two caches (Vite's `cacheDir`) and two ports |
 | Sending a message to an agent inside a running workflow started a duplicate copy of it, doing the same work again | Change the spec, which every lane reads first, or wait for the lane to finish |
 | `284c204` left a test red; `42e0b40`, three minutes later, fixed it | Run the tests a change touches before each commit, not just at the end |
 | The theme lane read the spec before a mid-run change and committed orange (`43fe274`) after the spec said gold | Changes through the spec reach agents that start later; a polish round catches the rest |
-| `David` was fast-forwarded to the morning tweaks before a full run; the first full run then failed two browser tests (fixed in `e97b645`) | No push or deploy until a full run passes on that exact commit |
+| `David` was fast-forwarded to the morning tweaks before a full run; the first full run then failed `budget.spec.js`, and `history.spec.js` still pressed a removed button (both fixed in `e97b645`) | No push or deploy until a full run passes on that exact commit |
 | `pgrep -f` matched its own shell, so a queued test never started; `tools/test-all.sh` checked port 3000, which served a different folder's code | Give each worktree its own port and check what a port serves |
 | A hand commit (`1c93961`, "updates") swept up an agent's half-done files | No hand commits on a branch an agent is building on |
 
