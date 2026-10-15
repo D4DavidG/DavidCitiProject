@@ -82,8 +82,9 @@ enforces the same rules, so hiding a button is never the only protection):
 Everyone also has **Account** (name, email, password, **My history**), the notification bell
 and the search box in the top bar.
 
-To run your own copy with your own logins, see [docs/SETUP.md](docs/SETUP.md). Local usernames
-differ on every machine, because the server generates them.
+To run your own copy, see [docs/SETUP.md](docs/SETUP.md). Its logins are your own: the
+server generates every username, so local ones differ on each machine
+([how to sign in locally](docs/SETUP.md#4-sign-in-locally-and-add-demo-data)).
 
 ## Screenshots
 
@@ -223,12 +224,13 @@ On AWS, anything but a GET changes the live data. Use your local copy to try cha
 1. Start the app with `./bin/start-dev.sh` (see [docs/SETUP.md](docs/SETUP.md)).
 2. Run `./tools/swagger.sh`, open http://localhost:8090/swagger.html, and pick the server
    `http://localhost:3001/api/tracker`.
-3. **POST /auth/login** with a local username and password (local usernames come from
-   `python3 tools/demo.py demo`), then call anything.
+3. **POST /auth/login** with a local username and password, then call anything. Local
+   usernames differ on every machine; [docs/SETUP.md](docs/SETUP.md#4-sign-in-locally-and-add-demo-data)
+   shows how to list them and where the passwords come from.
 
 To sign in as someone else, log in again: the new token replaces the old one. More, including
-Postman, the audit log and notifications step by step, and every error code:
-[docs/API.md](docs/API.md).
+Postman, curl, the audit log and notifications step by step, and every error code:
+[docs/API.md](docs/API.md) (Swagger: [section 5](docs/API.md#5-swagger-ui-step-by-step)).
 
 ## Documentation
 
@@ -279,9 +281,10 @@ The full picture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The reasons:
 The workshop ran everything on an Ubuntu 22.04 virtual desktop. In short:
 
 ```sh
-./bin/start-dev.sh               # local Postgres, LocalStack (fake AWS), the API on :3001, the website on :3000
-./bin/deploy-backend.sh          # AWS: Lambda, Aurora, CloudFront (terraform apply)
-./bin/deploy-frontend.sh         # AWS: build the website, upload it, print the URL
+source ~/.bashrc && ./bin/start-dev.sh   # local: Postgres, LocalStack (fake AWS), the API on :3001, the website on :3000
+./bin/setup-participant.sh               # AWS: fresh temporary credentials (they expire)
+./bin/deploy-backend.sh                  # AWS: Lambda, Aurora, CloudFront (terraform apply)
+./bin/deploy-frontend.sh                 # AWS: build the website, upload it to S3, print the URL
 ```
 
 First-time setup, the local logins, demo data, troubleshooting and the AWS details:

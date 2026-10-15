@@ -44,7 +44,7 @@ outdated it.
   `MAP.md`, `OVERNIGHT-REPORT.md`, and the design specs and plans in `docs/superpowers/`).
 - **Tests (15 Oct, before the post-demo changes):** 648 backend (97% of statements), 846
   website in 51 files (98.04% of lines), 33 browser tests passed and 1 skipped on request
-  (the README screenshots), 100 axe scans (light and dark), 70 API operations.
+  (the README screenshots), 100 axe scans (light and dark), 70 API operations (71 since `GET /users/{id}/projects`).
   `./tools/test-all.sh` runs every local check. Where each suite lives: `tests/README.md`;
   what each proves: `docs/TESTING.md`.
 - **Read these first:**
