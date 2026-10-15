@@ -101,6 +101,7 @@ export default function PeoplePage() {
   const [dialog, setDialog] = useState(null) // { kind: 'create'|'edit'|'capacity'|'history'|'reset'|'archive', person? }
   const [shown, setShown] = useState(null)
   const [message, setMessage] = useState(null)
+  const [reactivatingId, setReactivatingId] = useState(null)
   const { options: managers } = usePeopleOptions('MANAGER')
 
   const load = useCallback(() => request('GET', '/users', {
@@ -109,6 +110,20 @@ export default function PeoplePage() {
   const { data, error, loading, reload } = useApi(load)
   const rows = data?.items ?? []
   const showSalary = rows.some((p) => p.annualSalaryCents !== undefined)
+
+  /** Reactivate an archived person; their button is disabled until the answer, so one press sends one request. */
+  async function reactivate(p) {
+    setMessage(null)
+    setReactivatingId(p.userId)
+    try {
+      await request('POST', `/users/${p.userId}/reactivate`)
+      reload()
+    } catch (failure) {
+      setMessage(failure.message)
+    } finally {
+      setReactivatingId(null)
+    }
+  }
 
   const canSetCapacity = (p) => isAdmin || (user.role === 'MANAGER' && p.managerId === user.userId)
   const canSeeHistory = canSetCapacity // the same people: admins see everyone, managers their reports
@@ -141,7 +156,11 @@ export default function PeoplePage() {
             {isAdmin && !p.isArchived && <Button size="small" aria-label={`Edit ${name}`} onClick={() => setDialog({ kind: 'edit', person: p })}>Edit</Button>}
             {isAdmin && !p.isArchived && p.userId !== user.userId && <Button size="small" aria-label={`Reset password for ${name}`} onClick={() => setDialog({ kind: 'reset', person: p })}>Reset password</Button>}
             {isAdmin && p.userId !== user.userId && (p.isArchived
-              ? <Button size="small" aria-label={`Reactivate ${name}`} onClick={async () => { await request('POST', `/users/${p.userId}/reactivate`).catch((f) => setMessage(f.message)); reload() }}>Reactivate</Button>
+              ? (
+                <Button size="small" aria-label={`Reactivate ${name}`} onClick={() => reactivate(p)} disabled={reactivatingId === p.userId}>
+                  {reactivatingId === p.userId ? 'Reactivating…' : 'Reactivate'}
+                </Button>
+              )
               : <Button size="small" color="inherit" aria-label={`Archive ${name}`} onClick={() => setDialog({ kind: 'archive', person: p })}>Archive</Button>)}
           </Box>
         )

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PeoplePage from './PeoplePage'
-import { USERS, page, renderAt, session, stubApi } from '../../test/utils'
+import { USERS, holdOpen, page, renderAt, session, stubApi } from '../../test/utils'
 
 const MARIA = { userId: 2, username: 'ML662930', firstName: 'Maria', lastName: 'Lopez', email: 'maria.lopez@acme.test', role: 'MANAGER', jobTitle: 'Delivery lead', managerId: null, weeklyCapacityHours: 40, overtimeAllowed: false, isArchived: false, annualSalaryCents: 13_000_000 }
 const BEN = { userId: 4, username: 'BO435681', firstName: 'Ben', lastName: 'Okafor', email: 'ben.okafor@acme.test', role: 'EMPLOYEE', jobTitle: 'Developer', managerId: 2, weeklyCapacityHours: 40, overtimeAllowed: false, isArchived: false, annualSalaryCents: 10_000_000 }
@@ -154,6 +154,69 @@ describe('PeoplePage', () => {
     await userEvent.click(within(table).getByRole('button', { name: /archive ben okafor/i }))
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /archive account/i }))
     await waitFor(() => expect(calls.some((c) => c.path === '/users/4/archive')).toBe(true))
+  })
+
+  it('archives once, however often Archive account is pressed, and shows a refusal in the dialog', async () => {
+    const calls = renderPeople(USERS.admin, { 'POST /users/4/archive': [409, { error: 'Ben Okafor manages a live project: hand it over first.' }] })
+    const table = await screen.findByRole('table', { name: 'People' })
+    await userEvent.click(within(table).getByRole('button', { name: /archive ben okafor/i }))
+    const dialog = await screen.findByRole('dialog')
+    const release = holdOpen('/users/4/archive')
+    const confirm = within(dialog).getByRole('button', { name: /archive account/i })
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+    expect(within(dialog).getByRole('button', { name: /please wait/i })).toBeDisabled()
+    release()
+    expect(await within(dialog).findByText('Ben Okafor manages a live project: hand it over first.')).toBeInTheDocument()
+    expect(calls.filter((c) => c.path === '/users/4/archive')).toHaveLength(1)
+  })
+
+  describe('Reactivate on an archived person', () => {
+    const ANA = { ...BEN, userId: 8, username: 'AR123456', firstName: 'Ana', lastName: 'Ruiz', isArchived: true }
+
+    function renderArchived(reactivateAnswer) {
+      const calls = renderPeople(USERS.admin, { 'GET /users': [200, page([MARIA, ANA])], 'POST /users/8/reactivate': reactivateAnswer })
+      const release = holdOpen('/users/8/reactivate')
+      return { calls, release }
+    }
+
+    it('sends one request when pressed twice while the first is on its way', async () => {
+      const { calls, release } = renderArchived([200, { ...ANA, isArchived: false }])
+      const button = await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' })
+      fireEvent.click(button)
+      fireEvent.click(button)
+      release()
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Reactivate Ana Ruiz' })).toHaveTextContent(/^Reactivate$/))
+      expect(calls.filter((c) => c.path === '/users/8/reactivate')).toHaveLength(1)
+    })
+
+    it('is disabled and reads Reactivating… while the request runs', async () => {
+      const { release } = renderArchived([200, { ...ANA, isArchived: false }])
+      const button = await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' })
+      fireEvent.click(button)
+      await waitFor(() => expect(button).toBeDisabled())
+      expect(button).toHaveTextContent('Reactivating…')
+      release()
+      await waitFor(() => expect(button).toBeEnabled())
+    })
+
+    it("shows the server's refusal and enables the button again", async () => {
+      const { calls, release } = renderArchived([409, { error: 'Their line manager is archived: reactivate them first.' }])
+      const button = await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' })
+      fireEvent.click(button)
+      release()
+      expect(await screen.findByText('Their line manager is archived: reactivate them first.')).toBeInTheDocument()
+      expect(button).toBeEnabled()
+      expect(calls.filter((c) => c.path === '/users/8/reactivate')).toHaveLength(1)
+    })
+
+    it('reloads the list after it succeeds', async () => {
+      const { calls, release } = renderArchived([200, { ...ANA, isArchived: false }])
+      fireEvent.click(await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' }))
+      const listsBefore = calls.filter((c) => c.method === 'GET' && c.path === '/users').length
+      release()
+      await waitFor(() => expect(calls.filter((c) => c.method === 'GET' && c.path === '/users').length).toBeGreaterThan(listsBefore))
+    })
   })
 
   it('shows History to admins on every row', async () => {
