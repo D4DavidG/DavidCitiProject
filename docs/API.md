@@ -93,7 +93,7 @@ field:
 | `code` | When | Send again with |
 | --- | --- | --- |
 | `OVER_CAPACITY` | logging time past the person's weekly capacity, with overtime off | `"confirmOverCapacity": true` (the entry is saved and marked "Over capacity") |
-| `ON_PROJECTS` | archiving a person still on a live project (a booking that hasn't ended, or an unfinished task) | `"confirmOnProjects": true` |
+| `ON_PROJECTS` | archiving a person still on a live project (a booking that hasn't ended, or an open task); the message names the projects | `"confirmOnProjects": true` (their bookings end; their open tasks stay assigned to them) |
 
 **Lists** are always one page: `{"items": [...], "page": 1, "pageSize": 20, "total": 57,
 "totalPages": 3}`. Ask with `?page=2&pageSize=50`; the default page size is 20 (10 on the
@@ -238,7 +238,7 @@ Checked against the live API on 15 Oct. For your machine, set `API` to
 
 ```sh
 API=https://d1gov8jpsxhwer.cloudfront.net/api/tracker
-curl -s $API/health                                   # {"status": "ok"}: Lambda and database are up
+curl -s -w '\n' $API/health                           # {"status": "ok"}: Lambda and database are up
 
 # Sign in as Maria and keep the token
 TOKEN=$(curl -s -X POST $API/auth/login -H 'Content-Type: application/json' \
@@ -317,16 +317,19 @@ manager and the person; anyone else gets 404. Only admins see the before/after s
 | `PATCH /users/me` | any signed-in user | Change your own name or email. |
 | `GET /users/{id}` | any signed-in user | Get one person. |
 | `GET /users/{id}/history` | any signed-in user | One person's trail; only admins get the before/after state. |
-| `GET /users/{id}/projects` | any signed-in user | The live projects a person is on (bookings that haven't ended, unfinished tasks); the archive warning uses it. |
+| `GET /users/{id}/projects` | any signed-in user | List the live projects a person is on: bookings from today on, and open tasks. (The archive warning shows this list.) |
 | `PATCH /users/{id}` | admin | Change a person's account details (admin). |
 | `PATCH /users/{id}/capacity` | admin, manager | Set a person's weekly capacity, overtime and task limit. |
 | `POST /users/{id}/reset-password` | admin | Reset a person's password; the answer shows the new one once. |
-| `POST /users/{id}/archive` | admin | Archive a person (there is no delete). 409 `ON_PROJECTS` if they are still on a live project, unless the body has `"confirmOnProjects": true`. |
+| `POST /users/{id}/archive` | admin | Archive a person (there is no delete); someone on live projects needs confirmOnProjects. Without `"confirmOnProjects": true` in the body: 409 `ON_PROJECTS`, and nothing changes. |
 | `POST /users/{id}/reactivate` | admin | Reactivate an archived person. |
 
-**Minimum pay:** creating anyone or changing a salary refuses less than $20 an hour, which is
-$41,600 a year (annual salary / 2,080 hours): 400 with `field: annualSalaryCents`
-(`annualSalaryCents` must be at least `4160000`).
+**Minimum pay:** creating anyone, or changing a salary, refuses less than $20 an hour. Pay is
+yearly, and an hour is the yearly pay / 2,080, so the least is $41,600 a year
+(`annualSalaryCents` of at least `4160000`). Less answers 400
+`{"error": "Pay must be at least $20 an hour ($41,600 a year).", "field": "annualSalaryCents"}`
+(`MIN_ANNUAL_SALARY_CENTS` in [`domain/money.py`](../backend/tracker/domain/money.py)). A
+salary set before the rule stays until someone changes it.
 
 ### Projects
 
@@ -420,7 +423,7 @@ sent, `scope=decide` the ones you may decide.
 
 | Route | Who may call | What it does |
 | --- | --- | --- |
-| `GET /dashboard/projects` | admin, manager | Get the dashboard: each project's status, risk and budget, at risk first. `atRisk=true` or `false` keeps one column, `sort=updated` puts the most recent activity first, and each project carries `lastActivityAt`. `total` and `atRiskTotal` count every page. |
+| `GET /dashboard/projects` | admin, manager | Get the dashboard: each project's status, risk and budget, at risk first. `atRisk=true` keeps the at-risk projects, `atRisk=false` the on-track ones (the dashboard's two columns). `sort=updated` puts the latest change first; each project carries `lastActivityAt`, the latest change to it or anything in it (deliverables, tasks, bookings, logged time). `total` counts the filtered list across every page; `atRiskTotal` counts every at-risk project, whatever `atRisk` says. |
 | `GET /dashboard/at-risk` | admin, manager | List the projects at risk of missing a deadline. |
 | `GET /dashboard/allocation` | admin, manager | Get the allocation grid: people x weeks, flagged past capacity. Filters: `weekFrom`, `weeks`, `overOnly`, `projectIds`. |
 | `GET /dashboard/timeline` | any signed-in user | Get a timeline of your projects: their dates, Deliverables and bookings. |
