@@ -153,10 +153,14 @@ After the demo, David asked for some product changes and a documentation overhau
   but never edit it.
 - **Shared rules:** commits through a shared `flock` lock, files named on every commit, and
   the docs committed by 16:00.
-- **Then:** the old notes are deleted only after every lane has used them as sources; the
-  docs branch is merged; links and numbers are checked against a full test run.
-
-This page was written during that run, so its last step is described as planned.
+- **Then (16:00 to 16:35):** the old notes were deleted only after every lane had used them as
+  sources; a link checker passed (every link and anchor resolves, every page reachable from the
+  README); the docs branch was merged into `David` (`16b67d6`) and `David` into `main`
+  (`7f5f81b`); the numbers were taken from the final runs (683 backend, 889 website, 37 browser
+  passed and 1 skipped); David pushed and deployed, and 20 of 20 read-only browser tests then
+  passed on the live site.
+- **Mid-run, one change from David:** Ana Ruiz, archived during the demo, was reactivated, and
+  the lead session re-created Ana's Apollo booking from the audit log's record of it.
 
 ## 4. Guardrails
 

@@ -63,7 +63,7 @@ Postgres                constraints, triggers, the 5 integrity queries
 | [Website unit tests](#26-website-unit-tests-vitest-and-react-testing-library) | `frontend/src/**/*.test.js(x)`, beside the code | Each screen and component, with the API faked | **889 passed in 54 files, 98.11% of lines** (15 Oct) |
 | [Lint](#27-lint-eslint) | reads `frontend/` | JavaScript and React mistakes | clean |
 | [Production build](#28-the-production-build) | `frontend/` to `frontend/dist` | The website builds the way the deploy builds it | builds |
-| [Browser tests](#29-browser-tests-playwright) | `frontend/e2e/*.spec.js` (14 files) | The whole app in a real browser | **38 tests: 37 passed, 1 skipped on purpose** (local, 15 Oct, after the post-demo changes); 17 of 17 on AWS before them |
+| [Browser tests](#29-browser-tests-playwright) | `frontend/e2e/*.spec.js` (14 files) | The whole app in a real browser | **38 tests: 37 passed, 1 skipped on purpose** (local, 15 Oct, after the post-demo changes); 20 of 20 on AWS after their deploy |
 | [Accessibility scans](#210-accessibility-scans-axe) | inside `frontend/e2e/tour.spec.js` | WCAG A and AA problems on every screen | 8 tests, 100 scans, all passed |
 | [k6 load test](#211-k6-load-test) | `tests/load/load.js` | Speed and failures with many users at once | 4,038 requests, 0 failed, 4 of 4 thresholds (local, 14 Oct) |
 | [npm audit](#212-npm-audit) | reads the website's package list | Known security holes in the website's packages | 0 high (14 Oct) |
@@ -723,7 +723,7 @@ warm database, a folder for screenshots), runs Playwright, and ends with the pla
 | Watch it slower or faster (milliseconds between steps) | `E2E_SLOWMO=800 ./tools/e2e.sh --show demo` |
 | **A video of every test**, then the report that plays them (videos kept in `~/e2e-videos`, or `E2E_VIDEO_DIR`) | `./tools/e2e.sh --video demo` |
 | Playwright's own window (UI mode): pick a test, run it, replay each step | `./tools/e2e.sh --ui` |
-| The live AWS site: `demo`, `history`, `schedule` and `tour` (17 tests, about 2.5 minutes) | `./tools/e2e.sh --aws` |
+| The live AWS site: `demo`, `history`, `schedule`, `tour`, `search` and `archive-warning` (20 tests, about 2.5 minutes) | `./tools/e2e.sh --aws` |
 | The live site, watching | `./tools/e2e.sh --aws --show demo` |
 | A file that adds data, on the live site (warns, then waits 5 seconds) | `./tools/e2e.sh --aws --allow-writes timelog` |
 | Playwright's HTML report afterwards | `./tools/e2e.sh --report demo` |
@@ -749,8 +749,8 @@ warm database, a folder for screenshots), runs Playwright, and ends with the pla
   pauses 5 seconds first: every such run adds rows to the live database that stay for good.
   `screenshots` never runs there. The script wakes the site first (the database sleeps when
   idle; the first answer can take 15 seconds). With no file named it runs `demo`, `history`,
-  `schedule` and `tour`; `timeline`, `budget` and `workload` only read too, so you may name
-  them.
+  `schedule`, `tour`, `search` and `archive-warning`; `timeline`, `budget` and `workload`
+  only read too, so you may name them.
 - **Who signs in.** Locally, Maria Lopez (manager), Ana Ruiz (employee) and Sam Patel (a
   second manager), looked up in the local database by email. On AWS, Maria `ML662930`, Ben
   Okafor `BO435681` (chosen while Ana was archived during the 15 Oct demo; Ana is active again,
@@ -780,10 +780,8 @@ warm database, a folder for screenshots), runs Playwright, and ends with the pla
 | `Playwright is not installed here` | The website's packages or the browser are missing | Run the command it prints |
 
 **Latest results:** the full local run on 15 Oct after the post-demo changes: 37 passed, 1
-skipped on purpose (the screenshots). `--aws` after the 15 Oct deploy (before those changes):
-17 of 17 passed. Until the next deploy, `demo`, `tour`, `timeline`, `search` and
-`archive-warning` fail on the live site because it still runs the old screens; the script
-says so when you run them.
+skipped on purpose (the screenshots). `--aws` after the 15 Oct post-demo deploy:
+20 of 20 passed (16:35), the new `search` and `archive-warning` included.
 
 ## 8. Why these tools
 

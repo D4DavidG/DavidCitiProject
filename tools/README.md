@@ -39,7 +39,7 @@ appears. What each test file checks, and why, is in [docs/TESTING.md](../docs/TE
 | Watch the demo walk in a real window (about 20 seconds) | `./tools/e2e.sh --show demo` |
 | The same, slower | `E2E_SLOWMO=800 ./tools/e2e.sh --show demo` |
 | The live AWS site, in a window | `./tools/e2e.sh --aws --show demo` |
-| The live site's default set, no window: `demo`, `history`, `schedule` and `tour`, the read-only files seen passing there (name `timeline`, `budget` or `workload` to add them) | `./tools/e2e.sh --aws` |
+| The live site's default set, no window: `demo`, `history`, `schedule`, `tour`, `search` and `archive-warning` (20 tests), the read-only files seen passing there (name `timeline`, `budget` or `workload` to add them) | `./tools/e2e.sh --aws` |
 | Every browser test, local, no window | `./tools/e2e.sh` |
 | Record a video of every test, then open the report that plays them | `./tools/e2e.sh --video demo` |
 | The same on the live site | `./tools/e2e.sh --aws --video history` |

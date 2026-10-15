@@ -280,7 +280,7 @@ cd ~/DavidCitiProject && ./tools/e2e.sh --aws
 ```
 
 The first should print `{"status": "ok"}`. The second runs the browser tests that only read
-data against the live site (17 tests, about 2.5 minutes); details in [TESTING.md](TESTING.md).
+data against the live site (20 tests, about 2.5 minutes); details in [TESTING.md](TESTING.md).
 
 **A brand-new AWS environment** starts with only `AD000001`, created on the first cold start
 with the generated password. Read it right after `deploy-backend.sh`, in the same terminal:

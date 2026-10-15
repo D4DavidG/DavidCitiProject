@@ -20,12 +20,11 @@ outdated it.
 
 ### Where things stand (updated 15 Oct, afternoon)
 
-- **On AWS:** the 15 Oct deploy of `5ee66a5` (branch `David`; `main` at `4bbd9be`). After
-  it, 17 of 17 AWS-safe browser tests passed against https://d1gov8jpsxhwer.cloudfront.net.
-- **Committed but not on AWS** until David runs `./bin/deploy-backend.sh` and
-  `./bin/deploy-frontend.sh` (both together):
-  - the Swagger UI commit `4d8b949` (`docs/swagger.html`, `tools/swagger.sh`; its Lambda URL
-    CORS change in `infra/lambda.tf` needs the backend deploy);
+- **On AWS:** the 15 Oct post-demo deploy of `263d2fb` (branch `David`; `main` at `7f5f81b`,
+  the same files), about 16:30. After it, 20 of 20 AWS-safe browser tests passed against
+  https://d1gov8jpsxhwer.cloudfront.net (16:35). That deploy brought:
+  - the Swagger UI commit `4d8b949` (`docs/swagger.html`, `tools/swagger.sh`; the Lambda URL
+    now answers `access-control-allow-headers: authorization,content-type`, `infra/lambda.tf`);
   - the post-demo changes: top-bar search (pages by role and projects; `/`, `Ctrl+K` or `Cmd+K`); the
     archive warning (409 `code: "ON_PROJECTS"` unless `confirmOnProjects: true`; new route
     `GET /users/{id}/projects`); minimum pay of $20 an hour, $41,600 a year (400 on
@@ -35,7 +34,7 @@ outdated it.
     note on why only some names open a menu; no grid background; `tools/e2e.sh` `--video`,
     `--ui` and `--allow-writes`. One table of them: `docs/REQUIREMENTS.md`, "Changed after
     the demo".
-- **Docs overhaul (15 Oct, branch `docs-overhaul`):** a README in each important folder, the
+- **Docs overhaul (15 Oct, merged from branch `docs-overhaul`):** a README in each important folder, the
   guides in `docs/` (indexed by `docs/README.md`), the k6 load test moved to
   `tests/load/load.js`. Removed, with their content folded into the guides (old copies in git
   history): the workshop template's guides and policies (`docs/full-stack.md`,
@@ -63,13 +62,6 @@ outdated it.
   without a prompt (a blanket `"Bash"` allow, added 14 Oct at David's request; delete
   that line to go back). Hand David the exact commands for the denied ones.
 - **Open items:**
-  - the Lambda URL's CORS headers now name `authorization` and `content-type` instead of
-    `*` (`infra/lambda.tf`, 15 Oct, for Swagger UI); on AWS after the next
-    `./bin/deploy-backend.sh`. Swagger already works there in Chromium and Firefox today;
-    Firefox warns that `*` will stop covering `Authorization`;
-  - deploy `4d8b949` and the post-demo commits (see **Where things stand**):
-    `git push origin David`, then `./bin/deploy-backend.sh` and `./bin/deploy-frontend.sh`,
-    both together;
   - "Mark all as read" checks only the notifications on the current page;
   - notifications seeded before 14 Oct keep their old wording (no day for logged time);
   - the evaluators haven't yet been asked whether archive counts as the D in CRUD (§8);
