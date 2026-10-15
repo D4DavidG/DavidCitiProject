@@ -26,13 +26,15 @@ const TEXT_PAIRS = [
   ['fill.contrastText', 'fill.main'], // primary buttons, the selected menu item
   ['fill.contrastText', 'fill.hover'],
 ]
-// UI parts need 3:1: the gold Today line, the green-ink focus ring and button borders, a primary button's edge.
+// UI parts need 3:1: the gold Today line, the green-ink focus ring and button borders, a primary button's edge,
+// and a field's resting border, which sits on a dialog, on the page or across a grid line.
 const UI_PAIRS = [
   ['secondary.main', 'background.paper'],
   ['secondary.main', 'background.default'],
   ['primary.main', 'background.default'],
   ['fill.main', 'background.paper'],
   ['fill.main', 'background.default'],
+  ...SURFACES.map((surface) => ['fieldLine', surface]),
 ]
 
 describe.each(MODES)('the %s theme', (mode) => {
@@ -113,6 +115,77 @@ describe('links (spec 5c)', () => {
     const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
     expect(css).toMatch(/MuiLink-root:focus-visible\{(-webkit-)?text-decoration:underline/)
   })
+
+  // Green ink against body text is only 2.3:1 (1.4:1 in dark), under the 3:1 WCAG 1.4.1 asks of a
+  // link that differs by colour alone; axe's link-in-text-block rule accepts a change of weight.
+  it('stand out from the sentence around them by weight, not by colour alone', () => {
+    render(<ThemeProvider theme={makeTheme('light')}><Typography>See the <Link href="#/spec">spec</Link> for more.</Typography></ThemeProvider>)
+    const link = screen.getByRole('link', { name: 'spec' })
+    // The link's rule says font: inherit, then font-weight: 600, which a browser applies in that order
+    // (jsdom lets the shorthand win, so the rule is read rather than the computed weight).
+    const scope = [...link.classList].find((name) => name.startsWith('css-'))
+    const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent).join('')
+    expect(css).toMatch(new RegExp(`\\.${scope}\\{[^}]*font:inherit;[^}]*font-weight:600;`))
+    expect(screen.getByText(/See the/)).toHaveStyle({ fontWeight: '400' })
+  })
+})
+
+describe('the keyboard focus ring (spec 5c)', () => {
+  /** The page-wide rule that draws the ring: [selector, style]. */
+  const ring = (t) => Object.entries(t.components.MuiCssBaseline.styleOverrides).find(([, style]) => style.outline)
+  // jsdom reports :focus-visible only on the first Tab of a whole test file, so rather than tab to each
+  // control, ask whether the ring's selector takes it in once it has keyboard focus.
+  const ringed = (element) => element.matches(ring(theme)[0].replaceAll(':focus-visible', '').replaceAll('.Mui-focusVisible', ''))
+
+  it.each(MODES)('is 2 px green ink, just outside the control (%s)', (mode) => {
+    const t = makeTheme(mode)
+    expect(ring(t)[1]).toEqual({ outline: `2px solid ${t.palette.primary.main}`, outlineOffset: 2 })
+  })
+
+  it('takes in buttons, links and anything made a Tab stop on purpose: a chart row, a box that scrolls sideways', () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <Button>Edit</Button>
+        <a href="#/projects/1">Apollo</a>
+        <div role="img" aria-label="Apollo, 40 h" tabIndex={0} />
+        <div role="region" aria-label="Weeks, scrolls sideways" tabIndex={0} />
+      </ThemeProvider>,
+    )
+    const controls = [
+      screen.getByRole('button', { name: 'Edit' }), screen.getByRole('link', { name: 'Apollo' }),
+      screen.getByRole('img', { name: 'Apollo, 40 h' }), screen.getByRole('region', { name: 'Weeks, scrolls sideways' }),
+    ]
+    controls.forEach((control) => expect(ringed(control)).toBe(true))
+  })
+
+  it('leaves out the inside of a select field (the field draws its own focused border) and what only code focuses (a dialog)', () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <div className="MuiInputBase-input" role="combobox" aria-label="Action" aria-expanded="false" tabIndex={0} />
+        <div role="dialog" aria-label="Edit project" tabIndex={-1} />
+      </ThemeProvider>,
+    )
+    expect(ringed(screen.getByRole('combobox', { name: 'Action' }))).toBe(false)
+    expect(ringed(screen.getByRole('dialog', { name: 'Edit project' }))).toBe(false)
+  })
+})
+
+describe('motion', () => {
+  it.each(MODES)('switches off the slow card glow and the button transitions under prefers-reduced-motion (%s)', (mode) => {
+    const { components } = makeTheme(mode)
+    const calm = { '@media (prefers-reduced-motion: reduce)': { transition: 'none' } }
+    expect(components.MuiCard.styleOverrides.root).toMatchObject(calm)
+    expect(components.MuiButton.styleOverrides.root).toMatchObject(calm)
+  })
+})
+
+describe('raised panels in dark mode', () => {
+  it('are the solid near-black panel: no white overlay on dialogs, menus or the phone drawer', () => {
+    render(<ThemeProvider theme={makeTheme('dark')}><Dialog open aria-label="Dialog"><p>body</p></Dialog></ThemeProvider>)
+    const paper = screen.getByRole('dialog')
+    expect(getComputedStyle(paper).backgroundImage).toBe('none')
+    expect(paper).toHaveStyle({ backgroundColor: 'rgb(11, 14, 11)' })
+  })
 })
 
 describe('panels and titles (spec 5c)', () => {
@@ -142,6 +215,16 @@ describe('a field in error', () => {
     render(<ThemeProvider theme={theme}><OutlinedInput inputProps={{ 'aria-label': 'Minutes' }} /></ThemeProvider>)
     expect(getComputedStyle(screen.getByRole('textbox', { name: 'Minutes' }).parentElement).boxShadow).toBe('')
   })
+})
+
+describe('a field at rest', () => {
+  it.each([['light', 'rgb(118, 125, 120)'], ['dark', 'rgb(111, 121, 115)']])(
+    'has a border that reaches 3:1 on any surface, not MUI\'s faint default (%s)',
+    (mode, line) => {
+      render(<ThemeProvider theme={makeTheme(mode)}><OutlinedInput inputProps={{ 'aria-label': 'Name' }} /></ThemeProvider>)
+      expect(screen.getByRole('textbox', { name: 'Name' }).parentElement.querySelector('fieldset')).toHaveStyle({ borderColor: line })
+    },
+  )
 })
 
 describe('the default export', () => {

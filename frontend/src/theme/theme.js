@@ -17,6 +17,7 @@ const TOKENS = {
     text: '#161A16', // 14.3:1 on the page
     textSecondary: '#2C332E', // supporting lines; 10.5:1 on the page
     textMuted: '#4C5450', // the least important text only; 6.1:1 on a grid line
+    fieldLine: '#767D78', // a field's resting border: 4.2:1 on a panel, 3.4:1 on the page, 3.3:1 on a grid line
     ink: '#14602C', // green as text (links, outlined buttons, focus ring); 6.0:1 on a grid line, white on it 7.7:1
     onInk: '#FFFFFF',
     fill: '#1F7A3A', // the ONE green fill: top bar, primary buttons, selected menu item; white on it 5.4:1
@@ -42,6 +43,7 @@ const TOKENS = {
     text: '#D7D7D7', // 13.5:1 on a panel, 10.8:1 on a grid line
     textSecondary: '#C3C8C3', // 11.4:1 on a panel, 9.1:1 on a grid line
     textMuted: '#A9B0AA', // 8.8:1 on a panel, 7.0:1 on a grid line
+    fieldLine: '#6F7973', // 4.3:1 on a panel, 3.9:1 on the page, 3.4:1 on a grid line
     ink: '#7CC78F', // pale green links and outlined buttons; 9.6:1 on a panel; 16 apart from the grey
     onInk: '#0B0E0B',
     fill: '#FFFFFF', // primary buttons and the selected menu item: white, green words 7.7:1
@@ -84,6 +86,7 @@ export function makeTheme(mode) {
       text: { primary: t.text, secondary: t.textSecondary, muted: t.textMuted },
       divider: t.divider,
       gridLine: t.gridLine,
+      fieldLine: t.fieldLine,
       fill: { main: t.fill, contrastText: t.onFill, hover: t.fillHover },
       header: { main: t.header, contrastText: t.onHeader },
     },
@@ -105,8 +108,14 @@ export function makeTheme(mode) {
             backgroundImage: graphPaper(t.gridLine),
             backgroundSize: `${t.gridSize}px ${t.gridSize}px`,
           },
-          // The keyboard focus ring on every control: 2 px green ink, just outside it.
-          '.MuiButtonBase-root.Mui-focusVisible, a:focus-visible': { outline: `2px solid ${t.ink}`, outlineOffset: 2 },
+          // The keyboard focus ring on every control: 2 px green ink, just outside it. Besides buttons and
+          // links, anything made a Tab stop on purpose (a chart row, a box that scrolls sideways), but not
+          // the inside of a select field, which has its own focused border. :where() keeps that part weightless,
+          // so a component can still refine its own ring.
+          '.MuiButtonBase-root.Mui-focusVisible, a:focus-visible, :where([tabindex="0"]:not(.MuiInputBase-input)):focus-visible': {
+            outline: `2px solid ${t.ink}`,
+            outlineOffset: 2,
+          },
         },
       },
       MuiCard: {
@@ -152,8 +161,14 @@ export function makeTheme(mode) {
           },
         },
       },
-      // Links only go somewhere: green ink, underlined on hover and on keyboard focus.
-      MuiLink: { defaultProps: { underline: 'hover' }, styleOverrides: { root: { '&:focus-visible': { textDecoration: 'underline' } } } },
+      // Links only go somewhere: green ink, underlined on hover and on keyboard focus. Weight 600 too, so a
+      // link inside a sentence differs from the words around it by more than colour (WCAG 1.4.1).
+      MuiLink: {
+        defaultProps: { underline: 'hover' },
+        styleOverrides: { root: { fontWeight: 600, '&:focus-visible': { textDecoration: 'underline' } } },
+      },
+      // Dark mode: MUI lightens a raised panel (dialog, menu, phone drawer) with a white overlay; keep it solid.
+      MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
       MuiOutlinedInput: {
         styleOverrides: {
           // A field in error glows red around a 2 px red border (spec 5a); its message stays under it.
@@ -162,6 +177,8 @@ export function makeTheme(mode) {
             '&.Mui-error': { boxShadow: `0 0 0 3px ${alpha(t.error, 0.25)}` },
             '&.Mui-error .MuiOutlinedInput-notchedOutline': { borderColor: t.error, borderWidth: 2 },
           },
+          // At rest, a border that reaches 3:1 (MUI's default is about 1.7:1); hover, focus and error still win.
+          notchedOutline: { borderColor: t.fieldLine },
         },
       },
       MuiChip: { styleOverrides: { root: { borderRadius: 0 } } },
