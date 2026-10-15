@@ -144,7 +144,7 @@ python3 tools/demo.py seed
 - `seed` stops at once if the project Apollo already exists, so running it twice is harmless.
   The live site is already seeded.
 - `demo` changes no data: its attempts are refused. It works locally and on AWS (it signs in as
-  Ana Ruiz, so her account must be live; it was again from 15 Oct, 16:07).
+  Ana Ruiz, so Ana's account must be live; it was again from 15 Oct, 16:07).
 
 ## openapi.py: rebuild the API description
 
