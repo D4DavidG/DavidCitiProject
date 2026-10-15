@@ -93,15 +93,17 @@ describe('RequestsPage', () => {
     expect(calls[0].query.scope).toBe('sent')
   })
 
-  it('draws Approve as the primary kind (no second green), Reject as the danger kind, and Open project as a secondary button', async () => {
+  it('draws every button filled (spec 6.2): Approve and Open project green, Reject red', async () => {
     renderRequests()
     const rows = await table()
     const approve = within(rows).getByRole('button', { name: /approve allow overtime/i })
     expect(approve).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary')
-    expect(approve).not.toHaveClass('MuiButton-colorSuccess')
-    expect(within(rows).getByRole('button', { name: /reject allow overtime/i })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
-    expect(within(rows).getByRole('link', { name: /open project/i })).toHaveClass('MuiButton-outlined') // it opens the project, so a secondary button
+    expect(approve).not.toHaveClass('MuiButton-colorSuccess') // the one green, never a second
+    expect(within(rows).getByRole('button', { name: /reject allow overtime/i })).toHaveClass('MuiButton-contained', 'MuiButton-colorError')
+    expect(within(rows).getByRole('link', { name: /open project/i })).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary')
+    document.querySelectorAll('.MuiButton-root').forEach((b) => expect(b.className, b.textContent).not.toMatch(/MuiButton-(outlined|text)\b/))
   })
+
 
   it('steps back to the last page that exists when the last request on the last page is decided', async () => {
     let decided = false
