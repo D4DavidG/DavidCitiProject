@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AllocationPage from './AllocationPage'
+import { makeTheme } from '../../theme/theme'
+import { contrast } from '../../test/contrast'
 import { USERS, holdOpen, page, renderAt, session, stubApi } from '../../test/utils'
 
 const WEEKS = ['2026-10-12', '2026-10-19']
@@ -260,5 +262,19 @@ describe('AllocationPage', () => {
     expect(within(over).getByTestId('WarningAmberOutlinedIcon')).toBeInTheDocument()
     const fine = within(ben).getByText('25 / 40 h').closest('[data-over]')
     expect(within(fine).queryByTestId('WarningAmberOutlinedIcon')).not.toBeInTheDocument()
+  })
+
+  // The tour's axe scan found it on 15 Oct: in dark mode a 10% red wash under the red words gave 4.2:1.
+  it.each(['light', 'dark'])('keeps an over week\'s red words at 4.5:1 on its wash, in %s mode', async (mode) => {
+    const t = makeTheme(mode)
+    stubApi({ 'GET /dashboard/allocation': () => [200, { ...page([BEN, CHLOE]), weeks: WEEKS }] })
+    renderAt(<AllocationPage />, { path: '/allocation', auth: session(USERS.manager), theme: t })
+    const ben = await screen.findByRole('row', { name: /Ben Okafor/ })
+    const over = within(ben).getByText('45 / 40 h').closest('[data-over]')
+    // The wash as drawn: a see-through colour is laid over the card it sits on.
+    const [r, g, b, a = 1] = getComputedStyle(over).backgroundColor.match(/[\d.]+/g).map(Number)
+    const card = [1, 3, 5].map((i) => parseInt(t.palette.background.paper.slice(i, i + 2), 16))
+    const wash = `#${[r, g, b].map((v, i) => Math.round(v * a + card[i] * (1 - a)).toString(16).padStart(2, '0')).join('')}`
+    expect(contrast(t.palette.error.main, wash)).toBeGreaterThanOrEqual(4.5)
   })
 })

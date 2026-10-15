@@ -32,6 +32,7 @@ const TOKENS = {
     goldBright: '#FFD54A', // the logo's sparkles and the glow on its peak
     onGold: '#FFFFFF',
     error: '#C21F1F', // a true red for words and marks; 4.6:1 on a grid line
+    overWash: '#F4E5E0', // a red tint behind an over-capacity week (10% of the red on a card): red words 4.9:1
     danger: '#C21F1F', // danger buttons and the New label: white on it 6.0:1
     dangerHover: '#9A1818', // white on it 8.3:1
     warning: '#9C4A00', // pending, on hold; 4.7:1 on a grid line; white on it 6.2:1
@@ -63,6 +64,9 @@ const TOKENS = {
     goldBright: '#FFD54A',
     onGold: '#161A16',
     error: '#FF5A5A', // a true red that reads on a dark card: 4.7:1
+    // A darker red tint behind an over-capacity week: red words 5.3:1. Not a see-through wash of the red,
+    // which lightens the card and dropped the red words to 4.2:1 (axe, 15 Oct).
+    overWash: '#2B1D1D',
     danger: '#C62828', // danger buttons and the New label: white on it 5.6:1
     dangerHover: '#A61F1F', // white on it 7.4:1
     warning: '#FFA05C', // 7.1:1 on a card; dark words on it
@@ -94,6 +98,7 @@ export function makeTheme(mode) {
       primary: { main: t.greenText, contrastText: mode === 'light' ? t.onGreen : t.onStatus },
       secondary: { main: t.gold, light: t.goldBright, contrastText: t.onGold },
       error: status(t.error),
+      overWash: t.overWash,
       warning: status(t.warning),
       success: status(t.success),
       background: { default: t.page, paper: t.paper },

@@ -4,7 +4,6 @@ import {
   Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, FormControlLabel, Paper, Switch, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
 } from '@mui/material'
-import { alpha } from '@mui/material/styles'
 import PrevIcon from '@mui/icons-material/ChevronLeft'
 import NextIcon from '@mui/icons-material/ChevronRight'
 import ExpandIcon from '@mui/icons-material/ExpandMoreOutlined'
@@ -39,11 +38,12 @@ function WeekCell({ week, capacity }) {
           tabIndex={0}
           data-over={String(week.overAllocated)}
           aria-label={label}
-          sx={(theme) => ({
+          sx={{
             px: 1, py: 0.75, minWidth: 96, cursor: 'default',
-            bgcolor: week.overAllocated ? alpha(theme.palette.error.main, 0.1) : 'transparent',
+            // The theme's red tint for each mode, chosen so the red words keep 4.5:1 on it.
+            bgcolor: week.overAllocated ? 'overWash' : 'transparent',
             border: 1, borderColor: week.overAllocated ? 'error.main' : 'transparent',
-          })}
+          }}
         >
           <Typography variant="body2" sx={{ fontWeight: 600, color: week.overAllocated ? 'error.main' : week.bookedHours ? 'text.primary' : 'text.secondary' }}>
             {week.bookedHours} / {capacity} h

@@ -27,6 +27,8 @@ const TEXT_PAIRS = [
   ['fill.contrastText', 'fill.hover'],
   ['danger.contrastText', 'danger.main'], // danger buttons, the New label
   ['danger.contrastText', 'danger.hover'],
+  ['error.main', 'overWash'], // an over-capacity week on Allocation: red words on a red tint
+  ['text.primary', 'overWash'],
 ]
 // UI parts need 3:1: the gold Today line, the green focus ring, a button's edge,
 // and a field's resting border, which sits on a dialog, on the page or across a grid line.
