@@ -116,7 +116,7 @@ purpose, so anyone reviewing the project can sign in as each role:
 | Ben Okafor | Employee | `BO435681` | `Demo-pass-2026` |
 | Chloe Kim | Employee | `CK971979` | `Demo-pass-2026` |
 | Dev Shah | Employee | `DS516414` | `Demo-pass-2026` |
-| Ana Ruiz | Employee | `AR553882` | archived on AWS, so signing in is refused |
+| Ana Ruiz | Employee | `AR553882` | `Demo-pass-2026` (archived in the 15 Oct demo, reactivated the same afternoon) |
 
 Usernames are initials plus six digits, made by the server and never changed. If one of these
 passwords stops working, someone changed it: the admin can set a new one (People > Actions >

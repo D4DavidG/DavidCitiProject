@@ -65,9 +65,10 @@ idle and wakes on the first request.
 | Employee | Ben Okafor | `BO435681` | `Demo-pass-2026` |
 | Employee | Chloe Kim | `CK971979` | `Demo-pass-2026` |
 | Employee | Dev Shah | `DS516414` | `Demo-pass-2026` |
+| Employee | Ana Ruiz | `AR553882` | `Demo-pass-2026` |
 
-Ana Ruiz (`AR553882`) is archived on the live site, so that account can't sign in: it shows
-what archiving someone does. David chose to publish these logins so reviewers can try every
+Ana Ruiz was archived during the 15 Oct demo, then reactivated and booked on Apollo again the
+same afternoon. David chose to publish these logins so reviewers can try every
 role. Anything you change on the live site is real and rings other people's notification bells.
 
 **What each role sees** (the menu is `frontend/src/components/navigation.js`; the server

@@ -527,9 +527,10 @@ rules over real HTTP, with no browser and no test database.
 **Why we use it.** It shows the rules holding on a running system (the proxy or CloudFront,
 the Lambda and the database), and it is the terminal half of the demo.
 
-**On AWS it now stops early.** It signs in as Ana Ruiz, who is archived on the live site, and
-a failed sign-in ends the script (`Login failed for AR553882`, `tools/demo.py:75-78`) right
-after it prints the accounts. Run it on the local stack.
+**On AWS too.** It signs in as Ana Ruiz, so it needs her account live: a failed sign-in ends
+the script (`tools/demo.py:75-78`). Ana was archived during the 15 Oct demo and reactivated
+that afternoon; the walk then ran on the live site with all ten attempts refused as designed
+and 0 integrity violations (15 Oct, 16:12).
 
 **What it does.** Signs in as the admin, Maria, Ana and Ben over HTTPS and prints the
 accounts, the answers to the seven questions, then ten requests that break a rule (logging
@@ -750,7 +751,8 @@ warm database, a folder for screenshots), runs Playwright, and ends with the pla
   them.
 - **Who signs in.** Locally, Maria Lopez (manager), Ana Ruiz (employee) and Sam Patel (a
   second manager), looked up in the local database by email. On AWS, Maria `ML662930`, Ben
-  Okafor `BO435681` (Ana was archived there in the 15 Oct demo) and Sam `SP918535`, all with
+  Okafor `BO435681` (chosen while Ana was archived during the 15 Oct demo; she is active again,
+  and the tests stay on Ben) and Sam `SP918535`, all with
   the password `Demo-pass-2026`; the specs read the employee's name from `E2E_EMPLOYEE_NAME`
   (shared helper: `frontend/e2e/people.js`). The admin's
   password comes from `E2E_ADMIN_PASSWORD`; on AWS it defaults to the published `gusmao123`

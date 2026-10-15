@@ -75,7 +75,7 @@ warning and a 5-second pause; the rows they add stay for good, and they ring rea
 | Where | Manager | Employee | Second manager | Admin |
 | --- | --- | --- | --- | --- |
 | Local | Maria Lopez | Ana Ruiz | Sam Patel | AD000001, only if you set `E2E_ADMIN_PASSWORD`; without it `project-lifecycle` skips |
-| AWS | Maria Lopez, `ML662930` | Ben Okafor, `BO435681` (Ana Ruiz is archived there) | Sam Patel, `SP918535` | AD000001, password `gusmao123`, used only with `--allow-writes` |
+| AWS | Maria Lopez, `ML662930` | Ben Okafor, `BO435681` (chosen while Ana Ruiz was archived in the demo) | Sam Patel, `SP918535` | AD000001, password `gusmao123`, used only with `--allow-writes` |
 
 Every demo person's password is `Demo-pass-2026`. Locally the usernames differ on every
 machine, so the script reads them from the local database.
@@ -143,8 +143,8 @@ python3 tools/demo.py seed
 
 - `seed` stops at once if the project Apollo already exists, so running it twice is harmless.
   The live site is already seeded.
-- `demo` changes no data: its attempts are refused. It is for the local stack: on AWS, Ana Ruiz
-  is archived, so it stops when it tries to sign in as Ana.
+- `demo` changes no data: its attempts are refused. It works locally and on AWS (it signs in as
+  Ana Ruiz, so her account must be live; it was again from 15 Oct, 16:07).
 
 ## openapi.py: rebuild the API description
 
