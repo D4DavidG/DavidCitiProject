@@ -5,6 +5,8 @@ import { Alert, Button, Dialog, DialogActions, DialogContent, DialogContentText,
 /**
  * "Are you sure?" for archive and similar actions. Nothing in this app is deleted:
  * archived records are hidden, kept, and can be reactivated, and the wording says so.
+ * While the action runs, both buttons are disabled, the confirm button says "Please wait…",
+ * and Escape can't close it; they come back on success or error.
  */
 export default function ConfirmDialog({ open, title, message, confirmLabel, onConfirm, onClose }) {
   const [error, setError] = useState(null)
@@ -24,15 +26,15 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, onCo
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={() => { if (!busy) onClose() }} maxWidth="xs" fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <DialogContentText>{message}</DialogContentText>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={confirm} disabled={busy}>{confirmLabel}</Button>
+        <Button onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button variant="contained" onClick={confirm} disabled={busy}>{busy ? 'Please wait…' : confirmLabel}</Button>
       </DialogActions>
     </Dialog>
   )
