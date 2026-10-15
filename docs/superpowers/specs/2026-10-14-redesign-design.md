@@ -296,7 +296,7 @@ titles). The aim: **welcoming, not military**, easy to read, and everything cons
 
 - **Logo:** a softer, still corporate, logo-like font (Poppins, bold). The A's tip is a
   **sharp point** (not a rhombus), with **three gold sparkles**: one on top of the tip, one to
-  its left, one to its right.
+  its left, one to its right. The peak has a **soft gold glow** (the one glow on the site, David's request).
 - **Side menu:** collapsed and expanded by a small **bookmark tab sticking out of the menu's
   right edge near the top**, not a button at the bottom. Accessible name "Collapse menu" /
   "Expand menu", keyboard reachable, remembered as before.
