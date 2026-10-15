@@ -11,9 +11,10 @@ cd ~/DavidCitiProject
 ./tools/e2e.sh --show demo
 ```
 
-A Chrome window opens by itself, signs in as Maria (a manager) and walks the seven questions,
-waiting half a second between steps. It takes about 18 seconds and ends with
-`PASSED: 2 tests passed`.
+A browser window (Playwright's own Chromium, `frontend/playwright.config.js:23`) opens by itself,
+signs in as Maria (a manager) and walks the seven questions, waiting half a second between steps.
+It took about 18 seconds and ended with `PASSED: 2 tests passed` (14 Oct night, before the 15 Oct
+tweaks; see section 1, step 5).
 
 Words used here: a **browser test** (Playwright) drives a real browser against the real website,
 API and database. **Headless** means no window: it runs faster and prints the results. A
@@ -70,21 +71,39 @@ That prints `Total: 17 tests in 4 files` (demo, history, schedule, tour).
 **Step 5. Rehearse once, headless, on the exact version you will show:**
 
 ```sh
-cd ~/DavidCitiProject && ./tools/e2e.sh demo schedule history
+cd ~/DavidCitiProject && ./tools/e2e.sh demo schedule
 ```
 
-Expect `PASSED: 8 tests passed`, with about 25 seconds of test time (8 + 12 + 5 s, section 3).
-If `history` fails, read the first bullet below. If it says
+If every test passes it prints `PASSED: 6 tests passed` (2 + 4 tests, about 20 seconds of test
+time: 8 + 12 s, section 3). This pair has not yet been run on the merged code. If it says
 `Could not find Maria Lopez and Ana Ruiz`, the local data was never seeded: run the seed command
 it prints (it needs your local admin password, so type it yourself, not in front of the room).
 
-Two things to know before you rehearse:
+**Step 6. Refresh the tour pictures** on the version you will show (about 3 minutes; it writes
+`~/tour-shots`, `tools/e2e.sh:157`):
 
-- **The browser tests follow the newest screens.** The 15 Oct tweaks turned each person's buttons
-  on People into one **Actions** menu (`frontend/src/components/PersonActions.jsx:243`, "Actions
-  for ..."), but `history.spec.js` still presses a button named "History for Ana Ruiz"
-  (`frontend/e2e/history.spec.js:105-106`). Rehearse `history` after the tweaks are merged; if it
-  fails, leave it out of the live set.
+```sh
+cd ~/DavidCitiProject && ./tools/e2e.sh tour
+```
+
+The pictures there now are from 14 Oct, 23:28 to 23:51 (`stat` on the files), before the 15 Oct
+tweaks and the tour's dark-mode pass (`c054793`, 08:16). A full `tools/test-all.sh` run doesn't
+refresh them: it saves to a new temp folder unless `E2E_TOUR_DIR` is set (`tools/test-all.sh:107`).
+
+Three things to know before you rehearse:
+
+- **The browser-test pass counts and times on this page are from `cac33d7`, before the 15 Oct
+  tweaks** (section 4's backend and website counts are from the merged code). On the
+  merged code (`David` at `8df10e5`, the 09:24 `tools/test-all.sh` run), `budget.spec.js` failed 3
+  of 3 at 2.0 minutes each, and `history` needs its fix (next bullet). Rerun `./tools/e2e.sh` on
+  the exact version you will show before quoting `PASSED`.
+- **`history` is out of the live set for now.** The tweaks are merged (`git reflog show David`:
+  fast-forward at 09:20) and turned each person's buttons on People into one **Actions** menu
+  (`frontend/src/components/PersonActions.jsx:243`, "Actions for ..."). The committed
+  `history.spec.js` still presses "History for Ana Ruiz" (`frontend/e2e/history.spec.js:30-31`).
+  The fix (open "Actions for Ana Ruiz", then History) is uncommitted in the main folder, among
+  edits to 12 browser-test files (`git diff --stat`, 09:44). Commit it, then run
+  `./tools/e2e.sh demo schedule history` and expect `PASSED: 8 tests passed` before you show it.
 - **AWS runs whatever was last deployed.** Run a file with `--aws` only after the version you are
   showing is deployed there. Otherwise a test can fail simply because the screen it expects isn't
   live yet.
@@ -102,7 +121,7 @@ What happens, in order:
 
 1. The script prints four lines: `Target`, `Files`, `Users` and `Mode : a visible browser, 500 ms
    between steps` (`tools/e2e.sh:245-248`).
-2. A Chrome window opens and signs in as Maria. It checks the dashboard card for Apollo ("At
+2. A browser window (Playwright's Chromium) opens and signs in as Maria. It checks the dashboard card for Apollo ("At
    risk", and its budget), the allocation grid with Ben "Over-allocated" (Apollo 25 h, Zeus 20 h),
    Apollo's page with its Build deliverable, and the dependency view with Launch "Blocked"
    (`frontend/e2e/demo.spec.js:37-62`).
@@ -123,7 +142,7 @@ Playwright's `slowMo`, `frontend/playwright.config.js:21`). It also raises the t
 
 | You want | Command | About how long (demo file) |
 | --- | --- | --- |
-| Easier to follow in a room | `E2E_SLOWMO=800 ./tools/e2e.sh --show demo` | About 20 s (not timed: between the measured 16 s at 500 ms and 24 s at 1500 ms) |
+| Easier to follow in a room | `E2E_SLOWMO=800 ./tools/e2e.sh --show demo` | Not timed. The 16 s was with a visible browser at 500 ms, the 24 s headless at 1500 ms (`docs/TESTING.md:1104-1106`). Time it once in rehearsal |
 | The default | `./tools/e2e.sh --show demo` | 16 to 18 s (measured) |
 | Faster | `E2E_SLOWMO=300 ./tools/e2e.sh --show demo` | Under 16 s (not timed) |
 
@@ -152,12 +171,12 @@ headless time. That is an estimate, not a measurement.
 | --- | --- | --- | --- | --- | --- |
 | `demo` | 2 | 8 s | No | Local or AWS | The seven questions on screen, then the phone menu (section 2). **The best one to show** |
 | `schedule` | 4 | 12 s | No | Local or AWS | The Schedule at desktop and phone width: Ben's Apollo bar and his red-outlined "+5 h over" week, no sideways scrolling; then Tab reaches a bar, its tooltip opens, and Enter opens Apollo (`frontend/e2e/schedule.spec.js:1-11`). **A good second one**: it shows keyboard use |
-| `history` | 2 | 5 s | No | Local or AWS | Maria opens Ana's history and sees no before/after values (admin only); Ana sees My history on Account. See the warning in section 1, step 5 |
+| `history` | 2 | 5 s | No | Local or AWS | Maria opens Ana's history and sees no before/after values (admin only); Ana sees My history on Account. Out of the live set until its fix is committed (section 1, step 5) |
 | `requests` | 1 | 11 s | **Yes** | Local only | Three windows: Ana sends a question, Maria rejects it with a note, Ana reads the answer at phone width (`frontend/e2e/requests.spec.js:1-8`) |
 | `timelog` | 1 | 9 s | **Yes** | Local only | Ben logs 15 minutes, Maria approves it ("Saved"), Ben sees Approved, and Apollo's "Spent (approved time)" goes up (`frontend/e2e/timelog.spec.js:1-6`) |
 | `pull` | 1 | 4 s | **Yes** | Local only | Ana presses **Take this** on a Ready task on Apollo's Board, it moves to In progress with her name, then she puts it back (`frontend/e2e/pull.spec.js:69-88`) |
-| `budget`, `timeline`, `workload` | 3, 4, 5 | 9 s, 12 s, 17 s | No | Local; on AWS only if you name them | Chart checks: lines and bars in the right places, tooltips on hover and on Tab. Correct, but little to watch |
-| `tour` | 9 | about 3 min | No | Local or AWS | Every screen for a manager and an employee, desktop and phone, light and dark, with an accessibility scan (axe) on each. **Too long to watch**: run it beforehand and show the pictures it saves in `~/tour-shots` (`tools/e2e.sh:157`) |
+| `budget`, `timeline`, `workload` | 3, 4, 5 | 9 s, 12 s, 17 s | No | Local; on AWS only if you name them | Chart checks: lines and bars in the right places, tooltips on hover and on Tab. Little to watch. `budget` failed 3 of 3 on the merged code (section 1, step 5) |
+| `tour` | 9 | about 3 min | No | Local or AWS | Every screen for a manager and an employee, desktop and phone, light and dark, with an accessibility scan (axe) on each. **Too long to watch**: run it beforehand (section 1, step 6) and show the pictures it saves in `~/tour-shots` (`tools/e2e.sh:157`) |
 | `project-lifecycle` | 1 | 9 s | **Yes** | Local only | An admin creates, edits, archives and reactivates a project. **Skip it live**: it needs the admin password typed into the terminal |
 | `screenshots` | 1 | skipped | Rewrites `docs/screenshots` | Never live | Not a demo |
 
@@ -194,11 +213,13 @@ refuses them (`tools/e2e.sh:128-140`).
 
 | Suite | Command | How long | The line that proves it |
 | --- | --- | --- | --- |
-| Backend (pytest), against a real local Postgres | `cd ~/DavidCitiProject && .venv/bin/pytest -q` | About 30 s (`610 passed in 29.26s`, 15 Oct, the run in section 3, with coverage on) | `N passed in ...s` and no `failed`. 648 tests are collected now (`pytest --collect-only -q`, 15 Oct) |
+| Backend (pytest), against a real local Postgres | `cd ~/DavidCitiProject && .venv/bin/pytest -q` | About 30 s (`648 passed in 27.67s`, the 09:24 `tools/test-all.sh` run on the merged code, with coverage on) | `N passed in ...s` and no `failed` |
 | One rule only: "not yours" answers 404, word for word | `cd ~/DavidCitiProject && .venv/bin/pytest -q -k byte_identical` | Under a second (0.4 s on 14 Oct) | `3 passed` and a `deselected` count (14 Oct; `docs/DEMO-RUNBOOK.md` section 4) |
-| Website (Vitest + React Testing Library) | `cd ~/DavidCitiProject && (cd frontend && npm test)` | 3 to 4 minutes (`761 passed`, 221.81 s with coverage, the run in section 3) | `Test Files  N passed (N)` and `Tests  N passed (N)` |
+| Website (Vitest + React Testing Library) | `cd ~/DavidCitiProject && (cd frontend && npm test)` | 3 to 4 minutes (`Test Files  51 passed (51)`, `Tests  837 passed (837)`, 234.76 s with coverage, the same 09:24 run) | `Test Files  N passed (N)` and `Tests  N passed (N)` |
 | One screen's website tests | `cd ~/DavidCitiProject && (cd frontend && npx vitest run src/pages/approvals)` | A few seconds (2.3 s on 14 Oct) | `Tests  N passed (N)` |
 
+- The 09:24 run's logs are in `/tmp/tmp.q3YHknC1wb/` (VDI only; `backend.log`, `frontend.log`,
+  `e2e.log`). The same run's browser step is the one where `budget.spec.js` failed.
 - The website suite is too long to watch. Start it in a spare terminal at the start of your talk,
   and point at the result at the end.
 - Don't start the backend tests while another test run is going: they rebuild the same test
@@ -216,7 +237,7 @@ refuses them (`tools/e2e.sh:128-140`).
 | `requests` | "Three separate browsers: the employee asks, the manager rejects it with a note, the employee reads it on a phone. Each step writes an audit row and rings the right bell." |
 | `timelog` | "Only approved time costs money. Watch Spent: it goes up only after the manager approves." |
 | `pull` | "Employees pull work up to their task limit instead of being assigned it. The server holds that limit with a database row lock, so two clicks can't both get through." |
-| Backend suite | "Six hundred and forty-eight tests against a real Postgres. Each runs in a transaction that is rolled back, and after each one the five integrity checks must find nothing." (`tests/backend/conftest.py:3-7`) |
+| Backend suite | "Six hundred and forty-eight tests against a real Postgres. Each runs in a transaction that is rolled back, and after each one the five integrity checks must find nothing, except the few tests that plant a violation on purpose to prove a check catches it." (`tests/backend/conftest.py:3-7, 56-60`; `pytest.ini:6-7`. The raw-SQL schema tests skip only the audit query, `pytest.ini:6`) |
 | Website suite | "Every screen tested on its own with the API faked, so these need no server." |
 | The tour pictures | "Every screen, both roles, desktop and phone, light and dark, each with an automatic accessibility scan. A serious problem fails the test." (`frontend/e2e/tour.spec.js:1-6`) |
 
@@ -258,8 +279,8 @@ kept a recording." Then:
 | Passes locally, fails on AWS | AWS has an older version, or extra people in the live data (`docs/TESTING.md` section 4) | Show the local run instead |
 
 **If nothing will run at all:** show `./tools/e2e.sh --list` (it needs no server), the tour
-pictures in `~/tour-shots`, and the backend suite (`.venv/bin/pytest -q`), which needs only the
-local Postgres.
+pictures in `~/tour-shots` (only as new as your last `./tools/e2e.sh tour` run, section 1, step 6),
+and the backend suite (`.venv/bin/pytest -q`), which needs only the local Postgres.
 
 More detail on every file and option: `docs/TESTING.md` section 8 and `docs/DEMO-RUNBOOK.md`
 section 4.

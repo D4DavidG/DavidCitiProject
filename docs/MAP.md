@@ -8,7 +8,8 @@
 4. Every fact has a source: `file:line`, or a command and what it printed. Line numbers drift as code changes; file names don't.
 5. No secret values are on this page. Where a secret is kept, it says what kind of thing it is and where it lives, never the value.
 
-Checked on 15 Oct 2026, morning, on branch `David-tweaks` at commit `d43d958`. Paths start at the
+Checked on 15 Oct 2026, morning, on branch `David-tweaks` at commit `d43d958`; fact-check
+corrections about 09:45, at `b2cace1`. Paths start at the
 repo root (`~/DavidCitiProject`). Inside the API, `services/...` is short for
 `backend/tracker/services/...` (the same for `api/`, `domain/`, `store/`, `function.py`).
 
@@ -58,7 +59,8 @@ DavidCitiProject/
 │
 ├── backend/
 │   ├── README.md      The workshop's backend guide.                            [W, changed]
-│   ├── _examples/     The workshop's sample Lambda. Never deployed (a leading _ is skipped). [W]
+│   ├── _examples/     The workshop's sample Lambda. Never deployed (a leading _ is skipped).
+│   │                  We removed the Java and Node samples; only python-service is left. [W, changed]
 │   └── tracker/       THE API: Python, one AWS Lambda, all the rules.
 │       ├── function.py  Lambda entry: on a cold start connect, migrate, make the first
 │       │              admin; then hand every request to api/app.py
@@ -128,6 +130,8 @@ Sources: the folder walk and origins in this part come from `git ls-files`, `git
 `frontend/src/services/request.js:1-10`, `frontend/src/services/personAccess.js:1-5`).
 `grep -c '_r("' backend/tracker/api/routes.py` printed 70; `pytest --collect-only -q` printed
 `648 tests collected`; `git ls-files frontend/src | grep -c '\.test\.'` printed 51.
+`git log --oneline 56bd0bb..HEAD -- backend/_examples` printed one commit, `271e1f7` ("Remove the
+workshop's other-track guides and examples"), and `ls backend/_examples` printed `python-service`.
 
 ### One request, folder by folder
 
@@ -149,10 +153,14 @@ browser  ->  frontend/src/services/request.js     the one place the website call
 
 ### On the VDI only, never in git
 
-All are listed in `.gitignore` or `.git/info/exclude`. Names only, never contents.
+Each is outside the repo folder, or listed in `.gitignore` or `.git/info/exclude`. Names only,
+never contents.
 
 | Name | What kind of thing it holds |
 | --- | --- |
+| `~/.claude/` (your home folder) | Claude Code's own files: session transcripts, memory notes, settings. REPOINFO section 14 quotes them |
+| `.superpowers/` | The agents' build ledgers (`.superpowers/sdd/`), one progress file per build (`.git/info/exclude:7`) |
+| `.worktrees/` | A second checkout of the repo on another branch; now `.worktrees/tweaks` on `David-tweaks` (`.git/info/exclude:8`) |
 | `~/.bashrc` (your home folder) | The participant code and the LocalStack token, as environment variables (CLAUDE.md §4) |
 | `ENVIRONMENT.config` | The workshop's temporary AWS credentials, written by `bin/setup-participant.sh:153-166` (`.gitignore:215`) |
 | `~/.aws/credentials` | The same temporary credentials, for the `aws` command (`bin/setup-participant.sh:117-119`) |
@@ -162,7 +170,8 @@ All are listed in `.gitignore` or `.git/info/exclude`. Names only, never content
 | `.venv/`, `node_modules/` | Installed Python test tools and website libraries |
 | `infra/.terraform/` | Terraform's downloaded plugins; the real state is in S3, not here (`.gitignore:166`) |
 | `.claude/` | Claude Code's settings, including the deny list (`.gitignore:266`) |
-| `frontend/vite.3002.config.js` | A second local site on port 3002 for testing a branch (`.git/info/exclude`) |
+| `.worktrees/tweaks/frontend/vite.3002.config.js` | A second local site on port 3002 for testing a branch (`.git/info/exclude:10`). It exists only in that worktree, not in the main folder's `frontend/`. Its Vite cache sits in a Claude scratchpad folder under `/tmp` (`vite.3002.config.js:7`) |
+| `/tmp/e2e-XXXXXX.log` (6 random characters) | One full log per `tools/e2e.sh` run (`tools/e2e.sh:257`), named on its last lines as `Full output:` (`:308`). Gone when the VDI restarts |
 
 ---
 
@@ -178,17 +187,20 @@ database connection per warm Lambda (`function.py:26-27`), and writes no files (
 | | Local (your VDI) | AWS |
 | --- | --- | --- |
 | What | PostgreSQL 18.6, installed on the VDI itself (`select version()`) | Aurora PostgreSQL 17.7, Serverless v2 (`infra/rds.tf:11-13, 39`) |
-| Database name | `postgres`, the shared one (`infra/locals.tf:106-107`) | `codingworkshop` (`infra/rds.tf:14`) |
+| Database name | `postgres`, the shared one (`infra/locals.tf:106-107`) | `codingworkshop`: the project name `coding-workshop` without its dash (`infra/rds.tf:16`, `infra/variable.tf:4`) |
 | Where the files are | `/var/lib/postgresql/18/main` (`show data_directory`) | Managed by AWS, encrypted at rest (`infra/rds.tf:20`) |
 | How the API reaches it | The Docker bridge address `172.17.0.1`, port 5432 (`infra/locals.tf:104-105`) | Lambda settings built from the cluster's address; the connection is encrypted (`sslmode=require`, `store/postgres.py:62-63`) |
 | Sleeps when idle? | No | Yes (`min_capacity = 0.0`, `infra/rds.tf:27`): the first request after a pause takes about 15 s (CLAUDE.md §7) |
 | Backups | None | Automatic, kept 7 days (`infra/rds.tf:17-18`). No last copy on `terraform destroy` (`skip_final_snapshot`, `infra/rds.tf:19`) |
 | Who sets up the tables | The Lambda, on its first cold start: `function.py:45-55` runs `store/migrate.py` under a lock | The same |
 
-**The test databases are separate.** `tracker_test` and four others (`tracker_migrate_test`,
-`tracker_function_test`, `tracker_commit_test`, `tracker_claim_test`) are made and dropped by the
-tests. Their names are fixed in the test code, so a test can never touch the app's data
-(`tests/backend/pg.py:3-4, 13, 19-22`).
+**The test databases are separate.** `tracker_test` is rebuilt at the start of each run and stays
+afterwards (`tests/backend/conftest.py:3, 37-38`). The other four (`tracker_migrate_test`,
+`tracker_function_test`, `tracker_commit_test`, `tracker_claim_test`) are made and dropped by their
+tests (for example `tests/backend/test_migrate.py:11, 20`). Their names are fixed in the test code,
+so a test can never touch the app's data (`tests/backend/pg.py:3-4, 13`). The local server also
+holds a leftover `tracker_pm_test` from an old branch: `select datname from pg_database` listed it,
+and no test code names it now (`grep -rhoE 'tracker_[a-z_]*test' tests/ tools/` found only the five).
 
 #### Every table
 
@@ -217,8 +229,10 @@ database forces to agree (for example `001_init.sql:34`). The full design is in
 `docs/superpowers/specs/2026-10-13-database-design.md`.
 
 **How money and time are stored:** money is whole cents in `BIGINT` columns
-(`001_init.sql:16, 46, 166`), and one file, `domain/money.py`, does all the cents arithmetic
-(`domain/money.py:28-40`). Time worked is whole minutes; bookings are whole hours a week (1 to 40).
+(`001_init.sql:16, 46, 166`). `domain/money.py` holds the formulas (`domain/money.py:28-40`); the
+dashboard repeats them in SQL so Postgres can add them up (`services/dashboard.py:55-65`), and works
+out remaining and percent at `services/dashboard.py:77-79`. Time worked is whole minutes; bookings
+are whole hours a week (1 to 40).
 "Today" and weeks are Eastern time, although the servers run in UTC (`domain/clock.py:1-19`).
 The website does no money arithmetic.
 
@@ -243,7 +257,7 @@ A search of `frontend/src` for `localStorage`, `sessionStorage`, `indexedDB`, `d
 
 - **No cookies.** The refresh token travels in the response body. The tokens design explains why it isn't an HttpOnly cookie (`docs/superpowers/specs/2026-10-14-tokens-design.md`, section 2).
 - Both tokens are also held in memory (`frontend/src/services/request.js:36-37`), so the page still works if storage is blocked. Every storage read and write is wrapped in try/catch.
-- **Passwords you type** (sign-in, change password, the eye button) live only in the form while you type; nothing stores them (`frontend/src/components/PasswordField.jsx:16`).
+- **Passwords you type** live only in the page's memory while you type: the sign-in page's state (`frontend/src/pages/login/LoginPage.jsx:24`) and the change-password page's (`frontend/src/pages/login/ChangePasswordPage.jsx:25`). Nothing stores them: only `AuthContext.jsx`, `colorMode.js` and `AppLayout.jsx` touch browser storage (the search above). The eye that shows them is `frontend/src/components/PasswordField.jsx:15-44`.
 - **The clipboard counts too.** "Copy username and password" puts a new person's username and temporary password on your clipboard until you copy something else (`frontend/src/components/PersonActions.jsx:67`).
 - Each address has its own storage: `localhost:3000` and the CloudFront site never share it.
 
@@ -284,9 +298,11 @@ A search of `frontend/src` for `localStorage`, `sessionStorage`, `indexedDB`, `d
 | `test-all.sh` logs | A fresh temp folder per run, named on its last line ("Full logs:", `tools/test-all.sh:23`) | Until the VDI restarts |
 
 **What our code writes to the log:** migrations applied, a missing signing key, "database not
-ready", an unexpected error with its path, and a reused refresh token with the user's number.
-Never a password, token or request body (`function.py:54, 62, 68`; `api/app.py:53`;
-`services/sessions.py:80`).
+ready", an unexpected error with its path, and a reused refresh token with the user's number
+(`function.py:54, 62, 68`; `api/app.py:53`; `services/sessions.py:80`). Our code never logs a
+password, token or request body on purpose. But an unexpected database error is logged with its
+traceback (`api/app.py:52-53`; unlisted constraint violations are re-raised, `store/postgres.py:20-21,
+118`), and that can include the failing row's values. Not reproduced.
 
 ---
 
@@ -356,13 +372,13 @@ The request's path through the locks:
 | Input checks | Text trimmed and length-capped, numbers must be real numbers, dates `YYYY-MM-DD`, the body must be a JSON object | `domain/values.py:39-140`, `api/http.py:60-89` | Refuse rather than guess | Added |
 | Page size capped | At most 100 rows a page, whatever is asked | `services/paging.py:12` | No giant queries | Added |
 | Plain errors, no internals | Every error is `{ "error": "..." }`; a real bug says only "Something went wrong on our side. Nothing was changed." and the details go to the log | `api/errors.py:18-45`, `api/app.py:50-54` | Attackers learn nothing about the inside | Added |
-| Logs hold no secrets | Only the messages listed at the end of B4 | `function.py:54, 62, 68`; `api/app.py:53`; `services/sessions.py:80` | Logs are kept 7 days | Added |
+| No secrets logged on purpose | Only the messages listed at the end of B4; an unexpected database error's traceback can still carry the failing row | `function.py:54, 62, 68`; `api/app.py:52-53`; `services/sessions.py:80` | Logs are kept 7 days | Added |
 | The database's own rules | Allowed values, foreign keys, and a rule that no two live bookings of one person on one project overlap | `001_init.sql:27-34, 78-80, 174-179` | A last line of defence, even under parallel requests | Added |
 | Nothing can be deleted | No DELETE address, and a Postgres trigger refuses DELETE on every table | `001_init.sql:240-255`, `005_sessions.sql:20` | Nothing is lost by mistake or on purpose | Added |
 | An audit log nobody can edit | Every change writes an audit row in the same transaction; Postgres refuses to edit or delete those rows | `services/audit.py:37-66`, `001_init.sql:255` | "Who did what, when" always has an answer | Added |
 | Five integrity checks | Five questions that must always find nothing, run after every database test and at `GET /admin/integrity-check` | `store/integrity.py:10-79` | Catches quiet damage, including a change that forgot its audit row | Added |
 | Tamper-evident migrations | Each applied migration's SHA-256 is recorded; an edited one stops the Lambda. A lock stops two cold starts migrating at once | `store/migrate.py:50-73` | The database shape can't drift quietly | Added |
-| Row locks | Two requests can't both slip under a limit (capacity, task limit, taking a task) | `services/projects.py:121`, `services/users.py:184` | Correct even with many Lambdas at once | Added |
+| Row locks | Two requests can't both slip under a limit (capacity, task limit, taking a task) | `services/time_entries.py:71` (capacity), `services/tasks.py:156` (task limit), `services/tasks.py:53` (taking a task) | Correct even with many Lambdas at once | Added |
 
 ### The network and AWS
 
@@ -383,11 +399,11 @@ The request's path through the locks:
 | npm audit on every push | Fails if a website library has a known high-severity hole | `.github/workflows/react.actions.yml:26-27` | Supply-chain check | Came with the repo |
 | Checkov on Terraform | Reports risky cloud settings (reports only, never blocks) | `.github/workflows/terraform.actions.yml:23` | Awareness | Came with the repo |
 | Secrets kept out of git | `.gitignore` drops env files, credentials, Terraform state, your private folder and notes | `.gitignore:126, 167, 178, 212-215, 255` (template); `:262, 266, 270` (ours) | Credentials stay on the VDI | Both |
-| Claude can't push or deploy | Claude may edit, test and commit; `git push`, the deploy and cleanup scripts, and `terraform apply`/`destroy` are denied | `.claude/settings.local.json` (not in git) | A person always presses the button that changes AWS or publishes code | Added |
+| Claude can't push or deploy | Claude may edit, test and commit. The deny list blocks the usual spellings of push, deploy, cleanup and `terraform apply`/`destroy`; other spellings (`bin/...` without `./`, `bash ...`, `terraform -chdir=... apply`) aren't on it (Known gaps, item 17) | `.claude/settings.local.json` (not in git) | A person, not Claude, should press the button that changes AWS or publishes code | Added |
 
 ### Known gaps (said plainly)
 
-1. **The demo people share one password that is written in public files** (`tools/demo.py:27`, also in the tests and docs). If the seeded people on AWS still use it, anyone who has read the repo can sign in to the live site as a seeded manager. Not checked live. To close it: on the live site, People, Actions, reset each seeded person's password, or say it is demo data.
+1. **The demo people share one password that is written in public files** (`tools/demo.py:27`, also in the tests and docs). Confirmed 14 Oct night: the `--aws` browser runs signed in as Maria and Ana with the public password (`docs/TESTING.md:1102-1103`; `frontend/e2e/demo.spec.js:32`, `frontend/e2e/history.spec.js:11`), and the live usernames are in `tools/e2e.sh:48-50`. So anyone who has read the repo can sign in to the live site as a seeded manager. To close it: on the live site, People, Actions, reset each seeded person's password. That also stops the `./tools/e2e.sh --aws` browser tests working, so decide before the demo which matters more, or say it is demo data.
 2. **No rate limit or lockout.** Only the slow hash slows password guessing (about 1.1 s per warm sign-in on AWS, measured 13 Oct). A password you choose needs only 8 characters (`services/users.py:181`).
 3. **Tokens live in `sessionStorage`, not in an HttpOnly cookie** (`frontend/src/auth/AuthContext.jsx:8-9`). A script injected into the page could copy them. Mitigations: React escapes what it shows, `frontend/src/` has no `dangerouslySetInnerHTML`, and a copied refresh token used twice ends both sessions.
 4. **The Lambda's own address is public, takes any origin, and has no AWS-level check** (`infra/lambda.tf:41, 48`). Anyone can call it without going through CloudFront, so our code is the only lock. There is no firewall (WAF) in front.
@@ -403,6 +419,7 @@ The request's path through the locks:
 14. **`refresh_tokens` only grows**: rows can't be deleted and nothing prunes them.
 15. **The cleanup script's backup zips the whole folder**, including `ENVIRONMENT.config`, `private/` and `notes.txt`, into the state bucket (`bin/cleanup-environment.sh:58-59`). Run it only on purpose.
 16. **No lockfile in git** (`.gitignore:204`), so CI installs fresh versions each run; and Checkov never blocks (`soft_fail: true`).
+17. **Claude's deny list matches command spellings, not intent.** Its rules are prefixes such as `./bin/deploy-backend.sh`, `../bin/deploy-backend.sh`, `terraform apply` and `git push` (`.claude/settings.local.json`). `bin/deploy-backend.sh` without `./`, `bash ./bin/deploy-frontend.sh`, a full path, or `terraform -chdir=infra apply` aren't on it. Read from the patterns, not tested (REPOINFO section 14 already notes `bash -c` was never tested).
 
 **Checked for this page:** the line numbers above were opened and read on 15 Oct;
 `bandit -r ./backend` printed "No issues identified"; `pytest tests/backend/test_security.py`
