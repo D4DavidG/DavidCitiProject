@@ -2,7 +2,7 @@
 # Run the Playwright browser tests yourself: one command, on the local stack or the live AWS site.
 #
 #   ./tools/e2e.sh                 # every browser test, on the local stack
-#   ./tools/e2e.sh demo            # one file (names are Playwright's filters)
+#   ./tools/e2e.sh demo            # one file (any part of a spec file name)
 #   ./tools/e2e.sh --show demo     # a real browser window, slowed down so people can watch
 #   ./tools/e2e.sh --aws demo tour # against the live AWS site; read-only files only
 #   ./tools/e2e.sh --report demo   # then open Playwright's HTML report
@@ -26,9 +26,11 @@
 #           Maria's, Ana's and Sam's usernames are looked up in the local database, as
 #           tools/test-all.sh does. The admin password comes only from E2E_ADMIN_PASSWORD;
 #           without it project-lifecycle skips. The files that write add rows to the local database.
-# AWS:      runs only the read-only files (none named: all seven). A file that writes is
-#           refused. Seen passing on AWS on 14 Oct night: demo, history, schedule, tour.
-#           Not yet run there: timeline, budget, workload.
+# AWS:      runs only the read-only files. A file that writes is refused. With no name it runs
+#           the four seen passing on AWS on 14 Oct night: demo, history, schedule, tour (13 tests).
+#           timeline, budget and workload only read too, so you may name them, but on the live
+#           data budget passed 3 of 3 and timeline and workload each had one test that failed
+#           (the live data is not the seed's), so they are not in that default set.
 #           The site is warmed first (the database sleeps when idle).
 # Screens:  the tour saves its screenshots in E2E_TOUR_DIR (default $HOME/tour-shots).
 # Exit:     0 all passed, 1 a test failed or Playwright could not run, 2 bad request.
@@ -46,6 +48,9 @@ AWS_ZEUS="SP918535"      # Sam Patel
 
 # Which files only read. Anything not named here counts as one that writes.
 READ_ONLY="demo history schedule tour timeline budget workload"
+# What --aws runs when no file is named: the files seen passing on the live site (14 Oct night).
+# timeline and workload each have one test that fails on the live data, so they run there only when named.
+AWS_DEFAULT="demo history schedule tour"
 
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed -e '/^$/d' -e 's/^# \{0,1\}//'; }
 err() { printf '%s\n' "$*" >&2; }
@@ -131,8 +136,13 @@ if [ "$AWS" -eq 1 ]; then
     exit 2
   fi
   if [ "${#SELECTED[@]}" -eq 0 ]; then
-    for name in "${ALL[@]}"; do is_read_only "$name" && SELECTED+=("$name"); done
+    for name in "${ALL[@]}"; do case " $AWS_DEFAULT " in *" $name "*) SELECTED+=("$name") ;; esac; done
   fi
+  for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
+    case "$name" in
+      timeline|workload) echo "Note: $name.spec.js has one test that failed on the live data on 14 Oct night (the live data is not the seed's). The other tests in it passed." ;;
+    esac
+  done
 fi
 
 # What will run: the chosen files, or (local, none chosen) all of them.
@@ -142,7 +152,8 @@ in_run() { case " ${RUNSET[*]} " in *" $1 "*) return 0 ;; esac; return 1; }
 # ---- Where to point the tests, and who signs in -----------------------------------------
 
 export E2E_TOUR_DIR="${E2E_TOUR_DIR:-$HOME/tour-shots}"
-in_run screenshots || unset E2E_SCREENSHOTS   # it rewrites repo files: only when it is named
+# It rewrites repo files, so only when it is named (a run with no names does not count).
+case " ${SELECTED[*]-} " in *" screenshots "*) ;; *) unset E2E_SCREENSHOTS ;; esac
 NOTES=()  # variables we could not fill; they explain skipped tests at the end
 
 if [ "$AWS" -eq 1 ]; then
