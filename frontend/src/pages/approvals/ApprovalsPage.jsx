@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Alert, Box, Button } from '@mui/material'
+import { Box, Button, FormHelperText } from '@mui/material'
 import DataTable from '../../components/DataTable'
 import OverCapacityMark from '../../components/OverCapacityMark'
 import PageHeader from '../../components/PageHeader'
@@ -21,19 +21,17 @@ export default function ApprovalsPage() {
   const load = useCallback(() => request('GET', '/approvals/time-entries', { query: { q, page: pageNumber, pageSize: 20 } }), [q, pageNumber])
   const { data, error, loading, reload } = useApi(load)
   useLastPage(data, pageNumber, setPageNumber)
-  const [message, setMessage] = useState(null)
+  const [refusal, setRefusal] = useState(null) // { entryId, text }: shown in that entry's row
   const [busy, setBusy] = useState(null)
 
   async function decide(entry, action) {
     setBusy(entry.entryId)
-    setMessage(null)
+    setRefusal(null)
     try {
-      await request('POST', `/time-entries/${entry.entryId}/${action}`)
-      const verb = action === 'approve' ? 'Approved' : 'Rejected'
-      setMessage({ severity: 'success', text: `${verb} ${formatHours(entry.minutes)} by ${entry.personName}.` })
+      await request('POST', `/time-entries/${entry.entryId}/${action}`) // the Saved pop-up confirms it
       reload()
     } catch (failure) {
-      setMessage({ severity: 'error', text: failure.message })
+      setRefusal({ entryId: entry.entryId, text: failure.message })
     } finally {
       setBusy(null)
     }
@@ -52,9 +50,12 @@ export default function ApprovalsPage() {
       label: '',
       align: 'right',
       render: (e) => (
-        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button size="small" variant="contained" disabled={busy === e.entryId} aria-label={`Approve ${describe(e)}`} onClick={() => decide(e, 'approve')}>Approve</Button>
-          <Button size="small" variant="outlined" color="error" disabled={busy === e.entryId} aria-label={`Reject ${describe(e)}`} onClick={() => decide(e, 'reject')}>Reject</Button>
+        <Box sx={{ display: 'grid', gap: 0.5, justifyItems: 'end' }}>
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+            <Button size="small" variant="contained" disabled={busy === e.entryId} aria-label={`Approve ${describe(e)}`} onClick={() => decide(e, 'approve')}>Approve</Button>
+            <Button size="small" variant="outlined" color="error" disabled={busy === e.entryId} aria-label={`Reject ${describe(e)}`} onClick={() => decide(e, 'reject')}>Reject</Button>
+          </Box>
+          {refusal?.entryId === e.entryId && <FormHelperText error role="alert">{refusal.text}</FormHelperText>}
         </Box>
       ),
     },
@@ -69,7 +70,6 @@ export default function ApprovalsPage() {
       <Box sx={{ mb: 3 }}>
         <SearchField label="Search approvals" placeholder="Person, task or project" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
       </Box>
-      {message && <Alert severity={message.severity} sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message.text}</Alert>}
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={data?.items ?? []} rowKey="entryId" label="Time waiting for approval"
           empty={q ? 'No time waiting for approval matches your search.' : 'Nothing waiting for approval.'} />

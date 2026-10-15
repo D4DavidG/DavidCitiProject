@@ -93,16 +93,14 @@ describe('RequestsPage', () => {
     expect(calls[0].query.scope).toBe('sent')
   })
 
-  it('draws Approve as the primary kind (no second green), Reject as the danger kind, and Open project as a link', async () => {
+  it('draws Approve as the primary kind (no second green), Reject as the danger kind, and Open project as a secondary button', async () => {
     renderRequests()
     const rows = await table()
     const approve = within(rows).getByRole('button', { name: /approve allow overtime/i })
     expect(approve).toHaveClass('MuiButton-contained', 'MuiButton-colorPrimary')
     expect(approve).not.toHaveClass('MuiButton-colorSuccess')
     expect(within(rows).getByRole('button', { name: /reject allow overtime/i })).toHaveClass('MuiButton-outlined', 'MuiButton-colorError')
-    const open = within(rows).getByRole('link', { name: /open project/i })
-    expect(open).toHaveClass('MuiLink-root') // it only goes somewhere
-    expect(open).not.toHaveClass('MuiButton-root')
+    expect(within(rows).getByRole('link', { name: /open project/i })).toHaveClass('MuiButton-outlined') // it opens the project, so a secondary button
   })
 
   it('steps back to the last page that exists when the last request on the last page is decided', async () => {
@@ -198,7 +196,7 @@ describe('RequestsPage', () => {
     expect(await screen.findByText(/your line manager will answer/i)).toBeInTheDocument()
   })
 
-  it('shows the request-sent message below the search and filters, just above the list', async () => {
+  it('says "Request sent" as a status line next to the New request button, not in a page-wide alert', async () => {
     renderRequests(USERS.employee, { 'POST /project-requests': [201, OVERTIME] })
     await table()
     await userEvent.click(screen.getByRole('button', { name: /new request/i }))
@@ -206,10 +204,9 @@ describe('RequestsPage', () => {
     await userEvent.type(screen.getByLabelText(/why/i), 'Launch week')
     await userEvent.click(screen.getByRole('button', { name: /send request/i }))
     const message = await screen.findByText(/your line manager will answer/i)
-    const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(follows(screen.getByRole('textbox', { name: 'Search requests' }), message)).toBe(true)
-    expect(follows(screen.getByLabelText(/^kind/i), message)).toBe(true)
-    expect(follows(message, screen.getByRole('table', { name: /requests/i }))).toBe(true)
+    expect(message).toHaveAttribute('role', 'status')
+    expect(message.parentElement).toBe(screen.getByRole('button', { name: /new request/i }).parentElement)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('asking to archive a project offers your projects', async () => {
@@ -253,8 +250,8 @@ describe('RequestsPage', () => {
     expect(listLoads()).toBe(1)
     await userEvent.click(within(rows).getByRole('button', { name: /reject iris/i }))
     await userEvent.click(screen.getByRole('button', { name: /^reject$/i }))
-    expect(await screen.findByText('Rejected: Iris.')).toBeInTheDocument()
     await waitFor(() => expect(listLoads()).toBe(2))
+    expect(screen.queryByText(/^Rejected: Iris/)).not.toBeInTheDocument() // the Saved pop-up says it, and the row shows the status
   })
 
   it('rejecting sends the note', async () => {

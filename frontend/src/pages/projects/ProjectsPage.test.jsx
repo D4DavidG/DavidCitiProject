@@ -51,12 +51,12 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(calls.at(-1).query.status).toBe('ON_HOLD'))
   })
 
-  it('makes the project name a real link you can reach with the keyboard (it only goes somewhere, so it is not a button)', async () => {
+  it('makes the project name a secondary button that opens it, left aligned, reachable by keyboard', async () => {
     renderList()
     const link = await screen.findByRole('link', { name: 'Apollo' })
     expect(link).toHaveAttribute('href', '/projects/1')
-    expect(link).toHaveClass('MuiLink-root')
-    expect(link).not.toHaveClass('MuiButton-root')
+    expect(link).toHaveClass('MuiButton-outlined') // spec 5c: a project's name in a list is a secondary button
+    expect(link).toHaveStyle({ justifyContent: 'flex-start' })
     expect(link).not.toHaveAttribute('tabindex', '-1')
     link.focus()
     expect(link).toHaveFocus()
@@ -180,17 +180,16 @@ describe('ProjectsPage', () => {
       expect(request).not.toHaveClass('MuiButton-colorError')
     })
 
-    it('shows the request-sent message below the search and filter rows, just above the list', async () => {
+    it('says "Request sent" right next to the button that was pressed, not in a page-wide alert', async () => {
       renderList(USERS.manager, { ...both, 'POST /project-requests': [201, { requestId: 4 }] })
       await screen.findByRole('link', { name: 'Apollo' })
       await userEvent.click(screen.getByRole('button', { name: 'Request archive for Apollo' }))
       const dialog = await screen.findByRole('dialog', { name: /request archive of apollo/i })
       await userEvent.click(within(dialog).getByRole('button', { name: /send request/i }))
       const message = await screen.findByText(/request sent.*an admin will answer it/i)
-      const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
-      expect(follows(screen.getByRole('textbox', { name: 'Search projects' }), message)).toBe(true)
-      expect(follows(screen.getByLabelText(/^status/i), message)).toBe(true)
-      expect(follows(message, screen.getByRole('table', { name: 'Projects' }))).toBe(true)
+      expect(message).toHaveAttribute('role', 'status')
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(message.parentElement).toBe(screen.getByRole('button', { name: 'Request archive for Apollo' }).parentElement) // same cell
     })
 
     it('steps back to the last page that exists when archiving empties the page you are on', async () => {

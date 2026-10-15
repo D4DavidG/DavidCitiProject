@@ -65,6 +65,15 @@ describe('DependencyPage', () => {
     expect(calls.find((c) => c.method === 'POST').body).toEqual({ dependsOnMilestoneId: 12 })
   })
 
+  it('shows a refused link removal on the deliverable it was pressed on, not at the top of the page', async () => {
+    renderGraph(USERS.manager, { 'POST /milestones/12/dependencies/11/archive': [409, { error: 'Build is already signed off.' }] })
+    const launch = await screen.findByRole('article', { name: 'Launch' })
+    await userEvent.click(within(launch).getByRole('button', { name: /remove link to build/i }))
+    const refusal = await within(launch).findByText('Build is already signed off.')
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.closest('.MuiAlert-root')).toBeNull()
+  })
+
   it('removes a link', async () => {
     const calls = renderGraph(USERS.manager, { 'POST /milestones/12/dependencies/11/archive': [200, LAUNCH] })
     const launch = await screen.findByRole('article', { name: 'Launch' })

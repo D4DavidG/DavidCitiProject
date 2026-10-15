@@ -59,7 +59,9 @@ describe('ProjectDetailPage', () => {
     })
     const build = await screen.findByRole('region', { name: 'Build' })
     await userEvent.click(within(build).getByRole('button', { name: /sign off/i }))
-    expect(await screen.findByText('Design must be signed off first.')).toBeInTheDocument()
+    const refusal = await within(build).findByText('Design must be signed off first.') // on the card pressed, not at the top
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.closest('.MuiAlert-root')).toBeNull()
   })
 
   it('sends one sign-off however often it is pressed, and disables the card\'s buttons until the answer', async () => {
@@ -220,7 +222,9 @@ describe('ProjectDetailPage', () => {
     fireEvent.click(reactivate)
     expect(screen.getByRole('button', { name: /reactivat/i })).toBeDisabled()
     release()
-    expect(await screen.findByText('Its manager is archived: reactivate them first.')).toBeInTheDocument()
+    const refusal = await screen.findByText('Its manager is archived: reactivate them first.')
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.parentElement).toBe(screen.getByRole('button', { name: /^reactivate$/i }).parentElement) // beside the button pressed
     expect(calls.filter((c) => c.path === '/projects/1/reactivate')).toHaveLength(1)
     expect(screen.getByRole('button', { name: /^reactivate$/i })).toBeEnabled()
   })
@@ -345,7 +349,9 @@ describe('ProjectDetailPage', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: /send request/i }))
       await waitFor(() => expect(calls.find((c) => c.method === 'POST').body)
         .toEqual({ kind: 'ARCHIVE_PROJECT', projectId: 1, justification: 'Handed over' }))
-      expect(await screen.findByText(/request sent.*an admin will answer it/i)).toBeInTheDocument()
+      const sent = await screen.findByText(/request sent.*an admin will answer it/i)
+      expect(sent).toHaveAttribute('role', 'status') // beside the button, not a page-wide alert
+      expect(sent.parentElement).toBe(screen.getByRole('button', { name: /^request archive$/i }).parentElement)
     })
 
     it('gives an admin Archive project, not the request', async () => {
@@ -441,8 +447,11 @@ describe('ProjectDetailPage', () => {
         'POST /tasks/30/claim': [409, { error: refusal }],
       })
       await openBoard()
-      await userEvent.click(within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' }))
-      expect(await screen.findByText(refusal)).toBeInTheDocument()
+      const card = await screen.findByRole('article', { name: 'Go-live checklist' })
+      await userEvent.click(within(card).getByRole('button', { name: 'Take this' }))
+      const line = await within(card).findByText(refusal) // on the card of the task pressed
+      expect(line).toHaveAttribute('role', 'alert')
+      expect(line.closest('.MuiAlert-root')).toBeNull()
     })
 
     it('lets the manager assign every card outside Done', async () => {
@@ -508,7 +517,7 @@ describe('ProjectDetailPage', () => {
       })
       await openBoard()
       await userEvent.click(within(await screen.findByRole('article', { name: 'Go-live checklist' })).getByRole('button', { name: 'Take this' }))
-      expect(await screen.findByText('This task is already taken.')).toBeInTheDocument()
+      expect(await within(screen.getByRole('article', { name: 'Go-live checklist' })).findByText('This task is already taken.')).toBeInTheDocument()
       await waitFor(() => expect(boardCalls(calls)).toHaveLength(2))
     })
   })

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Link as RouterLink, useNavigate } from 'react-router'
-import { Alert, Box, Button, Chip, FormControlLabel, Link, MenuItem, Switch, TextField } from '@mui/material'
+import { Link, useNavigate } from 'react-router'
+import { Box, Button, Chip, FormControlLabel, MenuItem, Switch, TextField, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
@@ -48,8 +48,8 @@ NewProjectDialog.propTypes = { onClose: PropTypes.func.isRequired, onCreated: Pr
 
 /**
  * Every project you can see (admins: all, managers: theirs, employees: the ones
- * they're booked on), searchable and filterable on the server. Each name is a link
- * that opens the project. Admins can archive from here; a manager can ask the admins
+ * they're booked on), searchable and filterable on the server. Each name is a secondary
+ * button that opens the project. Admins can archive from here; a manager can ask the admins
  * to archive a project they manage.
  */
 export default function ProjectsPage() {
@@ -62,7 +62,7 @@ export default function ProjectsPage() {
   const [pageNumber, setPageNumber] = useState(1)
   const [creating, setCreating] = useState(false)
   const [dialog, setDialog] = useState(null) // { kind: 'archive'|'request', project }
-  const [message, setMessage] = useState(null)
+  const [sentFor, setSentFor] = useState(null) // the project a request was just sent for
 
   const load = useCallback(() => request('GET', '/projects', {
     query: { q, status, includeArchived: includeArchived ? 'true' : undefined, page: pageNumber, pageSize: PAGE_SIZE },
@@ -75,11 +75,11 @@ export default function ProjectsPage() {
     {
       key: 'name',
       label: 'Project',
-      // A real link (it only goes somewhere, so it is a link, not a button): green, underlined on hover and focus.
+      // A secondary button that is a real link (spec 5c): obviously clickable, left aligned, reachable by keyboard.
       render: (p) => (
-        <Link component={RouterLink} to={`/projects/${p.projectId}`} underline="hover" sx={{ fontWeight: 600 }}>
+        <Button component={Link} to={`/projects/${p.projectId}`} variant="outlined" size="small" sx={{ fontWeight: 600, justifyContent: 'flex-start', textAlign: 'left' }}>
           {p.name}
-        </Link>
+        </Button>
       ),
     },
     {
@@ -104,7 +104,8 @@ export default function ProjectsPage() {
       render: (p) => {
         const action = archiveAction(user, p)
         return (
-          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+            {sentFor === p.projectId && <Typography variant="body2" role="status">Request sent. An admin will answer it.</Typography>}
             {action === 'archive' && <Button size="small" variant="outlined" color="error" aria-label={`Archive ${p.name}`} onClick={() => setDialog({ kind: 'archive', project: p })}>Archive</Button>}
             {action === 'request' && <Button size="small" variant="outlined" aria-label={`Request archive for ${p.name}`} onClick={() => setDialog({ kind: 'request', project: p })}>Request archive</Button>}
           </Box>
@@ -139,7 +140,6 @@ export default function ProjectsPage() {
         )}
       </Box>
 
-      {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
       <PageState loading={loading} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={rows} rowKey="projectId" label="Projects" empty="No projects match." />
         <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />
@@ -158,7 +158,7 @@ export default function ProjectsPage() {
       {dialog?.kind === 'request' && (
         <RequestArchiveDialog
           project={dialog.project}
-          onSent={() => setMessage('Request sent. An admin will answer it.')}
+          onSent={() => setSentFor(dialog.project.projectId)}
           onClose={() => setDialog(null)}
         />
       )}

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Alert, Box, Button, Menu, MenuItem, Tab, Tabs } from '@mui/material'
+import { Box, Button, Menu, MenuItem, Tab, Tabs, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import FormDialog from '../../components/FormDialog'
 import PageHeader from '../../components/PageHeader'
@@ -91,8 +91,7 @@ export default function RequestsPage() {
   const close = () => setDialog(null)
   const reload = () => setVersion((n) => n + 1)
   const decide = async (action, body) => {
-    await request('POST', `/project-requests/${r.requestId}/${action}`, { body })
-    setMessage(action === 'approve' && r.kind === 'NEW_PROJECT' ? `Approved: project ${r.name} created.` : `${action === 'approve' ? 'Approved' : 'Rejected'}: ${r.name}.`)
+    await request('POST', `/project-requests/${r.requestId}/${action}`, { body }) // the Saved pop-up confirms it; the row shows the new status
     reload()
   }
   return (
@@ -101,7 +100,10 @@ export default function RequestsPage() {
         title="Requests"
         subtitle={SUBTITLES[user.role]}
         actions={sendKinds.length > 0 && (
-          <Button variant="contained" startIcon={<AddIcon />} aria-haspopup="menu" onClick={(e) => setMenuAnchor(e.currentTarget)}>New request</Button>
+          <>
+            {message && <Typography variant="body2" role="status" sx={{ alignSelf: 'center' }}>{message}</Typography>}
+            <Button variant="contained" startIcon={<AddIcon />} aria-haspopup="menu" onClick={(e) => { setMessage(null); setMenuAnchor(e.currentTarget) }}>New request</Button>
+          </>
         )}
       />
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
@@ -121,7 +123,6 @@ export default function RequestsPage() {
           kinds={kindsOn(user.role, scope)}
           view={views[scope]}
           version={version}
-          notice={message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
           onView={(patch) => setViews((all) => ({ ...all, [scope]: { ...all[scope], ...patch } }))}
           onDecide={(action, found) => setDialog({ action, request: found })}
         />

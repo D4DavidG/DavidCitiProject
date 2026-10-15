@@ -259,15 +259,14 @@ describe('PeoplePage', () => {
       expect(calls.filter((c) => c.path === '/users/8/reactivate')).toHaveLength(1)
     })
 
-    it('shows that refusal below the search and filter rows, just above the list', async () => {
+    it('shows that refusal in the row of the person, under their buttons, not in a page-wide alert', async () => {
       const { release } = renderArchived([409, { error: 'Their line manager is archived: reactivate them first.' }])
       fireEvent.click(await screen.findByRole('button', { name: 'Reactivate Ana Ruiz' }))
       release()
-      const message = await screen.findByText('Their line manager is archived: reactivate them first.')
-      const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
-      expect(follows(screen.getByRole('textbox', { name: 'Search people' }), message)).toBe(true)
-      expect(follows(screen.getByLabelText(/^role/i), message)).toBe(true)
-      expect(follows(message, screen.getByRole('table', { name: 'People' }))).toBe(true)
+      const refusal = await screen.findByText('Their line manager is archived: reactivate them first.')
+      expect(refusal).toHaveAttribute('role', 'alert')
+      expect(refusal.closest('tr')).toBe(screen.getByRole('button', { name: 'Reactivate Ana Ruiz' }).closest('tr'))
+      expect(refusal.closest('.MuiAlert-root')).toBeNull()
     })
 
     it('reloads the list after it succeeds', async () => {

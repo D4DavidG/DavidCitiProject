@@ -111,15 +111,23 @@ describe('NotificationsPage', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /mark all as read/i })).toBeEnabled())
   })
 
-  it('shows a failed mark-as-read below the search and the unread switch, just above the list', async () => {
+  it('shows a failed mark-as-read on that notification, next to its button, not in a page-wide alert', async () => {
     renderPage({ 'POST /notifications/5/read': [404, { error: 'Notification not found.' }] })
     const unread = await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
     await userEvent.click(within(unread).getByRole('button', { name: /mark as read/i }))
-    const message = await screen.findByText('Notification not found.')
-    const follows = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(follows(screen.getByRole('textbox', { name: 'Search notifications' }), message)).toBe(true)
-    expect(follows(screen.getByLabelText(/unread only/i), message)).toBe(true)
-    expect(follows(message, screen.getByRole('listitem', { name: /ana ruiz logged 8 h/i }))).toBe(true)
+    const refusal = await within(unread).findByText('Notification not found.')
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.closest('.MuiAlert-root')).toBeNull()
+    expect(within(screen.getByRole('listitem', { name: /changed their email/i })).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows a failed Mark all as read next to that button', async () => {
+    renderPage({ 'POST /notifications/read-all': [500, { error: 'Could not mark them.' }] })
+    await screen.findByRole('listitem', { name: /ana ruiz logged 8 h/i })
+    await userEvent.click(screen.getByRole('button', { name: /mark all as read/i }))
+    const refusal = await screen.findByText('Could not mark them.')
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.parentElement).toBe(screen.getByRole('button', { name: /mark all as read/i }).closest('span').parentElement)
   })
 
   it('steps back to the last page that exists when marking the last unread one empties an unread-only page', async () => {

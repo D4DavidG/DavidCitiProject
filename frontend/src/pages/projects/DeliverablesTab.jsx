@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Alert, Box, Button, Card, CardActions, CardContent, Chip, LinearProgress, Typography } from '@mui/material'
+import { Box, Button, Card, CardActions, CardContent, Chip, FormHelperText, LinearProgress, Typography } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import FormDialog from '../../components/FormDialog'
@@ -33,7 +33,7 @@ function signOffBlocker(d) {
   return reasons.length ? reasons.join(' and ') : null
 }
 
-function Deliverable({ deliverable, canManage, people, busy = false, onAction, onEdit, onArchive, onChanged }) {
+function Deliverable({ deliverable, canManage, people, busy = false, refusal = null, onAction, onEdit, onArchive, onChanged }) {
   const [open, setOpen] = useState(false)
   const titleId = `deliverable-${deliverable.milestoneId}`
   const notReady = signOffBlocker(deliverable)
@@ -67,6 +67,7 @@ function Deliverable({ deliverable, canManage, people, busy = false, onAction, o
         {canManage && !deliverable.completedAt && notReady && (
           <Typography variant="caption" color="text.secondary">Sign-off opens when it&apos;s done: {notReady}.</Typography>
         )}
+        {refusal && <FormHelperText error role="alert" sx={{ flexBasis: '100%', m: 0 }}>{refusal}</FormHelperText>}
       </CardActions>
     </Card>
   )
@@ -88,6 +89,8 @@ Deliverable.propTypes = {
   people: PropTypes.arrayOf(PropTypes.array).isRequired,
   /** True while a sign-off or reopen of this deliverable is on its way: its buttons are disabled. */
   busy: PropTypes.bool,
+  /** The server's sentence when a sign-off, reopen or similar was refused, shown on the card. */
+  refusal: PropTypes.string,
   onAction: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onArchive: PropTypes.func.isRequired,
@@ -104,19 +107,19 @@ Deliverable.propTypes = {
 export default function DeliverablesTab({ projectId, canManage, people, startDate, predictedEndDate }) {
   const load = useCallback(() => request('GET', `/projects/${projectId}/dependency-graph`), [projectId])
   const { data, error, loading, reload } = useApi(load)
-  const [actionError, setActionError] = useState(null)
+  const [refusal, setRefusal] = useState(null) // { milestoneId, text }: shown on that deliverable's card
   const [dialog, setDialog] = useState(null) // null | { deliverable?: object }
   const [archiving, setArchiving] = useState(null)
   const [actingId, setActingId] = useState(null)
 
   async function act(deliverable, action) {
-    setActionError(null)
+    setRefusal(null)
     setActingId(deliverable.milestoneId) // its buttons are disabled until the answer, so one press sends one request
     try {
       await request('POST', `/milestones/${deliverable.milestoneId}/${action}`)
       reload()
     } catch (failure) {
-      setActionError(failure.message)
+      setRefusal({ milestoneId: deliverable.milestoneId, text: failure.message })
     } finally {
       setActingId(null)
     }
@@ -131,7 +134,6 @@ export default function DeliverablesTab({ projectId, canManage, people, startDat
   const items = data?.nodes ?? []
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
-      {actionError && <Alert severity="error" onClose={() => setActionError(null)}>{actionError}</Alert>}
       {canManage && (
         <Box><Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialog({})}>New deliverable</Button></Box>
       )}
@@ -144,6 +146,7 @@ export default function DeliverablesTab({ projectId, canManage, people, startDat
             canManage={canManage}
             people={people}
             busy={actingId === d.milestoneId}
+            refusal={refusal?.milestoneId === d.milestoneId ? refusal.text : null}
             onAction={act}
             onEdit={(deliverable) => setDialog({ deliverable })}
             onArchive={setArchiving}

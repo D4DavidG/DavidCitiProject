@@ -43,8 +43,8 @@ describe('ApprovalsPage', () => {
     await screen.findByText('Ben Okafor')
     await userEvent.click(screen.getByRole('button', { name: /approve 8 h by ben okafor/i }))
     await waitFor(() => expect(calls.some((c) => c.path === '/time-entries/30/approve')).toBe(true))
-    expect(await screen.findByText(/approved 8 h by ben okafor/i)).toBeInTheDocument()
     expect(await screen.findByText(/nothing waiting for approval/i)).toBeInTheDocument()
+    expect(screen.queryByText(/approved 8 h by ben okafor/i)).not.toBeInTheDocument() // the Saved pop-up says it, not the page
   })
 
   it('rejects an entry', async () => {
@@ -98,10 +98,17 @@ describe('ApprovalsPage', () => {
     expect(calls.at(-1).query.page).toBe('1')
   })
 
-  it("shows the server's refusal", async () => {
-    renderQueue({ 'POST /time-entries/30/approve': [404, { error: 'Time entry not found.' }] })
+  it("shows the server's refusal in the row it belongs to, not in a page-wide alert", async () => {
+    renderQueue({
+      'GET /approvals/time-entries': [200, page([ENTRY, { ...ENTRY, entryId: 31, personName: 'Cara Diaz' }])],
+      'POST /time-entries/30/approve': [404, { error: 'Time entry not found.' }],
+    })
     await screen.findByText('Ben Okafor')
     await userEvent.click(screen.getByRole('button', { name: /approve 8 h by ben okafor/i }))
-    expect(await screen.findByText('Time entry not found.')).toBeInTheDocument()
+    const refusal = await screen.findByText('Time entry not found.')
+    expect(refusal).toHaveAttribute('role', 'alert')
+    expect(refusal.closest('tr')).toBe(screen.getByRole('button', { name: /approve 8 h by ben okafor/i }).closest('tr'))
+    expect(within(screen.getByRole('button', { name: /approve 8 h by cara diaz/i }).closest('tr')).queryByRole('alert')).not.toBeInTheDocument()
+    expect(refusal.closest('[role="alert"].MuiAlert-root')).toBeNull()
   })
 })

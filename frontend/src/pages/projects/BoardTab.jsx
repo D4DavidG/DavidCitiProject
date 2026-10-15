@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
-import { Alert, Box, Button, Chip, Paper, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, FormHelperText, Paper, Typography } from '@mui/material'
 import FormDialog from '../../components/FormDialog'
 import PageState from '../../components/PageState'
 import { useAuth } from '../../auth/useAuth'
@@ -27,7 +27,7 @@ export default function BoardTab({ projectId, canManage }) {
   const { user } = useAuth()
   const load = useCallback(() => request('GET', `/projects/${projectId}/board`), [projectId])
   const { data, error, loading, reload } = useApi(load)
-  const [failure, setFailure] = useState(null)
+  const [failure, setFailure] = useState(null) // { taskId, text }: shown on that task's card
   const [assigning, setAssigning] = useState(null)
   const [pendingId, setPendingId] = useState(null)
 
@@ -38,7 +38,7 @@ export default function BoardTab({ projectId, canManage }) {
     try {
       await request('POST', `/tasks/${taskId}/${verb}`)
     } catch (e) {
-      setFailure(e.message)
+      setFailure({ taskId, text: e.message })
     }
     // The buttons come back only once the reloaded board has arrived, so a card that is
     // about to move cannot be taken a second time in the gap.
@@ -53,7 +53,8 @@ export default function BoardTab({ projectId, canManage }) {
   return (
     <PageState loading={loading && !data} error={error} onRetry={reload}>
       <Box sx={{ display: 'grid', gap: 2 }}>
-        {failure && <Alert severity="error" onClose={() => setFailure(null)}>{failure}</Alert>}
+        {/* A refusal sits on its card; only if the task has left the board does it show here. */}
+        {failure && !tasks.some((t) => t.taskId === failure.taskId) && <Alert severity="error" onClose={() => setFailure(null)}>{failure.text}</Alert>}
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }} role="group" aria-label="Who holds what">
           {people.map((p) => {
             const over = p.held > p.limit
@@ -82,6 +83,7 @@ export default function BoardTab({ projectId, canManage }) {
                         <Button size="small" variant="outlined" onClick={() => setAssigning(t)}>Assign</Button>
                       )}
                     </Box>
+                    {failure?.taskId === t.taskId && <FormHelperText error role="alert" sx={{ m: 0 }}>{failure.text}</FormHelperText>}
                   </Paper>
                 ))}
               </Box>

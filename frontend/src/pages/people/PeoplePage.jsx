@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem,
+  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, FormHelperText, MenuItem,
   Switch, TextField, Typography,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/PersonAddAlt'
@@ -101,7 +101,7 @@ export default function PeoplePage() {
   const [pageNumber, setPageNumber] = useState(1)
   const [dialog, setDialog] = useState(null) // { kind: 'create'|'edit'|'capacity'|'history'|'reset'|'archive', person? }
   const [shown, setShown] = useState(null)
-  const [message, setMessage] = useState(null)
+  const [refusal, setRefusal] = useState(null) // { userId, text }: a failed Reactivate, shown in that person's row
   const [reactivatingId, setReactivatingId] = useState(null)
   const { options: managers } = usePeopleOptions('MANAGER')
 
@@ -115,13 +115,13 @@ export default function PeoplePage() {
 
   /** Reactivate an archived person; their button is disabled until the answer, so one press sends one request. */
   async function reactivate(p) {
-    setMessage(null)
+    setRefusal(null)
     setReactivatingId(p.userId)
     try {
       await request('POST', `/users/${p.userId}/reactivate`)
       reload()
     } catch (failure) {
-      setMessage(failure.message)
+      setRefusal({ userId: p.userId, text: failure.message })
     } finally {
       setReactivatingId(null)
     }
@@ -152,18 +152,21 @@ export default function PeoplePage() {
       render: (p) => {
         const name = fullName(p)
         return (
-          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            {canSetCapacity(p) && !p.isArchived && <Button size="small" variant="outlined" aria-label={`Capacity for ${name}`} onClick={() => setDialog({ kind: 'capacity', person: p })}>Capacity</Button>}
-            {canSeeHistory(p) && <Button size="small" variant="outlined" aria-label={`History for ${name}`} onClick={() => setDialog({ kind: 'history', person: p })}>History</Button>}
-            {isAdmin && !p.isArchived && <Button size="small" variant="outlined" aria-label={`Edit ${name}`} onClick={() => setDialog({ kind: 'edit', person: p })}>Edit</Button>}
-            {isAdmin && !p.isArchived && p.userId !== user.userId && <Button size="small" variant="outlined" aria-label={`Reset password for ${name}`} onClick={() => setDialog({ kind: 'reset', person: p })}>Reset password</Button>}
-            {isAdmin && p.userId !== user.userId && (p.isArchived
-              ? (
-                <Button size="small" variant="outlined" aria-label={`Reactivate ${name}`} onClick={() => reactivate(p)} disabled={reactivatingId === p.userId}>
-                  {reactivatingId === p.userId ? 'Reactivating…' : 'Reactivate'}
-                </Button>
-              )
-              : <Button size="small" variant="outlined" color="error" aria-label={`Archive ${name}`} onClick={() => setDialog({ kind: 'archive', person: p })}>Archive</Button>)}
+          <Box sx={{ display: 'grid', gap: 0.5, justifyItems: 'end' }}>
+            <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {canSetCapacity(p) && !p.isArchived && <Button size="small" variant="outlined" aria-label={`Capacity for ${name}`} onClick={() => setDialog({ kind: 'capacity', person: p })}>Capacity</Button>}
+              {canSeeHistory(p) && <Button size="small" variant="outlined" aria-label={`History for ${name}`} onClick={() => setDialog({ kind: 'history', person: p })}>History</Button>}
+              {isAdmin && !p.isArchived && <Button size="small" variant="outlined" aria-label={`Edit ${name}`} onClick={() => setDialog({ kind: 'edit', person: p })}>Edit</Button>}
+              {isAdmin && !p.isArchived && p.userId !== user.userId && <Button size="small" variant="outlined" aria-label={`Reset password for ${name}`} onClick={() => setDialog({ kind: 'reset', person: p })}>Reset password</Button>}
+              {isAdmin && p.userId !== user.userId && (p.isArchived
+                ? (
+                  <Button size="small" variant="outlined" aria-label={`Reactivate ${name}`} onClick={() => reactivate(p)} disabled={reactivatingId === p.userId}>
+                    {reactivatingId === p.userId ? 'Reactivating…' : 'Reactivate'}
+                  </Button>
+                )
+                : <Button size="small" variant="outlined" color="error" aria-label={`Archive ${name}`} onClick={() => setDialog({ kind: 'archive', person: p })}>Archive</Button>)}
+            </Box>
+            {refusal?.userId === p.userId && <FormHelperText error role="alert">{refusal.text}</FormHelperText>}
           </Box>
         )
       },
@@ -195,7 +198,6 @@ export default function PeoplePage() {
         )}
       </Box>
 
-      {message && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={rows} rowKey="userId" label="People" empty="Nobody matches." />
         <Pager page={pageNumber} totalPages={data?.totalPages} onChange={setPageNumber} />

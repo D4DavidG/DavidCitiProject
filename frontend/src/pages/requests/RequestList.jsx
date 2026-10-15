@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
-import { Link as RouterLink } from 'react-router'
-import { Box, Button, Link, MenuItem, TextField } from '@mui/material'
+import { Link } from 'react-router'
+import { Box, Button, MenuItem, TextField } from '@mui/material'
 import DataTable from '../../components/DataTable'
 import PageState, { Pager } from '../../components/PageState'
 import SearchField from '../../components/SearchField'
@@ -17,7 +17,7 @@ import { KIND_LABELS } from './constants'
  * Reject show). The page keeps `view` so each tab remembers its own search and page;
  * `version` goes up after a change so the list loads again.
  */
-export default function RequestList({ scope, kinds, view, version, notice = null, onView, onDecide }) {
+export default function RequestList({ scope, kinds, view, version, onView, onDecide }) {
   const { q, status, kind, page: pageNumber } = view
   const load = useCallback(() => request('GET', '/project-requests', {
     query: { scope, q, status, kind, page: pageNumber, pageSize: 20 },
@@ -46,7 +46,7 @@ export default function RequestList({ scope, kinds, view, version, notice = null
       align: 'right',
       render: (r) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          {r.createdProjectId && <Link component={RouterLink} to={`/projects/${r.createdProjectId}`} underline="hover">Open project</Link>}
+          {r.createdProjectId && <Button size="small" variant="outlined" component={Link} to={`/projects/${r.createdProjectId}`}>Open project</Button>}
           {scope === 'decide' && r.status === 'PENDING' && (
             <>
               <Button size="small" variant="contained" aria-label={`Approve ${r.name}`} onClick={() => onDecide('approve', r)}>Approve</Button>
@@ -78,7 +78,6 @@ export default function RequestList({ scope, kinds, view, version, notice = null
         </TextField>
       </Box>
 
-      {notice}
       <PageState loading={loading && !data} error={error} onRetry={reload}>
         <DataTable columns={columns} rows={data?.items ?? []} rowKey="requestId" label="Requests"
           empty={q || status || kind ? 'No requests match.' : 'No requests.'} />
@@ -102,8 +101,6 @@ RequestList.propTypes = {
   }).isRequired,
   /** Changes after every send or decision, to load the list again. */
   version: PropTypes.number.isRequired,
-  /** A message (an Alert) shown below the search and filters, just above the list. */
-  notice: PropTypes.node,
   /** Called with the fields to change in `view`. */
   onView: PropTypes.func.isRequired,
   /** Called with 'approve' or 'reject' and the request, from the Approve and Reject buttons. */

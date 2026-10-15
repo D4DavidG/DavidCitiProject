@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, Switch, Tooltip, Typography } from '@mui/material'
+import { Box, Button, Card, CardContent, Chip, FormControlLabel, FormHelperText, Switch, Tooltip, Typography } from '@mui/material'
 import PageHeader from '../../components/PageHeader'
 import { useAuth } from '../../auth/useAuth'
 import PageState, { Pager } from '../../components/PageState'
@@ -27,7 +27,7 @@ export default function NotificationsPage() {
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [q, setQ] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
-  const [error, setError] = useState(null)
+  const [refusal, setRefusal] = useState(null) // { id, text }: a failed write, shown next to the button pressed
   const load = useCallback(() => request('GET', '/notifications', {
     query: { unread: unreadOnly ? 'true' : undefined, q, page: pageNumber, pageSize: 20 },
   }), [unreadOnly, q, pageNumber])
@@ -38,13 +38,14 @@ export default function NotificationsPage() {
   // The bell announces a new unread count; refresh the list so the new item shows up.
   useEffect(() => onUnreadChange(() => { reload() }), [reload])
 
-  async function write(path) {
-    setError(null)
+  /** POST `path`; `id` is the notification (or 'all') whose button was pressed, so a refusal shows beside it. */
+  async function write(path, id) {
+    setRefusal(null)
     try {
       await request('POST', path)
       notifications.reload()
     } catch (failure) {
-      setError(failure.message)
+      setRefusal({ id, text: failure.message })
     }
   }
 
@@ -56,12 +57,15 @@ export default function NotificationsPage() {
         title="Notifications"
         subtitle={SUBTITLES[user.role]}
         actions={(
-          // The server marks every notification, not just the ones a search shows, so it waits until the search is cleared.
-          <Tooltip title={q ? 'Clear the search to mark every notification as read.' : ''}>
-            <Box component="span">
-              <Button variant="outlined" disabled={nothingUnread || Boolean(q)} onClick={() => write('/notifications/read-all')}>Mark all as read</Button>
-            </Box>
-          </Tooltip>
+          <Box sx={{ display: 'grid', gap: 0.5, justifyItems: 'end' }}>
+            {/* The server marks every notification, not just the ones a search shows, so it waits until the search is cleared. */}
+            <Tooltip title={q ? 'Clear the search to mark every notification as read.' : ''}>
+              <Box component="span">
+                <Button variant="outlined" disabled={nothingUnread || Boolean(q)} onClick={() => write('/notifications/read-all', 'all')}>Mark all as read</Button>
+              </Box>
+            </Tooltip>
+            {refusal?.id === 'all' && <FormHelperText error role="alert">{refusal.text}</FormHelperText>}
+          </Box>
         )}
       />
       <Box sx={{ mb: 2 }}>
@@ -72,7 +76,6 @@ export default function NotificationsPage() {
         control={<Switch checked={unreadOnly} onChange={(e) => { setUnreadOnly(e.target.checked); setPageNumber(1) }} />}
         label="Unread only"
       />
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <PageState
         loading={notifications.loading && !notifications.data}
         error={notifications.error}
@@ -89,8 +92,9 @@ export default function NotificationsPage() {
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   {!n.isRead && <Chip size="small" color="primary" label="New" />}
-                  {!n.isRead && <Button size="small" variant="outlined" onClick={() => write(`/notifications/${n.notificationId}/read`)}>Mark as read</Button>}
+                  {!n.isRead && <Button size="small" variant="outlined" onClick={() => write(`/notifications/${n.notificationId}/read`, n.notificationId)}>Mark as read</Button>}
                 </Box>
+                {refusal?.id === n.notificationId && <FormHelperText error role="alert" sx={{ flexBasis: '100%', m: 0 }}>{refusal.text}</FormHelperText>}
               </CardContent>
             </Card>
           ))}

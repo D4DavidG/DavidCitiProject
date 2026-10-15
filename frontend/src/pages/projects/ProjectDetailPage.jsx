@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link, useParams } from 'react-router'
-import { Alert, Box, Button, Chip, Tab, Tabs, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, FormHelperText, Tab, Tabs, Typography } from '@mui/material'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import FormDialog from '../../components/FormDialog'
 import PageHeader from '../../components/PageHeader'
@@ -115,15 +115,15 @@ export default function ProjectDetailPage() {
                 <Button component={Link} to={`/projects/${projectId}/dependencies`} variant="outlined">Dependency view</Button>
                 {canManage && <Button variant="outlined" onClick={() => setEditing(true)}>Edit project</Button>}
                 {archive === 'archive' && <Button variant="outlined" color="error" onClick={() => setArchiving(true)}>Archive project</Button>}
-                {archive === 'request' && <Button variant="outlined" onClick={() => setRequesting(true)}>Request archive</Button>}
+                {archive === 'request' && <Button variant="outlined" onClick={() => { setRequestSent(false); setRequesting(true) }}>Request archive</Button>}
+                {requestSent && <Typography variant="body2" role="status" sx={{ alignSelf: 'center' }}>Request sent. An admin will answer it.</Typography>}
                 {isAdmin && p.isArchived && (
                   <Button variant="contained" onClick={reactivate} disabled={reactivating}>{reactivating ? 'Reactivating…' : 'Reactivate'}</Button>
                 )}
+                {actionError && <FormHelperText error role="alert" sx={{ alignSelf: 'center', m: 0 }}>{actionError}</FormHelperText>}
               </>
             )}
           />
-          {actionError && <Alert severity="error" sx={{ mb: 2 }}>{actionError}</Alert>}
-          {requestSent && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setRequestSent(false)}>Request sent. An admin will answer it.</Alert>}
           {p.isArchived && <Alert severity="warning" sx={{ mb: 2 }}>This project is archived: hidden from lists and read-only, but kept with its history.</Alert>}
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
