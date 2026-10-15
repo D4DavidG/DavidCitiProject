@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DashboardPage from './DashboardPage'
-import { page, renderAt, stubApi } from '../../test/utils'
+import { holdOpen, page, renderAt, stubApi } from '../../test/utils'
 
 const APOLLO = {
   projectId: 1, name: 'Apollo', status: 'ACTIVE', managerId: 2, managerName: 'Maria Lopez',
@@ -55,16 +55,29 @@ describe('DashboardPage', () => {
     const calls = renderDashboard()
     await screen.findByRole('article', { name: 'Apollo' })
     await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
-    await waitFor(() => expect(calls.at(-1).query.search).toBe('apo'))
+    await waitFor(() => expect(calls.at(-1).query.q).toBe('apo'))
     expect(calls.filter((c) => c.path === '/dashboard/timeline')).toHaveLength(1)
   })
 
-  it('searches projects as I type, with no Search button to press', async () => {
+  it('searches projects as I type, sending q like every other list, with no Search button to press', async () => {
     const calls = renderDashboard()
     await screen.findByRole('article', { name: 'Apollo' })
     expect(screen.queryByRole('button', { name: 'Search' })).not.toBeInTheDocument()
     await userEvent.type(screen.getByRole('textbox', { name: 'Search projects' }), 'apo')
-    await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/projects').at(-1).query).toMatchObject({ search: 'apo', page: '1' }))
+    await waitFor(() => expect(calls.filter((c) => c.path === '/dashboard/projects').at(-1).query).toMatchObject({ q: 'apo', page: '1' }))
+    expect(calls.filter((c) => c.path === '/dashboard/projects').at(-1).query.search).toBeUndefined()
+  })
+
+  it('keeps the counts and cards on screen while a new search loads, so the page does not flicker', async () => {
+    renderDashboard()
+    const card = await screen.findByRole('article', { name: 'Apollo' })
+    const release = holdOpen('/dashboard/projects')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Search projects' }), 'apo{Enter}')
+    await waitFor(() => expect(globalThis.fetch.mock.calls.some(([url]) => url.includes('q=apo'))).toBe(true))
+    expect(screen.queryByText(/^Loading/)).not.toBeInTheDocument()
+    expect(card).toBeInTheDocument()
+    expect(screen.getByLabelText('Total projects')).toBeInTheDocument()
+    release()
   })
 
   it("tells a manager these are their own projects, not the company's", async () => {
@@ -121,21 +134,24 @@ describe('DashboardPage', () => {
     expect(chart.compareDocumentPosition(screen.getByRole('article', { name: 'Apollo' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('links each card to its project', async () => {
+  it('links each card to its project with a text link, since it goes somewhere rather than doing something', async () => {
     renderDashboard()
     const card = await screen.findByRole('article', { name: 'Apollo' })
-    expect(within(card).getByRole('link', { name: /open project/i })).toHaveAttribute('href', '/projects/1')
+    const link = within(card).getByRole('link', { name: /open project/i })
+    expect(link).toHaveAttribute('href', '/projects/1')
+    expect(link).toHaveClass('MuiLink-root')
+    expect(link).not.toHaveClass('MuiButton-root')
   })
 
   it('searches and filters on the server', async () => {
     const calls = renderDashboard({ 'GET /dashboard/projects': [200, page([APOLLO])] })
     await screen.findByRole('article', { name: 'Apollo' })
     await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
-    await waitFor(() => expect(calls.at(-1).query.search).toBe('apo'))
+    await waitFor(() => expect(calls.at(-1).query.q).toBe('apo'))
     await userEvent.click(screen.getByLabelText(/status/i))
     await userEvent.click(await screen.findByRole('option', { name: 'Active' }))
     await waitFor(() => expect(calls.at(-1).query.status).toBe('ACTIVE'))
-    expect(calls.at(-1).query.search).toBe('apo')
+    expect(calls.at(-1).query.q).toBe('apo')
   })
 
   it('says so when there are no projects', async () => {
@@ -168,7 +184,7 @@ describe('DashboardPage', () => {
     const calls = renderDashboard()
     await screen.findByRole('figure', { name: 'Workload this week · all projects' })
     await userEvent.type(screen.getByLabelText(/search projects/i), 'apo{Enter}')
-    await waitFor(() => expect(calls.at(-1).query.search).toBe('apo'))
+    await waitFor(() => expect(calls.at(-1).query.q).toBe('apo'))
     expect(calls.filter((c) => c.path === '/dashboard/allocation')).toHaveLength(1)
     expect(screen.getByRole('figure', { name: 'Workload this week · all projects' })).toBeInTheDocument()
   })

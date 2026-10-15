@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { Link } from 'react-router'
 import {
-  Box, Button, Card, CardActions, CardContent, Chip, LinearProgress, Link as MuiLink, MenuItem, TextField, Typography,
+  Box, Card, CardActions, CardContent, Chip, LinearProgress, Link as MuiLink, MenuItem, TextField, Typography,
 } from '@mui/material'
 import WarningIcon from '@mui/icons-material/WarningAmberRounded'
 import CheckIcon from '@mui/icons-material/CheckCircleOutlined'
@@ -72,8 +72,9 @@ function ProjectCard({ project }) {
 
         <BudgetBar {...project} />
       </CardContent>
-      <CardActions>
-        <Button component={Link} to={`/projects/${project.projectId}`}>Open project</Button>
+      {/* It goes somewhere, so it is a link (green ink), not a button (spec 5c). */}
+      <CardActions sx={{ px: 2, pb: 2 }}>
+        <MuiLink component={Link} to={`/projects/${project.projectId}`} sx={{ fontWeight: 600 }}>Open project</MuiLink>
       </CardActions>
     </Card>
   )
@@ -126,7 +127,7 @@ export default function DashboardPage() {
   const [pageNumber, setPageNumber] = useState(1)
 
   const load = useCallback(
-    () => request('GET', '/dashboard/projects', { query: { search, status, page: pageNumber, pageSize: PAGE_SIZE } }),
+    () => request('GET', '/dashboard/projects', { query: { q: search, status, page: pageNumber, pageSize: PAGE_SIZE } }),
     [search, status, pageNumber],
   )
   const { data, error, loading, reload } = useApi(load)
@@ -150,7 +151,8 @@ export default function DashboardPage() {
         </TextField>
       </Box>
 
-      <PageState loading={loading} error={error} onRetry={reload} empty={data && items.length === 0 ? 'No projects to show.' : null}>
+      {/* Only the first load shows the spinner: a new search keeps the old counts and cards until it arrives. */}
+      <PageState loading={loading && !data} error={error} onRetry={reload} empty={data && items.length === 0 ? 'No projects to show.' : null}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3 }}>
           <Stat label="Total projects" value={data?.total ?? 0} />
           <Stat label="Total at risk" value={data?.atRiskTotal ?? 0} color="error.main" />
