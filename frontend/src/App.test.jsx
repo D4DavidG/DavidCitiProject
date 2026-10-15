@@ -33,9 +33,10 @@ describe('routes', () => {
     expect(await screen.findByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
   })
 
-  it('lands employees on their tasks', async () => {
+  it('lands employees on their own Dashboard, with their tasks on it', async () => {
     renderApp('/', session(USERS.employee))
-    expect(await screen.findByRole('heading', { name: /my tasks/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'My tasks' })).toBeInTheDocument()
   })
 
   it('keeps an employee out of the allocation grid', async () => {

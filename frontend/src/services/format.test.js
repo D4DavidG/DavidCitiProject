@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, centsToDollarsInput, daysBetween, formatCents, formatDate, formatDateTime, formatDay, formatHours, formatPerWeek, parseDollars, parseDuration, splitMinutes, todayIso,
+  addDays, centsToDollarsInput, daysBetween, formatCents, formatDate, formatDateTime, formatDay, formatHours, formatPerWeek, parseDollars, splitMinutes, todayIso,
 } from './format'
 
 describe('formatCents', () => {
@@ -60,41 +60,6 @@ describe('splitMinutes', () => {
   it('leaves both boxes empty when there is no value', () => {
     expect(splitMinutes(null)).toEqual({ hours: '', minutes: '' })
     expect(splitMinutes(undefined)).toEqual({ hours: '', minutes: '' })
-  })
-})
-
-describe('parseDuration', () => {
-  it('turns typed hours and minutes into minutes, an empty box counting as 0', () => {
-    expect(parseDuration('2', '30', 1440)).toEqual({ minutes: 150 })
-    expect(parseDuration('', '45', 1440)).toEqual({ minutes: 45 })
-    expect(parseDuration(' 3 ', '', 1440)).toEqual({ minutes: 180 })
-    expect(parseDuration('24', '0', 1440)).toEqual({ minutes: 1440 })
-    expect(parseDuration('100', '', 60000)).toEqual({ minutes: 6000 })
-  })
-
-  it('refuses minutes that are not a whole number from 0 to 59, naming the Minutes box', () => {
-    const error = { box: 'minutes', error: 'Minutes must be a whole number from 0 to 59.' }
-    expect(parseDuration('1', '75', 1440)).toEqual(error)
-    expect(parseDuration('1', '2.5', 1440)).toEqual(error)
-    expect(parseDuration('1', '-5', 1440)).toEqual(error)
-    expect(parseDuration('1', 'ten', 1440)).toEqual(error)
-  })
-
-  it('refuses hours that are not a whole number up to the maximum, naming the Hours box', () => {
-    expect(parseDuration('2.5', '', 1440)).toEqual({ box: 'hours', error: 'Hours must be a whole number from 0 to 24.' })
-    expect(parseDuration('25', '', 1440)).toEqual({ box: 'hours', error: 'Hours must be a whole number from 0 to 24.' })
-    expect(parseDuration('1001', '', 60000)).toEqual({ box: 'hours', error: 'Hours must be a whole number from 0 to 1000.' })
-  })
-
-  it('refuses no time at all', () => {
-    const error = { box: 'hours', error: 'Enter some time: at least 1 minute.' }
-    expect(parseDuration('', '', 1440)).toEqual(error)
-    expect(parseDuration('0', '0', 1440)).toEqual(error)
-  })
-
-  it('refuses a total over the maximum', () => {
-    expect(parseDuration('24', '30', 1440)).toEqual({ box: 'hours', error: 'That is more than 24 h.' })
-    expect(parseDuration('1000', '1', 60000)).toEqual({ box: 'hours', error: 'That is more than 1000 h.' })
   })
 })
 

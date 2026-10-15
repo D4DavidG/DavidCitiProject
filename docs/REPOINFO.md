@@ -917,7 +917,7 @@ More, with longer answers: [GUIDE.md §8](GUIDE.md#8-questions-you-will-probably
 | "The integrity check runs after every test" | "After every database test" | Unit tests and `no_integrity_check` tests skip it |
 | "Every list is paginated" | "Top-level lists are paged (in SQL, except the dashboard); lists inside a project come whole" | `_whole` in `api/handlers.py:51-54` |
 | "Login timing is perfectly constant" | "An unknown username does the same hashing work as a wrong password; the test counts the work, not the clock" | `test_unknown_username_costs_the_same_hashing_as_a_wrong_password`; not timed on AWS |
-| "The browser checks nothing" | "The browser checks only that typed time is whole numbers within the server's own limits, to point at the wrong box; the server still refuses" | `parseDuration`, `frontend/src/services/format.js:75-88` |
+| "The browser checks nothing" | "The browser checks only required boxes, typed time and numbers within the server's own limits, and end dates after start dates, to point at the wrong box; the server still refuses" | `checkNumber`, `checkDuration` and `submit()` in `frontend/src/components/FormDialog.jsx:37-222` |
 | "Only `money.py` does money maths" | "`money.py` holds the formulas; the dashboard repeats them in one SQL query" | `services/dashboard.py:52-58` |
 | "No N+1, proven" | "Each screen uses a fixed number of queries; no test counts them yet" | No query-count test |
 | "Managers can see everything in an employee's history" | "A manager sees what happened, never the salary: the before/after state is admin-only" | `audit_view(include_states=...)`; `test_history_never_shows_salary_to_a_manager` |
