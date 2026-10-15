@@ -26,12 +26,12 @@ outdated it.
   `./bin/deploy-frontend.sh` (both together):
   - the Swagger UI commit `4d8b949` (`docs/swagger.html`, `tools/swagger.sh`; its Lambda URL
     CORS change in `infra/lambda.tf` needs the backend deploy);
-  - the post-demo changes: top-bar search (pages by role and projects; `/` or `Ctrl+K`); the
+  - the post-demo changes: top-bar search (pages by role and projects; `/`, `Ctrl+K` or `Cmd+K`); the
     archive warning (409 `code: "ON_PROJECTS"` unless `confirmOnProjects: true`; new route
     `GET /users/{id}/projects`); minimum pay of $20 an hour, $41,600 a year (400 on
     `annualSalaryCents`); the dashboard's two columns, At risk and On track, 3 projects each
     by latest activity (`atRisk`, `sort=updated` and `lastActivityAt` on
-    `GET /dashboard/projects`); the late tooltip; "Week of" on the timeline; the Allocation
+    `GET /dashboard/projects`); the late tooltip; "Week of" on the dashboard and Schedule timelines; the Allocation
     note on why only some names open a menu; no grid background; `tools/e2e.sh` `--video`,
     `--ui` and `--allow-writes`. One table of them: `docs/REQUIREMENTS.md`, "Changed after
     the demo".
@@ -44,8 +44,8 @@ outdated it.
   `MAP.md`, `OVERNIGHT-REPORT.md`, and the design specs and plans in `docs/superpowers/`).
 - **Tests (15 Oct, before the post-demo changes):** 648 backend (97% of statements), 846
   website in 51 files (98.04% of lines), 33 browser tests passed and 1 skipped on request
-  (the README screenshots), 100 axe scans (light and dark), 70 API operations (71 since `GET /users/{id}/projects`).
-  `./tools/test-all.sh` runs every local check. Where each suite lives: `tests/README.md`;
+  (the README screenshots), 100 axe scans (light and dark), 70 API operations (71 since
+  `GET /users/{id}/projects`). `./tools/test-all.sh` runs every local check. Where each suite lives: `tests/README.md`;
   what each proves: `docs/TESTING.md`.
 - **Read these first:**
   - `README.md` (the front door: logins, the repo tree, Swagger) and `docs/README.md` (the
