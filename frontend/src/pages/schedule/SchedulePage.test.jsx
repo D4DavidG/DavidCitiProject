@@ -99,6 +99,8 @@ describe('SchedulePage', () => {
     const weekOf = screen.getByTestId('week-of')
     expect(weekOf).toHaveTextContent(/^Week of$/)
     expect(weekOf).toHaveClass('MuiTypography-caption')
+    // A block, as the dates are: an inline caption took the cell's taller line and sat 6 px below them.
+    expect(weekOf).toHaveStyle({ display: 'block' })
   })
 
   it("places each bar on its own weeks (grid columns) and its project's lane (grid row)", async () => {

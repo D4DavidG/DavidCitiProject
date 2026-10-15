@@ -306,7 +306,8 @@ export default function SchedulePage() {
             <Box aria-hidden="true" sx={{ ...rowGrid(weeks.length), mt: 1 }}>
               {/* "Week of" leads the row of dates (each date is a week's Monday), in the dates' own caption style. */}
               <Box sx={{ ...nameCell(c.grid), gridRow: 1, borderRight: 'none', textAlign: 'right', py: 0 }}>
-                <Typography data-testid="week-of" variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Week of</Typography>
+                {/* A block, like the dates (grid items), so it takes the caption's own line height and sits level with them. */}
+                <Typography data-testid="week-of" variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 600 }}>Week of</Typography>
               </Box>
               {weeks.map((w) => (
                 <Typography key={w} variant="caption" sx={{ px: 0.75, color: 'text.secondary', fontWeight: 600 }}>{formatDay(w)}</Typography>
