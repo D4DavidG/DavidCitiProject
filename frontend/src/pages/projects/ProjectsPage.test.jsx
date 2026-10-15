@@ -40,7 +40,7 @@ describe('ProjectsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
     await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
     await userEvent.type(screen.getByRole('textbox', { name: 'Search projects' }), 'apo')
-    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ search: 'apo', page: '1' }))
+    await waitFor(() => expect(calls.at(-1).query).toMatchObject({ q: 'apo', page: '1' }))
   })
 
   it('filters by status on the server', async () => {

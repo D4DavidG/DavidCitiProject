@@ -55,7 +55,7 @@ export default function ProjectsPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const isAdmin = user.role === 'ADMIN'
-  const [search, setSearch] = useState('')
+  const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
   const [includeArchived, setIncludeArchived] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
@@ -64,8 +64,8 @@ export default function ProjectsPage() {
   const [message, setMessage] = useState(null)
 
   const load = useCallback(() => request('GET', '/projects', {
-    query: { search, status, includeArchived: includeArchived ? 'true' : undefined, page: pageNumber, pageSize: PAGE_SIZE },
-  }), [search, status, includeArchived, pageNumber])
+    query: { q, status, includeArchived: includeArchived ? 'true' : undefined, page: pageNumber, pageSize: PAGE_SIZE },
+  }), [q, status, includeArchived, pageNumber])
   const { data, error, loading, reload } = useApi(load)
   const rows = data?.items ?? []
 
@@ -122,7 +122,7 @@ export default function ProjectsPage() {
       />
 
       <Box sx={{ mb: 2 }}>
-        <SearchField id="projects-search" label="Search projects" placeholder="Project name" onSearch={(q) => { setSearch(q); setPageNumber(1) }} />
+        <SearchField id="projects-search" label="Search projects" placeholder="Project name" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
       </Box>
       {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, alignItems: 'center' }}>

@@ -94,7 +94,7 @@ export default function PeoplePage() {
   const { user } = useAuth()
   const isMobile = useIsMobile()
   const isAdmin = user.role === 'ADMIN'
-  const [search, setSearch] = useState('')
+  const [q, setQ] = useState('')
   const [role, setRole] = useState('')
   const [includeArchived, setIncludeArchived] = useState(false)
   const [pageNumber, setPageNumber] = useState(1)
@@ -105,8 +105,8 @@ export default function PeoplePage() {
   const { options: managers } = usePeopleOptions('MANAGER')
 
   const load = useCallback(() => request('GET', '/users', {
-    query: { search, role, includeArchived: includeArchived ? 'true' : undefined, page: pageNumber, pageSize: 20 },
-  }), [search, role, includeArchived, pageNumber])
+    query: { q, role, includeArchived: includeArchived ? 'true' : undefined, page: pageNumber, pageSize: 20 },
+  }), [q, role, includeArchived, pageNumber])
   const { data, error, loading, reload } = useApi(load)
   const rows = data?.items ?? []
   const showSalary = rows.some((p) => p.annualSalaryCents !== undefined)
@@ -181,7 +181,7 @@ export default function PeoplePage() {
       {message && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
 
       <Box sx={{ mb: 2 }}>
-        <SearchField id="people-search" label="Search people" placeholder="Name, username or email" onSearch={(q) => { setSearch(q); setPageNumber(1) }} />
+        <SearchField id="people-search" label="Search people" placeholder="Name, username or email" onSearch={(text) => { setQ(text); setPageNumber(1) }} />
       </Box>
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, alignItems: 'center' }}>
         <TextField id="people-role" select label="Role" size="small" value={role} onChange={(e) => { setRole(e.target.value); setPageNumber(1) }} sx={{ minWidth: 160 }}>
