@@ -14,7 +14,7 @@ checks one layer, from the database up to a real browser.
 | --- | --- | --- | --- | --- | --- | --- |
 | **Database rule tests** | Postgres itself refuses bad rows (each by its named rule), nothing can be deleted, the 5 integrity queries each catch a planted problem, migrations run once and all-or-nothing | The last line of defence must hold even if the Python is wrong | `tests/backend/test_schema.py`, `test_no_delete.py`, `test_integrity.py`, `test_migrate.py` | `.venv/bin/pytest -q tests/backend/test_schema.py tests/backend/test_no_delete.py tests/backend/test_integrity.py tests/backend/test_migrate.py` | 2 s | 88 |
 | **Business-rule (service) tests** | Every rule in `MVP.md`: who may do what, capacity and overtime, sign-off, budget maths, audit rows and who gets notified, money, the clock, password hashing, tokens (15 minutes) and refresh tokens (rotation, reuse detection) | Fast and precise: they call the rules directly, never through HTTP (they never import `api`) | `tests/backend/test_users.py`, `test_work.py`, `test_projects.py`, `test_requests.py`, `test_dashboard.py`, `test_audit.py`, `test_domain.py`, `test_security.py`, `test_sessions.py` | `.venv/bin/pytest -q tests/backend/test_users.py tests/backend/test_work.py tests/backend/test_projects.py tests/backend/test_requests.py tests/backend/test_dashboard.py tests/backend/test_audit.py tests/backend/test_domain.py tests/backend/test_security.py tests/backend/test_sessions.py` | 7 s | 315 |
-| **API tests** | Routing (both path shapes), every route needs a token, the role is read from the database, 404 not 403, error and list shapes, no DELETE route; every read route and every write route called once; the Lambda entry point | Proves the wiring between the web request and the rules, using real Lambda-shaped events | `tests/backend/test_api.py`, `test_api_read_walk.py`, `test_api_audit_walk.py`, `test_function.py` | `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py` | 4 s | 142 |
+| **API tests** | Routing (both path shapes), every route needs a token, the role is read from the database, 404 not 403, error and list shapes, no DELETE route; every read route and every write route called once; the Lambda entry point; `docs/openapi.json` matches the route table | Proves the wiring between the web request and the rules, using real Lambda-shaped events | `tests/backend/test_api.py`, `test_api_read_walk.py`, `test_api_audit_walk.py`, `test_function.py`, `test_openapi.py` | `.venv/bin/pytest -q tests/backend/test_api.py tests/backend/test_api_read_walk.py tests/backend/test_api_audit_walk.py tests/backend/test_function.py tests/backend/test_openapi.py` | 4 s | 142 |
 | **"Writes really commit" test** | A change is actually saved, not left in a transaction that is never committed | Every other test rolls back on purpose, so only a test on its own database can catch "nothing is ever saved" | `tests/backend/test_store_commits.py` | `.venv/bin/pytest -q tests/backend/test_store_commits.py` | under 1 s | 2 |
 | **Race (concurrency) tests** | Two people pressing "Take this" at the same moment: only one wins, and nobody goes over their task limit | A race only shows up with two real database connections at once; the test waits until Postgres reports the second one blocked | `tests/backend/test_claim_race.py` | `.venv/bin/pytest -q tests/backend/test_claim_race.py` | under 1 s | 2 |
 | **Website component tests** (Vitest + React Testing Library) | Each screen shows the right thing and sends the right request: field names, cents, only-changed fields, refusals shown as written, buttons per role, phone layout | Fast checks of the website without a browser or a server: the API is faked at `fetch` | `frontend/src/**/*.test.jsx`, `*.test.js` (32 files, beside the code they test) | `cd frontend && npm test` | 115 s | 324 |
@@ -31,6 +31,20 @@ Website total: `npm test` printed `Test Files  32 passed (32)`, `Tests  324 pass
 
 The backend tests need local Postgres running. They build their own `tracker_test`
 database (`tests/backend/pg.py:13`) and never touch the app's data.
+
+### Import the API into Postman or SwaggerHub
+
+`docs/openapi.json` is generated from the route table (`.venv/bin/python tools/openapi.py`
+after any route change; `test_openapi.py` fails if you forget).
+
+- **Postman:** Import, Files, choose `docs/openapi.json`, import as a Postman Collection.
+  Set the collection variable `baseUrl` to `http://localhost:3001/api/tracker` (local) or
+  `https://d1gov8jpsxhwer.cloudfront.net/api/tracker` (AWS). Send "Log in", copy `token`
+  from the answer into the collection's Authorization tab (Bearer Token). Tokens last 15
+  minutes.
+- **SwaggerHub:** Create New, Import and Document API, upload `docs/openapi.json`. Browse
+  and share it there; "Try it out" may be blocked by CORS (a page on swaggerhub.com
+  calling our server). Not tried.
 
 ## 2. What coverage means for each kind of test
 

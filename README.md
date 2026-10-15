@@ -249,6 +249,7 @@ Lambda-shaped event goes through the same entry point AWS uses. Real HTTP is exe
 | `test_integrity.py` | each integrity query catches a deliberately planted violation |
 | `test_users.py`, `test_audit.py`, `test_projects.py`, `test_work.py`, `test_requests.py`, `test_dashboard.py` | every business rule, calling services directly |
 | `test_api.py` | routing (both path shapes), every non-public route needs a token, role from the database, 404 not 403, error and list shapes, no DELETE anywhere, refresh and logout over HTTP, a password change ends older tokens |
+| `test_openapi.py` | the OpenAPI file matches the route table; every handler documented; bodies match the services |
 | `test_api_audit_walk.py` | calls every write route and checks each one left an audit row |
 | `test_api_read_walk.py` | calls every read route and checks its shape; audit-log filters; malformed queries and bodies; a crash is a 500 with a generic message (`{"error": ...}`) |
 | `test_domain.py`, `test_security.py` | validation, money, the Eastern-time clock, hashing (and that production stays at 600k rounds), tokens (valid at 14:59, refused at 15:00) |
@@ -362,6 +363,25 @@ archived project. `demo` prints the seven answers, then tries to break the rules
 capacity, a future date, another manager's project, an employee creating a project, a
 dependency loop, signing off unfinished work, DELETE, no token. It ends on the
 integrity check.
+
+### API file (Postman, SwaggerHub)
+
+`docs/openapi.json` (OpenAPI 3.0.3) lists all 69 endpoints: method, path, who may call
+it, the body it takes and the status it answers. `tools/openapi.py` builds it from the
+route table (`backend/tracker/api/routes.py`); each summary is the handler's docstring.
+`tests/backend/test_openapi.py` fails when the saved file is stale, so after a route
+change run:
+
+```sh
+.venv/bin/python tools/openapi.py   # Wrote docs/openapi.json: 69 operations
+```
+
+- **Postman:** Import, Files, choose `docs/openapi.json`, import as a Postman Collection.
+  Set the collection's `baseUrl` to the local or AWS server, send "Log in", and paste
+  `token` from the answer into the collection's Authorization tab (Bearer Token, 15 minutes).
+- **SwaggerHub:** Create New, Import and Document API, upload `docs/openapi.json`.
+  "Try it out" from swaggerhub.com may be blocked by CORS; Postman is not a browser, so
+  CORS does not apply there.
 
 ## Deploying to AWS
 

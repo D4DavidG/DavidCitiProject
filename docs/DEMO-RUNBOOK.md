@@ -445,8 +445,10 @@ The audit-log request with the filter `entityType=projects&dateFrom=2026-10-13` 
 version of the admin screen. **Not verified:** the signed-in requests were never sent, and
 REST Client wasn't installed, on 14 Oct.
 
-Postman is also installed in VS Code, but it wants a sign-in and each request built by hand;
-skip it.
+Postman (also installed in VS Code, but it wants a sign-in) can import every endpoint at
+once from `docs/openapi.json`: Import, Files, choose the file, import as a Postman
+Collection, then set `baseUrl`. Steps in `docs/TESTING.md` ("Import the API into Postman
+or SwaggerHub"). Not tried.
 
 ---
 

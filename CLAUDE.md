@@ -56,7 +56,9 @@ outdated it.
   - `docs/REPOINFO.md` (what to say, with every claim checked against the code,
     and a "say this, not that" table) and `docs/DEMO-RUNBOOK.md` (what to run and click
     live, the tests, Plan B); `tools/tracker.http` holds read-only API requests for VS
-    Code's REST Client;
+    Code's REST Client; `docs/openapi.json` is the OpenAPI file for Postman and
+    SwaggerHub (regenerate with `.venv/bin/python tools/openapi.py` after any route
+    change; `test_openapi.py` fails until you do);
   - `docs/OVERNIGHT-REPORT.md`: what was built on the night of 13 to 14 Oct, every
     decision made for David, and what isn't verified;
   - `docs/superpowers/plans/2026-10-13-manual-verification.md`: the AWS checklist,
