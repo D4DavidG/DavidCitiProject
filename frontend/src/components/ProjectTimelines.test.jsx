@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProjectTimelines from './ProjectTimelines'
-import { USERS, page, renderAt, session, stubApi } from '../test/utils'
+import theme, { makeTheme } from '../theme/theme'
+import { OTHER_COLOUR, PROJECT_COLOURS } from '../theme/chartColours'
+import { USERS, holdOpen, page, renderAt, session, stubApi } from '../test/utils'
 
 // Today is Wednesday Oct 14, 2026, so the window opens on Monday Sep 28 and ends Sunday Dec 20.
 const TODAY = '2026-10-14'
@@ -21,11 +23,23 @@ const ZEUS = {
   deliverables: [], bookings: [{ userId: 9, name: 'Chloe Kim', startDate: '2027-01-04', endDate: '2027-02-28', hoursPerWeek: 30 }],
 }
 
-function renderTimelines({ answer = [200, page([APOLLO, ZEUS])], user = USERS.manager } = {}) {
+function renderTimelines({ answer = [200, page([APOLLO, ZEUS])], user = USERS.manager, mode = 'light', headingVariant } = {}) {
   const calls = stubApi({ 'GET /dashboard/timeline': answer })
-  renderAt(<ProjectTimelines title="My projects this week" today={TODAY} />, { path: '/dashboard', auth: session(user) })
+  renderAt(<ProjectTimelines title="My projects this week" today={TODAY} headingVariant={headingVariant} />, {
+    path: '/dashboard', auth: session(user), theme: mode === 'dark' ? makeTheme('dark') : theme,
+  })
   return calls
 }
+
+/** A colour as the browser reports it (rgb(...)), so a hex token can be compared with a computed style. */
+function rgb(colour) {
+  const probe = document.createElement('div')
+  probe.style.backgroundColor = colour
+  return probe.style.backgroundColor
+}
+const fill = (element) => getComputedStyle(element).backgroundColor
+/** Every request the page has started, held open or not (holdOpen wraps fetch in a vi.fn). */
+const started = () => globalThis.fetch.mock.calls.map(([url]) => url)
 
 const projectBar = (name) => screen.findByRole('img', { name: new RegExp(`^${name} project,`) })
 const weekLabels = () => [...document.querySelectorAll('[data-testid="week-label"]')].map((el) => el.textContent)
@@ -60,13 +74,28 @@ describe('ProjectTimelines', () => {
     expect(within(screen.getByRole('link', { name: 'Zeus' }).closest('li')).queryByText('At risk')).not.toBeInTheDocument()
   })
 
-  it("draws the project's span as a bar in its project colour, cut at the window's end", async () => {
+  it("draws the project's span as a bar, cut at the window's end", async () => {
     renderTimelines()
     const bar = await projectBar('Apollo')
     expect(bar).toHaveAccessibleName('Apollo project, Active, at risk, Oct 1, 2026 to Dec 31, 2026')
     expect(parseFloat(bar.style.left)).toBeCloseTo(300 / 84) // Oct 1 is day 3 of 84
     expect(parseFloat(bar.style.width)).toBeCloseTo(8100 / 84) // Oct 1 to Dec 20, the last day shown
-    expect(bar.style.backgroundColor).toBe('rgb(28, 92, 171)') // PROJECT_COLOURS[0], as on the Schedule
+  })
+
+  it("draws every project's bar in the theme's one green, never a project colour another chart uses", async () => {
+    // Seven projects: the 6th and 7th used to fall to the pale Other colour, and a project colour
+    // here could name a different project in the workload chart on the same page.
+    const seven = Array.from({ length: 7 }, (_, i) => ({ ...APOLLO, projectId: i + 1, name: `P${i + 1}`, atRisk: false }))
+    renderTimelines({ answer: [200, page(seven)] })
+    await projectBar('P7')
+    const fills = seven.map((p) => fill(screen.getByRole('img', { name: new RegExp(`^${p.name} project,`) })))
+    expect(new Set(fills)).toEqual(new Set([rgb(theme.palette.primary.main)]))
+    expect([...PROJECT_COLOURS, OTHER_COLOUR].map(rgb)).not.toContain(fills[0])
+  })
+
+  it("draws the bars in dark mode's own accent, which reads on the dark card", async () => {
+    renderTimelines({ mode: 'dark' })
+    expect(fill(await projectBar('Apollo'))).toBe(rgb(makeTheme('dark').palette.primary.main))
   })
 
   it('says when a project starts if it is wholly after the weeks shown', async () => {
@@ -110,9 +139,31 @@ describe('ProjectTimelines', () => {
       return selector === ':focus-visible' ? this === document.activeElement : matches.call(this, selector)
     })
     renderTimelines()
-    await projectBar('Apollo')
-    await tabTo(screen.getByRole('img', { name: /deliverable Launch/ }))
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Launch · due Nov 20, 2026 · Not started')
+    await tabTo(await projectBar('Apollo'))
+    await userEvent.keyboard('{End}')
+    expect(screen.getByRole('img', { name: /deliverable Launch/ })).toHaveFocus()
+    const tip = await screen.findByText('Launch · due Nov 20, 2026 · Not started')
+    expect(tip.closest('[role="tooltip"]')).not.toBeNull()
+  })
+
+  it("is one Tab stop per row: the arrow keys, Home and End move along that row's marks", async () => {
+    renderTimelines()
+    const bar = await projectBar('Apollo')
+    const design = screen.getByRole('img', { name: /deliverable Design/ })
+    const build = screen.getByRole('img', { name: /deliverable Build/ })
+    const launch = screen.getByRole('img', { name: /deliverable Launch/ })
+    const stops = () => screen.getAllByRole('img').filter((mark) => mark.tabIndex === 0)
+    expect(stops()).toEqual([bar]) // Zeus is off screen, so it has no marks
+    await tabTo(bar)
+    await userEvent.keyboard('{ArrowRight}')
+    expect(design).toHaveFocus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(build).toHaveFocus()
+    await userEvent.keyboard('{End}{ArrowRight}')
+    expect(launch).toHaveFocus() // stops at the end
+    expect(stops()).toEqual([launch]) // Tab comes back to where you were
+    await userEvent.keyboard('{Home}{ArrowLeft}')
+    expect(bar).toHaveFocus()
   })
 
   it('draws the today line and tints this week', async () => {
@@ -151,14 +202,49 @@ describe('ProjectTimelines', () => {
     expect(calls).toHaveLength(1)
   })
 
+  it('gives Earlier, Later and This week the outlined look of every secondary button', async () => {
+    renderTimelines()
+    await projectBar('Apollo')
+    const names = ['Earlier', 'Later', 'This week']
+    names.forEach((name) => expect(screen.getByRole('button', { name })).toHaveClass('MuiButton-outlined'))
+  })
+
+  it('never disables This week, so focus stays on it; at this week it does nothing', async () => {
+    renderTimelines()
+    await projectBar('Apollo')
+    const thisWeek = screen.getByRole('button', { name: 'This week' })
+    expect(thisWeek).toBeEnabled()
+    await userEvent.click(thisWeek)
+    expect(weekLabels()[0]).toBe('Sep 28')
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+    await userEvent.click(thisWeek)
+    expect(weekLabels()[0]).toBe('Sep 28')
+    expect(thisWeek).toHaveFocus()
+  })
+
+  it('announces the new weeks politely when they move', async () => {
+    renderTimelines()
+    await projectBar('Apollo')
+    expect(screen.getByText('Sep 28 – Dec 20, 2026')).toHaveAttribute('aria-live', 'polite')
+  })
+
   it("draws my own booking as a thin band labelled with its hours a week, and nobody else's", async () => {
     renderTimelines({ user: USERS.employee }) // userId 3, Ben
     const band = await screen.findByRole('img', { name: 'Your booking on Apollo, 20 hours a week, Oct 5, 2026 to Nov 29, 2026' })
     expect(band).toHaveTextContent('20 h/wk')
-    expect(within(band).getByTestId('band').style.backgroundColor).toBe('rgb(28, 92, 171)')
     await userEvent.click(screen.getByRole('button', { name: 'Later' }))
     await userEvent.click(screen.getByRole('button', { name: 'Later' }))
     expect(screen.queryByRole('img', { name: /Your booking on Zeus/ })).not.toBeInTheDocument() // Chloe's, not mine
+  })
+
+  it('explains my booking band in the legend, in the same colour as the band', async () => {
+    renderTimelines({ user: USERS.employee })
+    const band = await screen.findByRole('img', { name: /^Your booking on Apollo/ })
+    const legend = screen.getByRole('list', { name: 'Legend' })
+    const item = within(legend).getByText('Your booking, hours a week')
+    const swatch = item.querySelector('[data-mark]')
+    expect(fill(within(band).getByTestId('band'))).toBe(rgb(theme.palette.text.secondary))
+    expect(fill(swatch)).toBe(fill(within(band).getByTestId('band')))
   })
 
   it("draws no booking band for a manager looking at other people's bookings", async () => {
@@ -196,6 +282,30 @@ describe('ProjectTimelines', () => {
     await projectBar('Apollo')
     await userEvent.click(screen.getByRole('button', { name: /go to page 2/i }))
     await waitFor(() => expect(calls.at(-1).query.page).toBe('2'))
+  })
+
+  it('keeps the rows and the page buttons, and your focus, while the next page loads', async () => {
+    renderTimelines({ answer: [200, page([APOLLO], { total: 14, totalPages: 2, pageSize: 10 })] })
+    const bar = await projectBar('Apollo')
+    const release = holdOpen('/dashboard/timeline')
+    const next = screen.getByRole('button', { name: /go to page 2/i })
+    next.focus()
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(started().some((url) => url.includes('page=2'))).toBe(true))
+    expect(screen.queryByText(/^Loading/)).not.toBeInTheDocument()
+    expect(bar).toBeInTheDocument()
+    expect(next).toHaveFocus()
+    release()
+  })
+
+  it('titles the section as an h2 in the h3 size by default (the Dashboard cards are h3-sized)', async () => {
+    renderTimelines()
+    expect(await screen.findByRole('heading', { level: 2, name: 'My projects this week' })).toHaveClass('MuiTypography-h3')
+  })
+
+  it('takes the h2 size when the page passes headingVariant', async () => {
+    renderTimelines({ headingVariant: 'h2' })
+    expect(await screen.findByRole('heading', { level: 2, name: 'My projects this week' })).toHaveClass('MuiTypography-h2')
   })
 
   it('says so when there are no projects', async () => {
